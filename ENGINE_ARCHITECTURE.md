@@ -9,7 +9,7 @@
 ### 1. Engine (engine.h/cpp)
 
 - **Назначение**: Главный координатор всех подсистем
-- **Ответственность**: 
+- **Ответственность**:
   - Инициализация всех подсистем
   - Главный игровой цикл
   - Управление временем и обновлениями
@@ -95,7 +95,7 @@
 
 ### Поток данных
 
-```
+```text
 Voxel Model → Mesh Generator → Vertices + Indices → GPU Buffers → Vulkan Pipeline → Framebuffer
 ```
 
@@ -104,7 +104,7 @@ Voxel Model → Mesh Generator → Vertices + Indices → GPU Buffers → Vulkan
 1. **Begin Frame**: Получение изображения из swapchain
 2. **Update Uniforms**: Обновление матриц и параметров освещения
 3. **Bind Pipeline**: Привязка graphics pipeline
-4. **Render World**: 
+4. **Render World**:
    - Для каждой модели в мире:
      - Генерация или получение меша
      - Обновление model матрицы
@@ -113,7 +113,7 @@ Voxel Model → Mesh Generator → Vertices + Indices → GPU Buffers → Vulkan
 
 ### Графический конвейер Vulkan
 
-```
+```text
 Vertex Input → Vertex Shader → Primitive Assembly → Rasterization → Fragment Shader → Color Blending → Framebuffer
 ```
 
@@ -140,7 +140,7 @@ Vertex Input → Vertex Shader → Primitive Assembly → Rasterization → Frag
 ```cpp
 struct vertex {
     vec3f position;  // 12 bytes
-    vec3f normal;    // 12 bytes  
+    vec3f normal;    // 12 bytes
     uint32 color;    // 4 bytes (RGBA packed)
 }; // Total: 28 bytes
 ```
@@ -170,7 +170,7 @@ graph LR
     D --> E[Create World]
     E --> F[Setup Event Handlers]
     F --> G[Engine Ready]
-    
+
     style A fill:#e1f5fe,stroke:#000,color:#000
     style G fill:#c8e6c9,stroke:#000,color:#000
     style B fill:#fff3e0,stroke:#000,color:#000
@@ -191,7 +191,7 @@ graph LR
     H --> I{Window Close?}
     I -->|No| A
     I -->|Yes| J[Exit]
-    
+
     style A fill:#e3f2fd,stroke:#000,color:#000
     style F fill:#fff8e1,stroke:#000,color:#000
     style I fill:#ffebee,stroke:#000,color:#000
@@ -205,7 +205,7 @@ graph LR
     A[Begin Frame<br/>Acquire Image] --> B[Update Uniform Buffers]
     B --> C[Bind Pipeline]
     C --> D[For Each Model]
-    
+
     D --> E[Get/Generate Mesh]
     E --> F[Calculate Transform]
     F --> G[Update Uniform Buffer]
@@ -213,7 +213,7 @@ graph LR
     H --> I{More Models?}
     I -->|Yes| D
     I -->|No| J[End Frame<br/>Present Image]
-    
+
     style A fill:#e8f5e8,stroke:#000,color:#000
     style J fill:#e8f5e8,stroke:#000,color:#000
     style D fill:#fff3e0,stroke:#000,color:#000
@@ -228,7 +228,7 @@ graph LR
     B --> C[Destroy Vulkan Context<br/>Device, Instance]
     C --> D[Destroy Window<br/>GLFW]
     D --> E[Cleanup All Resources]
-    
+
     style A fill:#fff3e0,stroke:#000,color:#000
     style E fill:#ffebee,stroke:#000,color:#000
     style B fill:#e1f5fe,stroke:#000,color:#000
@@ -258,17 +258,17 @@ graph LR
 
 int main() {
     voxel::engine engine(1280, 720, "Voxel World");
-    
+
     // Создать простую модель
     voxel::model model(4, 4, 4);
     model.set_voxel(1, 1, 1, 0xFF0000FF); // Красный воксель
-    
+
     // Добавить в мир
     engine.get_world().add_model(model, {0, 0, 0});
-    
+
     // Запустить движок
     engine.run();
-    
+
     return 0;
 }
 ```
@@ -295,7 +295,7 @@ make
 
 1. **Face Culling**: Не генерируем грани, которые скрыты соседними вокселями
 2. **Frustum Culling**: Отсекаем объекты вне видимой области
-3. **Memory Management**: 
+3. **Memory Management**:
    - Использование staging buffers для эффективного копирования данных
    - Переиспользование command buffers
    - Упакованные цвета (32-bit) для экономии памяти
