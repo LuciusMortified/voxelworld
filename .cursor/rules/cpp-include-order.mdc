@@ -1,0 +1,28 @@
+---
+description: 
+globs: *.h,*.cpp
+alwaysApply: false
+---
+# C++: Порядок сортировки #include
+
+Во всех C++ файлах порядок директив #include должен быть следующим:
+
+1. Системные заголовки (например, <vector>, <string>, <cstdint>)
+2. Заголовки внешних библиотек (например, <vulkan/vulkan.h>, <GLFW/glfw3.h>, <glm/glm.hpp>)
+3. Заголовки текущего проекта (например, "engine.h", "voxel_model.h")
+
+Между каждым блоком должен быть пустой разделяющий комментарий или пустая строка.
+
+Пример:
+```cpp
+#include <vector>
+#include <string>
+
+#include <vulkan/vulkan.h>
+#include <GLFW/glfw3.h>
+
+#include "engine.h"
+#include "voxel_model.h"
+```
+
+Это правило распространяется на все новые и существующие C++ файлы в проекте.

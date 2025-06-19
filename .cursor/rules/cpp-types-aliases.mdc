@@ -1,0 +1,21 @@
+---
+description: 
+globs: *.h,*.cpp
+alwaysApply: false
+---
+# C++: Использование собственных алиасов для целых типов
+
+Вместо стандартных типов из <cstdint> (например, uint32_t, int64_t) или длинных объявлений (unsigned int, signed long long и т.д.) во всех исходных и заголовочных файлах проекта должны использоваться короткие алиасы из [types.h](mdc:engine/include/types.h):
+
+- uint8, uint16, uint32, uint64
+- int8, int16, int32, int64
+
+Пример:
+```cpp
+#include "types.h"
+
+uint32 value = 42;
+int16  delta = -1;
+```
+
+Это правило распространяется на все новые и существующие файлы проекта.

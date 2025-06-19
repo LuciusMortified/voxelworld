@@ -1,0 +1,36 @@
+# CMake build
+build/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+
+# macOS
+.DS_Store
+
+# VSCode/CLion
+.vscode/
+.idea/
+
+# Компилятор/отладчик
+*.o
+*.obj
+*.so
+*.dll
+*.exe
+*.out
+*.a
+*.lib
+*.pdb
+
+# Логи и временные файлы
+*.log
+*.tmp
+*.swp
+*~
+
+# Генерируемые файлы
+*.generated.*
+
+# Пользовательские настройки
+*.user 
