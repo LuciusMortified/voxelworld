@@ -10,7 +10,7 @@ namespace voxel {
     void engine::run() {
         // TODO: главный цикл
     }
-    voxel_world& engine::world() {
+    world& engine::world() {
         return world_;
     }
 } 

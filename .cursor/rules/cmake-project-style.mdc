@@ -1,0 +1,27 @@
+---
+description: 
+globs: CMakeLists.txt
+alwaysApply: false
+---
+# CMake: Стиль использования project() и ${PROJECT_NAME}
+
+Во всех CMakeLists.txt файлах должен использоваться следующий стиль:
+
+1. В начале файла: `project(имя_проекта)`
+2. Для target использовать `${PROJECT_NAME}` вместо хардкода имени
+3. Для target_include_directories и target_link_libraries также использовать `${PROJECT_NAME}`
+
+Пример:
+```cmake
+project(my_library)
+
+add_library(${PROJECT_NAME} STATIC
+    src/file1.cpp
+    src/file2.cpp
+)
+
+target_include_directories(${PROJECT_NAME} PUBLIC include)
+target_link_libraries(${PROJECT_NAME} PUBLIC dependency)
+```
+
+Это правило распространяется на все CMakeLists.txt файлы в проекте.

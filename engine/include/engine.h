@@ -1,7 +1,7 @@
 #pragma once
 #include <string_view>
 
-#include "voxel_world.h"
+#include "world.h"
 
 namespace voxel {
     class engine {
@@ -10,8 +10,8 @@ namespace voxel {
         ~engine();
 
         void run();
-        voxel_world& world();
+        world& world();
     private:
-        voxel_world world_;
+        world world_;
     };
 } 
