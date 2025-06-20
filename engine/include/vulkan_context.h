@@ -2,6 +2,8 @@
 #include <vector>
 #include <optional>
 
+#include "types.h"
+
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
@@ -9,8 +11,8 @@ namespace voxel {
     class window;
     
     struct queue_family_indices {
-        std::optional<uint32_t> graphics_family;
-        std::optional<uint32_t> present_family;
+        std::optional<uint32> graphics_family;
+        std::optional<uint32> present_family;
         
         bool is_complete() const {
             return graphics_family.has_value() && present_family.has_value();
