@@ -1,4 +1,6 @@
 #include "engine.h"
+#include "window.h"
+#include "world.h"
 
 namespace voxel {
     engine::engine(int width, int height, std::string_view title) {
@@ -9,8 +11,5 @@ namespace voxel {
     }
     void engine::run() {
         // TODO: главный цикл
-    }
-    world& engine::world() {
-        return world_;
     }
 } 

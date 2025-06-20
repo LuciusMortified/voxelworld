@@ -13,7 +13,10 @@ alwaysApply: false
 
 Между каждым блоком должен быть пустой разделяющий комментарий или пустая строка.
 
-Пример:
+## Пути к заголовкам проекта
+
+**ВСЕГДА используйте абсолютные пути для заголовков проекта.** Относительные пути запрещены.
+
 ```cpp
 #include <vector>
 #include <string>
@@ -22,7 +25,40 @@ alwaysApply: false
 #include <GLFW/glfw3.h>
 
 #include "engine.h"
-#include "voxel_model.h"
+#include "window.h"
+#include "input.h"
 ```
+
+## Настройка CMake для приложений
+
+**ВСЕГДА добавляйте в CMake файл приложения:**
+```cmake
+target_link_libraries(${PROJECT_NAME} voxelengine)
+```
+
+Это автоматически добавит include директории библиотеки voxelengine к приложению и позволит использовать короткие пути к заголовкам.
+
+## Пример правильного форматирования:
+
+```cpp
+#include <iostream>
+#include <vector>
+#include <string>
+
+#include <vulkan/vulkan.h>
+#include <GLFW/glfw3.h>
+
+#include "engine.h"
+#include "window.h"
+#include "input.h"
+#include "camera.h"
+#include "renderer.h"
+```
+
+## Обязательные действия при создании/редактировании приложений:
+
+1. **В CMake файле приложения** - убедиться что есть `target_link_libraries(${PROJECT_NAME} voxelengine)`
+2. **В C++ файлах** - использовать только абсолютные пути для заголовков проекта
+3. **Никогда не использовать** относительные пути типа `../../engine/include/`
 
 Это правило распространяется на все новые и существующие C++ файлы в проекте.

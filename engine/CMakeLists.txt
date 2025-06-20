@@ -8,6 +8,7 @@ set(ENGINE_HEADERS
     "include/world.h"
     "include/model.h"
     "include/window.h"
+    "include/input.h"
     "include/vulkan_context.h"
     "include/camera.h"
     "include/buffer.h"
@@ -20,6 +21,7 @@ set(ENGINE_SOURCES
     "src/engine.cpp"
     "src/world.cpp"
     "src/model.cpp"
+    "src/window.cpp"
 )
 
 # Find required packages
@@ -35,10 +37,10 @@ target_include_directories(${PROJECT_NAME} PUBLIC include)
 target_include_directories(${PROJECT_NAME} PUBLIC ${Vulkan_INCLUDE_DIRS})
 
 # Link libraries
-target_link_libraries(${PROJECT_NAME} PUBLIC ${Vulkan_LIBRARIES} glfw glm)
+target_link_libraries(${PROJECT_NAME} PUBLIC ${Vulkan_LIBRARIES} glfw glm::glm)
 
-# Compile features
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_17)
+# Compile features - C++20
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
 
 # Compile definitions
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -51,4 +53,4 @@ add_custom_target(copy_shaders ALL
         ${CMAKE_CURRENT_SOURCE_DIR}/shaders
         ${CMAKE_BINARY_DIR}/shaders
     COMMENT "Copying shaders to build directory"
-) 
+)

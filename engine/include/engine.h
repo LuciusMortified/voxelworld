@@ -6,9 +6,6 @@
 
 namespace voxel {
     class window;
-    class vulkan_context;
-    class renderer;
-    class camera;
 
     class engine {
     public:
@@ -22,8 +19,6 @@ namespace voxel {
         void run();
         
         world& get_world() { return world_; }
-        camera& get_camera() { return *camera_; }
-        renderer& get_renderer() { return *renderer_; }
 
     private:
         void initialize();
@@ -33,8 +28,5 @@ namespace voxel {
 
         world world_;
         std::unique_ptr<window> window_;
-        std::unique_ptr<vulkan_context> vulkan_context_;
-        std::unique_ptr<renderer> renderer_;
-        std::unique_ptr<camera> camera_;
     };
 } 

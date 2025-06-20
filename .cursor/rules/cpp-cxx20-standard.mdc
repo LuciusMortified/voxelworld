@@ -1,0 +1,100 @@
+---
+description: 
+globs: *.h,*.cpp,CMakeLists.txt
+alwaysApply: false
+---
+# C++: Использование стандарта C++20
+
+Во всех C++ файлах и CMake таргетах проекта ОБЯЗАТЕЛЬНО использовать стандарт C++20.
+
+## Требования к C++ файлам
+
+Все исходные файлы (.cpp, .h, .hpp) должны быть совместимы с C++20 и использовать его возможности:
+
+### Рекомендуемые возможности C++20:
+- **Concepts** - для улучшения шаблонов
+- **Ranges** - для работы с последовательностями
+- **Coroutines** - для асинхронного программирования
+- **Three-way comparison** - `<=>` оператор
+- **Designated initializers** - именованная инициализация
+- **Constexpr improvements** - улучшенные constexpr функции
+- **Modules** - модульная система (если поддерживается компилятором)
+
+### Примеры использования C++20:
+```cpp
+// Concepts
+template<typename T>
+concept Numeric = std::integral<T> || std::floating_point<T>;
+
+template<Numeric T>
+T add(T a, T b) { return a + b; }
+
+// Three-way comparison
+struct Point {
+    int x, y;
+    auto operator<=>(const Point&) const = default;
+};
+
+// Designated initializers
+struct Config {
+    int width = 800;
+    int height = 600;
+    std::string title = "Default";
+};
+
+Config config{.width = 1280, .height = 720, .title = "Voxel Engine"};
+```
+
+## Требования к CMake файлам
+
+Все CMake таргеты должны явно указывать C++20 стандарт:
+
+### Для библиотек:
+```cmake
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+```
+
+### Для исполняемых файлов:
+```cmake
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
+```
+
+### Пример полного CMakeLists.txt:
+```cmake
+project(my_project)
+
+add_library(${PROJECT_NAME} STATIC
+    src/file1.cpp
+    src/file2.cpp
+)
+
+target_include_directories(${PROJECT_NAME} PUBLIC include)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
+target_link_libraries(${PROJECT_NAME} PUBLIC dependency)
+```
+
+## Проверка совместимости
+
+### Компиляторы должны поддерживать:
+- **GCC** 10+ или **Clang** 10+ для Linux/macOS
+- **MSVC** 2019 16.10+ для Windows
+
+### Проверка в CMake:
+```cmake
+# Проверка минимальной версии компилятора
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 10.0)
+        message(FATAL_ERROR "GCC 10.0 or later required for C++20")
+    endif()
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 10.0)
+        message(FATAL_ERROR "Clang 10.0 or later required for C++20")
+    endif()
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.28)
+        message(FATAL_ERROR "MSVC 2019 16.10 or later required for C++20")
+    endif()
+endif()
+```
+
+Это правило распространяется на все новые и существующие C++ файлы и CMake конфигурации в проекте.
