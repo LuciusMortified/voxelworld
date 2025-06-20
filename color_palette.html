@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voxel Engine - 255 Color Palette</title>
+    <style>
+        body {
+            font-family: 'Courier New', monospace;
+            background: #1a1a1a;
+            color: #ffffff;
+            margin: 20px;
+            line-height: 1.6;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #2a2a2a;
+            border-radius: 10px;
+        }
+        
+        .palette-section {
+            margin-bottom: 40px;
+            background: #2a2a2a;
+            padding: 20px;
+            border-radius: 10px;
+        }
+        
+        .section-title {
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #00ff00;
+            border-bottom: 2px solid #00ff00;
+            padding-bottom: 5px;
+        }
+        
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        .color-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-radius: 5px;
+            background: #333;
+            border: 1px solid #555;
+        }
+        
+        .color-swatch {
+            width: 40px;
+            height: 40px;
+            border-radius: 5px;
+            margin-right: 15px;
+            border: 2px solid #fff;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .color-info {
+            flex: 1;
+        }
+        
+        .color-name {
+            font-weight: bold;
+            margin-bottom: 2px;
+        }
+        
+        .color-hex {
+            font-size: 12px;
+            color: #aaa;
+            font-family: monospace;
+        }
+        
+        .rgb-info {
+            font-size: 11px;
+            color: #888;
+        }
+        
+        .usage-example {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 10px;
+            border-left: 4px solid #00ff00;
+        }
+        
+        .code {
+            background: #000;
+            color: #00ff00;
+            padding: 10px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            background: #2a2a2a;
+            border-radius: 10px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎨 Voxel Engine - 255 Color Palette</h1>
+        <p>Полная палитра цветов для воксельного движка на Vulkan</p>
+    </div>
+
+    <div class="palette-section">
+        <div class="section-title">🌈 Основные цвета (RGB)</div>
+        <div class="color-grid">
+            <div class="color-item">
+                <div class="color-swatch" style="background: #000000;"></div>
+                <div class="color-info">
+                    <div class="color-name">BLACK</div>
+                    <div class="color-hex">0x000000FF</div>
+                    <div class="rgb-info">RGB(0, 0, 0)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #FFFFFF;"></div>
+                <div class="color-info">
+                    <div class="color-name">WHITE</div>
+                    <div class="color-hex">0xFFFFFFFF</div>
+                    <div class="rgb-info">RGB(255, 255, 255)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #FF0000;"></div>
+                <div class="color-info">
+                    <div class="color-name">RED</div>
+                    <div class="color-hex">0xFF0000FF</div>
+                    <div class="rgb-info">RGB(255, 0, 0)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #00FF00;"></div>
+                <div class="color-info">
+                    <div class="color-name">GREEN</div>
+                    <div class="color-hex">0x00FF00FF</div>
+                    <div class="rgb-info">RGB(0, 255, 0)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #0000FF;"></div>
+                <div class="color-info">
+                    <div class="color-name">BLUE</div>
+                    <div class="color-hex">0x0000FFFF</div>
+                    <div class="rgb-info">RGB(0, 0, 255)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #FFFF00;"></div>
+                <div class="color-info">
+                    <div class="color-name">YELLOW</div>
+                    <div class="color-hex">0xFFFF00FF</div>
+                    <div class="rgb-info">RGB(255, 255, 0)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #00FFFF;"></div>
+                <div class="color-info">
+                    <div class="color-name">CYAN</div>
+                    <div class="color-hex">0x00FFFFFF</div>
+                    <div class="rgb-info">RGB(0, 255, 255)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #FF00FF;"></div>
+                <div class="color-info">
+                    <div class="color-name">MAGENTA</div>
+                    <div class="color-hex">0xFF00FFFF</div>
+                    <div class="rgb-info">RGB(255, 0, 255)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="palette-section">
+        <div class="section-title">🌿 Природные цвета</div>
+        <div class="color-grid">
+            <div class="color-item">
+                <div class="color-swatch" style="background: #7CFC00;"></div>
+                <div class="color-info">
+                    <div class="color-name">GRASS</div>
+                    <div class="color-hex">0x7CFC00FF</div>
+                    <div class="rgb-info">RGB(124, 252, 0)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #8B4513;"></div>
+                <div class="color-info">
+                    <div class="color-name">DIRT</div>
+                    <div class="color-hex">0x8B4513FF</div>
+                    <div class="rgb-info">RGB(139, 69, 19)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #F4A460;"></div>
+                <div class="color-info">
+                    <div class="color-name">SAND</div>
+                    <div class="color-hex">0xF4A460FF</div>
+                    <div class="rgb-info">RGB(244, 164, 96)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #808080;"></div>
+                <div class="color-info">
+                    <div class="color-name">STONE</div>
+                    <div class="color-hex">0x808080FF</div>
+                    <div class="rgb-info">RGB(128, 128, 128)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #4682B4;"></div>
+                <div class="color-info">
+                    <div class="color-name">WATER</div>
+                    <div class="color-hex">0x4682B4FF</div>
+                    <div class="rgb-info">RGB(70, 130, 180)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #F0F8FF;"></div>
+                <div class="color-info">
+                    <div class="color-name">ICE</div>
+                    <div class="color-hex">0xF0F8FFFF</div>
+                    <div class="rgb-info">RGB(240, 248, 255)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #FF4500;"></div>
+                <div class="color-info">
+                    <div class="color-name">FIRE/LAVA</div>
+                    <div class="color-hex">0xFF4500FF</div>
+                    <div class="rgb-info">RGB(255, 69, 0)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #228B22;"></div>
+                <div class="color-info">
+                    <div class="color-name">LEAVES</div>
+                    <div class="color-hex">0x228B22FF</div>
+                    <div class="rgb-info">RGB(34, 139, 34)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="palette-section">
+        <div class="section-title">⚡ Металлические цвета</div>
+        <div class="color-grid">
+            <div class="color-item">
+                <div class="color-swatch" style="background: #C0C0C0;"></div>
+                <div class="color-info">
+                    <div class="color-name">SILVER</div>
+                    <div class="color-hex">0xC0C0C0FF</div>
+                    <div class="rgb-info">RGB(192, 192, 192)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #FFD700;"></div>
+                <div class="color-info">
+                    <div class="color-name">GOLD_METAL</div>
+                    <div class="color-hex">0xFFD700FF</div>
+                    <div class="rgb-info">RGB(255, 215, 0)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #CD7F32;"></div>
+                <div class="color-info">
+                    <div class="color-name">BRONZE</div>
+                    <div class="color-hex">0xCD7F32FF</div>
+                    <div class="rgb-info">RGB(205, 127, 50)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #B87333;"></div>
+                <div class="color-info">
+                    <div class="color-name">COPPER</div>
+                    <div class="color-hex">0xB87333FF</div>
+                    <div class="rgb-info">RGB(184, 115, 51)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #696969;"></div>
+                <div class="color-info">
+                    <div class="color-name">IRON</div>
+                    <div class="color-hex">0x696969FF</div>
+                    <div class="rgb-info">RGB(105, 105, 105)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="palette-section">
+        <div class="section-title">🎨 Пастельные цвета</div>
+        <div class="color-grid">
+            <div class="color-item">
+                <div class="color-swatch" style="background: #FFB6C1;"></div>
+                <div class="color-info">
+                    <div class="color-name">PASTEL_PINK</div>
+                    <div class="color-hex">0xFFB6C1FF</div>
+                    <div class="rgb-info">RGB(255, 182, 193)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #B0E0E6;"></div>
+                <div class="color-info">
+                    <div class="color-name">PASTEL_BLUE</div>
+                    <div class="color-hex">0xB0E0E6FF</div>
+                    <div class="rgb-info">RGB(176, 224, 230)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #98FB98;"></div>
+                <div class="color-info">
+                    <div class="color-name">PASTEL_GREEN</div>
+                    <div class="color-hex">0x98FB98FF</div>
+                    <div class="rgb-info">RGB(152, 251, 152)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #F0E68C;"></div>
+                <div class="color-info">
+                    <div class="color-name">PASTEL_YELLOW</div>
+                    <div class="color-hex">0xF0E68CFF</div>
+                    <div class="rgb-info">RGB(240, 230, 140)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #DDA0DD;"></div>
+                <div class="color-info">
+                    <div class="color-name">PASTEL_PURPLE</div>
+                    <div class="color-hex">0xDDA0DDFF</div>
+                    <div class="rgb-info">RGB(221, 160, 221)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #FFB347;"></div>
+                <div class="color-info">
+                    <div class="color-name">PASTEL_ORANGE</div>
+                    <div class="color-hex">0xFFB347FF</div>
+                    <div class="rgb-info">RGB(255, 179, 71)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="palette-section">
+        <div class="section-title">💫 Неоновые цвета</div>
+        <div class="color-grid">
+            <div class="color-item">
+                <div class="color-swatch" style="background: #FF1493;"></div>
+                <div class="color-info">
+                    <div class="color-name">NEON_PINK</div>
+                    <div class="color-hex">0xFF1493FF</div>
+                    <div class="rgb-info">RGB(255, 20, 147)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #00BFFF;"></div>
+                <div class="color-info">
+                    <div class="color-name">NEON_BLUE</div>
+                    <div class="color-hex">0x00BFFFFF</div>
+                    <div class="rgb-info">RGB(0, 191, 255)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #39FF14;"></div>
+                <div class="color-info">
+                    <div class="color-name">NEON_GREEN</div>
+                    <div class="color-hex">0x39FF14FF</div>
+                    <div class="rgb-info">RGB(57, 255, 20)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #FFFF00;"></div>
+                <div class="color-info">
+                    <div class="color-name">NEON_YELLOW</div>
+                    <div class="color-hex">0xFFFF00FF</div>
+                    <div class="rgb-info">RGB(255, 255, 0)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #FF8C00;"></div>
+                <div class="color-info">
+                    <div class="color-name">NEON_ORANGE</div>
+                    <div class="color-hex">0xFF8C00FF</div>
+                    <div class="rgb-info">RGB(255, 140, 0)</div>
+                </div>
+            </div>
+            <div class="color-item">
+                <div class="color-swatch" style="background: #9400D3;"></div>
+                <div class="color-info">
+                    <div class="color-name">NEON_PURPLE</div>
+                    <div class="color-hex">0x9400D3FF</div>
+                    <div class="rgb-info">RGB(148, 0, 211)</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="palette-section">
+        <div class="section-title">📝 Пример использования</div>
+        <div class="usage-example">
+            <p><strong>Создание вокселей с цветами из палитры:</strong></p>
+            <div class="code">
+<pre>
+#include "voxel.h"
+
+// Создание вокселей с разными цветами
+voxel::voxel grass_block(voxel::colors::GRASS);
+voxel::voxel stone_block(voxel::colors::STONE);
+voxel::voxel water_block(voxel::colors::WATER);
+voxel::voxel gold_block(voxel::colors::GOLD_METAL);
+
+// Использование в модели
+voxel::model world_model(16, 16, 16);
+world_model.set_voxel(0, 0, 0, voxel::colors::DIRT);
+world_model.set_voxel(1, 1, 1, voxel::colors::GRASS);
+world_model.set_voxel(2, 2, 2, voxel::colors::STONE);
+world_model.set_voxel(3, 3, 3, voxel::colors::WATER);
+world_model.set_voxel(4, 4, 4, voxel::colors::GOLD_METAL);
+</pre>
+            </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>🎮 Voxel Engine на Vulkan | 255-цветная палитра</p>
+        <p>Все цвета используют формат RGBA (32-bit) с альфа-каналом FF (непрозрачный)</p>
+    </div>
+</body>
+</html> 
