@@ -1,27 +1,45 @@
+cmake_minimum_required(VERSION 3.16)
+
 project(voxelengine)
 
 # Engine library
 set(ENGINE_HEADERS
-    "include/engine.h"
-    "include/types.h"
-    "include/voxel.h"
-    "include/world.h"
-    "include/model.h"
-    "include/window.h"
-    "include/input.h"
-    "include/vulkan_context.h"
-    "include/camera.h"
-    "include/buffer.h"
-    "include/mesh.h"
-    "include/shader.h"
-    "include/renderer.h"
+    "include/voxel/engine.h"
+    "include/voxel/types.h"
+    "include/voxel/voxel.h"
+    "include/voxel/world.h"
+    "include/voxel/transform.h"
+    "include/voxel/model.h"
+    "include/voxel/window.h"
+    "include/voxel/input.h"
+    "include/voxel/vulkan_context.h"
+    "include/voxel/camera.h"
+    "include/voxel/camera_controller.h"
+    "include/voxel/game_logic.h"
+    "include/voxel/buffer.h"
+    "include/voxel/mesh.h"
+    "include/voxel/shader.h"
+    "include/voxel/renderer.h"
+    "include/voxel/math_utils.h"
+    "include/voxel/events.h"
 )
 
 set(ENGINE_SOURCES
     "src/engine.cpp"
     "src/world.cpp"
+    "src/transform.cpp"
     "src/model.cpp"
     "src/window.cpp"
+    "src/buffer.cpp"
+    "src/mesh.cpp"
+    "src/vulkan_context.cpp"
+    "src/camera.cpp"
+    "src/camera_controller.cpp"
+    "src/game_logic.cpp"
+    "src/math_utils.cpp"
+    "src/renderer.cpp"
+    "src/shader.cpp"
+    "src/events.cpp"
 )
 
 # Find required packages

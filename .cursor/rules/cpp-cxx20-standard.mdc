@@ -1,7 +1,7 @@
 ---
 description: 
-globs: *.h,*.cpp,CMakeLists.txt
-alwaysApply: false
+globs: 
+alwaysApply: true
 ---
 # C++: Использование стандарта C++20
 

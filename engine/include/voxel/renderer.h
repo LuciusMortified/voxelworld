@@ -2,7 +2,8 @@
 #include <vulkan/vulkan.h>
 #include <vector>
 #include <memory>
-#include "types.h"
+
+#include <voxel/types.h>
 
 namespace voxel {
     class vulkan_context;
@@ -11,9 +12,9 @@ namespace voxel {
     class mesh;
     class shader;
     class uniform_buffer;
+    class world;
 
     struct uniform_buffer_object {
-        alignas(16) float model[16];
         alignas(16) float view[16];
         alignas(16) float projection[16];
         alignas(16) vec3f view_pos;
@@ -21,9 +22,13 @@ namespace voxel {
         alignas(16) vec3f light_color;
     };
 
+    struct push_constant_data {
+        alignas(16) float model[16];
+    };
+
     class renderer {
     public:
-        renderer(vulkan_context& context, window& window);
+        renderer(std::shared_ptr<vulkan_context> context, std::shared_ptr<window> window);
         ~renderer();
 
         // Запретить копирование
@@ -33,9 +38,10 @@ namespace voxel {
         void begin_frame();
         void end_frame();
 
-        void render_mesh(const mesh& mesh, const vec3f& position, const vec3f& rotation = {}, const vec3f& scale = {1.0f, 1.0f, 1.0f});
-        void render_world(const class world& world, const camera& camera);
+        void render_mesh(std::shared_ptr<mesh> mesh, const vec3f& position, const vec3f& rotation = {}, const vec3f& scale = {1.0f, 1.0f, 1.0f});
+        void render_world(const std::shared_ptr<world>& world, std::shared_ptr<camera> camera);
 
+        void set_clear_color(const colorf& color);
         void set_clear_color(float r, float g, float b, float a = 1.0f);
         void wait_idle();
 
@@ -64,8 +70,8 @@ namespace voxel {
         VkPresentModeKHR choose_swap_present_mode(const std::vector<VkPresentModeKHR>& available_present_modes);
         VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& capabilities);
 
-        vulkan_context& context_;
-        window& window_;
+        std::shared_ptr<vulkan_context> context_;
+        std::shared_ptr<window> window_;
 
         // Swapchain
         VkSwapchainKHR swapchain_;
@@ -95,13 +101,14 @@ namespace voxel {
         std::vector<VkDescriptorSet> descriptor_sets_;
 
         // Шейдеры
-        std::unique_ptr<shader> default_shader_;
+        std::unique_ptr<shader> vertex_shader_;
+        std::unique_ptr<shader> fragment_shader_;
 
         // Состояние рендеринга
         uint32_t current_frame_;
         uint32_t current_image_index_;
         bool framebuffer_resized_;
-        float clear_color_[4];
+        colorf clear_color_;
 
         static const int MAX_FRAMES_IN_FLIGHT = 2;
     };

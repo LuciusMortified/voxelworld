@@ -2,8 +2,8 @@
 #include <chrono>
 #include <thread>
 
-#include "window.h"
-#include "input.h"
+#include <voxel/window.h>
+#include <voxel/input.h>
 
 int main() {
     try {

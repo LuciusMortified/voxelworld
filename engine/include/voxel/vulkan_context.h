@@ -1,11 +1,11 @@
 #pragma once
 #include <vector>
 #include <optional>
+#include <memory>
+
+#include <vulkan/vulkan.h>
 
 #include "types.h"
-
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
 
 namespace voxel {
     class window;
@@ -27,7 +27,7 @@ namespace voxel {
 
     class vulkan_context {
     public:
-        vulkan_context(window& window);
+        vulkan_context(std::shared_ptr<window> window);
         ~vulkan_context();
 
         // Запретить копирование
@@ -55,9 +55,9 @@ namespace voxel {
         bool is_device_suitable(VkPhysicalDevice device);
         queue_family_indices find_queue_families(VkPhysicalDevice device);
         bool check_device_extension_support(VkPhysicalDevice device);
-        swapchain_support_details query_swapchain_support(VkPhysicalDevice device);
+        swapchain_support_details query_swapchain_support(VkPhysicalDevice device) const;
 
-        window& window_;
+        std::shared_ptr<window> window_;
         VkInstance instance_;
         VkSurfaceKHR surface_;
         VkPhysicalDevice physical_device_;
@@ -67,9 +67,7 @@ namespace voxel {
         VkCommandPool command_pool_;
         queue_family_indices queue_families_;
 
-        const std::vector<const char*> device_extensions_ = {
-            VK_KHR_SWAPCHAIN_EXTENSION_NAME
-        };
+        std::vector<const char*> device_extensions_;
 
 #ifdef DEBUG
         VkDebugUtilsMessengerEXT debug_messenger_;

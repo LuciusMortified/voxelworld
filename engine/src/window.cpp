@@ -1,4 +1,4 @@
-#include "window.h"
+#include <voxel/window.h>
 #include <stdexcept>
 #include <vector>
 
@@ -26,34 +26,14 @@ window::window(int width, int height, std::string_view title)
     // Настройка обработчиков событий
     glfwSetWindowUserPointer(window_, this);
     
-    // Обработчик изменения размера окна
-    glfwSetFramebufferSizeCallback(window_, [](GLFWwindow* window, int width, int height) {
-        auto* w = static_cast<voxel::window*>(glfwGetWindowUserPointer(window));
-        w->width_ = width;
-        w->height_ = height;
-    });
-    
-    // Обработчик нажатий клавиш
-    glfwSetKeyCallback(window_, [](GLFWwindow* window, int key, int scancode, int action, int mods) {
-        auto* w = static_cast<voxel::window*>(glfwGetWindowUserPointer(window));
-        // Здесь можно добавить обработку клавиш
-        if (key == static_cast<int>(input::key::ESCAPE) && action == GLFW_PRESS) {
-            glfwSetWindowShouldClose(window, GLFW_TRUE);
-        }
-    });
-    
-    // Обработчик мыши
-    glfwSetCursorPosCallback(window_, [](GLFWwindow* window, double xpos, double ypos) {
-        auto* w = static_cast<voxel::window*>(glfwGetWindowUserPointer(window));
-        w->last_cursor_x_ = xpos;
-        w->last_cursor_y_ = ypos;
-    });
-    
-    // Обработчик прокрутки
-    glfwSetScrollCallback(window_, [](GLFWwindow* window, double xoffset, double yoffset) {
-        auto* w = static_cast<voxel::window*>(glfwGetWindowUserPointer(window));
-        // Здесь можно добавить обработку прокрутки
-    });
+    // Установка GLFW callbacks
+    glfwSetKeyCallback(window_, key_callback);
+    glfwSetMouseButtonCallback(window_, mouse_button_callback);
+    glfwSetCursorPosCallback(window_, mouse_motion_callback);
+    glfwSetScrollCallback(window_, mouse_scroll_callback);
+    glfwSetFramebufferSizeCallback(window_, window_size_callback);
+    glfwSetWindowFocusCallback(window_, window_focus_callback);
+    glfwSetWindowCloseCallback(window_, window_close_callback);
 }
 
 window::~window() {
@@ -61,6 +41,88 @@ window::~window() {
         glfwDestroyWindow(window_);
     }
     glfwTerminate();
+}
+
+// GLFW callback функции
+void window::key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
+    auto* w = static_cast<voxel::window*>(glfwGetWindowUserPointer(window));
+    
+    // Преобразование GLFW mods в input::mod
+    input::mod input_mods = static_cast<input::mod>(mods);
+    
+    // Создание соответствующего события в зависимости от action
+    switch (action) {
+        case GLFW_PRESS: {
+            events::key_press event(static_cast<input::key>(key), scancode, input_mods);
+            w->event_dispatcher_.dispatch(event);
+            break;
+        }
+        case GLFW_RELEASE: {
+            events::key_release event(static_cast<input::key>(key), scancode, input_mods);
+            w->event_dispatcher_.dispatch(event);
+            break;
+        }
+        case GLFW_REPEAT: {
+            events::key_repeat event(static_cast<input::key>(key), scancode, input_mods);
+            w->event_dispatcher_.dispatch(event);
+            break;
+        }
+    }
+}
+
+void window::mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
+    auto* w = static_cast<voxel::window*>(glfwGetWindowUserPointer(window));
+    
+    // Преобразование GLFW mods в input::mod
+    input::mod input_mods = static_cast<input::mod>(mods);
+    
+    // Создание соответствующего события в зависимости от action
+    if (action == GLFW_PRESS) {
+        events::mouse_press event(static_cast<input::mouse_button>(button), input_mods);
+        w->event_dispatcher_.dispatch(event);
+    } else if (action == GLFW_RELEASE) {
+        events::mouse_release event(static_cast<input::mouse_button>(button), input_mods);
+        w->event_dispatcher_.dispatch(event);
+    }
+}
+
+void window::mouse_motion_callback(GLFWwindow* window, double xpos, double ypos) {
+    auto* w = static_cast<voxel::window*>(glfwGetWindowUserPointer(window));
+    w->last_cursor_x_ = xpos;
+    w->last_cursor_y_ = ypos;
+    
+    events::mouse_move event(xpos, ypos);
+    w->event_dispatcher_.dispatch(event);
+}
+
+void window::mouse_scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
+    auto* w = static_cast<voxel::window*>(glfwGetWindowUserPointer(window));
+    
+    events::mouse_scroll event(xoffset, yoffset);
+    w->event_dispatcher_.dispatch(event);
+}
+
+void window::window_size_callback(GLFWwindow* window, int width, int height) {
+    auto* w = static_cast<voxel::window*>(glfwGetWindowUserPointer(window));
+    w->width_ = width;
+    w->height_ = height;
+    
+    events::window_resize event(width, height);
+    w->event_dispatcher_.dispatch(event);
+}
+
+void window::window_focus_callback(GLFWwindow* window, int focused) {
+    auto* w = static_cast<voxel::window*>(glfwGetWindowUserPointer(window));
+    
+    events::window_focus event(focused == GLFW_TRUE);
+    w->event_dispatcher_.dispatch(event);
+}
+
+void window::window_close_callback(GLFWwindow* window) {
+    auto* w = static_cast<voxel::window*>(glfwGetWindowUserPointer(window));
+    
+    events::window_close event;
+    w->event_dispatcher_.dispatch(event);
 }
 
 bool window::should_close() const {
@@ -93,8 +155,9 @@ std::vector<const char*> window::get_required_extensions() const {
     std::vector<const char*> extensions(glfw_extensions, glfw_extensions + glfw_extension_count);
     
     // Добавляем дополнительные расширения, если нужно
-    #ifdef VK_USE_PLATFORM_MACOS_MVK
+    #ifdef __APPLE__
         extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+        extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
     #endif
     
     return extensions;

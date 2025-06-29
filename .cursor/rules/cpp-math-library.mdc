@@ -1,0 +1,117 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# C++: Использование математической библиотеки
+
+Во всех C++ файлах проекта ОБЯЗАТЕЛЬНО использовать математическую библиотеку [math_utils.h](mdc:engine/include/math_utils.h) для всех математических операций.
+
+## Запрещено использовать:
+
+- Прямые вызовы `std::cos`, `std::sin`, `std::tan`, `std::sqrt` и других математических функций
+- Собственные реализации математических функций
+- Другие математические библиотеки (glm, eigen и т.д.) без согласования
+
+## Обязательно использовать:
+
+### Тригонометрические функции:
+```cpp
+#include "math_utils.h"
+
+float angle = math::radians(45.0f);
+float cos_val = std::cos(angle);  // Используем std:: напрямую
+float sin_val = std::sin(angle);  // Используем std:: напрямую
+```
+
+### Функции для векторов:
+```cpp
+#include "math_utils.h"
+
+vec3f v1(1.0f, 2.0f, 3.0f);
+vec3f v2(4.0f, 5.0f, 6.0f);
+
+float len = math::length(v1);
+vec3f normalized = math::normalize(v1);
+vec3f cross_product = math::cross(v1, v2);
+float dot_product = math::dot(v1, v2);
+```
+
+### Функции для матриц:
+```cpp
+#include "math_utils.h"
+
+float view_matrix[16];
+float proj_matrix[16];
+float result_matrix[16];
+
+math::look_at_matrix(view_matrix, eye, center, up);
+math::perspective_matrix(proj_matrix, fov, aspect, near, far);
+math::multiply_matrices(result_matrix, proj_matrix, view_matrix);
+```
+
+### Утилиты для углов:
+```cpp
+#include "math_utils.h"
+
+float degrees = 45.0f;
+float radians = math::radians(degrees);
+float back_to_degrees = math::degrees(radians);
+```
+
+### Дополнительные функции:
+```cpp
+#include "math_utils.h"
+
+float clamped = math::clamp(value, 0.0f, 1.0f);
+float interpolated = math::lerp(a, b, t);
+vec3f interpolated_vec = math::lerp(vec_a, vec_b, t);
+```
+
+## Константы:
+
+```cpp
+#include "math_utils.h"
+
+float pi = math::PI;
+float deg_to_rad = math::DEG_TO_RAD;
+float rad_to_deg = math::RAD_TO_DEG;
+```
+
+## Примеры правильного использования:
+
+### В camera.cpp:
+```cpp
+#include "math_utils.h"
+
+void camera::update_vectors() {
+    float pitch_rad = math::radians(pitch_);
+    float yaw_rad = math::radians(yaw_);
+    
+    forward_.x = std::cos(yaw_rad) * std::cos(pitch_rad);
+    forward_.y = std::sin(pitch_rad);
+    forward_.z = std::sin(yaw_rad) * std::cos(pitch_rad);
+    
+    forward_ = math::normalize(forward_);
+    right_ = math::normalize(math::cross(forward_, vec3f(0.0f, 1.0f, 0.0f)));
+    up_ = math::normalize(math::cross(right_, forward_));
+}
+```
+
+### В mesh.cpp:
+```cpp
+#include "math_utils.h"
+
+void mesh::calculate_normals() {
+    for (size_t i = 0; i < indices_.size(); i += 3) {
+        vec3f v1 = vertices_[indices_[i]];
+        vec3f v2 = vertices_[indices_[i + 1]];
+        vec3f v3 = vertices_[indices_[i + 2]];
+        
+        vec3f normal = math::normalize(math::cross(v2 - v1, v3 - v1));
+        // ... остальная логика
+    }
+}
+```
+
+Это правило распространяется на все новые и существующие C++ файлы в проекте.

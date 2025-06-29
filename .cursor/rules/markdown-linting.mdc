@@ -25,7 +25,7 @@ alwaysApply: false
 - Запрещены пробелы в конце строк
 - Удалять все trailing spaces
 
-### MD012/no-multiple-blank-lines
+### MD012/no-multiple-blank-lines (no-multiple-blanks)
 - Не более одной пустой строки подряд
 - Максимум 1 пустая строка между блоками
 

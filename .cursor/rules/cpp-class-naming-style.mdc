@@ -1,7 +1,7 @@
 ---
 description: 
-globs: *.h,*.cpp
-alwaysApply: false
+globs: 
+alwaysApply: true
 ---
 # C++: Стиль именования классов
 

@@ -1,10 +1,12 @@
 #pragma once
 #include <string_view>
 #include <vector>
-#include "input.h"
 
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
+
+#include "input.h"
+#include "events.h"
 
 namespace voxel {
     class window {
@@ -42,12 +44,34 @@ namespace voxel {
         void restore();
 
         GLFWwindow* get_handle() const { return window_; }
+        
+        // Публичный доступ к диспетчеру событий
+        events::event_dispatcher& get_event_dispatcher() { return event_dispatcher_; }
+        
+        // Удобный метод для подписки на события
+        template<events::event_type E, events::event_callback<E> F>
+        events::sub_id on(F&& callback) {
+            return event_dispatcher_.on<E>(std::forward<F>(callback));
+        }
 
     private:
+        // GLFW callback функции
+        static void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+        static void mouse_button_callback(GLFWwindow* window, int button, int action, int mods);
+        static void mouse_motion_callback(GLFWwindow* window, double xpos, double ypos);
+        static void mouse_scroll_callback(GLFWwindow* window, double xoffset, double yoffset);
+        static void window_size_callback(GLFWwindow* window, int width, int height);
+        static void window_focus_callback(GLFWwindow* window, int focused);
+        static void window_close_callback(GLFWwindow* window);
+
         GLFWwindow* window_;
         int width_, height_;
+        std::string title_;
         
         mutable double last_cursor_x_ = 0.0;
         mutable double last_cursor_y_ = 0.0;
+        
+        // Система событий
+        events::event_dispatcher event_dispatcher_;
     };
 }

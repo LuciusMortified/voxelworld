@@ -1,0 +1,179 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# C++: Форматирование функций с длинными списками аргументов
+
+При объявлении и определении функций C++ с длинными списками аргументов ОБЯЗАТЕЛЬНО использовать многострочное форматирование для улучшения читаемости.
+
+## Правила форматирования:
+
+### Объявления функций в .h файлах
+Когда объявление функции имеет более 3 аргументов или общая длина строки превышает 80 символов, использовать следующий формат:
+
+```cpp
+// Правильно - многострочное форматирование
+void function_name(
+    const std::string& first_argument,
+    int second_argument,
+    const std::vector<float>& third_argument,
+    bool fourth_argument
+);
+
+// Неправильно - все в одной строке
+void function_name(const std::string& first_argument, int second_argument, const std::vector<float>& third_argument, bool fourth_argument);
+```
+
+### Определения функций в .cpp файлах
+Когда определение функции имеет общую длину строки превышает 80 символов, использовать следующий формат:
+
+```cpp
+// Правильно - многострочное форматирование
+void greedy_mesh_generator::generate_face_quads(
+    std::vector<vertex>& vertices,
+    std::vector<uint32>& indices,
+    const model& model,
+    int face_direction
+) {
+    // реализация функции
+}
+
+// Неправильно - все в одной строке
+void greedy_mesh_generator::generate_face_quads(std::vector<vertex>& vertices, std::vector<uint32>& indices, const model& model, int face_direction) {
+    // реализация функции
+}
+```
+
+### Конструкторы классов
+```cpp
+// Объявление в .h файле
+class MyClass {
+public:
+    MyClass(
+        const std::string& name,
+        int width,
+        int height,
+        const std::vector<uint32>& data
+    );
+};
+
+// Определение в .cpp файле
+MyClass::MyClass(
+    const std::string& name,
+    int width,
+    int height,
+    const std::vector<uint32>& data
+) : name_(name), width_(width), height_(height), data_(data) {
+    // реализация конструктора
+}
+```
+
+### Список инициализации конструкторов
+Когда список инициализации конструктора имеет длину строки превышает 80 символов, использовать многострочное форматирование:
+
+```cpp
+// Правильно - многострочный список инициализации
+MyClass::MyClass(
+    const std::string& name,
+    int width,
+    int height,
+    const std::vector<uint32>& data
+) : name_(name), width_(width), 
+    height_(height), data_(data) {
+    // реализация конструктора
+}
+
+// Или альтернативный вариант
+MyClass::MyClass(
+    const std::string& name,
+    int width,
+    int height,
+    const std::vector<uint32>& data
+) : name_(name), 
+    width_(width), 
+    height_(height), 
+    data_(data) {
+    // реализация конструктора
+}
+
+// Неправильно - длинный список инициализации в одной строке
+MyClass::MyClass(const std::string& name, int width, int height, const std::vector<uint32>& data) : name_(name), width_(width), height_(height), data_(data) {
+    // реализация конструктора
+}
+```
+
+### Шаблонные функции
+```cpp
+// Объявление в .h файле
+template<typename T>
+T process_data(
+    const std::vector<T>& input_data,
+    const processing_config& config,
+    error_handler& handler
+);
+
+// Определение в .cpp файле
+template<typename T>
+T process_data(
+    const std::vector<T>& input_data,
+    const processing_config& config,
+    error_handler& handler
+) {
+    // реализация функции
+}
+```
+
+### Статические методы
+```cpp
+// Объявление в .h файле
+static void generate_face_quads(
+    std::vector<vertex>& vertices,
+    std::vector<uint32>& indices,
+    const class model& model,
+    int face_direction
+);
+
+// Определение в .cpp файле
+static void add_quad(
+    std::vector<vertex>& vertices,
+    std::vector<uint32>& indices,
+    const vec3f& min_pos,
+    const vec3f& max_pos,
+    int face_direction,
+    uint32 color
+) {
+    // реализация функции
+}
+```
+
+## Правила отступов:
+
+### Для объявлений (.h файлы):
+1. **Открывающая скобка** - на той же строке, что и имя функции
+2. **Аргументы** - каждый на отдельной строке с отступом в 4 пробела
+3. **Закрывающая скобка** - на отдельной строке на том же уровне, что и имя функции
+4. **Точка с запятой** - на той же строке, что и закрывающая скобка
+
+### Для определений (.cpp файлы):
+1. **Открывающая скобка** - на той же строке, что и последний аргумент
+2. **Аргументы** - каждый на отдельной строке с отступом в 4 пробела
+3. **Закрывающая скобка** - на отдельной строке на том же уровне, что и имя функции
+4. **Открывающая фигурная скобка** - на той же строке, что и закрывающая круглая скобка
+5. **Список инициализации** (для конструкторов) - разбивать на несколько строк, если длина превышает 80 символов
+
+## Исключения:
+
+- Функции с 1-2 короткими аргументами могут оставаться в одной строке
+- Функции с короткими списками аргументов могут оставаться в одной строке, если общая длина не превышает 80 символов
+- Простые геттеры и сеттеры могут использовать однострочный формат
+- Встроенные функции (inline) могут использовать однострочный формат, если общая длина не превышает 80 символов
+- Список инициализации может оставаться в одной строке, если длина не превышает 80 символов
+
+## Примеры из проекта:
+
+Смотрите файл [mesh.h](mdc:engine/include/mesh.h) для примеров правильного форматирования объявлений методов `generate_face_quads` и `add_quad`.
+
+Смотрите файл [mesh.cpp](mdc:engine/src/mesh.cpp) для примеров правильного форматирования определений методов `generate_face_quads` и `add_quad`.
+
+Это правило распространяется на все новые и существующие C++ файлы в проекте.

@@ -73,13 +73,6 @@ enum class input_mode {
     RAW_MOUSE_MOTION = 0x00033005 // Сырое движение мыши
 };
 
-// Состояния нажатия
-enum class action {
-    RELEASE = 0,
-    PRESS = 1,
-    REPEAT = 2
-};
-
 // Модификаторы
 enum class mod {
     SHIFT = 0x0001,

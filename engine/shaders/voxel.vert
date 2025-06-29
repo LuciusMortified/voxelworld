@@ -5,9 +5,13 @@ layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
 layout(location = 2) in uint inColor;
 
+// Push constants для матрицы модели
+layout(push_constant) uniform PushConstants {
+    mat4 model;
+} push;
+
 // Uniform buffer object
 layout(binding = 0) uniform UniformBufferObject {
-    mat4 model;
     mat4 view;
     mat4 proj;
     vec3 viewPos;
@@ -32,11 +36,11 @@ vec3 unpackColor(uint packedColor) {
 
 void main() {
     // Трансформация позиции
-    vec4 worldPos = ubo.model * vec4(inPosition, 1.0);
+    vec4 worldPos = push.model * vec4(inPosition, 1.0);
     fragPos = worldPos.xyz;
     
     // Трансформация нормали
-    fragNormal = normalize(mat3(transpose(inverse(ubo.model))) * inNormal);
+    fragNormal = normalize(mat3(transpose(inverse(push.model))) * inNormal);
     
     // Распаковка цвета
     fragColor = unpackColor(inColor);
