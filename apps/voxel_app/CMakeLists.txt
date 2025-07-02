@@ -12,12 +12,9 @@ target_link_libraries(${PROJECT_NAME} voxelengine)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 
 # Копирование шейдеров из движка в папку приложения
-add_custom_target(copy_shaders_${PROJECT_NAME} ALL
+add_custom_command(TARGET ${PROJECT_NAME} PRE_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/engine/shaders
-        ${CMAKE_CURRENT_BINARY_DIR}/shaders
+        ${CMAKE_SOURCE_DIR}/shaders
+        $<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders
     COMMENT "Copying shaders to ${PROJECT_NAME} build directory"
 )
-
-# Зависимость от копирования шейдеров
-add_dependencies(${PROJECT_NAME} copy_shaders_${PROJECT_NAME})

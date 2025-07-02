@@ -44,8 +44,8 @@ set(ENGINE_SOURCES
 
 # Find required packages
 find_package(Vulkan REQUIRED)
-find_package(glfw3 REQUIRED)
-find_package(glm REQUIRED)
+find_package(glfw3 CONFIG REQUIRED)
+find_package(glm CONFIG REQUIRED)
 
 # Create engine library
 add_library(${PROJECT_NAME} STATIC ${ENGINE_HEADERS} ${ENGINE_SOURCES})
@@ -64,11 +64,3 @@ target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     target_compile_definitions(${PROJECT_NAME} PRIVATE DEBUG)
 endif()
-
-# Copy shaders to build directory
-add_custom_target(copy_shaders ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_CURRENT_SOURCE_DIR}/shaders
-        ${CMAKE_BINARY_DIR}/shaders
-    COMMENT "Copying shaders to build directory"
-)

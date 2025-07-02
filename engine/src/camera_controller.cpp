@@ -80,6 +80,10 @@ namespace voxel {
     }
 
     void fps_camera_controller::handle_mouse_moved(double x, double y) {
+        if (!camera_) {
+            return;
+        }
+
         // Инициализация позиции мыши при первом захвате
         if (!mouse_initialized_) {
             last_mouse_x_ = x;
@@ -100,7 +104,7 @@ namespace voxel {
             float yaw_delta = static_cast<float>(delta_x) * mouse_sensitivity_;
             float pitch_delta = static_cast<float>(delta_y) * mouse_sensitivity_;
             
-            camera_->rotate(-pitch_delta, yaw_delta);
+            camera_->rotate(pitch_delta, yaw_delta);
         }
     }
 

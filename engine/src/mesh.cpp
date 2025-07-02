@@ -32,7 +32,7 @@ std::vector<VkVertexInputAttributeDescription> vertex::get_attribute_description
     // color
     attribute_descriptions[2].binding = 0;
     attribute_descriptions[2].location = 2;
-    attribute_descriptions[2].format = VK_FORMAT_R8G8B8A8_UNORM;
+    attribute_descriptions[2].format = VK_FORMAT_R32_UINT;
     attribute_descriptions[2].offset = offsetof(vertex, color);
     
     return attribute_descriptions;
@@ -152,19 +152,19 @@ void simple_mesh_generator::add_cube_face(
         vec3f(0, 0, -1)   // -Z
     };
     
-    // Вершины для каждой грани (4 вершины на грань)
+    // Вершины для каждой грани (4 вершины на грань) - против часовой стрелки относительно нормали
     static const vec3f face_vertices[6][4] = {
-        // +X face
-        {{1, 0, 0}, {1, 1, 0}, {1, 1, 1}, {1, 0, 1}},
-        // -X face
-        {{0, 0, 1}, {0, 1, 1}, {0, 1, 0}, {0, 0, 0}},
-        // +Y face
+        // +X face (нормаль +X) - смотрим снаружи на грань x=1
+        {{1, 0, 0}, {1, 0, 1}, {1, 1, 1}, {1, 1, 0}},
+        // -X face (нормаль -X) - смотрим снаружи на грань x=0
+        {{0, 0, 0}, {0, 1, 0}, {0, 1, 1}, {0, 0, 1}},
+        // +Y face (нормаль +Y) - смотрим снаружи на грань y=1
         {{0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {0, 1, 1}},
-        // -Y face
-        {{0, 0, 1}, {1, 0, 1}, {1, 0, 0}, {0, 0, 0}},
-        // +Z face
+        // -Y face (нормаль -Y) - смотрим снаружи на грань y=0
+        {{0, 0, 0}, {0, 0, 1}, {1, 0, 1}, {1, 0, 0}},
+        // +Z face (нормаль +Z) - смотрим снаружи на грань z=1
         {{0, 0, 1}, {0, 1, 1}, {1, 1, 1}, {1, 0, 1}},
-        // -Z face
+        // -Z face (нормаль -Z) - смотрим снаружи на грань z=0
         {{1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 0}}
     };
     
@@ -399,20 +399,20 @@ void greedy_mesh_generator::add_quad(
         vec3f(0, 0, -1)   // -Z
     };
     
-    // Вершины для каждого направления грани
+    // Вершины для каждого направления грани - против часовой стрелки относительно нормали
     static const int vertex_indices[6][4] = {
-        // +X: (max.x, min.y, min.z), (max.x, max.y, min.z), (max.x, max.y, max.z), (max.x, min.y, max.z)
-        {0, 1, 2, 3},
-        // -X: (min.x, min.y, max.z), (min.x, max.y, max.z), (min.x, max.y, min.z), (min.x, min.y, min.z)
-        {3, 2, 1, 0},
+        // +X: (max.x, min.y, min.z), (max.x, min.y, max.z), (max.x, max.y, max.z), (max.x, max.y, min.z)
+        {1, 5, 6, 2},
+        // -X: (min.x, min.y, min.z), (min.x, max.y, min.z), (min.x, max.y, max.z), (min.x, min.y, max.z)
+        {0, 3, 7, 4},
         // +Y: (min.x, max.y, min.z), (max.x, max.y, min.z), (max.x, max.y, max.z), (min.x, max.y, max.z)
-        {0, 1, 2, 3},
-        // -Y: (min.x, min.y, max.z), (max.x, min.y, max.z), (max.x, min.y, min.z), (min.x, min.y, min.z)
-        {3, 2, 1, 0},
+        {3, 2, 6, 7},
+        // -Y: (min.x, min.y, min.z), (min.x, min.y, max.z), (max.x, min.y, max.z), (max.x, min.y, min.z)
+        {0, 4, 5, 1},
         // +Z: (min.x, min.y, max.z), (min.x, max.y, max.z), (max.x, max.y, max.z), (max.x, min.y, max.z)
-        {0, 1, 2, 3},
+        {4, 7, 6, 5},
         // -Z: (max.x, min.y, min.z), (max.x, max.y, min.z), (min.x, max.y, min.z), (min.x, min.y, min.z)
-        {0, 1, 2, 3}
+        {1, 2, 3, 0}
     };
     
     // Создаем 8 вершин куба

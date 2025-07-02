@@ -39,7 +39,7 @@ namespace voxel {
         void end_frame();
 
         void render_mesh(std::shared_ptr<mesh> mesh, const vec3f& position, const vec3f& rotation = {}, const vec3f& scale = {1.0f, 1.0f, 1.0f});
-        void render_world(const std::shared_ptr<world>& world, std::shared_ptr<camera> camera);
+        void render_world(const std::shared_ptr<world>& world, const std::shared_ptr<camera>& camera);
 
         void set_clear_color(const colorf& color);
         void set_clear_color(float r, float g, float b, float a = 1.0f);
@@ -64,10 +64,11 @@ namespace voxel {
         void cleanup_swapchain();
         void recreate_swapchain();
 
-        void update_uniform_buffer(uint32_t current_image, const camera& camera);
+        void update_uniform_buffer(const std::shared_ptr<camera>& camera);
 
-        VkSurfaceFormatKHR choose_swap_surface_format(const std::vector<VkSurfaceFormatKHR>& available_formats);
-        VkPresentModeKHR choose_swap_present_mode(const std::vector<VkPresentModeKHR>& available_present_modes);
+        static VkSurfaceFormatKHR choose_swap_surface_format(const std::vector<VkSurfaceFormatKHR>& available_formats);
+
+        static VkPresentModeKHR choose_swap_present_mode(const std::vector<VkPresentModeKHR>& available_present_modes);
         VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& capabilities);
 
         std::shared_ptr<vulkan_context> context_;
@@ -77,7 +78,7 @@ namespace voxel {
         VkSwapchainKHR swapchain_;
         std::vector<VkImage> swapchain_images_;
         VkFormat swapchain_image_format_;
-        VkExtent2D swapchain_extent_;
+        VkExtent2D swapchain_extent_{};
         std::vector<VkImageView> swapchain_image_views_;
 
         // Render pass и pipeline
@@ -109,6 +110,7 @@ namespace voxel {
         uint32_t current_image_index_;
         bool framebuffer_resized_;
         colorf clear_color_;
+        std::vector<VkFence> images_in_flight_; // Fences для каждого изображения swapchain
 
         static const int MAX_FRAMES_IN_FLIGHT = 2;
     };

@@ -86,11 +86,6 @@ void engine::main_loop() {
         // Обработка событий окна (GLFW callbacks автоматически вызывают event_dispatcher)
         window_->poll_events();
         
-        // Проверка необходимости выхода
-        if (!running_) {
-            break;
-        }
-        
         // Обновление логики
         update(delta_time);
         
@@ -100,11 +95,11 @@ void engine::main_loop() {
 }
 
 void engine::update(float delta_time) {
+    // Обновление мешей мира (асинхронная генерация)
+    world_->update_meshes();
+    
     // Обновление игровой логики
     game_logic_->update(delta_time);
-    
-    // Удаляем неэффективный код получения размера окна каждый кадр
-    // Теперь aspect ratio обновляется только при изменении размера окна
 }
 
 void engine::render() {

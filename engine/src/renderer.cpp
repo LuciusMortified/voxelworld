@@ -1,13 +1,13 @@
-#include <voxel/renderer.h>
-#include <voxel/vulkan_context.h>
-#include <voxel/window.h>
-#include <voxel/camera.h>
-#include <voxel/mesh.h>
-#include <voxel/shader.h>
-#include <voxel/buffer.h>
-#include <voxel/world.h>
-#include <voxel/buffer.h>
-#include <voxel/math_utils.h>
+#include "voxel/renderer.h"
+#include "voxel/vulkan_context.h"
+#include "voxel/window.h"
+#include "voxel/camera.h"
+#include "voxel/mesh.h"
+#include "voxel/shader.h"
+#include "voxel/buffer.h"
+#include "voxel/world.h"
+#include "voxel/buffer.h"
+#include "voxel/math_utils.h"
 
 #include <algorithm>
 #include <array>
@@ -19,10 +19,10 @@
 namespace voxel {
 
 renderer::renderer(std::shared_ptr<vulkan_context> context, std::shared_ptr<window> window)
-    : context_(std::move(context)), window_(std::move(window)), current_frame_(0), current_image_index_(0),
-      framebuffer_resized_(false), swapchain_(VK_NULL_HANDLE), render_pass_(VK_NULL_HANDLE),
-      descriptor_set_layout_(VK_NULL_HANDLE), pipeline_layout_(VK_NULL_HANDLE),
-      graphics_pipeline_(VK_NULL_HANDLE), descriptor_pool_(VK_NULL_HANDLE) {
+    : context_(std::move(context)), window_(std::move(window)), swapchain_(VK_NULL_HANDLE), render_pass_(VK_NULL_HANDLE),
+      descriptor_set_layout_(VK_NULL_HANDLE), pipeline_layout_(VK_NULL_HANDLE), graphics_pipeline_(VK_NULL_HANDLE),
+      descriptor_pool_(VK_NULL_HANDLE), current_frame_(0),
+      current_image_index_(0), framebuffer_resized_(false), images_in_flight_() {
     
     clear_color_ = colorf(0.1f, 0.1f, 0.1f, 1.0f);
 
@@ -47,29 +47,57 @@ renderer::~renderer() {
     wait_idle();
     cleanup_swapchain();
     
+    // Освобождаем pipeline
+    if (graphics_pipeline_ != VK_NULL_HANDLE) {
+        vkDestroyPipeline(context_->get_device(), graphics_pipeline_, nullptr);
+        graphics_pipeline_ = VK_NULL_HANDLE;
+    }
+    
+    // Освобождаем pipeline layout
+    if (pipeline_layout_ != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(context_->get_device(), pipeline_layout_, nullptr);
+        pipeline_layout_ = VK_NULL_HANDLE;
+    }
+    
+    // Освобождаем descriptor set layout
+    if (descriptor_set_layout_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(context_->get_device(), descriptor_set_layout_, nullptr);
+        descriptor_set_layout_ = VK_NULL_HANDLE;
+    }
+    
+    // Освобождаем render pass
+    if (render_pass_ != VK_NULL_HANDLE) {
+        vkDestroyRenderPass(context_->get_device(), render_pass_, nullptr);
+        render_pass_ = VK_NULL_HANDLE;
+    }
+    
+    // Освобождаем descriptor pool
+    if (descriptor_pool_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(context_->get_device(), descriptor_pool_, nullptr);
+        descriptor_pool_ = VK_NULL_HANDLE;
+    }
+    
     // Освобождаем шейдеры
     vertex_shader_.reset();
     fragment_shader_.reset();
-    
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroySemaphore(context_->get_device(), render_finished_semaphores_[i], nullptr);
-        vkDestroySemaphore(context_->get_device(), image_available_semaphores_[i], nullptr);
-        vkDestroyFence(context_->get_device(), in_flight_fences_[i], nullptr);
-    }
 }
 
 void renderer::begin_frame() {
     // Ждем завершения предыдущего кадра
     vkWaitForFences(context_->get_device(), 1, &in_flight_fences_[current_frame_], VK_TRUE, UINT64_MAX);
 
-    // Получаем следующий image из swapchain
+    // Сбрасываем fence для рендеринга перед использованием
+    vkResetFences(context_->get_device(), 1, &in_flight_fences_[current_frame_]);
+
+    // Получаем следующий image из swapchain (используем семафор)
+    uint32_t image_index;
     VkResult result = vkAcquireNextImageKHR(
         context_->get_device(), 
         swapchain_, 
         UINT64_MAX, 
         image_available_semaphores_[current_frame_], 
         VK_NULL_HANDLE, 
-        &current_image_index_
+        &image_index
     );
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
@@ -79,14 +107,22 @@ void renderer::begin_frame() {
         throw std::runtime_error("Failed to acquire swap chain image!");
     }
 
-    // Сбрасываем fence только если мы не будем пересоздавать swapchain
-    vkResetFences(context_->get_device(), 1, &in_flight_fences_[current_frame_]);
+    current_image_index_ = image_index;
+
+    // Ждем завершения предыдущего использования этого изображения
+    if (images_in_flight_[image_index] != VK_NULL_HANDLE) {
+        vkWaitForFences(context_->get_device(), 1, &images_in_flight_[image_index], VK_TRUE, UINT64_MAX);
+    }
+
+    // Связываем fence с изображением
+    images_in_flight_[image_index] = in_flight_fences_[current_frame_];
 }
 
 void renderer::end_frame() {
     VkSubmitInfo submit_info{};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
+    // Используем семафор для ожидания получения изображения
     VkSemaphore wait_semaphores[] = {image_available_semaphores_[current_frame_]};
     VkPipelineStageFlags wait_stages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
     submit_info.waitSemaphoreCount = 1;
@@ -95,7 +131,7 @@ void renderer::end_frame() {
     submit_info.commandBufferCount = 1;
     submit_info.pCommandBuffers = &command_buffers_[current_image_index_];
 
-    VkSemaphore signal_semaphores[] = {render_finished_semaphores_[current_frame_]};
+    VkSemaphore signal_semaphores[] = {render_finished_semaphores_[current_image_index_]};
     submit_info.signalSemaphoreCount = 1;
     submit_info.pSignalSemaphores = signal_semaphores;
 
@@ -135,11 +171,20 @@ void renderer::render_mesh(std::shared_ptr<mesh> mesh, const vec3f& position, co
     mesh->draw_indexed(command_buffers_[current_image_index_]);
 }
 
-void renderer::render_world(const std::shared_ptr<world>& world, std::shared_ptr<camera> camera) {
+void renderer::render_world(const std::shared_ptr<world>& world, const std::shared_ptr<camera>& camera) {
     if (!camera || !world) return;
     
     // Обновляем uniform buffer для текущего кадра
-    update_uniform_buffer(current_image_index_, *camera);
+    update_uniform_buffer(camera);
+
+    // Начинаем запись в command buffer
+    VkCommandBufferBeginInfo begin_info{};
+    begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+    if (vkBeginCommandBuffer(command_buffers_[current_image_index_], &begin_info) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to begin recording command buffer!");
+    }
 
     // Начинаем рендер пасс
     VkRenderPassBeginInfo render_pass_info{};
@@ -165,7 +210,7 @@ void renderer::render_world(const std::shared_ptr<world>& world, std::shared_ptr
         pipeline_layout_,
         0,
         1,
-        &descriptor_sets_[current_image_index_],
+        &descriptor_sets_[current_frame_],
         0,
         nullptr
     );
@@ -386,8 +431,8 @@ void renderer::create_graphics_pipeline() {
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width = (float)swapchain_extent_.width;
-    viewport.height = (float)swapchain_extent_.height;
+    viewport.width = static_cast<float>(swapchain_extent_.width);
+    viewport.height = static_cast<float>(swapchain_extent_.height);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
 
@@ -410,7 +455,7 @@ void renderer::create_graphics_pipeline() {
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
 
     // Multisampling state
@@ -498,7 +543,7 @@ void renderer::create_command_buffers() {
     alloc_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     alloc_info.commandPool = context_->get_command_pool();
     alloc_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    alloc_info.commandBufferCount = (uint32_t)command_buffers_.size();
+    alloc_info.commandBufferCount = static_cast<uint32_t>(command_buffers_.size());
 
     if (vkAllocateCommandBuffers(context_->get_device(), &alloc_info, command_buffers_.data()) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate command buffers!");
@@ -506,9 +551,13 @@ void renderer::create_command_buffers() {
 }
 
 void renderer::create_sync_objects() {
+    // Семафоры создаем по количеству кадров в полете
     image_available_semaphores_.resize(MAX_FRAMES_IN_FLIGHT);
-    render_finished_semaphores_.resize(MAX_FRAMES_IN_FLIGHT);
+    render_finished_semaphores_.resize(swapchain_images_.size());
+    // Fences создаем по количеству кадров в полете
     in_flight_fences_.resize(MAX_FRAMES_IN_FLIGHT);
+    // Инициализируем массив fences для изображений
+    images_in_flight_.resize(swapchain_images_.size(), VK_NULL_HANDLE);
 
     VkSemaphoreCreateInfo semaphore_info{};
     semaphore_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
@@ -517,10 +566,23 @@ void renderer::create_sync_objects() {
     fence_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fence_info.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
+    // Создаем семафоры для каждого кадра в полете
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        if (vkCreateSemaphore(context_->get_device(), &semaphore_info, nullptr, &image_available_semaphores_[i]) != VK_SUCCESS ||
-            vkCreateSemaphore(context_->get_device(), &semaphore_info, nullptr, &render_finished_semaphores_[i]) != VK_SUCCESS ||
-            vkCreateFence(context_->get_device(), &fence_info, nullptr, &in_flight_fences_[i]) != VK_SUCCESS) {
+        if (vkCreateSemaphore(context_->get_device(), &semaphore_info, nullptr, &image_available_semaphores_[i]) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create synchronization objects for a frame!");
+        }
+    }
+
+    // Создаем семафоры для каждого изображения swapchain
+    for (size_t i = 0; i < swapchain_images_.size(); i++) {
+        if (vkCreateSemaphore(context_->get_device(), &semaphore_info, nullptr, &render_finished_semaphores_[i]) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create synchronization objects for a frame!");
+        }
+    }
+
+    // Создаем fences для каждого кадра в полете
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        if (vkCreateFence(context_->get_device(), &fence_info, nullptr, &in_flight_fences_[i]) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create synchronization objects for a frame!");
         }
     }
@@ -593,6 +655,19 @@ void renderer::cleanup_swapchain() {
     }
 
     vkDestroySwapchainKHR(context_->get_device(), swapchain_, nullptr);
+
+    // Очищаем семафоры при пересоздании swapchain
+    for (auto semaphore : image_available_semaphores_) {
+        vkDestroySemaphore(context_->get_device(), semaphore, nullptr);
+    }
+    for (auto semaphore : render_finished_semaphores_) {
+        vkDestroySemaphore(context_->get_device(), semaphore, nullptr);
+    }
+
+    // Очищаем fences при пересоздании swapchain
+    for (auto fence : in_flight_fences_) {
+        vkDestroyFence(context_->get_device(), fence, nullptr);
+    }
 }
 
 void renderer::recreate_swapchain() {
@@ -614,32 +689,33 @@ void renderer::recreate_swapchain() {
     create_swapchain();
     create_image_views();
     create_framebuffers();
+    create_sync_objects(); // Пересоздаем семафоры для нового количества изображений
 }
 
-void renderer::update_uniform_buffer(uint32_t current_image, const camera& camera) {
+void renderer::update_uniform_buffer(const std::shared_ptr<camera>& camera) {
     uniform_buffer_object ubo{};
     
     // View matrix
-    mat4f view_matrix = camera.get_view_matrix();
+    mat4f view_matrix = camera->get_view_matrix();
     for (int i = 0; i < 16; i++) {
         ubo.view[i] = view_matrix[i];
     }
     
     // Projection matrix
-    mat4f proj_matrix = camera.get_projection_matrix();
+    mat4f proj_matrix = camera->get_projection_matrix();
     for (int i = 0; i < 16; i++) {
         ubo.projection[i] = proj_matrix[i];
     }
     
     // View position
-    vec3f view_pos = camera.get_position();
+    vec3f view_pos = camera->get_position();
     ubo.view_pos = view_pos;
     
     // Light position and color (hardcoded for now)
     ubo.light_pos = vec3f(2.0f, 2.0f, 2.0f);
     ubo.light_color = vec3f(1.0f, 1.0f, 1.0f);
 
-    uniform_buffers_[current_image]->copy_from(&ubo, sizeof(ubo));
+    uniform_buffers_[current_frame_]->copy_from(&ubo, sizeof(ubo));
 }
 
 VkSurfaceFormatKHR renderer::choose_swap_surface_format(const std::vector<VkSurfaceFormatKHR>& available_formats) {

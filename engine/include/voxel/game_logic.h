@@ -2,6 +2,7 @@
 #include <memory>
 #include <optional>
 #include <functional>
+#include <stdexcept>
 
 #include <voxel/camera_controller.h>
 #include <voxel/events.h>

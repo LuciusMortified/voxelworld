@@ -1,9 +1,14 @@
 # CMake build
+out/
 build/
 CMakeFiles/
 CMakeCache.txt
 cmake_install.cmake
 Makefile
+CMakeUserPresets.json
+
+# VCPKG
+vcpkg_installed/
 
 # macOS
 .DS_Store
