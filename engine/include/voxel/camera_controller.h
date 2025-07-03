@@ -54,7 +54,6 @@ namespace voxel {
 
     private:
         void update_camera_movement(float delta_time);
-        void update_camera_rotation();
         void handle_key_pressed(input::key key);
         void handle_mouse_moved(double x, double y);
 

@@ -22,7 +22,7 @@ renderer::renderer(std::shared_ptr<vulkan_context> context, std::shared_ptr<wind
     : context_(std::move(context)), window_(std::move(window)), swapchain_(VK_NULL_HANDLE), render_pass_(VK_NULL_HANDLE),
       descriptor_set_layout_(VK_NULL_HANDLE), pipeline_layout_(VK_NULL_HANDLE), graphics_pipeline_(VK_NULL_HANDLE),
       descriptor_pool_(VK_NULL_HANDLE), current_frame_(0),
-      current_image_index_(0), framebuffer_resized_(false), images_in_flight_() {
+      current_image_index_(0), framebuffer_resized_(false) {
     
     clear_color_ = colorf(0.1f, 0.1f, 0.1f, 1.0f);
 
@@ -455,7 +455,7 @@ void renderer::create_graphics_pipeline() {
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;  // Изменено для совместимости с инвертированной Y
     rasterizer.depthBiasEnable = VK_FALSE;
 
     // Multisampling state
@@ -712,7 +712,7 @@ void renderer::update_uniform_buffer(const std::shared_ptr<camera>& camera) {
     ubo.view_pos = view_pos;
     
     // Light position and color (hardcoded for now)
-    ubo.light_pos = vec3f(2.0f, 2.0f, 2.0f);
+    ubo.light_pos = vec3f(10.0f, 10.0f, 10.0f);
     ubo.light_color = vec3f(1.0f, 1.0f, 1.0f);
 
     uniform_buffers_[current_frame_]->copy_from(&ubo, sizeof(ubo));

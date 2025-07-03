@@ -64,9 +64,6 @@ namespace voxel {
         
         // Обновляем движение камеры
         update_camera_movement(delta_time);
-        
-        // Обновляем поворот камеры
-        update_camera_rotation();
     }
 
     void fps_camera_controller::handle_key_pressed(input::key key) {
@@ -104,7 +101,7 @@ namespace voxel {
             float yaw_delta = static_cast<float>(delta_x) * mouse_sensitivity_;
             float pitch_delta = static_cast<float>(delta_y) * mouse_sensitivity_;
             
-            camera_->rotate(pitch_delta, yaw_delta);
+            camera_->rotate(-pitch_delta, yaw_delta);  // Инвертируем pitch для Vulkan
         }
     }
 
@@ -127,44 +124,18 @@ namespace voxel {
             camera_->move_right(move_speed);
         }
         
-        // Движение вверх/вниз (Space/Shift)
+        // Движение вверх/вниз (Space/Shift) - используем мировую ось Y
         if (window_->is_key_pressed(input::key::SPACE)) {
-            camera_->move_up(move_speed);
+            vec3f world_up(0.0f, 1.0f, 0.0f);
+            camera_->set_position(camera_->get_position() + world_up * move_speed);
         }
         if (window_->is_key_pressed(input::key::LEFT_SHIFT)) {
-            camera_->move_up(-move_speed);
+            vec3f world_up(0.0f, 1.0f, 0.0f);
+            camera_->set_position(camera_->get_position() - world_up * move_speed);
         }
     }
 
-    void fps_camera_controller::update_camera_rotation() {
-        if (!mouse_captured_) return;
-        
-        double mouse_x, mouse_y;
-        window_->get_cursor_pos(&mouse_x, &mouse_y);
-        
-        // Инициализация позиции мыши при первом захвате
-        if (!mouse_initialized_) {
-            last_mouse_x_ = mouse_x;
-            last_mouse_y_ = mouse_y;
-            mouse_initialized_ = true;
-            return;
-        }
-        
-        // Вычисляем дельту движения мыши
-        double delta_x = mouse_x - last_mouse_x_;
-        double delta_y = mouse_y - last_mouse_y_;
-        
-        last_mouse_x_ = mouse_x;
-        last_mouse_y_ = mouse_y;
-        
-        // Применяем поворот камеры
-        if (delta_x != 0 || delta_y != 0) {
-            float yaw_delta = static_cast<float>(delta_x) * mouse_sensitivity_;
-            float pitch_delta = static_cast<float>(delta_y) * mouse_sensitivity_;
-            
-            camera_->rotate(-pitch_delta, yaw_delta);
-        }
-    }
+
 
     void fps_camera_controller::set_camera(std::shared_ptr<camera> camera) {
         camera_ = camera;

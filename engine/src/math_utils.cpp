@@ -9,7 +9,7 @@ mat4f perspective_matrix(float fov, float aspect, float near, float far) {
     float f = 1.0f / std::tan(radians(fov * 0.5f));
     
     matrix(0, 0) = f / aspect; matrix(0, 1) = 0.0f; matrix(0, 2) = 0.0f; matrix(0, 3) = 0.0f;
-    matrix(1, 0) = 0.0f; matrix(1, 1) = f; matrix(1, 2) = 0.0f; matrix(1, 3) = 0.0f;
+    matrix(1, 0) = 0.0f; matrix(1, 1) = -f; matrix(1, 2) = 0.0f; matrix(1, 3) = 0.0f;  // Инвертируем Y для Vulkan
     matrix(2, 0) = 0.0f; matrix(2, 1) = 0.0f; matrix(2, 2) = (far + near) / (near - far); matrix(2, 3) = -1.0f;
     matrix(3, 0) = 0.0f; matrix(3, 1) = 0.0f; matrix(3, 2) = (2.0f * far * near) / (near - far); matrix(3, 3) = 0.0f;
     

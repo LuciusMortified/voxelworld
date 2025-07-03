@@ -1,5 +1,6 @@
 #include <voxel/camera.h>
 #include <voxel/math_utils.h>
+#include <iostream>
 
 namespace voxel {
 
