@@ -45,7 +45,6 @@ set(ENGINE_SOURCES
 # Find required packages
 find_package(Vulkan REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
-find_package(glm CONFIG REQUIRED)
 
 # Create engine library
 add_library(${PROJECT_NAME} STATIC ${ENGINE_HEADERS} ${ENGINE_SOURCES})
@@ -55,7 +54,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC include)
 target_include_directories(${PROJECT_NAME} PUBLIC ${Vulkan_INCLUDE_DIRS})
 
 # Link libraries
-target_link_libraries(${PROJECT_NAME} PUBLIC ${Vulkan_LIBRARIES} glfw glm::glm)
+target_link_libraries(${PROJECT_NAME} PUBLIC ${Vulkan_LIBRARIES} glfw)
 
 # Compile features - C++20
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_20)

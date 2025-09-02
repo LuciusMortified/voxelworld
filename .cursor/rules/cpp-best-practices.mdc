@@ -1,0 +1,372 @@
+---
+globs: *.h,*.cpp
+alwaysApply: false
+---
+# C++: Лучшие практики разработки
+
+## Обработка ошибок
+
+### Исключения
+**Использовать исключения для ошибок времени выполнения:**
+
+```cpp
+// ✅ Правильно
+class file_error : public std::runtime_error {
+public:
+    explicit file_error(const std::string& message) 
+        : std::runtime_error("File error: " + message) {}
+};
+
+void load_texture(const std::string& path) {
+    std::ifstream file(path);
+    if (!file.is_open()) {
+        throw file_error("Cannot open file: " + path);
+    }
+}
+```
+
+### Коды возврата
+**Использовать для ожидаемых ошибок:**
+
+```cpp
+// ✅ Правильно
+enum class load_result {
+    success,
+    file_not_found,
+    invalid_format,
+    out_of_memory
+};
+
+load_result load_model(const std::string& path, model& result) {
+    if (!std::filesystem::exists(path)) {
+        return load_result::file_not_found;
+    }
+    return load_result::success;
+}
+```
+
+## Управление ресурсами
+
+### RAII принцип
+**Всегда использовать RAII для управления ресурсами:**
+
+```cpp
+#include "types.h"
+
+// ✅ Правильно - RAII класс
+class texture {
+private:
+    uint32 handle_;
+    
+public:
+    texture() : handle_(0) {
+        glGenTextures(1, &handle_);
+        if (handle_ == 0) {
+            throw std::runtime_error("Failed to create texture");
+        }
+    }
+    
+    ~texture() {
+        if (handle_ != 0) {
+            glDeleteTextures(1, &handle_);
+        }
+    }
+    
+    // Запрет копирования
+    texture(const texture&) = delete;
+    texture& operator=(const texture&) = delete;
+    
+    // Разрешение перемещения
+    texture(texture&& other) noexcept : handle_(other.handle_) {
+        other.handle_ = 0;
+    }
+    
+    texture& operator=(texture&& other) noexcept {
+        if (this != &other) {
+            if (handle_ != 0) {
+                glDeleteTextures(1, &handle_);
+            }
+            handle_ = other.handle_;
+            other.handle_ = 0;
+        }
+        return *this;
+    }
+    
+    uint32 get_handle() const { return handle_; }
+};
+```
+
+### Умные указатели
+**Предпочитать std::unique_ptr и std::shared_ptr:**
+
+```cpp
+// ✅ Правильно
+class mesh_manager {
+private:
+    std::unordered_map<std::string, std::unique_ptr<mesh>> meshes_;
+    
+public:
+    void add_mesh(const std::string& name, std::unique_ptr<mesh> mesh) {
+        meshes_[name] = std::move(mesh);
+    }
+    
+    mesh* get_mesh(const std::string& name) {
+        auto it = meshes_.find(name);
+        return it != meshes_.end() ? it->second.get() : nullptr;
+    }
+};
+```
+
+## Производительность
+
+### Передача параметров
+**Использовать const ссылки для больших объектов, move семантику для перемещения:**
+
+```cpp
+// ✅ Правильно - const ссылка для чтения
+void process_vertices(
+    const std::vector<vertex>& vertices,
+    const transform& transform
+) {
+}
+
+// ✅ Правильно - move семантика для перемещения
+void add_vertices(std::vector<vertex> vertices) {
+    vertices_.insert(vertices_.end(), 
+                    std::make_move_iterator(vertices.begin()),
+                    std::make_move_iterator(vertices.end()));
+}
+
+// ❌ Неправильно - ненужное копирование
+void bad_process_vertices(
+    std::vector<vertex> vertices,  // копирование без необходимости
+    transform transform             // копирование без необходимости
+) {
+}
+```
+
+### Move семантика
+**Использовать std::move для rvalue и перемещения объектов:**
+
+```cpp
+// ✅ Правильно - возврат по значению с автоматическим move
+std::vector<vertex> create_vertices() {
+    std::vector<vertex> result;
+    result.reserve(1000);
+    for (int i = 0; i < 1000; ++i) {
+        result.emplace_back(i, i, i);
+    }
+    return result;  // автоматический move (RVO/NRVO)
+}
+
+// ✅ Правильно - перемещение в параметрах
+class mesh_builder {
+private:
+    std::vector<vertex> vertices_;
+    
+public:
+    void add_vertices(std::vector<vertex> vertices) {
+        vertices_.insert(vertices_.end(), 
+                        std::make_move_iterator(vertices.begin()),
+                        std::make_move_iterator(vertices.end()));
+    }
+    
+    void add_vertex(vertex v) {
+        vertices_.push_back(std::move(v));
+    }
+};
+
+// ✅ Правильно - перемещение в конструкторах
+class mesh {
+private:
+    std::vector<vertex> vertices_;
+    std::string name_;
+    
+public:
+    mesh(std::vector<vertex> vertices, std::string name)
+        : vertices_(std::move(vertices)), name_(std::move(name)) {}
+};
+
+// ✅ Правильно - перемещение в присваивании
+void update_mesh() {
+    std::vector<vertex> new_vertices = create_vertices();
+    mesh_builder builder;
+    builder.add_vertices(std::move(new_vertices));  // явный move
+}
+
+// ❌ Неправильно - ненужный move
+void bad_example() {
+    std::vector<vertex> vertices = create_vertices();
+    builder.add_vertices(std::move(vertices));  // vertices теперь пустой!
+    // vertices.size() == 0 - объект перемещен
+}
+```
+
+## Безопасность
+
+### Валидация входных данных
+**Проверять все входные параметры:**
+
+```cpp
+// ✅ Правильно
+void set_resolution(int width, int height) {
+    if (width <= 0 || height <= 0) {
+        throw std::invalid_argument("Resolution must be positive");
+    }
+    if (width > MAX_RESOLUTION || height > MAX_RESOLUTION) {
+        throw std::invalid_argument("Resolution too large");
+    }
+    
+    width_ = width;
+    height_ = height;
+}
+```
+
+## Документация кода
+
+### Комментарии
+**Документировать публичные API:**
+
+```cpp
+/**
+ * @brief Генерирует меш для воксельной модели
+ * 
+ * @param vertices Вектор для хранения вершин
+ * @param indices Вектор для хранения индексов
+ * @param model Воксельная модель для генерации меша
+ * @param face_direction Направление грани (0-5)
+ * 
+ * @throws std::invalid_argument если face_direction некорректен
+ * @throws std::runtime_error если не удалось сгенерировать меш
+ * 
+ * @note Функция автоматически очищает входные векторы
+ */
+void generate_face_quads(
+    std::vector<vertex>& vertices,
+    std::vector<uint32>& indices,
+    const model& model,
+    int face_direction
+);
+```
+
+## AI Assistant режим
+
+### Запрет комментариев в агентском режиме
+**При работе с C++ файлами в агентском режиме НЕ добавлять комментарии:**
+
+```cpp
+// ❌ Неправильно - НЕ добавлять такие комментарии в агентском режиме
+void process_data() {
+    // инициализация переменных
+    int count = 0;
+    
+    // цикл обработки
+    for (int i = 0; i < 10; ++i) {
+        // увеличение счетчика
+        count++;
+    }
+    
+    // возврат результата
+    return count;
+}
+
+// ✅ Правильно - чистый код без избыточных комментариев
+void process_data() {
+    int count = 0;
+    
+    for (int i = 0; i < 10; ++i) {
+        count++;
+    }
+    
+    return count;
+}
+```
+
+### Исключения для комментариев
+**Комментарии разрешены только в следующих случаях:**
+
+1. **Документация публичных API** (Doxygen комментарии)
+2. **Объяснение сложной бизнес-логики**
+3. **TODO/FIXME комментарии**
+4. **Предупреждения о потенциальных проблемах**
+
+```cpp
+// ✅ Разрешено - документация API
+/**
+ * @brief Вычисляет расстояние между двумя точками
+ * @param p1 Первая точка
+ * @param p2 Вторая точка
+ * @return Расстояние между точками
+ */
+float calculate_distance(const vec3f& p1, const vec3f& p2);
+
+// ✅ Разрешено - сложная логика
+void complex_algorithm() {
+    // Используем алгоритм Флойда-Уоршелла для поиска кратчайших путей
+    // в графе с отрицательными весами
+    for (int k = 0; k < n; ++k) {
+        for (int i = 0; i < n; ++i) {
+            for (int j = 0; j < n; ++j) {
+                if (dist[i][k] + dist[k][j] < dist[i][j]) {
+                    dist[i][j] = dist[i][k] + dist[k][j];
+                }
+            }
+        }
+    }
+}
+
+// ✅ Разрешено - TODO
+void load_texture() {
+    // TODO: Добавить поддержку формата PNG
+    load_bmp_texture();
+}
+
+// ✅ Разрешено - предупреждение
+void dangerous_operation() {
+    // ВНИМАНИЕ: Эта функция может вызвать утечку памяти
+    // если не вызвать cleanup() после использования
+    allocate_resources();
+}
+```
+
+### Принципы чистого кода
+**Код должен быть самодокументируемым:**
+
+```cpp
+// ❌ Неправильно - избыточные комментарии
+void calculate_average() {
+    // инициализация суммы
+    float sum = 0.0f;
+    
+    // инициализация счетчика
+    int count = 0;
+    
+    // цикл по элементам
+    for (const auto& value : values) {
+        // добавление к сумме
+        sum += value;
+        
+        // увеличение счетчика
+        count++;
+    }
+    
+    // вычисление среднего
+    float average = sum / count;
+    
+    // возврат результата
+    return average;
+}
+
+// ✅ Правильно - самодокументируемый код
+float calculate_average(const std::vector<float>& values) {
+    float sum = 0.0f;
+    
+    for (const auto& value : values) {
+        sum += value;
+    }
+    
+    return sum / values.size();
+}
+```
+
+Это правило распространяется на все новые и существующие C++ файлы в проекте.

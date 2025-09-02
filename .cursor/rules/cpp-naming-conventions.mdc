@@ -1,0 +1,308 @@
+---
+globs: *.h,*.cpp
+alwaysApply: false
+---
+# C++: Правила именования
+
+Все элементы C++ кода должны следовать единому стилю именования snake_case, аналогично стандартной библиотеке C++ (std::).
+
+## Классы и структуры
+
+**Всегда использовать snake_case:**
+
+```cpp
+// ✅ Правильно
+class voxel_model { };
+class voxel_world { };
+class engine { };
+struct vertex_data { };
+
+// ❌ Неправильно
+class VoxelModel { };
+class VoxelWorld { };
+class Engine { };
+struct VertexData { };
+```
+
+## Файлы
+
+**Всегда использовать snake_case:**
+
+```cpp
+// ✅ Правильно
+voxel_model.h
+voxel_world.cpp
+engine.hpp
+math_utils.inl
+
+// ❌ Неправильно
+VoxelModel.h
+VoxelWorld.cpp
+Engine.hpp
+MathUtils.inl
+```
+
+## Функции и методы
+
+**Всегда использовать snake_case:**
+
+```cpp
+// ✅ Правильно
+void generate_mesh();
+void calculate_normals();
+bool is_valid() const;
+void set_position(const vec3f& pos);
+
+// ❌ Неправильно
+void generateMesh();
+void calculateNormals();
+bool isValid() const;
+void setPosition(const vec3f& pos);
+```
+
+## Переменные и члены классов
+
+**Всегда использовать snake_case:**
+
+```cpp
+// ✅ Правильно
+int vertex_count;
+float rotation_angle;
+std::vector<vertex> vertices_;
+bool is_visible;
+
+// ❌ Неправильно
+int vertexCount;
+float rotationAngle;
+std::vector<vertex> vertices_;
+bool isVisible;
+```
+
+## Константы
+
+**Всегда использовать snake_case:**
+
+```cpp
+// ✅ Правильно
+const int MAX_VERTICES = 1000;
+const float PI = 3.14159f;
+const std::string DEFAULT_TEXTURE = "default.png";
+
+// ❌ Неправильно
+const int maxVertices = 1000;
+const float pi = 3.14159f;
+const std::string defaultTexture = "default.png";
+```
+
+## Перечисления
+
+**Всегда использовать snake_case:**
+
+```cpp
+// ✅ Правильно
+enum class face_direction {
+    front,
+    back,
+    left,
+    right,
+    top,
+    bottom
+};
+
+// ❌ Неправильно
+enum class FaceDirection {
+    Front,
+    Back,
+    Left,
+    Right,
+    Top,
+    Bottom
+};
+```
+
+## Макросы
+
+**Всегда использовать UPPER_SNAKE_CASE:**
+
+```cpp
+// ✅ Правильно
+#define MAX_BUFFER_SIZE 1024
+#define DEBUG_MODE 1
+#define API_VERSION "1.0"
+
+// ❌ Неправильно
+#define MaxBufferSize 1024
+#define debugMode 1
+#define apiVersion "1.0"
+```
+
+## Исключения
+
+**НЕ изменять:**
+- Имена из внешних библиотек (Vulkan, GLFW, std::)
+- Имена в стороннем коде
+- Имена в генерируемых файлах
+
+## Автоматическая проверка
+
+### IDE настройки
+- Включить clang-tidy с правилом `readability-identifier-naming`
+- Настроить автоисправление при сохранении
+
+### Pre-commit hooks
+- Добавить проверку именования в pre-commit конфигурацию
+- Автоматическое исправление простых случаев
+
+Это правило распространяется на все новые и существующие C++ файлы в проекте.
+# C++: Правила именования
+
+Все элементы C++ кода должны следовать единому стилю именования snake_case, аналогично стандартной библиотеке C++ (std::).
+
+## Классы и структуры
+
+**Всегда использовать snake_case:**
+
+```cpp
+// ✅ Правильно
+class voxel_model { };
+class voxel_world { };
+class engine { };
+struct vertex_data { };
+
+// ❌ Неправильно
+class VoxelModel { };
+class VoxelWorld { };
+class Engine { };
+struct VertexData { };
+```
+
+## Файлы
+
+**Всегда использовать snake_case:**
+
+```cpp
+// ✅ Правильно
+voxel_model.h
+voxel_world.cpp
+engine.hpp
+math_utils.inl
+
+// ❌ Неправильно
+VoxelModel.h
+VoxelWorld.cpp
+Engine.hpp
+MathUtils.inl
+```
+
+## Функции и методы
+
+**Всегда использовать snake_case:**
+
+```cpp
+// ✅ Правильно
+void generate_mesh();
+void calculate_normals();
+bool is_valid() const;
+void set_position(const vec3f& pos);
+
+// ❌ Неправильно
+void generateMesh();
+void calculateNormals();
+bool isValid() const;
+void setPosition(const vec3f& pos);
+```
+
+## Переменные и члены классов
+
+**Всегда использовать snake_case:**
+
+```cpp
+// ✅ Правильно
+int vertex_count;
+float rotation_angle;
+std::vector<vertex> vertices_;
+bool is_visible;
+
+// ❌ Неправильно
+int vertexCount;
+float rotationAngle;
+std::vector<vertex> vertices_;
+bool isVisible;
+```
+
+## Константы
+
+**Всегда использовать snake_case:**
+
+```cpp
+// ✅ Правильно
+const int MAX_VERTICES = 1000;
+const float PI = 3.14159f;
+const std::string DEFAULT_TEXTURE = "default.png";
+
+// ❌ Неправильно
+const int maxVertices = 1000;
+const float pi = 3.14159f;
+const std::string defaultTexture = "default.png";
+```
+
+## Перечисления
+
+**Всегда использовать snake_case:**
+
+```cpp
+// ✅ Правильно
+enum class face_direction {
+    front,
+    back,
+    left,
+    right,
+    top,
+    bottom
+};
+
+// ❌ Неправильно
+enum class FaceDirection {
+    Front,
+    Back,
+    Left,
+    Right,
+    Top,
+    Bottom
+};
+```
+
+## Макросы
+
+**Всегда использовать UPPER_SNAKE_CASE:**
+
+```cpp
+// ✅ Правильно
+#define MAX_BUFFER_SIZE 1024
+#define DEBUG_MODE 1
+#define API_VERSION "1.0"
+
+// ❌ Неправильно
+#define MaxBufferSize 1024
+#define debugMode 1
+#define apiVersion "1.0"
+```
+
+## Исключения
+
+**НЕ изменять:**
+- Имена из внешних библиотек (Vulkan, GLFW, std::)
+- Имена в стороннем коде
+- Имена в генерируемых файлах
+
+## Автоматическая проверка
+
+### IDE настройки
+- Включить clang-tidy с правилом `readability-identifier-naming`
+- Настроить автоисправление при сохранении
+
+### Pre-commit hooks
+- Добавить проверку именования в pre-commit конфигурацию
+- Автоматическое исправление простых случаев
+
+Это правило распространяется на все новые и существующие C++ файлы в проекте.

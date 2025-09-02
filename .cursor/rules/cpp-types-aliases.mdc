@@ -1,7 +1,6 @@
 ---
-description: 
-globs: 
-alwaysApply: true
+globs: *.h,*.cpp
+alwaysApply: false
 ---
 # C++: Использование собственных алиасов для целых типов
 

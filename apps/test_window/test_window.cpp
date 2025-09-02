@@ -7,14 +7,8 @@
 
 int main() {
     try {
-        std::cout << "Создание окна..." << std::endl;
-        
         // Создание окна
         voxel::window window(1280, 720, "Voxel Engine - Window Test");
-        
-        std::cout << "Окно создано успешно!" << std::endl;
-        std::cout << "Размер окна: " << window.get_width() << "x" << window.get_height() << std::endl;
-        std::cout << "Нажмите ESC для выхода" << std::endl;
         
         // Главный цикл
         while (!window.should_close()) {
@@ -50,9 +44,6 @@ int main() {
             // Небольшая задержка для снижения нагрузки на CPU
             std::this_thread::sleep_for(std::chrono::milliseconds(16)); // ~60 FPS
         }
-        
-        std::cout << "Окно закрыто" << std::endl;
-        
     } catch (const std::exception& e) {
         std::cerr << "Ошибка: " << e.what() << std::endl;
         return 1;

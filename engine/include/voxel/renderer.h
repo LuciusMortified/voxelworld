@@ -38,8 +38,16 @@ namespace voxel {
         void begin_frame();
         void end_frame();
 
-        void render_mesh(std::shared_ptr<mesh> mesh, const vec3f& position, const vec3f& rotation = {}, const vec3f& scale = {1.0f, 1.0f, 1.0f});
-        void render_world(const std::shared_ptr<world>& world, const std::shared_ptr<camera>& camera);
+        void render_mesh(
+            std::shared_ptr<mesh> mesh,
+            const vec3f& position,
+            const vec3f& rotation = {},
+            const vec3f& scale = {1.0f, 1.0f, 1.0f}
+        );
+        void render_world(
+            const std::shared_ptr<world>& world,
+            const std::shared_ptr<camera>& camera
+        );
 
         void set_clear_color(const colorf& color);
         void set_clear_color(float r, float g, float b, float a = 1.0f);
@@ -51,6 +59,7 @@ namespace voxel {
     private:
         void create_swapchain();
         void create_image_views();
+        void create_depth_resources();
         void create_render_pass();
         void create_descriptor_set_layout();
         void create_graphics_pipeline();
@@ -62,14 +71,45 @@ namespace voxel {
         void create_descriptor_sets();
 
         void cleanup_swapchain();
+        void cleanup_depth_resources();
         void recreate_swapchain();
 
-        void update_uniform_buffer(const std::shared_ptr<camera>& camera);
+        void update_uniform_buffer(
+            const std::shared_ptr<camera>& camera
+        );
 
-        static VkSurfaceFormatKHR choose_swap_surface_format(const std::vector<VkSurfaceFormatKHR>& available_formats);
+        VkFormat find_depth_format();
+        VkFormat find_supported_format(
+            const std::vector<VkFormat>& candidates,
+            VkImageTiling tiling,
+            VkFormatFeatureFlags features
+        );
 
-        static VkPresentModeKHR choose_swap_present_mode(const std::vector<VkPresentModeKHR>& available_present_modes);
-        VkExtent2D choose_swap_extent(const VkSurfaceCapabilitiesKHR& capabilities);
+        void create_image(
+            VkImage& image,
+            VkDeviceMemory& image_memory,
+            VkExtent2D extent,
+            VkFormat format,
+            VkImageTiling tiling,
+            VkImageUsageFlags usage,
+            VkMemoryPropertyFlags properties
+        );
+        VkImageView create_image_view(
+            VkImage image,
+            VkFormat format,
+            VkImageAspectFlags aspect_flags
+        );
+        uint32 find_memory_type(uint32 typeFilter, VkMemoryPropertyFlags properties);
+
+        static VkSurfaceFormatKHR choose_swap_surface_format(
+            const std::vector<VkSurfaceFormatKHR>& available_formats
+        );
+        static VkPresentModeKHR choose_swap_present_mode(
+            const std::vector<VkPresentModeKHR>& available_present_modes
+        );
+        VkExtent2D choose_swap_extent(
+            const VkSurfaceCapabilitiesKHR& capabilities
+        );
 
         std::shared_ptr<vulkan_context> context_;
         std::shared_ptr<window> window_;
@@ -80,6 +120,11 @@ namespace voxel {
         VkFormat swapchain_image_format_;
         VkExtent2D swapchain_extent_{};
         std::vector<VkImageView> swapchain_image_views_;
+
+        // Depth
+        VkImage depth_image_;
+        VkDeviceMemory depth_image_memory_;
+        VkImageView depth_image_view_;
 
         // Render pass и pipeline
         VkRenderPass render_pass_;

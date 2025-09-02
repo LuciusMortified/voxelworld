@@ -32,7 +32,7 @@ public:
         get_engine()->get_camera()->set_rotation(voxel::math::radians(0.0f), 0.0f);
         
         // Создание модели
-        create_simple_cube();
+        create_flower_model();
         
         std::cout << "Воксельное приложение инициализировано!" << std::endl;
     }
@@ -55,58 +55,19 @@ public:
     }
     
 private:
-    void create_simple_cube() {
-        // Создаем простую кубическую модель 3x3x3
-        cube_model_ = std::make_shared<voxel::model>(3, 3, 3);
+    void create_flower_model() {
+        model_ = std::make_shared<voxel::model>(3, 3, 3);
         
-        // Заполняем куб без перезаписи вокселов
-        // Нижняя грань (синяя) - y=0
-        cube_model_->set_voxel(0, 0, 0, voxel::BLUE);
-        cube_model_->set_voxel(1, 0, 0, voxel::BLUE);
-        cube_model_->set_voxel(2, 0, 0, voxel::BLUE);
-        cube_model_->set_voxel(0, 0, 1, voxel::BLUE);
-        cube_model_->set_voxel(1, 0, 1, voxel::BLUE);
-        cube_model_->set_voxel(2, 0, 1, voxel::BLUE);
-        cube_model_->set_voxel(0, 0, 2, voxel::BLUE);
-        cube_model_->set_voxel(1, 0, 2, voxel::BLUE);
-        cube_model_->set_voxel(2, 0, 2, voxel::BLUE);
-        
-        // Верхняя грань (зеленая) - y=2
-        cube_model_->set_voxel(0, 2, 0, voxel::GREEN);
-        cube_model_->set_voxel(1, 2, 0, voxel::GREEN);
-        cube_model_->set_voxel(2, 2, 0, voxel::GREEN);
-        cube_model_->set_voxel(0, 2, 1, voxel::GREEN);
-        cube_model_->set_voxel(1, 2, 1, voxel::GREEN);
-        cube_model_->set_voxel(2, 2, 1, voxel::GREEN);
-        cube_model_->set_voxel(0, 2, 2, voxel::GREEN);
-        cube_model_->set_voxel(1, 2, 2, voxel::GREEN);
-        cube_model_->set_voxel(2, 2, 2, voxel::GREEN);
-        
-        // Передняя грань (красная) - z=0 (только средние вокселы)
-        cube_model_->set_voxel(0, 1, 0, voxel::RED);
-        cube_model_->set_voxel(1, 1, 0, voxel::RED);
-        cube_model_->set_voxel(2, 1, 0, voxel::RED);
-        
-        // Задняя грань (желтая) - z=2 (только средние вокселы)
-        cube_model_->set_voxel(0, 1, 2, voxel::YELLOW);
-        cube_model_->set_voxel(1, 1, 2, voxel::YELLOW);
-        cube_model_->set_voxel(2, 1, 2, voxel::YELLOW);
-        
-        // Левая грань (циановая) - x=0 (только средние вокселы)
-        cube_model_->set_voxel(0, 1, 0, voxel::CYAN);
-        cube_model_->set_voxel(0, 1, 1, voxel::CYAN);
-        cube_model_->set_voxel(0, 1, 2, voxel::CYAN);
-        
-        // Правая грань (пурпурная) - x=2 (только средние вокселы)
-        cube_model_->set_voxel(2, 1, 0, voxel::MAGENTA);
-        cube_model_->set_voxel(2, 1, 1, voxel::MAGENTA);
-        cube_model_->set_voxel(2, 1, 2, voxel::MAGENTA);
-        
-        // Центр куба (белый)
-        cube_model_->set_voxel(1, 1, 1, voxel::WHITE);
-        
+        model_->set_voxel(1, 1, 0, voxel::GREEN);
+        model_->set_voxel(1, 1, 1, voxel::GREEN);
+        model_->set_voxel(1, 1, 2, voxel::GREEN);
+        model_->set_voxel(1, 0, 1, voxel::GREEN);
+        model_->set_voxel(1, 2, 1, voxel::GREEN);
+        model_->set_voxel(0, 1, 1, voxel::GREEN);
+        model_->set_voxel(2, 1, 1, voxel::GREEN);
+
         // Добавляем куб в мир движка
-        cube_id_ = get_engine()->get_world()->add_object(cube_model_, {0.0f, 0.0f, 0.0f});
+        cube_id_ = get_engine()->get_world()->add_object(model_, {0.0f, 0.0f, 0.0f});
         std::cout << "Кубик добавлен в мир с ID: " << cube_id_ << std::endl;
         
         cube_rotation_ = 0.0f;
@@ -138,10 +99,6 @@ private:
                     camera_controller_->toggle_cursor_mode();
                 }
                 break;
-            case voxel::input::key::Q:
-                std::cout << "Выход из приложения" << std::endl;
-                get_engine()->shutdown();
-                break;
             case voxel::input::key::KEY_1:
                 // Изменение скорости вращения
                 cube_rotation_speed_ = (cube_rotation_speed_ > 0) ? 0.0f : voxel::math::radians(5.0f);
@@ -152,7 +109,7 @@ private:
         }
     }
     
-    std::shared_ptr<voxel::model> cube_model_;
+    std::shared_ptr<voxel::model> model_;
     voxel::object_id cube_id_ = 0;
     float cube_rotation_{};
     float cube_rotation_speed_{};

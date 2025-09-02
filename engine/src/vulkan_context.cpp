@@ -1,6 +1,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <set>
+#include <cstring>
 
 #include <voxel/vulkan_context.h>
 #include <voxel/window.h>

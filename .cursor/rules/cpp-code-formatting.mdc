@@ -1,0 +1,388 @@
+---
+globs: *.h,*.cpp
+alwaysApply: false
+---
+# C++: Правила форматирования кода
+
+## Порядок #include директив
+
+**Обязательный порядок:**
+1. Системные заголовки (`<vector>`, `<string>`, `<cstdint>`)
+2. Заголовки внешних библиотек (`<vulkan/vulkan.h>`, `<GLFW/glfw3.h>`)
+3. Заголовки проекта (`"engine.h"`, `"voxel_model.h"`)
+
+**Между блоками - пустая строка:**
+
+```cpp
+#include <iostream>
+#include <vector>
+#include <string>
+
+#include <vulkan/vulkan.h>
+#include <GLFW/glfw3.h>
+
+#include "engine.h"
+#include "window.h"
+#include "input.h"
+```
+
+## Пути к заголовкам проекта
+
+**ВСЕГДА использовать абсолютные пути:**
+
+```cpp
+// ✅ Правильно
+#include "engine.h"
+#include "voxel_model.h"
+
+// ❌ Неправильно
+#include "../../engine/include/engine.h"
+#include "../include/voxel_model.h"
+```
+
+## Форматирование функций
+
+### Многострочное форматирование для длинных функций
+
+**Применять когда:**
+- Более 3 аргументов
+- Длина строки превышает 80 символов
+
+#### Объявления в .h файлах:
+```cpp
+// ✅ Правильно
+void generate_face_quads(
+    std::vector<vertex>& vertices,
+    std::vector<uint32>& indices,
+    const model& model,
+    int face_direction
+);
+
+// ❌ Неправильно
+void generate_face_quads(std::vector<vertex>& vertices, std::vector<uint32>& indices, const model& model, int face_direction);
+```
+
+#### Определения в .cpp файлах:
+```cpp
+// ✅ Правильно
+void greedy_mesh_generator::generate_face_quads(
+    std::vector<vertex>& vertices,
+    std::vector<uint32>& indices,
+    const model& model,
+    int face_direction
+) {
+    // реализация
+}
+
+// ❌ Неправильно
+void greedy_mesh_generator::generate_face_quads(std::vector<vertex>& vertices, std::vector<uint32>& indices, const model& model, int face_direction) {
+    // реализация
+}
+```
+
+### Конструкторы
+```cpp
+// ✅ Правильно
+MyClass::MyClass(
+    const std::string& name,
+    int width,
+    int height
+) : name_(name), width_(width), height_(height) {
+    // реализация
+}
+
+// ❌ Неправильно
+MyClass::MyClass(const std::string& name, int width, int height) : name_(name), width_(width), height_(height) {
+    // реализация
+}
+```
+
+## Отступы и пробелы
+
+### Основные правила:
+- **Отступ**: 4 пробела (НЕ табуляция)
+- **Максимальная длина строки**: 80 символов
+- **Пробелы вокруг операторов**: `a + b`, `a == b`
+- **Пробелы после запятых**: `func(a, b, c)`
+
+### Примеры:
+```cpp
+// ✅ Правильно
+if (condition) {
+    for (int i = 0; i < count; ++i) {
+        result = a + b * c;
+    }
+}
+
+// ❌ Неправильно
+if(condition){
+    for(int i=0;i<count;++i){
+        result=a+b*c;
+    }
+}
+```
+
+## Структура файлов
+
+### Заголовочные файлы (.h, .hpp):
+```cpp
+#pragma once
+
+// Системные заголовки
+#include <vector>
+#include <string>
+
+// Заголовки проекта
+#include "types.h"
+
+// Объявления классов
+class my_class {
+public:
+    my_class();
+    ~my_class();
+    
+private:
+    int member_;
+};
+```
+
+### Исходные файлы (.cpp):
+```cpp
+// Заголовки проекта
+#include "my_class.h"
+
+// Реализация
+my_class::my_class() : member_(0) {
+    // конструктор
+}
+
+my_class::~my_class() {
+    // деструктор
+}
+```
+
+## Исключения
+
+**Однострочный формат разрешен для:**
+- Простых геттеров/сеттеров
+- Функций с 1-2 короткими аргументами
+- Встроенных функций (inline) до 80 символов
+
+```cpp
+// ✅ Разрешено
+int get_count() const { return count_; }
+void set_count(int value) { count_ = value; }
+inline float square(float x) { return x * x; }
+```
+
+## Автоматизация
+
+### clang-format конфигурация:
+```yaml
+BasedOnStyle: Google
+IndentWidth: 4
+ColumnLimit: 80
+AccessModifierOffset: -4
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: false
+```
+
+### IDE настройки:
+- Включить автоформатирование при сохранении
+- Использовать clang-format для C++ файлов
+- Настроить pre-commit hooks для автоматической проверки
+
+Это правило распространяется на все новые и существующие C++ файлы в проекте.
+
+# C++: Правила форматирования кода
+
+## Порядок #include директив
+
+**Обязательный порядок:**
+1. Системные заголовки (`<vector>`, `<string>`, `<cstdint>`)
+2. Заголовки внешних библиотек (`<vulkan/vulkan.h>`, `<GLFW/glfw3.h>`)
+3. Заголовки проекта (`"engine.h"`, `"voxel_model.h"`)
+
+**Между блоками - пустая строка:**
+
+```cpp
+#include <iostream>
+#include <vector>
+#include <string>
+
+#include <vulkan/vulkan.h>
+#include <GLFW/glfw3.h>
+
+#include "engine.h"
+#include "window.h"
+#include "input.h"
+```
+
+## Пути к заголовкам проекта
+
+**ВСЕГДА использовать абсолютные пути:**
+
+```cpp
+// ✅ Правильно
+#include "engine.h"
+#include "voxel_model.h"
+
+// ❌ Неправильно
+#include "../../engine/include/engine.h"
+#include "../include/voxel_model.h"
+```
+
+## Форматирование функций
+
+### Многострочное форматирование для длинных функций
+
+**Применять когда:**
+- Более 3 аргументов
+- Длина строки превышает 80 символов
+
+#### Объявления в .h файлах:
+```cpp
+// ✅ Правильно
+void generate_face_quads(
+    std::vector<vertex>& vertices,
+    std::vector<uint32>& indices,
+    const model& model,
+    int face_direction
+);
+
+// ❌ Неправильно
+void generate_face_quads(std::vector<vertex>& vertices, std::vector<uint32>& indices, const model& model, int face_direction);
+```
+
+#### Определения в .cpp файлах:
+```cpp
+// ✅ Правильно
+void greedy_mesh_generator::generate_face_quads(
+    std::vector<vertex>& vertices,
+    std::vector<uint32>& indices,
+    const model& model,
+    int face_direction
+) {
+    // реализация
+}
+
+// ❌ Неправильно
+void greedy_mesh_generator::generate_face_quads(std::vector<vertex>& vertices, std::vector<uint32>& indices, const model& model, int face_direction) {
+    // реализация
+}
+```
+
+### Конструкторы
+```cpp
+// ✅ Правильно
+MyClass::MyClass(
+    const std::string& name,
+    int width,
+    int height
+) : name_(name), width_(width), height_(height) {
+    // реализация
+}
+
+// ❌ Неправильно
+MyClass::MyClass(const std::string& name, int width, int height) : name_(name), width_(width), height_(height) {
+    // реализация
+}
+```
+
+## Отступы и пробелы
+
+### Основные правила:
+- **Отступ**: 4 пробела (НЕ табуляция)
+- **Максимальная длина строки**: 80 символов
+- **Пробелы вокруг операторов**: `a + b`, `a == b`
+- **Пробелы после запятых**: `func(a, b, c)`
+
+### Примеры:
+```cpp
+// ✅ Правильно
+if (condition) {
+    for (int i = 0; i < count; ++i) {
+        result = a + b * c;
+    }
+}
+
+// ❌ Неправильно
+if(condition){
+    for(int i=0;i<count;++i){
+        result=a+b*c;
+    }
+}
+```
+
+## Структура файлов
+
+### Заголовочные файлы (.h, .hpp):
+```cpp
+#pragma once
+
+// Системные заголовки
+#include <vector>
+#include <string>
+
+// Заголовки проекта
+#include "types.h"
+
+// Объявления классов
+class my_class {
+public:
+    my_class();
+    ~my_class();
+    
+private:
+    int member_;
+};
+```
+
+### Исходные файлы (.cpp):
+```cpp
+// Заголовки проекта
+#include "my_class.h"
+
+// Реализация
+my_class::my_class() : member_(0) {
+    // конструктор
+}
+
+my_class::~my_class() {
+    // деструктор
+}
+```
+
+## Исключения
+
+**Однострочный формат разрешен для:**
+- Простых геттеров/сеттеров
+- Функций с 1-2 короткими аргументами
+- Встроенных функций (inline) до 80 символов
+
+```cpp
+// ✅ Разрешено
+int get_count() const { return count_; }
+void set_count(int value) { count_ = value; }
+inline float square(float x) { return x * x; }
+```
+
+## Автоматизация
+
+### clang-format конфигурация:
+```yaml
+BasedOnStyle: Google
+IndentWidth: 4
+ColumnLimit: 80
+AccessModifierOffset: -4
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: false
+```
+
+### IDE настройки:
+- Включить автоформатирование при сохранении
+- Использовать clang-format для C++ файлов
+- Настроить pre-commit hooks для автоматической проверки
+
+Это правило распространяется на все новые и существующие C++ файлы в проекте.
+
