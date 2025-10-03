@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Компилируем vertex shader
-glslc voxel.vert -o voxel_vert.spv
+glslc voxel.vert -o voxel.vert.spv
 if [ $? -eq 0 ]; then
     echo "Vertex shader compiled successfully"
 else
@@ -10,7 +10,7 @@ else
 fi
 
 # Компилируем fragment shader
-glslc voxel.frag -o voxel_frag.spv
+glslc voxel.frag -o voxel.frag.spv
 if [ $? -eq 0 ]; then
     echo "Fragment shader compiled successfully"
 else

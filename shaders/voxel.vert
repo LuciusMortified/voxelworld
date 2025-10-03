@@ -28,9 +28,9 @@ layout(location = 4) out vec3 lightPos;
 layout(location = 5) out vec3 lightColor;
 
 vec3 unpackColor(uint packedColor) {
-    float r = float((packedColor >> 24) & 0xFF) / 255.0;
-    float g = float((packedColor >> 16) & 0xFF) / 255.0;
-    float b = float((packedColor >> 8) & 0xFF) / 255.0;
+    float r = float((packedColor >> 24) & uint(0xFF)) / 255.0;
+    float g = float((packedColor >> 16) & uint(0xFF)) / 255.0;
+    float b = float((packedColor >> 8) & uint(0xFF)) / 255.0;
     return vec3(r, g, b);
 }
 
