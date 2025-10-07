@@ -1,15 +1,7 @@
 #include <iostream>
 
-#include <vw/gfx/app.h>
-#include <vw/gfx/engine.h>
-#include <vw/gfx/model.h>
-#include <vw/gfx/voxel.h>
-#include <vw/gfx/world.h>
-#include <vw/math.h>
-
-#include <imgui.h>
-
-#include "vw/gfx/camera_controller.h"
+#include <vw/core.h>
+#include <vw/gfx.h>
 
 using namespace vw;
 
@@ -19,15 +11,18 @@ public:
         auto& window = get_engine().get_window();
         auto& camera = get_engine().get_camera();
 
-        camera_controller_ = std::make_unique<gfx::fps_camera_controller>(0.1f, 5.0f);
+        camera_controller_ =
+            std::make_unique<gfx::fps_camera_controller>(0.1f, 5.0f);
         camera_controller_->setup(window, camera);
 
-        window.on<gfx::events::key_press>([this](const gfx::events::key_press& event) {
-            handle_key_press(event.key);
-            return true;
-        });
+        window.sub<gfx::key_press_event>(
+            [this](const gfx::key_press_event& event) {
+                handle_key_press(event.key);
+                return true;
+            }
+        );
 
-        window.on<gfx::events::window_close>([this](gfx::events::window_close&) {
+        window.sub<gfx::window_close_event>([this](gfx::window_close_event&) {
             get_engine().shutdown();
             return true;
         });
@@ -47,8 +42,13 @@ public:
 
     void render() override {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImVec2 window_pos = ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
-        ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.0f, 0.0f));
+        ImVec2 window_pos =
+            ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
+        ImGui::SetNextWindowPos(
+            window_pos,
+            ImGuiCond_Always,
+            ImVec2(0.0f, 0.0f)
+        );
 
         // clang-format off
         ImGuiWindowFlags window_flags =
@@ -74,50 +74,53 @@ public:
         ImGui::Text("Object:");
         ImGui::Text("Rotation speed:");
         ImGui::SliderFloat("##", &object_rotation_speed_, 0.0f, 20.0f);
-        ImGui::Text("Current angle: %.2f degrees", vw::math::degrees(object_rotation_));
+        ImGui::Text(
+            "Current angle: %.2f degrees",
+            vw::math::degrees(object_rotation_)
+        );
         ImGui::End();
 
-        get_engine().get_renderer().draw_grid(
-            vec3f{1, 0, 1}, 1.f, 3
-        );
+        get_engine().get_renderer().draw_grid(vec3f{1, 0, 1}, 1.f, 3);
 
-        get_engine().get_renderer().draw_box(
-            vec3f{1, 0, 1}, vec3f{1.f}
-        );
+        get_engine().get_renderer().draw_box(vec3f{1, 0, 1}, vec3f{1.f});
     }
 
 private:
     void create_flower_model() {
         model_ = std::make_shared<gfx::model>(3, 6, 3);
-        model_->set_voxel(1, 0, 1, gfx::colors::green);
-        model_->set_voxel(1, 1, 1, gfx::colors::green);
-        model_->set_voxel(1, 2, 1, gfx::colors::green);
-        model_->set_voxel(1, 3, 1, gfx::colors::green);
-        model_->set_voxel(1, 4, 1, gfx::colors::green);
-        model_->set_voxel(1, 5, 1, gfx::colors::yellow);
-        model_->set_voxel(1, 4, 0, gfx::colors::white);
-        model_->set_voxel(1, 4, 1, gfx::colors::white);
-        model_->set_voxel(1, 4, 2, gfx::colors::white);
-        model_->set_voxel(0, 4, 1, gfx::colors::white);
-        model_->set_voxel(2, 4, 1, gfx::colors::white);
+        model_->set_voxel(1, 0, 1, colors::green);
+        model_->set_voxel(1, 1, 1, colors::green);
+        model_->set_voxel(1, 2, 1, colors::green);
+        model_->set_voxel(1, 3, 1, colors::green);
+        model_->set_voxel(1, 4, 1, colors::green);
+        model_->set_voxel(1, 5, 1, colors::yellow);
+        model_->set_voxel(1, 4, 0, colors::white);
+        model_->set_voxel(1, 4, 1, colors::white);
+        model_->set_voxel(1, 4, 2, colors::white);
+        model_->set_voxel(0, 4, 1, colors::white);
+        model_->set_voxel(2, 4, 1, colors::white);
 
-        object_id_ = get_engine().get_world().add_object(model_, {0.0f, 0.0f, 0.0f});
+        object_id_ =
+            get_engine().get_world().add_object(model_, {0.0f, 0.0f, 0.0f});
 
-        object_rotation_ = 0.0f;
+        object_rotation_       = 0.0f;
         object_rotation_speed_ = vw::math::radians(0.0f);
     }
 
     void update_object_rotation(float delta_time) {
         object_rotation_ += object_rotation_speed_ * delta_time;
-        get_engine().get_world().set_object_rotation(object_id_, {0.0f, object_rotation_, 0.0f});
+        get_engine().get_world().set_object_rotation(
+            object_id_,
+            {0.0f, object_rotation_, 0.0f}
+        );
     }
 
-    void handle_key_press(gfx::input::key key) const {
+    void handle_key_press(gfx::keyboard::key key) const {
         switch (key) {
-            case gfx::input::key::ESCAPE:
+            case gfx::keyboard::key::ESCAPE:
                 get_engine().shutdown();
                 break;
-            case gfx::input::key::F1:
+            case gfx::keyboard::key::F1:
                 camera_controller_->toggle_mouse_captured();
                 break;
             default:
@@ -135,7 +138,11 @@ private:
 
 int main() {
     try {
-        const auto instance = std::make_shared<gfx::engine>(1280, 720, "Voxel App - Test Simple Model");
+        const auto instance = std::make_shared<gfx::engine>(
+            1280,
+            720,
+            "Voxel World - Test Simple Model"
+        );
         instance->run(std::make_unique<simple_model_app>());
     } catch (const std::exception& e) {
         std::cerr << "Ошибка: " << e.what() << std::endl;
