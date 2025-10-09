@@ -1,14 +1,14 @@
-#include "vw/gfx/world/transform.h"
+#include "vw/core/transform.h"
 #include "vw/core/math.h"
 
-namespace vw::gfx {
+namespace vw {
 
 const mat4f& transform::get_matrix() const {
-    if (matrix_dirty) {
-        cached_matrix = math::transform_matrix(position_, rotation_, scale_);
-        matrix_dirty = false;
+    if (matrix_dirty_) {
+        cached_matrix_ = math::transform_matrix(position_, rotation_, scale_);
+        matrix_dirty_  = false;
     }
-    return cached_matrix;
+    return cached_matrix_;
 }
 
 void transform::set_position(const vec3f& pos) {
@@ -47,4 +47,4 @@ void transform::scale(const vec3f& factor) {
     mark_dirty();
 }
 
-} // namespace vw::gfx 
+}  // namespace vw

@@ -1,11 +1,11 @@
 #pragma once
 
-#ifndef VW_GFX_TRANSFORM_H
-#define VW_GFX_TRANSFORM_H
+#ifndef VW_CORE_TRANSFORM_H
+#define VW_CORE_TRANSFORM_H
 
 #include "vw/core.h"
 
-namespace vw::gfx {
+namespace vw {
 
 struct transform {
 private:
@@ -13,16 +13,18 @@ private:
     vec3f rotation_{0.0f, 0.0f, 0.0f};  // углы в радианах
     vec3f scale_{1.0f, 1.0f, 1.0f};
 
-    mutable mat4f cached_matrix;
-    mutable bool matrix_dirty = true;
+    mutable mat4f cached_matrix_;
+    mutable bool matrix_dirty_ = true;
 
 public:
     const vec3f& get_position() const {
         return position_;
     }
+
     const vec3f& get_rotation() const {
         return rotation_;
     }
+
     const vec3f& get_scale() const {
         return scale_;
     }
@@ -38,10 +40,10 @@ public:
     void scale(const vec3f& factor);
 
     void mark_dirty() const {
-        matrix_dirty = true;
+        matrix_dirty_ = true;
     }
 };
 
-}  // namespace vw::gfx
+}  // namespace vw
 
-#endif  // VW_GFX_TRANSFORM_H
+#endif  // VW_CORE_TRANSFORM_H

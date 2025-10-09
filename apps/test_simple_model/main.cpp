@@ -5,7 +5,7 @@
 
 using namespace vw;
 
-class simple_model_app : public gfx::app {
+class simple_model_app final : public gfx::app {
 public:
     void setup() override {
         auto& window = get_engine().get_window();
@@ -33,6 +33,11 @@ public:
         get_engine().get_debug_tool().set_visible(true);
 
         create_flower_model();
+
+        auto& world = get_engine().get_world();
+        some_entity_ = world.create();
+        world.get_registry().add(some_entity_, gfx::transformable{});
+        world.get_registry().add<gfx::renderable>(some_entity_);
     }
 
     void update(float delta_time) override {
@@ -81,13 +86,12 @@ public:
         ImGui::End();
 
         get_engine().get_renderer().draw_grid(vec3f{1, 0, 1}, 1.f, 3);
-
         get_engine().get_renderer().draw_box(vec3f{1, 0, 1}, vec3f{1.f});
     }
 
 private:
     void create_flower_model() {
-        model_ = std::make_shared<gfx::model>(3, 6, 3);
+        model_ = std::make_shared<model>(3, 6, 3);
         model_->set_voxel(1, 0, 1, colors::green);
         model_->set_voxel(1, 1, 1, colors::green);
         model_->set_voxel(1, 2, 1, colors::green);
@@ -130,10 +134,12 @@ private:
 
     std::unique_ptr<gfx::fps_camera_controller> camera_controller_;
 
-    std::shared_ptr<gfx::model> model_;
+    std::shared_ptr<model> model_;
     gfx::object_id object_id_ = 0;
     float object_rotation_{};
     float object_rotation_speed_{};
+
+    gfx::entity some_entity_;
 };
 
 int main() {

@@ -14,8 +14,8 @@ set(ENGINE_HEADERS
     "include/vw/gfx/engine/engine.h"
     "include/vw/core/voxel.h"
     "include/vw/gfx/world/world.h"
-    "include/vw/gfx/world/transform.h"
-    "include/vw/gfx/resource/model.h"
+    "include/vw/core/transform.h"
+    "include/vw/core/model.h"
     "include/vw/gfx/window/window.h"
     "include/vw/gfx/window/input.h"
     "include/vw/gfx/render/vulkan_context.h"
@@ -30,14 +30,20 @@ set(ENGINE_HEADERS
     "include/vw/gfx/debug/debug_primitive.h"
         include/vw/core/vec2.h
         include/vw/gfx.h
+        include/vw/gfx/world/entity.h
+        include/vw/gfx/world/entity_manager.h
+        include/vw/gfx/world/component_pool.h
+        include/vw/gfx/world/component_registry.h
+        include/vw/gfx/world/transformable.h
+        include/vw/gfx/world/renderable.h
 )
 
 set(ENGINE_SOURCES
     "src/core/math.cpp"
     "src/gfx/engine/engine.cpp"
     "src/gfx/world/world.cpp"
-    "src/gfx/world/transform.cpp"
-    "src/gfx/resource/model.cpp"
+    "src/core/transform.cpp"
+    "src/core/model.cpp"
     "src/gfx/window/window.cpp"
     "src/gfx/resource/buffer.cpp"
     "src/gfx/resource/mesh.cpp"

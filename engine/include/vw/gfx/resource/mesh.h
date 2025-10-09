@@ -7,9 +7,9 @@
 #include <memory>
 #include <vector>
 
+#include "../../core/model.h"
 #include "vw/core/types.h"
 #include "vw/gfx/resource/buffer.h"
-#include "vw/gfx/resource/model.h"
 
 namespace vw::gfx {
 class vulkan_context;

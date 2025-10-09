@@ -89,10 +89,7 @@ void world::set_object_scale(object_id id, const vec3f& scale) {
     }
 }
 
-void world::set_object_transform(
-    object_id id,
-    const transform& transform_data
-) {
+void world::set_object_transform(object_id id, const transform& transform_data) {
     if (auto obj = get_object(id)) {
         obj->transform = transform_data;
     }
@@ -118,7 +115,7 @@ void world::scale_object(object_id id, const vec3f& factor) {
 
 void world::set_object_model(object_id id, std::shared_ptr<model> new_model) {
     if (auto obj = get_object(id)) {
-        obj->pmodel = new_model;
+        obj->pmodel     = new_model;
         obj->mesh_dirty = true;
     }
 }
@@ -157,6 +154,18 @@ bool world::object_exists(object_id id) const {
     return object_map_.find(id) != object_map_.end();
 }
 
+entity world::create() {
+    return entity_manager_.create();
+}
+
+bool world::has(entity e) const {
+    return entity_manager_.has(e);
+}
+
+void world::destroy(entity e) {
+    entity_manager_.destroy(e);
+}
+
 void world::mark_object_mesh_dirty(object_id id) {
     if (auto obj = get_object(id)) {
         obj->mesh_dirty = true;
@@ -168,7 +177,7 @@ void world::update_object_mesh(std::shared_ptr<world_object> obj) {
         return;
     }
 
-    auto task = std::make_unique<mesh_generation_task>(obj->id, obj->pmodel);
+    auto task   = std::make_unique<mesh_generation_task>(obj->id, obj->pmodel);
     auto future = task->promise.get_future();
 
     obj->mesh_future = std::move(future);
@@ -188,9 +197,7 @@ void world::gen_thread_function() {
 
         {
             std::unique_lock<std::mutex> lock(gen_mutex_);
-            gen_cv_.wait(lock, [this] {
-                return !gen_queue_.empty() || !gen_running_;
-            });
+            gen_cv_.wait(lock, [this] { return !gen_queue_.empty() || !gen_running_; });
 
             if (!gen_queue_.empty()) {
                 task = std::move(gen_queue_.front());
@@ -200,8 +207,7 @@ void world::gen_thread_function() {
 
         if (task) {
             try {
-                mesh_data data =
-                    greedy_mesh_generator::generate_mesh_data(task->pmodel);
+                mesh_data data = greedy_mesh_generator::generate_mesh_data(task->pmodel);
 
                 task->promise.set_value(std::move(data));
             } catch (const std::exception& e) {

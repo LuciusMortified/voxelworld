@@ -1,6 +1,6 @@
-#include "vw/gfx/resource/model.h"
+#include "vw/core/model.h"
 
-namespace vw::gfx {
+namespace vw {
     model::model(int width, int height, int depth)
         : width_(width), height_(height), depth_(depth), 
           voxels_(width * height * depth, voxel()) {}

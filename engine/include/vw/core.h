@@ -11,5 +11,7 @@
 #include "vw/core/vec4.h"
 #include "vw/core/color.h"
 #include "vw/core/voxel.h"
+#include "vw/core/transform.h"
+#include "vw/core/model.h"
 
 #endif  // VW_CORE_H

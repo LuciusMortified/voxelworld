@@ -1,13 +1,13 @@
 #pragma once
 
-#ifndef VW_GFX_MODEL_H
-#define VW_GFX_MODEL_H
+#ifndef VW_CORE_MODEL_H
+#define VW_CORE_MODEL_H
 
 #include <vector>
 
 #include "vw/core.h"
 
-namespace vw::gfx {
+namespace vw {
 class model {
 public:
     model(int width, int height, int depth);
@@ -50,6 +50,6 @@ private:
     [[nodiscard]]
     int index(int x, int y, int z) const;
 };
-}  // namespace vw::gfx
+}  // namespace vw
 
-#endif  // VW_GFX_MODEL_H
+#endif  // VW_CORE_MODEL_H
