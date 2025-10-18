@@ -8,25 +8,37 @@
 #include "vw/core.h"
 
 namespace vw::gfx {
+
 struct entity final {
     static constexpr uint32 invalid_index = std::numeric_limits<uint32>::max();
 
-    uint32 index;
-    uint32 generation;
+    uint32 index      = invalid_index;
+    uint32 generation = 0;
 
-    entity() : index(invalid_index), generation(0) {}
-    entity(uint32 index, uint32 generation) : index(index), generation(generation) {}
-
-    [[nodiscard]]
-    bool operator==(const entity& rhs) const {
+    [[nodiscard]] auto operator==(const entity& rhs) const -> bool {
         return index == rhs.index && generation == rhs.generation;
     }
 
-    [[nodiscard]]
-    bool operator!=(const entity& rhs) const {
+    [[nodiscard]] auto operator!=(const entity& rhs) const -> bool {
         return !(*this == rhs);
     }
+
+    [[nodiscard]] auto is_valid() const -> bool {
+        return index != invalid_index;
+    }
 };
+
+static constexpr entity invalid_entity = entity{};
+
 }  // namespace vw::gfx
+
+namespace std {
+template <>
+struct hash<vw::gfx::entity> {
+    auto operator()(const vw::gfx::entity& ent) const noexcept -> size_t {
+        return std::hash<vw::uint32>()(ent.index) ^ (std::hash<vw::uint32>()(ent.generation) << 1);
+    }
+};
+}  // namespace std
 
 #endif  // VW_GFX_ENTITY_H

@@ -5,7 +5,8 @@
 
 #include <vector>
 
-#include "vw/core.h"
+#include "vw/core/color.h"
+#include "vw/core/voxel.h"
 
 namespace vw {
 class model {

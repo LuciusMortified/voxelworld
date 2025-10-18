@@ -47,15 +47,19 @@ inline float dot(const vec3f& a, const vec3f& b) {
 
 mat4f perspective_matrix(float fov, float aspect, float near, float far);
 mat4f look_at_matrix(const vec3f& eye, const vec3f& center, const vec3f& up);
-mat4f multiply_matrices(const mat4f& a, const mat4f& b);
 
 mat4f translation_matrix(const vec3f& translation);
 mat4f rotation_matrix_x(float angle);
 mat4f rotation_matrix_y(float angle);
 mat4f rotation_matrix_z(float angle);
-mat4f rotation_matrix(const vec3f& rotation);  // комбинированная матрица поворота
+mat4f rotation_matrix(const vec3f& rotation);  // комбинированная матрица поворота ZYX
 mat4f scale_matrix(const vec3f& scale);
-mat4f transform_matrix(const vec3f& position, const vec3f& rotation, const vec3f& scale);
+mat4f transform_matrix(
+    const vec3f& position,
+    const vec3f& rotation,
+    const vec3f& scale,
+    const vec3f& origin
+);
 
 mat4f identity_matrix();
 mat4f transpose_matrix(const mat4f& matrix);

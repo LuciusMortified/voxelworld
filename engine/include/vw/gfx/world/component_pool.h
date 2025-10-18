@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "entity.h"
-#include "entity_manager.h"
 
 namespace vw::gfx {
 template <typename T>
@@ -18,34 +17,34 @@ public:
     }
 
     [[nodiscard]]
-    bool has(entity e) const {
-        return e.index != entity::invalid_index && e.index < sparse_indices_.size() &&
-            sparse_indices_[e.index] != entity::invalid_index &&
-            dense_entities_[sparse_indices_[e.index]] == e;
+    bool has(entity ent) const {
+        return ent.index != entity::invalid_index && ent.index < sparse_indices_.size() &&
+            sparse_indices_[ent.index] != entity::invalid_index &&
+            dense_entities_[sparse_indices_[ent.index]] == ent;
     }
 
-    void add(entity e, T&& value = {}) {
-        if (e.index >= sparse_indices_.size()) [[unlikely]] {
-            sparse_indices_.resize(e.index + 1, entity::invalid_index);
+    void add(entity ent, T&& value = {}) {
+        if (ent.index >= sparse_indices_.size()) [[unlikely]] {
+            sparse_indices_.resize(ent.index + 1, entity::invalid_index);
         }
 
-        if (has(e)) [[unlikely]] {
-            dense_data_[sparse_indices_[e.index]] = std::forward<T>(value);
+        if (has(ent)) [[unlikely]] {
+            dense_data_[sparse_indices_[ent.index]] = std::forward<T>(value);
             return;
         }
 
         const uint32 index = dense_data_.size();
         dense_data_.push_back(std::forward<T>(value));
-        dense_entities_.push_back(e);
-        sparse_indices_[e.index] = index;
+        dense_entities_.push_back(ent);
+        sparse_indices_[ent.index] = index;
     }
 
-    void remove(entity e) {
-        if (!has(e)) [[unlikely]] {
+    void remove(entity ent) {
+        if (!has(ent)) [[unlikely]] {
             return;
         }
 
-        const uint32 index      = sparse_indices_[e.index];
+        const uint32 index      = sparse_indices_[ent.index];
         const uint32 last_index = dense_data_.size() - 1;
 
         if (index != last_index) {

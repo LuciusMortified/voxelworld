@@ -53,7 +53,7 @@ mat4f camera::get_projection_matrix() const {
 }
 
 mat4f camera::get_view_projection_matrix() const {
-    return math::multiply_matrices(get_projection_matrix(), get_view_matrix());
+    return get_projection_matrix() * get_view_matrix();
 }
 
 void camera::move_forward(float distance) {

@@ -7,7 +7,8 @@
 #include <memory>
 #include <vector>
 
-#include "../../core/model.h"
+#include "vw/core/model.h"
+#include "vw/core/vec3.h"
 #include "vw/core/types.h"
 #include "vw/gfx/resource/buffer.h"
 

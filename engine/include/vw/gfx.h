@@ -3,8 +3,6 @@
 #ifndef VW_GFX_H
 #define VW_GFX_H
 
-#include "core/model.h"
-#include "core/transform.h"
 #include "vw/gfx/camera/camera.h"
 #include "vw/gfx/camera/camera_controller.h"
 #include "vw/gfx/debug/debug_primitive.h"

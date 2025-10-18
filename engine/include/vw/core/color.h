@@ -3,26 +3,24 @@
 #ifndef VW_CORE_COLOR_H
 #define VW_CORE_COLOR_H
 
-#include "vw/core.h"
+#include "vw/core/types.h"
 
 namespace vw {
 struct color {
-    constexpr color() : value(0) {}
+    uint32 value;
+
+    constexpr color() : value(0U) {}
     constexpr explicit color(uint32 value_) : value(value_) {}
 
-    constexpr color(const color& c)                   = default;
-    constexpr color& operator=(const color& c)        = default;
-    constexpr bool operator==(const color& rhs) const = default;
+    constexpr color(const color&)                    = default;
+    constexpr auto operator=(const color&) -> color& = default;
+    constexpr color(color&&)                         = default;
+    constexpr auto operator=(color&&) -> color&      = default;
 
-    constexpr color(color&& c)            = default;
-    constexpr color& operator=(color&& c) = default;
+    constexpr auto operator==(const color&) const -> bool = default;
+    constexpr auto operator!=(const color&) const -> bool = default;
 
-    [[nodiscard]]
-    constexpr bool is_empty() const {
-        return value == 0;
-    }
-
-    uint32 value;
+    [[nodiscard]] constexpr auto is_empty() const -> bool;
 };
 
 // 255-цветная палитра - основные цвета
@@ -104,5 +102,7 @@ constexpr auto leaves = color(0x228B22FF);
 
 }  // namespace colors
 }  // namespace vw
+
+#include "vw/core/color.inl.h"
 
 #endif  // VW_CORE_COLOR_H

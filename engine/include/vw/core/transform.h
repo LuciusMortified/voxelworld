@@ -3,47 +3,37 @@
 #ifndef VW_CORE_TRANSFORM_H
 #define VW_CORE_TRANSFORM_H
 
-#include "vw/core.h"
+#include "vw/core/math.h"
 
 namespace vw {
 
 struct transform {
 private:
-    vec3f position_{0.0f, 0.0f, 0.0f};
-    vec3f rotation_{0.0f, 0.0f, 0.0f};  // углы в радианах
-    vec3f scale_{1.0f, 1.0f, 1.0f};
-
-    mutable mat4f cached_matrix_;
-    mutable bool matrix_dirty_ = true;
+    vec3f position_{0.0F, 0.0F, 0.0F};
+    vec3f rotation_{0.0F, 0.0F, 0.0F};  // углы в радианах
+    vec3f scale_{1.0F, 1.0F, 1.0F};
+    vec3f origin_{0.0F, 0.0F, 0.0F};
 
 public:
-    const vec3f& get_position() const {
-        return position_;
-    }
+    [[nodiscard]] auto get_position() const -> const vec3f&;
+    [[nodiscard]] auto get_rotation() const -> const vec3f&;
+    [[nodiscard]] auto get_scale() const -> const vec3f&;
+    [[nodiscard]] auto get_origin() const -> const vec3f&;
 
-    const vec3f& get_rotation() const {
-        return rotation_;
-    }
+    [[nodiscard]] auto calc_matrix() const -> mat4f;
 
-    const vec3f& get_scale() const {
-        return scale_;
-    }
-
-    const mat4f& get_matrix() const;
-
-    void set_position(const vec3f& pos);
-    void set_rotation(const vec3f& rot);
-    void set_scale(const vec3f& scl);
+    void set_position(const vec3f& position);
+    void set_rotation(const vec3f& rotation);
+    void set_scale(const vec3f& scale);
+    void set_origin(const vec3f& origin);
 
     void translate(const vec3f& offset);
     void rotate(const vec3f& angles);
     void scale(const vec3f& factor);
-
-    void mark_dirty() const {
-        matrix_dirty_ = true;
-    }
 };
 
 }  // namespace vw
+
+#include "vw/core/transform.inl.h"
 
 #endif  // VW_CORE_TRANSFORM_H

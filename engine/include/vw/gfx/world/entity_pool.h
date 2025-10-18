@@ -8,11 +8,11 @@
 #include "vw/gfx/world/entity.h"
 
 namespace vw::gfx {
-class entity_manager final {
+class entity_pool final {
 public:
     static constexpr size_t default_capacity = 1024;
 
-    explicit entity_manager(size_t capacity = default_capacity) {
+    explicit entity_pool(size_t capacity = default_capacity) {
         generations_.reserve(capacity);
     }
 

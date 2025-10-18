@@ -1,9 +1,15 @@
 #include "vw/gfx/debug/debug_primitive.h"
 
+#include "vw/core/vec3.h"
+#include "vw/core/color.h"
+
+#include <cstddef>
+#include <vector>
+#include <vulkan/vulkan_core.h>
+
 namespace vw::gfx {
 
-std::vector<VkVertexInputBindingDescription>
-debug_vertex::get_binding_descriptions() {
+auto debug_vertex::get_binding_descriptions() -> std::vector<VkVertexInputBindingDescription> {
     std::vector<VkVertexInputBindingDescription> bindings(1);
 
     bindings[0].binding   = 0;
@@ -13,8 +19,7 @@ debug_vertex::get_binding_descriptions() {
     return bindings;
 }
 
-std::vector<VkVertexInputAttributeDescription>
-debug_vertex::get_attribute_descriptions() {
+auto debug_vertex::get_attribute_descriptions() -> std::vector<VkVertexInputAttributeDescription> {
     std::vector<VkVertexInputAttributeDescription> attributes(2);
 
     // Position
@@ -36,12 +41,12 @@ void debug_primitives::clear() {
     vertices_.clear();
 }
 
-void debug_primitives::add_line(const vec3f& a, const vec3f& b, color col) {
-    vertices_.emplace_back(a, col);
-    vertices_.emplace_back(b, col);
+void debug_primitives::add_line(const vec3f& begin, const vec3f& end, color col) {
+    vertices_.emplace_back(begin, col);
+    vertices_.emplace_back(end, col);
 }
 
-const std::vector<debug_vertex>& debug_primitives::get_vertices() const {
+auto debug_primitives::get_vertices() const -> const std::vector<debug_vertex>& {
     return vertices_;
 }
 

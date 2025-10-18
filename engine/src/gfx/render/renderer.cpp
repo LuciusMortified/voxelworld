@@ -260,13 +260,11 @@ void renderer::render_world(const world& world, const camera& camera) const {
         nullptr
     );
 
+    push_constant_data push_data{};
     for (const auto& obj : world.get_objects()) {
         if (obj->visible && obj->pmesh) {
-            push_constant_data push_data{};
-            const mat4f& model_matrix = obj->transform.get_matrix();
-            for (int i = 0; i < 16; i++) {
-                push_data.model[i] = model_matrix[i];
-            }
+            const mat4f& model_matrix = obj->transform.calc_matrix();
+            memcpy(push_data.model, model_matrix.cptr(), sizeof(mat4f));
 
             vkCmdPushConstants(
                 command_buffers_[current_image_index_],
@@ -299,8 +297,8 @@ void renderer::render_debug_primitives(const camera& camera) {
     debug_push_constant_data push_data{};
     const mat4f view       = camera.get_view_matrix();
     const mat4f projection = camera.get_projection_matrix();
-    const mat4f view_proj  = math::multiply_matrices(view, projection);
-    memcpy(push_data.viewProj, view_proj.data, sizeof(mat4f));
+    const mat4f view_proj  = view * projection;
+    memcpy(push_data.view_proj, view_proj.cptr(), sizeof(mat4f));
 
     vkCmdPushConstants(
         command_buffers_[current_image_index_],
@@ -311,7 +309,7 @@ void renderer::render_debug_primitives(const camera& camera) {
         &push_data
     );
 
-    VkBuffer vertex_buffer  = debug_vertex_buffer_->get_buffer();
+    VkBuffer vertex_buffer        = debug_vertex_buffer_->get_buffer();
     constexpr VkDeviceSize offset = 0;
     vkCmdBindVertexBuffers(command_buffers_[current_image_index_], 0, 1, &vertex_buffer, &offset);
 
@@ -1326,10 +1324,10 @@ void renderer::update_uniform_buffer(const camera& camera) const {
     uniform_buffer_object ubo{};
 
     // View matrix
-    memcpy(ubo.view, camera.get_view_matrix().data, sizeof(mat4f));
+    memcpy(ubo.view, camera.get_view_matrix().cptr(), sizeof(mat4f));
 
     // Projection matrix
-    memcpy(ubo.projection, camera.get_projection_matrix().data, sizeof(mat4f));
+    memcpy(ubo.projection, camera.get_projection_matrix().cptr(), sizeof(mat4f));
 
     // View position
     ubo.view_pos = camera.get_position();
@@ -1480,25 +1478,25 @@ VkPresentModeKHR renderer::choose_swap_present_mode(
 VkExtent2D renderer::choose_swap_extent(const VkSurfaceCapabilitiesKHR& capabilities) {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
         return capabilities.currentExtent;
-    } else {
-        int width, height;
-        window_->get_framebuffer_size(&width, &height);
-
-        VkExtent2D actual_extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
-
-        actual_extent.width = std::clamp(
-            actual_extent.width,
-            capabilities.minImageExtent.width,
-            capabilities.maxImageExtent.width
-        );
-        actual_extent.height = std::clamp(
-            actual_extent.height,
-            capabilities.minImageExtent.height,
-            capabilities.maxImageExtent.height
-        );
-
-        return actual_extent;
     }
+
+    int width, height;
+    window_->get_framebuffer_size(&width, &height);
+
+    VkExtent2D actual_extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
+
+    actual_extent.width = std::clamp(
+        actual_extent.width,
+        capabilities.minImageExtent.width,
+        capabilities.maxImageExtent.width
+    );
+    actual_extent.height = std::clamp(
+        actual_extent.height,
+        capabilities.minImageExtent.height,
+        capabilities.maxImageExtent.height
+    );
+
+    return actual_extent;
 }
 
 void renderer::set_render_mode(render_mode mode) {

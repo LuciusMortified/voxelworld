@@ -10,6 +10,7 @@
 
 #include "vw/core.h"
 #include "vw/gfx/debug/debug_primitive.h"
+#include "vw/gfx/world/world.h"
 
 namespace vw::gfx {
 
@@ -20,7 +21,6 @@ class camera;
 class mesh;
 class shader;
 class uniform_buffer;
-class world;
 
 enum class render_mode { lit, wireframe };
 
@@ -37,7 +37,7 @@ struct push_constant_data {
 };
 
 struct debug_push_constant_data {
-    alignas(16) float32 viewProj[16]{};
+    alignas(16) float32 view_proj[16]{};
 };
 
 class renderer {

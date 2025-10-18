@@ -15,12 +15,17 @@
 
 #include "vw/core.h"
 #include "vw/gfx/resource/mesh.h"
-#include "vw/gfx/world/component_registry.h"
-#include "vw/gfx/world/entity_manager.h"
-#include "vw/gfx/world/renderable.h"
-#include "vw/gfx/world/transformable.h"
+#include "vw/gfx/world/entity_pool.h"
+#include "vw/gfx/world/registry.h"
+
+#include "vw/gfx/world/components/model_component.h"
+#include "vw/gfx/world/components/transform_component.h"
+
+#include "vw/gfx/world/systems/hierarchy_system.h"
+#include "vw/gfx/world/systems/transform_system.h"
 
 namespace vw::gfx {
+
 class vulkan_context;
 
 using object_id = uint32;
@@ -49,8 +54,14 @@ struct mesh_generation_task {
         : id(id), pmodel(std::move(pmodel)) {}
 };
 
+using default_components = std::tuple<hierarchy_component, transform_component, model_component>;
+
 class world {
 public:
+    using registry_type         = typename registry_from_tuple<default_components>::type;
+    using transform_system_type = typename transform_system_from_tuple<default_components>::type;
+    using hierarchy_system_type = typename hierarchy_system_from_tuple<default_components>::type;
+
     explicit world(vulkan_context& context);
     ~world();
 
@@ -63,7 +74,8 @@ public:
         std::shared_ptr<model> model,
         const vec3f& position = {0, 0, 0},
         const vec3f& rotation = {0, 0, 0},
-        const vec3f& scale    = {1, 1, 1}
+        const vec3f& scale    = {1, 1, 1},
+        const vec3f& origin   = {0, 0, 0}
     );
     void remove_object(object_id id);
     void clear();
@@ -93,23 +105,23 @@ public:
     bool is_object_visible(object_id id) const;
 
     void update_meshes();
+    void update();
 
     object_id get_next_object_id() {
         return next_object_id_++;
     }
     bool object_exists(object_id id) const;
 
-    [[nodiscard]]
-    entity create();
-
-    [[nodiscard]]
-    bool has(entity e) const;
-
-    void destroy(entity e);
-
-    [[nodiscard]]
-    auto& get_registry() {
+    [[nodiscard]] auto get_registry() -> registry_type& {
         return registry_;
+    }
+
+    [[nodiscard]] auto get_hierarchy_system() -> hierarchy_system_type& {
+        return hierarchy_system_;
+    }
+
+    [[nodiscard]] auto get_transform_system() -> transform_system_type& {
+        return transform_system_;
     }
 
 private:
@@ -131,9 +143,11 @@ private:
     void gen_thread_function();
     void process_completed_meshes();
 
-    entity_manager entity_manager_;
-    component_registry<transformable, renderable> registry_;
+    registry_type registry_;
+    transform_system_type transform_system_;
+    hierarchy_system_type hierarchy_system_;
 };
+
 }  // namespace vw::gfx
 
 #endif  // VW_GFX_WORLD_H

@@ -25,6 +25,11 @@ struct vec3 {
     }
 
     [[nodiscard]]
+    vec3 operator-() const {
+        return vec3(-x, -y, -z);
+    }
+
+    [[nodiscard]]
     vec3 operator*(T scalar) const {
         return vec3(x * scalar, y * scalar, z * scalar);
     }
@@ -37,6 +42,10 @@ struct vec3 {
     [[nodiscard]]
     bool operator!=(const vec3& other) const {
         return !(*this == other);
+    }
+
+    vec3& operator+=(const vec3& other) {
+        return *this = *this + other;
     }
 };
 

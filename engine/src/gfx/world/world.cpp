@@ -8,7 +8,7 @@
 
 namespace vw::gfx {
 
-world::world(vulkan_context& context) : context_(&context) {
+world::world(vulkan_context& context) : context_(&context), transform_system_(registry_), hierarchy_system_(registry_, transform_system_) {
     gen_thread_ = std::thread(&world::gen_thread_function, this);
 }
 
@@ -28,7 +28,8 @@ object_id world::add_object(
     std::shared_ptr<model> model,
     const vec3f& position,
     const vec3f& rotation,
-    const vec3f& scale
+    const vec3f& scale,
+    const vec3f& origin
 ) {
     object_id id = get_next_object_id();
 
@@ -36,6 +37,7 @@ object_id world::add_object(
     obj->transform.set_position(position);
     obj->transform.set_rotation(rotation);
     obj->transform.set_scale(scale);
+    obj->transform.set_origin(origin);
 
     objects_.push_back(obj);
     object_map_[id] = obj;
@@ -150,24 +152,16 @@ void world::update_meshes() {
     }
 }
 
+void world::update() {
+    transform_system_.update();
+}
+
 bool world::object_exists(object_id id) const {
-    return object_map_.find(id) != object_map_.end();
-}
-
-entity world::create() {
-    return entity_manager_.create();
-}
-
-bool world::has(entity e) const {
-    return entity_manager_.has(e);
-}
-
-void world::destroy(entity e) {
-    entity_manager_.destroy(e);
+    return object_map_.contains(id);
 }
 
 void world::mark_object_mesh_dirty(object_id id) {
-    if (auto obj = get_object(id)) {
+    if (const auto obj = get_object(id)) {
         obj->mesh_dirty = true;
     }
 }

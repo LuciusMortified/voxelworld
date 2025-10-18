@@ -28,22 +28,30 @@ set(ENGINE_HEADERS
     "include/vw/gfx/render/renderer.h"
     "include/vw/gfx/debug/debug_window.h"
     "include/vw/gfx/debug/debug_primitive.h"
-        include/vw/core/vec2.h
-        include/vw/gfx.h
-        include/vw/gfx/world/entity.h
-        include/vw/gfx/world/entity_manager.h
-        include/vw/gfx/world/component_pool.h
-        include/vw/gfx/world/component_registry.h
-        include/vw/gfx/world/transformable.h
-        include/vw/gfx/world/renderable.h
+    "include/vw/core/vec2.h"
+    "include/vw/gfx.h"
+    "include/vw/gfx/world/entity.h"
+    "include/vw/gfx/world/entity_pool.h"
+    "include/vw/gfx/world/component_pool.h"
+    "include/vw/gfx/world/registry.h"
+    "include/vw/core/transform.inl.h"
+    "include/vw/core/color.inl.h"
+    "include/vw/gfx/world/components/hierarchy_component.h"
+    "include/vw/gfx/world/components/hierarchy_component.inl.h"
+    "include/vw/gfx/world/components/model_component.h"
+    "include/vw/gfx/world/components/transform_component.h"
+    "include/vw/gfx/world/components/transform_component.inl.h"
+    "include/vw/gfx/world/systems/hierarchy_system.h"
+    "include/vw/gfx/world/systems/hierarchy_system.inl.h"
+    "include/vw/gfx/world/systems/transform_system.h"
+    "include/vw/gfx/world/systems/transform_system.inl.h"
 )
 
 set(ENGINE_SOURCES
     "src/core/math.cpp"
     "src/gfx/engine/engine.cpp"
     "src/gfx/world/world.cpp"
-    "src/core/transform.cpp"
-    "src/core/model.cpp"
+        "src/core/model.cpp"
     "src/gfx/window/window.cpp"
     "src/gfx/resource/buffer.cpp"
     "src/gfx/resource/mesh.cpp"
@@ -54,7 +62,6 @@ set(ENGINE_SOURCES
     "src/gfx/resource/shader.cpp"
     "src/gfx/debug/debug_window.cpp"
     "src/gfx/debug/debug_primitive.cpp"
-        include/vw/core/vec4.h
 )
 
 # Find required packages
@@ -67,7 +74,7 @@ add_library(${PROJECT_NAME} STATIC ${ENGINE_HEADERS} ${ENGINE_SOURCES})
 
 # Set include directories
 target_include_directories(${PROJECT_NAME} PUBLIC include)
-target_include_directories(${PROJECT_NAME} PUBLIC ${Vulkan_INCLUDE_DIRS})
+target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC ${Vulkan_INCLUDE_DIRS})
 
 # Link libraries
 target_link_libraries(${PROJECT_NAME} PUBLIC ${Vulkan_LIBRARIES} glfw imgui::imgui)

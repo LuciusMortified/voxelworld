@@ -9,6 +9,7 @@
 #include <typeindex>
 
 #include "vw/gfx/world/component_pool.h"
+#include "vw/gfx/world/entity_pool.h"
 
 namespace vw::gfx {
 
@@ -33,14 +34,26 @@ consteval size_t type_index_in() {
 }
 
 template <typename... Ts>
-class component_registry {
+class registry {
 public:
     template <typename T>
     component_pool<T>& get_pool() {
         constexpr size_t index = type_index_in<T, Ts...>();
         static_assert(index < sizeof...(Ts), "type not in component registry");
 
-        return std::get<index>(pools_);
+        return std::get<index>(component_pools_);
+    }
+
+    template <typename T>
+    const component_pool<T>& get_pool() const {
+        constexpr size_t index = type_index_in<T, Ts...>();
+        static_assert(index < sizeof...(Ts), "type not in component registry");
+
+        return std::get<index>(component_pools_);
+    }
+
+    entity create() {
+        return entity_pool_.create();
     }
 
     template <typename T>
@@ -48,13 +61,13 @@ public:
         get_pool<T>().add(e, std::forward<T>(value));
     }
 
-    template <typename T>
-    T& get(entity e) {
-        return get_pool<T>().get(e);
+    template<typename T>
+    [[nodiscard]] auto has(entity ent) const -> bool {
+        return get_pool<T>().has(ent);
     }
 
     template <typename T>
-    const T& get(entity e) const {
+    T& get(entity e) {
         return get_pool<T>().get(e);
     }
 
@@ -64,29 +77,34 @@ public:
     }
 
     void remove_all(entity e) {
-        (get_pool<Ts>().remove(e), ...);
+        (remove<Ts>(e), ...);
+    }
+
+    void destroy(entity e) {
+        remove_all(e);
+        entity_pool_.destroy(e);
     }
 
     template <typename... Cs>
     auto view() {
-        return component_view<component_registry, Cs...>(*this);
+        return component_view<registry, Cs...>(*this);
     }
 
 private:
-    std::tuple<component_pool<Ts>...> pools_;
+    entity_pool entity_pool_;
+    std::tuple<component_pool<Ts>...> component_pools_;
 };
 
 template <typename T, typename... Cs>
 class component_view {
 public:
-    explicit component_view(T& registry) : registry_{registry} {
+    explicit component_view(T& registry) : registry_{&registry} {
         pick_entities_();
     }
 
     struct iterator {
-        const component_view<Cs...>* view = nullptr;
-
-        size_t index = 0;
+        component_view* view = nullptr;
+        size_t index         = 0;
 
         [[nodiscard]]
         bool operator==(const iterator& rhs) const {
@@ -103,14 +121,15 @@ public:
         }
 
         [[nodiscard]]
-        auto operator*() const {
-            const entity e = (*view->entities_)[index];
-            return view->tuple_for(e);
+        auto operator*() {
+            entity e = (*view->entities_)[index];
+            return std::tuple<entity, Cs&...>{e, view->registry_->template get<Cs>(e)...};
         }
 
     private:
         void advance_() {
-            bool not_at_end = true, not_in_all = true;
+            bool not_at_end = true;
+            bool not_in_all = true;
             for (; not_at_end && not_in_all; index++) {
                 not_at_end = index < view->entities_->size();
                 not_in_all = not_at_end && !view->present_in_all((*view->entities_)[index]);
@@ -118,9 +137,9 @@ public:
         }
     };
 
-    iterator begin() const {
+    iterator begin() {
         iterator it{this, 0};
-        if (entities_->empty()) {
+        if (entities_->empty()) [[unlikely]] {
             return it;
         }
         if (!present_in_all(entities_->front())) {
@@ -129,13 +148,14 @@ public:
         return it;
     }
 
-    iterator end() const {
-        return {this, entities_->size()};
+    iterator end() {
+        iterator it{this, entities_->size()};
+        return it;
     }
 
 private:
     T* registry_;
-    std::vector<entity>* entities_ = nullptr;
+    const std::vector<entity>* entities_ = nullptr;
 
     void pick_entities_() {
         if constexpr (sizeof...(Cs) == 0) {
@@ -144,9 +164,11 @@ private:
             return;
         }
 
-        std::array<std::pair<size_t, std::vector<entity>*>, sizeof...(Cs)> candidates = {
-            {registry_->template get_pool<Cs>().entities().size(),
-             &registry_->template get_pool<Cs>().entities()}...
+        std::array<std::pair<size_t, const std::vector<entity>*>, sizeof...(Cs)> candidates = {
+            std::pair<size_t, const std::vector<entity>*>{
+                registry_->template get_pool<Cs>().entities().size(),
+                &registry_->template get_pool<Cs>().entities()
+            }...
         };
 
         auto it = std::min_element(
@@ -160,10 +182,14 @@ private:
     bool present_in_all(entity e) const {
         return (registry_->template get_pool<Cs>().has(e) && ...);
     }
+};
 
-    auto tuple_for(entity e) const {
-        return std::forward_as_tuple(e, registry_->template get<Cs>(e)...);
-    }
+template <typename... Ts>
+struct registry_from_tuple;
+
+template <typename... Ts>
+struct registry_from_tuple<std::tuple<Ts...>> {
+    using type = registry<Ts...>;
 };
 
 }  // namespace vw::gfx

@@ -20,15 +20,15 @@ struct debug_vertex {
     explicit debug_vertex(vec3f pos, color col = colors::red) : pos(pos), col(col) {}
 
     [[nodiscard]]
-    static std::vector<VkVertexInputBindingDescription> get_binding_descriptions();
+    static auto get_binding_descriptions() -> std::vector<VkVertexInputBindingDescription>;
 
     [[nodiscard]]
-    static std::vector<VkVertexInputAttributeDescription> get_attribute_descriptions();
+    static auto get_attribute_descriptions() -> std::vector<VkVertexInputAttributeDescription>;
 };
 
 class debug_primitives {
 public:
-    void add_line(const vec3f& a, const vec3f& b, color col = colors::red);
+    void add_line(const vec3f& begin, const vec3f& end, color col = colors::red);
 
     void add_box(const vec3f& origin, const vec3f& size, color col = colors::green) {
         const vec3f p0 = origin;
@@ -60,26 +60,26 @@ public:
     }
 
     void add_grid(const vec3f& origin, float cel_size, int lines, color col = colors::gray) {
-        const float size = cel_size * lines;
+        const float size = cel_size * static_cast<float>(lines);
         for (int i = -lines; i <= lines; ++i) {
             add_line(
-                origin + vec3f{i * cel_size, 0.0f, -size},
-                origin + vec3f{i * cel_size, 0.0f, size},
+                origin + vec3f{static_cast<float>(i) * cel_size, 0.0f, -size},
+                origin + vec3f{static_cast<float>(i) * cel_size, 0.0f, size},
                 col
             );
             add_line(
-                origin + vec3f{-size, 0.0f, i * cel_size},
-                origin + vec3f{size, 0.0f, i * cel_size},
+                origin + vec3f{-size, 0.0f, static_cast<float>(i) * cel_size},
+                origin + vec3f{size, 0.0f, static_cast<float>(i) * cel_size},
                 col
             );
         }
     }
 
     [[nodiscard]]
-    const std::vector<debug_vertex>& get_vertices() const;
+    auto get_vertices() const -> const std::vector<debug_vertex>&;
 
     [[nodiscard]]
-    bool is_empty() const {
+    auto is_empty() const -> bool {
         return vertices_.empty();
     }
 
