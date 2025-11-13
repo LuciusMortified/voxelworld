@@ -2,12 +2,14 @@
 
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
+
 #include <algorithm>
 #include <chrono>
 #include <memory>
 #include <stdexcept>
 #include <thread>
 
+#include "vw/core/math.h"
 #include "vw/gfx/camera/camera.h"
 #include "vw/gfx/render/vulkan_context.h"
 #include "vw/gfx/resource/buffer.h"
@@ -18,7 +20,10 @@
 
 namespace vw::gfx {
 
-renderer::renderer(vulkan_context& context, window& window) : context_(&context), window_(&window) {
+renderer::renderer(
+    vulkan_context& context, window& window
+)
+    : context_(&context), window_(&window) {
     vertex_shader_ =
         std::make_unique<shader>(*context_, "shaders/voxel.vert.spv", shader_type::VERTEX);
     fragment_shader_ =
@@ -72,11 +77,7 @@ renderer::~renderer() {
 void renderer::begin_frame() {
     // Ждем завершения предыдущего кадра
     vkWaitForFences(
-        context_->get_device(),
-        1,
-        &in_flight_fences_[current_frame_],
-        VK_TRUE,
-        UINT64_MAX
+        context_->get_device(), 1, &in_flight_fences_[current_frame_], VK_TRUE, UINT64_MAX
     );
 
     // Сбрасываем fence для рендеринга перед использованием
@@ -105,11 +106,7 @@ void renderer::begin_frame() {
     // Ждем завершения предыдущего использования этого изображения
     if (images_in_flight_[image_index] != VK_NULL_HANDLE) {
         vkWaitForFences(
-            context_->get_device(),
-            1,
-            &images_in_flight_[image_index],
-            VK_TRUE,
-            UINT64_MAX
+            context_->get_device(), 1, &images_in_flight_[image_index], VK_TRUE, UINT64_MAX
         );
     }
 
@@ -139,10 +136,7 @@ void renderer::end_frame() {
     submit_info.pSignalSemaphores    = signal_semaphores;
 
     if (vkQueueSubmit(
-            context_->get_graphics_queue(),
-            1,
-            &submit_info,
-            in_flight_fences_[current_frame_]
+            context_->get_graphics_queue(), 1, &submit_info, in_flight_fences_[current_frame_]
         ) != VK_SUCCESS) {
         throw std::runtime_error("Failed to submit draw command buffers!");
     }
@@ -171,7 +165,9 @@ void renderer::end_frame() {
     current_frame_ = (current_frame_ + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-void renderer::render(world& world, camera& camera) {
+void renderer::render(
+    world& world, camera& camera
+) {
     // Начинаем запись в command buffer
     VkCommandBufferBeginInfo begin_info{};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -198,9 +194,7 @@ void renderer::render(world& world, camera& camera) {
 
     // Первый проход для 3д объектов
     vkCmdBeginRenderPass(
-        command_buffers_[current_image_index_],
-        &render_pass_info,
-        VK_SUBPASS_CONTENTS_INLINE
+        command_buffers_[current_image_index_], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE
     );
 
     VkViewport viewport{};
@@ -238,15 +232,15 @@ void renderer::render(world& world, camera& camera) {
     }
 }
 
-void renderer::render_world(const world& world, const camera& camera) const {
+void renderer::render_world(
+    world& world, const camera& camera
+) const {
     update_uniform_buffer(camera);
 
     VkPipeline current_pipeline =
         (current_render_mode_ == render_mode::lit) ? graphics_pipeline_ : wireframe_pipeline_;
     vkCmdBindPipeline(
-        command_buffers_[current_image_index_],
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        current_pipeline
+        command_buffers_[current_image_index_], VK_PIPELINE_BIND_POINT_GRAPHICS, current_pipeline
     );
 
     vkCmdBindDescriptorSets(
@@ -261,27 +255,33 @@ void renderer::render_world(const world& world, const camera& camera) const {
     );
 
     push_constant_data push_data{};
-    for (const auto& obj : world.get_objects()) {
-        if (obj->visible && obj->pmesh) {
-            const mat4f& model_matrix = obj->transform.calc_matrix();
-            memcpy(push_data.model, model_matrix.cptr(), sizeof(mat4f));
-
-            vkCmdPushConstants(
-                command_buffers_[current_image_index_],
-                pipeline_layout_,
-                VK_SHADER_STAGE_VERTEX_BIT,
-                0,
-                sizeof(push_constant_data),
-                &push_data
-            );
-
-            obj->pmesh->bind(command_buffers_[current_image_index_]);
-
-            obj->pmesh->draw_indexed(command_buffers_[current_image_index_]);
+    auto render_view = world.view_components<transform_component, model_component>();
+    for (const auto& [ent, transform_comp, model_comp] : render_view) {
+        const auto mesh = model_comp.get_mesh();
+        if (!mesh) {
+            continue;
         }
+
+        const mat4f& model_matrix  = transform_comp.get_world_matrix();
+        const mat4f model_matrix_t = math::transpose_matrix(model_matrix);
+        memcpy(push_data.model, model_matrix_t.cptr(), sizeof(mat4f));
+
+        vkCmdPushConstants(
+            command_buffers_[current_image_index_],
+            pipeline_layout_,
+            VK_SHADER_STAGE_VERTEX_BIT,
+            0,
+            sizeof(push_constant_data),
+            &push_data
+        );
+
+        mesh->bind(command_buffers_[current_image_index_]);
+        mesh->draw_indexed(command_buffers_[current_image_index_]);
     }
 }
-void renderer::render_debug_primitives(const camera& camera) {
+void renderer::render_debug_primitives(
+    const camera&
+) {
     if (debug_primitives_.is_empty()) {
         return;
     }
@@ -289,24 +289,18 @@ void renderer::render_debug_primitives(const camera& camera) {
     update_debug_vertex_buffer();
 
     vkCmdBindPipeline(
-        command_buffers_[current_image_index_],
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        debug_pipeline_
+        command_buffers_[current_image_index_], VK_PIPELINE_BIND_POINT_GRAPHICS, debug_pipeline_
     );
 
-    debug_push_constant_data push_data{};
-    const mat4f view       = camera.get_view_matrix();
-    const mat4f projection = camera.get_projection_matrix();
-    const mat4f view_proj  = view * projection;
-    memcpy(push_data.view_proj, view_proj.cptr(), sizeof(mat4f));
-
-    vkCmdPushConstants(
+    vkCmdBindDescriptorSets(
         command_buffers_[current_image_index_],
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
         debug_pipeline_layout_,
-        VK_SHADER_STAGE_VERTEX_BIT,
         0,
-        sizeof(debug_push_constant_data),
-        &push_data
+        1,
+        &descriptor_sets_[current_frame_],
+        0,
+        nullptr
     );
 
     VkBuffer vertex_buffer        = debug_vertex_buffer_->get_buffer();
@@ -337,14 +331,18 @@ void renderer::render_imgui() const {
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), command_buffers_[current_image_index_]);
 }
 
-void renderer::set_clear_color(float r, float g, float b, float a) {
+void renderer::set_clear_color(
+    float r, float g, float b, float a
+) {
     clear_color_.x = r;
     clear_color_.y = g;
     clear_color_.z = b;
     clear_color_.w = a;
 }
 
-void renderer::set_clear_color(vec4f color) {
+void renderer::set_clear_color(
+    vec4f color
+) {
     clear_color_ = color;
 }
 
@@ -388,8 +386,7 @@ void renderer::create_swapchain() {
     auto queue_families = context_->get_queue_families();
     if (queue_families.graphics_family != queue_families.present_family) {
         uint32_t queue_family_indices[] = {
-            queue_families.graphics_family.value(),
-            queue_families.present_family.value()
+            queue_families.graphics_family.value(), queue_families.present_family.value()
         };
         create_info.imageSharingMode      = VK_SHARING_MODE_CONCURRENT;
         create_info.queueFamilyIndexCount = 2;
@@ -405,10 +402,7 @@ void renderer::create_swapchain() {
     swapchain_images_.resize(image_count);
 
     vkGetSwapchainImagesKHR(
-        context_->get_device(),
-        swapchain_,
-        &image_count,
-        swapchain_images_.data()
+        context_->get_device(), swapchain_, &image_count, swapchain_images_.data()
     );
 
     swapchain_image_format_ = surface_format.format;
@@ -435,10 +429,7 @@ void renderer::create_image_views() {
         view_info.subresourceRange.layerCount     = 1;
 
         if (vkCreateImageView(
-                context_->get_device(),
-                &view_info,
-                nullptr,
-                &swapchain_image_views_[i]
+                context_->get_device(), &view_info, nullptr, &swapchain_image_views_[i]
             ) != VK_SUCCESS) {
             throw std::runtime_error("failed to create image views");
         }
@@ -591,10 +582,7 @@ void renderer::create_descriptor_set_layout() {
     layout_info.pBindings    = &ubo_layout_binding;
 
     if (vkCreateDescriptorSetLayout(
-            context_->get_device(),
-            &layout_info,
-            nullptr,
-            &descriptor_set_layout_
+            context_->get_device(), &layout_info, nullptr, &descriptor_set_layout_
         ) != VK_SUCCESS) {
         throw std::runtime_error("failed to create descriptor set layout");
     }
@@ -603,8 +591,7 @@ void renderer::create_descriptor_set_layout() {
 void renderer::create_graphics_pipeline() {
     // Используем уже созданные шейдеры
     VkPipelineShaderStageCreateInfo shader_stages[] = {
-        vertex_shader_->get_stage_info(),
-        fragment_shader_->get_stage_info()
+        vertex_shader_->get_stage_info(), fragment_shader_->get_stage_info()
     };
 
     // Vertex input state
@@ -697,10 +684,7 @@ void renderer::create_graphics_pipeline() {
     pipeline_layout_info.pPushConstantRanges    = &push_constant_range;
 
     if (vkCreatePipelineLayout(
-            context_->get_device(),
-            &pipeline_layout_info,
-            nullptr,
-            &pipeline_layout_
+            context_->get_device(), &pipeline_layout_info, nullptr, &pipeline_layout_
         ) != VK_SUCCESS) {
         throw std::runtime_error("failed to create pipeline layout");
     }
@@ -725,12 +709,7 @@ void renderer::create_graphics_pipeline() {
     pipeline_info.basePipelineHandle  = VK_NULL_HANDLE;
 
     if (vkCreateGraphicsPipelines(
-            context_->get_device(),
-            VK_NULL_HANDLE,
-            1,
-            &pipeline_info,
-            nullptr,
-            &graphics_pipeline_
+            context_->get_device(), VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &graphics_pipeline_
         ) != VK_SUCCESS) {
         throw std::runtime_error("failed to create graphics pipeline");
     }
@@ -738,8 +717,7 @@ void renderer::create_graphics_pipeline() {
 
 void renderer::create_wireframe_pipeline() {
     VkPipelineShaderStageCreateInfo shader_stages[] = {
-        vertex_shader_->get_stage_info(),
-        fragment_shader_->get_stage_info()
+        vertex_shader_->get_stage_info(), fragment_shader_->get_stage_info()
     };
 
     auto binding_description    = vertex::get_binding_descriptions();
@@ -830,12 +808,7 @@ void renderer::create_wireframe_pipeline() {
     pipeline_info.basePipelineHandle  = VK_NULL_HANDLE;
 
     if (vkCreateGraphicsPipelines(
-            context_->get_device(),
-            VK_NULL_HANDLE,
-            1,
-            &pipeline_info,
-            nullptr,
-            &wireframe_pipeline_
+            context_->get_device(), VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &wireframe_pipeline_
         ) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create wireframe pipeline!");
     }
@@ -843,8 +816,7 @@ void renderer::create_wireframe_pipeline() {
 void renderer::create_debug_pipeline() {
     // Используем уже созданные шейдеры
     VkPipelineShaderStageCreateInfo shader_stages[] = {
-        debug_vertex_shader_->get_stage_info(),
-        debug_fragment_shader_->get_stage_info()
+        debug_vertex_shader_->get_stage_info(), debug_fragment_shader_->get_stage_info()
     };
 
     // Vertex input state
@@ -924,23 +896,20 @@ void renderer::create_debug_pipeline() {
     depth_stencil.stencilTestEnable     = VK_FALSE;
 
     // Pipeline layout
-    VkPushConstantRange push_constant_range{};
-    push_constant_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-    push_constant_range.offset     = 0;
-    push_constant_range.size       = sizeof(debug_push_constant_data);
+    // VkPushConstantRange push_constant_range{};
+    // push_constant_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    // push_constant_range.offset     = 0;
+    // push_constant_range.size       = sizeof(debug_push_constant_data);
 
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
     pipeline_layout_info.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeline_layout_info.setLayoutCount         = 0;
-    pipeline_layout_info.pSetLayouts            = nullptr;
-    pipeline_layout_info.pushConstantRangeCount = 1;
-    pipeline_layout_info.pPushConstantRanges    = &push_constant_range;
+    pipeline_layout_info.setLayoutCount         = 1;
+    pipeline_layout_info.pSetLayouts            = &descriptor_set_layout_;
+    pipeline_layout_info.pushConstantRangeCount = 0;
+    pipeline_layout_info.pPushConstantRanges    = nullptr;
 
     if (vkCreatePipelineLayout(
-            context_->get_device(),
-            &pipeline_layout_info,
-            nullptr,
-            &debug_pipeline_layout_
+            context_->get_device(), &pipeline_layout_info, nullptr, &debug_pipeline_layout_
         ) != VK_SUCCESS) {
         throw std::runtime_error("failed to create debug pipeline layout");
     }
@@ -964,12 +933,7 @@ void renderer::create_debug_pipeline() {
     pipeline_info.basePipelineHandle  = VK_NULL_HANDLE;
 
     if (vkCreateGraphicsPipelines(
-            context_->get_device(),
-            VK_NULL_HANDLE,
-            1,
-            &pipeline_info,
-            nullptr,
-            &debug_pipeline_
+            context_->get_device(), VK_NULL_HANDLE, 1, &pipeline_info, nullptr, &debug_pipeline_
         ) != VK_SUCCESS) {
         throw std::runtime_error("failed to create debug pipeline");
     }
@@ -994,10 +958,7 @@ void renderer::create_framebuffers() {
         framebuffer_info.layers          = 1;
 
         if (vkCreateFramebuffer(
-                context_->get_device(),
-                &framebuffer_info,
-                nullptr,
-                &framebuffers_[i]
+                context_->get_device(), &framebuffer_info, nullptr, &framebuffers_[i]
             ) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create framebuffer!");
         }
@@ -1038,10 +999,7 @@ void renderer::create_sync_objects() {
     // Создаем семафоры для каждого кадра в полете
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         if (vkCreateSemaphore(
-                context_->get_device(),
-                &semaphore_info,
-                nullptr,
-                &image_available_semaphores_[i]
+                context_->get_device(), &semaphore_info, nullptr, &image_available_semaphores_[i]
             ) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create synchronization objects for a frame!");
         }
@@ -1050,10 +1008,7 @@ void renderer::create_sync_objects() {
     // Создаем семафоры для каждого изображения swapchain
     for (size_t i = 0; i < swapchain_images_.size(); i++) {
         if (vkCreateSemaphore(
-                context_->get_device(),
-                &semaphore_info,
-                nullptr,
-                &render_finished_semaphores_[i]
+                context_->get_device(), &semaphore_info, nullptr, &render_finished_semaphores_[i]
             ) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create synchronization objects for a frame!");
         }
@@ -1130,7 +1085,8 @@ void renderer::create_descriptor_sets() {
 void renderer::init_imgui() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO();
+    ImGuiIO& io    = ImGui::GetIO();
+    io.IniFilename = nullptr;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
     setup_imgui_style();
@@ -1159,18 +1115,18 @@ void renderer::init_imgui() {
 }
 
 void renderer::create_imgui_descriptor_pool() {
-    std::vector<VkDescriptorPoolSize> pool_sizes = {
-        {VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
-        {VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
-        {VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
-        {VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
-        {VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
-        {VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
-        {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
-        {VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}
+    std::array<VkDescriptorPoolSize, 11> pool_sizes = {
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 1000},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1000},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1000},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000},
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 1000}
     };
 
     VkDescriptorPoolCreateInfo pool_info{};
@@ -1181,10 +1137,7 @@ void renderer::create_imgui_descriptor_pool() {
     pool_info.maxSets       = 1000;
 
     if (vkCreateDescriptorPool(
-            context_->get_device(),
-            &pool_info,
-            nullptr,
-            &imgui_descriptor_pool_
+            context_->get_device(), &pool_info, nullptr, &imgui_descriptor_pool_
         ) != VK_SUCCESS) {
         throw std::runtime_error("failed to create imgui descriptor pool");
     }
@@ -1254,26 +1207,26 @@ void renderer::cleanup_debug_pipeline() {
 }
 
 void renderer::cleanup_swapchain() {
-    for (auto framebuffer : framebuffers_) {
+    for (auto* framebuffer : framebuffers_) {
         vkDestroyFramebuffer(context_->get_device(), framebuffer, nullptr);
     }
 
-    for (auto image_view : swapchain_image_views_) {
+    for (auto* image_view : swapchain_image_views_) {
         vkDestroyImageView(context_->get_device(), image_view, nullptr);
     }
 
     vkDestroySwapchainKHR(context_->get_device(), swapchain_, nullptr);
 
     // Очищаем семафоры при пересоздании swapchain
-    for (auto semaphore : image_available_semaphores_) {
+    for (auto* semaphore : image_available_semaphores_) {
         vkDestroySemaphore(context_->get_device(), semaphore, nullptr);
     }
-    for (auto semaphore : render_finished_semaphores_) {
+    for (auto* semaphore : render_finished_semaphores_) {
         vkDestroySemaphore(context_->get_device(), semaphore, nullptr);
     }
 
     // Очищаем fences при пересоздании swapchain
-    for (auto fence : in_flight_fences_) {
+    for (auto* fence : in_flight_fences_) {
         vkDestroyFence(context_->get_device(), fence, nullptr);
     }
 }
@@ -1294,7 +1247,8 @@ void renderer::cleanup_depth_resources() {
 }
 
 void renderer::recreate_swapchain() {
-    int width = 0, height = 0;
+    int width  = 0;
+    int height = 0;
     window_->get_framebuffer_size(&width, &height);
     while (width == 0 || height == 0) {
         window_->get_framebuffer_size(&width, &height);
@@ -1320,14 +1274,18 @@ void renderer::recreate_swapchain() {
     current_image_index_ = 0;
 }
 
-void renderer::update_uniform_buffer(const camera& camera) const {
+void renderer::update_uniform_buffer(
+    const camera& camera
+) const {
     uniform_buffer_object ubo{};
 
     // View matrix
-    memcpy(ubo.view, camera.get_view_matrix().cptr(), sizeof(mat4f));
+    const mat4f& view_matrix = camera.get_view_matrix();
+    memcpy(ubo.view, view_matrix.cptr(), sizeof(mat4f));
 
     // Projection matrix
-    memcpy(ubo.projection, camera.get_projection_matrix().cptr(), sizeof(mat4f));
+    const mat4f& projection_matrix = camera.get_projection_matrix();
+    memcpy(ubo.projection, projection_matrix.cptr(), sizeof(mat4f));
 
     // View position
     ubo.view_pos = camera.get_position();
@@ -1352,9 +1310,7 @@ VkFormat renderer::find_depth_format() {
 }
 
 VkFormat renderer::find_supported_format(
-    const std::vector<VkFormat>& candidates,
-    VkImageTiling tiling,
-    VkFormatFeatureFlags features
+    const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features
 ) {
     for (VkFormat format : candidates) {
         VkFormatProperties props;
@@ -1362,12 +1318,13 @@ VkFormat renderer::find_supported_format(
         if (tiling == VK_IMAGE_TILING_LINEAR &&
             (props.linearTilingFeatures & features) == features) {
             return format;
-        } else if (tiling == VK_IMAGE_TILING_OPTIMAL &&
-                   (props.optimalTilingFeatures & features) == features) {
+        }
+        if (tiling == VK_IMAGE_TILING_OPTIMAL &&
+            (props.optimalTilingFeatures & features) == features) {
             return format;
         }
     }
-    throw std::runtime_error("Failed to find supported format!");
+    throw std::runtime_error("failed to find supported format for physical device");
 }
 
 void renderer::create_image(
@@ -1414,7 +1371,9 @@ void renderer::create_image(
     vkBindImageMemory(context_->get_device(), image, image_memory, 0);
 }
 
-uint32 renderer::find_memory_type(uint32 typeFilter, VkMemoryPropertyFlags properties) {
+uint32 renderer::find_memory_type(
+    uint32 typeFilter, VkMemoryPropertyFlags properties
+) {
     VkPhysicalDeviceMemoryProperties mem_properties;
     vkGetPhysicalDeviceMemoryProperties(context_->get_physical_device(), &mem_properties);
 
@@ -1429,9 +1388,7 @@ uint32 renderer::find_memory_type(uint32 typeFilter, VkMemoryPropertyFlags prope
 }
 
 VkImageView renderer::create_image_view(
-    VkImage image,
-    VkFormat format,
-    VkImageAspectFlags aspect_flags
+    VkImage image, VkFormat format, VkImageAspectFlags aspect_flags
 ) {
     VkImageViewCreateInfo view_info{};
     view_info.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1475,7 +1432,9 @@ VkPresentModeKHR renderer::choose_swap_present_mode(
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-VkExtent2D renderer::choose_swap_extent(const VkSurfaceCapabilitiesKHR& capabilities) {
+VkExtent2D renderer::choose_swap_extent(
+    const VkSurfaceCapabilitiesKHR& capabilities
+) {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
         return capabilities.currentExtent;
     }
@@ -1486,20 +1445,18 @@ VkExtent2D renderer::choose_swap_extent(const VkSurfaceCapabilitiesKHR& capabili
     VkExtent2D actual_extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
 
     actual_extent.width = std::clamp(
-        actual_extent.width,
-        capabilities.minImageExtent.width,
-        capabilities.maxImageExtent.width
+        actual_extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width
     );
     actual_extent.height = std::clamp(
-        actual_extent.height,
-        capabilities.minImageExtent.height,
-        capabilities.maxImageExtent.height
+        actual_extent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height
     );
 
     return actual_extent;
 }
 
-void renderer::set_render_mode(render_mode mode) {
+void renderer::set_render_mode(
+    render_mode mode
+) {
     current_render_mode_ = mode;
 }
 

@@ -1,0 +1,64 @@
+#pragma once
+
+#ifndef VW_GFX_MESH_POOL_H
+#define VW_GFX_MESH_POOL_H
+
+#include <condition_variable>
+#include <future>
+#include <memory>
+#include <mutex>
+#include <queue>
+#include <thread>
+#include <unordered_map>
+
+#include "vw/gfx/model/model_hash.h"
+#include "vw/gfx/resource/mesh.h"
+
+namespace vw::gfx {
+
+class vulkan_context;
+class model;
+
+struct mesh_generation_task {
+    model_hash hash;
+    std::shared_ptr<model> model_ptr;
+    std::promise<mesh_data> promise;
+
+    mesh_generation_task(model_hash hash, std::shared_ptr<model> model_ptr)
+        : hash(hash), model_ptr(std::move(model_ptr)) {}
+};
+
+class mesh_pool final {
+public:
+    explicit mesh_pool(vulkan_context& context);
+    ~mesh_pool();
+
+    mesh_pool(const mesh_pool&) = delete;
+    auto operator=(const mesh_pool&) -> mesh_pool& = delete;
+    mesh_pool(mesh_pool&&) = delete;
+    auto operator=(mesh_pool&&) -> mesh_pool& = delete;
+
+    [[nodiscard]] auto has(const model_hash& hash) const -> bool;
+    [[nodiscard]] auto is_pending(const model_hash& hash) const -> bool;
+    void request_mesh(const std::shared_ptr<model>& model);
+    [[nodiscard]] auto get(const model_hash& hash) const -> std::shared_ptr<mesh>;
+    void process_completed();
+
+private:
+    void gen_thread_function();
+
+    vulkan_context& context_;
+    std::unordered_map<model_hash, std::shared_ptr<mesh>> meshes_;
+    std::thread gen_thread_;
+    std::queue<std::unique_ptr<mesh_generation_task>> gen_queue_;
+    std::mutex gen_mutex_;
+    std::condition_variable gen_cv_;
+    bool gen_running_;
+    std::unordered_map<model_hash, std::future<mesh_data>> pending_meshes_;
+};
+
+}  // namespace vw::gfx
+
+#include "vw/gfx/resource/mesh_pool.inl.h"
+
+#endif  // VW_GFX_MESH_POOL_H

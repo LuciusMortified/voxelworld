@@ -1,8 +1,13 @@
 #version 450
 
-layout(push_constant) uniform PushConstants {
-    mat4 viewProj;
-} pc;
+// Uniform buffer object
+layout(binding = 0) uniform UniformBufferObject {
+    mat4 view;
+    mat4 proj;
+    vec3 viewPos;
+    vec3 lightPos;
+    vec3 lightColor;
+} ubo;
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in uint inColor;
@@ -18,6 +23,6 @@ vec4 unpackColor(uint packedColor) {
 }
 
 void main() {
-    gl_Position = pc.viewProj * vec4(inPosition, 1.0);
+    gl_Position = ubo.proj * ubo.view * vec4(inPosition, 1.0);
     outColor = unpackColor(inColor);
 }

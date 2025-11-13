@@ -12,7 +12,16 @@ debug_window::debug_window(renderer& renderer)
     fps_history_.reserve(MAX_HISTORY_SIZE);
 }
 
-void debug_window::update(float delta_time) {
+void debug_window::render(float delta_time) {
+    if (!visible_) {
+        return;
+    }
+
+    update_fps(delta_time);
+    render_fps_window();
+}
+
+void debug_window::update_fps(float delta_time) {
     fps_accumulator_ += delta_time;
     frame_count_++;
 
@@ -28,14 +37,6 @@ void debug_window::update(float delta_time) {
         frame_count_     = 0;
         last_fps_update_ = current_time;
     }
-}
-
-void debug_window::render() {
-    if (!visible_) {
-        return;
-    }
-
-    render_fps_window();
 }
 
 void debug_window::toggle_visibility() {

@@ -1,8 +1,10 @@
-#include <iostream>
-#include "vw/gfx/world/components/hierarchy_component.h"
-
 #include <vw/core.h>
 #include <vw/gfx.h>
+#include <vw/gfx/model/model.h>
+
+#include <iostream>
+
+#include "vw/gfx/world/components/hierarchy_component.h"
 
 using namespace vw;
 
@@ -26,47 +28,24 @@ public:
         });
 
         camera.set_position({-5.0f, 1.5f, 0.0f});
-        camera.set_rotation(vw::math::radians(0.0f), 0.0f);
+        camera.set_rotation(math::radians(0.0f), 0.0f);
         get_engine().get_renderer().set_clear_color(0.1f, 0.2f, 0.3f, 1.0f);
         get_engine().get_debug_tool().set_visible(true);
 
         create_flower_model();
-
-        auto& world_registry   = get_engine().get_world().get_registry();
-        auto& transform_system = get_engine().get_world().get_transform_system();
-        auto& hierarchy_system = get_engine().get_world().get_hierarchy_system();
-
-        some_entity_ = world_registry.create();
-        world_registry.add(some_entity_, gfx::transform_component{});
-        world_registry.add(some_entity_, gfx::model_component{});
-        world_registry.add(some_entity_, gfx::hierarchy_component{});
-
-        const auto another_entity = world_registry.create();
-        world_registry.add(another_entity, gfx::transform_component{});
-        world_registry.add(another_entity, gfx::hierarchy_component{});
-
-        for (auto view = world_registry.view<gfx::transform_component, gfx::model_component>();
-             auto [ent, trf, rnd] : view) {
-            std::cout << ent.index << " " << trf.get_position().x << " " << rnd.x << std::endl;
-            transform_system.modify(ent).translate({10.0f, 0.0f, 0.0f});
-        }
-
-        for (auto [ent, trf] : world_registry.view<gfx::transform_component>()) {
-            std::cout << ent.index << " " << ent.generation << " " << trf.get_position().x << "\n";
-        }
     }
 
     void cleanup() override {
-        auto& world_registry = get_engine().get_world().get_registry();
-        world_registry.destroy(some_entity_);
+        auto& world = get_engine().get_world();
+        world.destroy_entity(some_entity_);
     }
 
-    void update(float delta_time) override {
+    void render(
+        float delta_time
+    ) override {
         camera_controller_->update(delta_time);
         update_object_rotation(delta_time);
-    }
 
-    void render() override {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         ImVec2 window_pos       = ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
         ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.0f, 0.0f));
@@ -96,15 +75,19 @@ public:
         ImGui::Text("Rotation speed:");
         ImGui::SliderFloat("##", &object_rotation_speed_, 0.0f, 20.0f);
         ImGui::Text("Current angle: %.2f degrees", vw::math::degrees(object_rotation_));
-        ImGui::End();
 
-        get_engine().get_renderer().draw_grid(vec3f{1, 0, 1}, 1.f, 3);
-        get_engine().get_renderer().draw_box(vec3f{1, 0, 1}, vec3f{1.f});
+        ImGui::End();
     }
 
 private:
     void create_flower_model() {
-        model_ = std::make_shared<model>(3, 6, 3);
+        auto& world            = get_engine().get_world();
+        auto& model_registry   = world.get_model_registry();
+        auto& transform_system = world.get_transform_system();
+        auto& model_system     = world.get_model_system();
+
+        // Создаем модель и регистрируем ее
+        model_ = std::make_shared<gfx::model>(3, 6, 3);
         model_->set_voxel(1, 0, 1, colors::green);
         model_->set_voxel(1, 1, 1, colors::green);
         model_->set_voxel(1, 2, 1, colors::green);
@@ -117,29 +100,46 @@ private:
         model_->set_voxel(0, 4, 1, colors::white);
         model_->set_voxel(2, 4, 1, colors::white);
 
-        object_id_ = get_engine().get_world().add_object(
-            model_,
-            {0.0f, 0.0f, 0.0f},
-            {0.0f, 0.0f, 0.0f},
-            {1.0f, 1.0f, 1.0f},
-            {1.5f, 3.0f, 1.5f}
-        );
+        model_registry.add("flower_model", model_);
+
+        // Создаем сущность с моделью
+        some_entity_ = world.create_entity();
+        world.add_component(some_entity_, gfx::transform_component{});
+        world.add_component(some_entity_, gfx::model_component{});
+        world.add_component(some_entity_, gfx::hierarchy_component{});
+
+        // Настраиваем transform
+        transform_system.modify(some_entity_).set_origin({1.5f, 3.0f, 1.5f});
+
+        // Настраиваем модель через model_system
+        model_system.set_model(some_entity_, model_);
 
         object_rotation_       = 0.0f;
-        object_rotation_speed_ = vw::math::radians(0.0f);
+        object_rotation_speed_ = math::radians(5.0f);
     }
 
-    void update_object_rotation(float delta_time) {
+    void update_object_rotation(
+        float delta_time
+    ) {
         object_rotation_ += object_rotation_speed_ * delta_time;
 
-        if (object_rotation_ > vw::math::radians(360.0f)) {
-            object_rotation_ = vw::math::radians(0.0f);
+        if (object_rotation_ > math::radians(360.0f)) {
+            object_rotation_ = math::radians(0.0f);
         }
 
-        get_engine().get_world().set_object_rotation(object_id_, {0.0f, object_rotation_, 0.0f});
+        auto& transform_system = get_engine().get_world().get_transform_system();
+        transform_system.modify(some_entity_).set_rotation({0.0f, object_rotation_, 0.0f});
+
+        auto grid_transform = transform{};
+        grid_transform.set_origin({1.5f, 3.0f, 1.5f});
+        grid_transform.set_rotation({0.0f, object_rotation_, 0.0f});
+
+        get_engine().get_renderer().draw_grid(grid_transform, 1.f, 3, 3);
     }
 
-    void handle_key_press(gfx::keyboard::key key) const {
+    void handle_key_press(
+        gfx::keyboard::key key
+    ) const {
         switch (key) {
             case gfx::keyboard::key::ESCAPE:
                 get_engine().shutdown();
@@ -154,8 +154,7 @@ private:
 
     std::unique_ptr<gfx::fps_camera_controller> camera_controller_;
 
-    std::shared_ptr<model> model_;
-    gfx::object_id object_id_ = 0;
+    std::shared_ptr<gfx::model> model_;
     float object_rotation_{};
     float object_rotation_speed_{};
 
@@ -168,7 +167,7 @@ int main() {
             std::make_shared<gfx::engine>(1280, 720, "Voxel World - Test Simple Model");
         instance->run(std::make_unique<simple_model_app>());
     } catch (const std::exception& e) {
-        std::cerr << "Ошибка: " << e.what() << std::endl;
+        std::cerr << "Ошибка: " << e.what() << '\n';
         return 1;
     }
 

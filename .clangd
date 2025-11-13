@@ -32,6 +32,7 @@ Diagnostics:
     Remove:
       - readability-magic-numbers
       - readability-uppercase-literal-suffix
+      - readability-identifier-length
       - bugprone-easily-swappable-parameters
       
   UnusedIncludes: None

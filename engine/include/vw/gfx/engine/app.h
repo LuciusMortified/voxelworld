@@ -14,29 +14,24 @@ public:
     app()          = default;
     virtual ~app() = default;
 
-    app(const app&)            = delete;
-    app& operator=(const app&) = delete;
+    app(const app&)                    = delete;
+    auto operator=(const app&) -> app& = delete;
 
     virtual void setup() {}
 
     virtual void cleanup() {}
 
-    virtual void update(float delta_time) {}
-
-    virtual void render() {}
+    virtual void render([[maybe_unused]] float delta_time) {}
 
     void run(engine& engine) {
         engine_ = &engine;
     }
 
 protected:
-    [[nodiscard]]
-    engine& get_engine() const {
-#ifndef NDEBUG
-        if (!engine_) {
+    [[nodiscard]] auto get_engine() const -> engine& {
+        if (engine_ == nullptr) {
             throw std::runtime_error("engine not set in app");
         }
-#endif
         return *engine_;
     }
 

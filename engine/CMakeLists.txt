@@ -15,7 +15,6 @@ set(ENGINE_HEADERS
     "include/vw/core/voxel.h"
     "include/vw/gfx/world/world.h"
     "include/vw/core/transform.h"
-    "include/vw/core/model.h"
     "include/vw/gfx/window/window.h"
     "include/vw/gfx/window/input.h"
     "include/vw/gfx/render/vulkan_context.h"
@@ -45,13 +44,21 @@ set(ENGINE_HEADERS
     "include/vw/gfx/world/systems/hierarchy_system.inl.h"
     "include/vw/gfx/world/systems/transform_system.h"
     "include/vw/gfx/world/systems/transform_system.inl.h"
+    "include/vw/gfx/world/systems/model_system.h"
+    "include/vw/gfx/world/systems/model_system.inl.h"
+    "include/vw/gfx/world/world.inl.h"
+    "include/vw/gfx/model/model.h"
+    "include/vw/gfx/model/model.inl.h"
+    "include/vw/gfx/model/model_hash.h"
+    "include/vw/gfx/model/model_registry.h"
+    "include/vw/gfx/model/model_registry.inl.h"
+    "include/vw/gfx/resource/mesh_pool.h"
+    "include/vw/gfx/resource/mesh_pool.inl.h"
 )
 
 set(ENGINE_SOURCES
     "src/core/math.cpp"
     "src/gfx/engine/engine.cpp"
-    "src/gfx/world/world.cpp"
-        "src/core/model.cpp"
     "src/gfx/window/window.cpp"
     "src/gfx/resource/buffer.cpp"
     "src/gfx/resource/mesh.cpp"
@@ -61,7 +68,6 @@ set(ENGINE_SOURCES
     "src/gfx/render/renderer.cpp"
     "src/gfx/resource/shader.cpp"
     "src/gfx/debug/debug_window.cpp"
-    "src/gfx/debug/debug_primitive.cpp"
 )
 
 # Find required packages

@@ -21,8 +21,7 @@ public:
     debug_window(debug_window&&)            = default;
     debug_window& operator=(debug_window&&) = default;
 
-    void update(float delta_time);
-    void render();
+    void render(float delta_time);
 
     void toggle_visibility();
     void set_visible(bool visible) {
@@ -35,6 +34,7 @@ public:
     }
 
 private:
+    void update_fps(float delta_time);
     void update_fps_history(float fps);
     void render_fps_window();
     void render_fps_graph() const;

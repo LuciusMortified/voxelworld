@@ -94,22 +94,7 @@ void mesh::draw_indexed(VkCommandBuffer command_buffer) const {
 
 // ================== simple_mesh_generator ==================
 
-mesh simple_mesh_generator::generate_from_model(
-    vulkan_context& context,
-    const std::shared_ptr<model>& model
-) {
-    if (!model) {
-        return mesh{context};
-    }
-
-    mesh_data data = generate_mesh_data(model);
-
-    mesh result{context};
-    result.set_mesh_data(data);
-    return result;
-}
-
-mesh_data simple_mesh_generator::generate_mesh_data(const std::shared_ptr<model>& model) {
+mesh_data simple_mesh_generator::generate_mesh_data(std::shared_ptr<model> model) {
     if (!model) {
         return mesh_data{};
     }
@@ -223,22 +208,7 @@ bool simple_mesh_generator::is_face_visible(
 
 // ================== greedy_mesh_generator ==================
 
-mesh greedy_mesh_generator::generate_from_model(
-    vulkan_context& context,
-    const std::shared_ptr<model>& model
-) {
-    if (!model) {
-        throw std::runtime_error("model is null");
-    }
-
-    mesh_data data = generate_mesh_data(model);
-
-    mesh result{context};
-    result.set_mesh_data(data);
-    return result;
-}
-
-mesh_data greedy_mesh_generator::generate_mesh_data(const std::shared_ptr<model>& model) {
+mesh_data greedy_mesh_generator::generate_mesh_data(std::shared_ptr<model> model) {
     if (!model) {
         throw std::runtime_error("model is null");
     }

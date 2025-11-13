@@ -5,7 +5,12 @@
 
 #include "vw/gfx/world/registry.h"
 
+namespace vw {
+struct transform;
+}  // namespace vw
+
 namespace vw::gfx {
+struct transform_component;
 
 template <typename... Cs>
 class transform_system final {
@@ -16,7 +21,7 @@ public:
 
     void update();
     void mark_world_dirty(entity ent);
-    
+
     class transform_modifier {
     public:
         transform_modifier& set_position(const vec3f& position);
@@ -26,20 +31,25 @@ public:
         transform_modifier& translate(const vec3f& offset);
         transform_modifier& rotate(const vec3f& angles);
         transform_modifier& scale(const vec3f& factor);
-        
+
     private:
         friend class transform_system;
         transform_modifier(transform_system* system, entity ent);
-        
+
         transform_system* system_;
         entity entity_;
     };
-    
+
     transform_modifier modify(entity ent);
-    
+
 private:
-    void mark_children_dirty(entity ent);
-    
+    void mark_children_world_dirty(entity ent);
+
+    [[nodiscard]] auto calc_world_transform(
+        transform local_transform,
+        const transform_component& parent_comp
+    ) -> transform;
+
     [[nodiscard]] auto get_hierarchy_depth(entity ent) const -> size_t;
 
     registry_type* registry_;

@@ -7,10 +7,11 @@
 #include <memory>
 #include <vector>
 
-#include "vw/core/model.h"
-#include "vw/core/vec3.h"
 #include "vw/core/types.h"
+#include "vw/core/vec3.h"
+#include "vw/gfx/model/model.h"
 #include "vw/gfx/resource/buffer.h"
+
 
 namespace vw::gfx {
 class vulkan_context;
@@ -81,10 +82,7 @@ private:
 class simple_mesh_generator {
 public:
     [[nodiscard]]
-    static mesh generate_from_model(vulkan_context& context, const std::shared_ptr<model>& model);
-
-    [[nodiscard]]
-    static mesh_data generate_mesh_data(const std::shared_ptr<model>& model);
+    static mesh_data generate_mesh_data(std::shared_ptr<model> model);
 
 private:
     static void add_cube_face(
@@ -108,10 +106,7 @@ private:
 class greedy_mesh_generator {
 public:
     [[nodiscard]]
-    static mesh generate_from_model(vulkan_context& context, const std::shared_ptr<model>& model);
-
-    [[nodiscard]]
-    static mesh_data generate_mesh_data(const std::shared_ptr<model>& model);
+    static mesh_data generate_mesh_data(std::shared_ptr<model> model);
 
 private:
     static void generate_face_quads(

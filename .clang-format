@@ -1,6 +1,3 @@
-# Конфигурация clang-format для проекта voxelworld
-# Основана на Google Style с адаптацией под требования проекта
-
 BasedOnStyle: Google
 
 # Основные настройки
@@ -21,7 +18,7 @@ AllowShortCaseLabelsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
-AllowAllArgumentsOnNextLine: false
+AllowAllArgumentsOnNextLine: true
 AlwaysBreakAfterReturnType: None
 AlwaysBreakAfterDefinitionReturnType: None
 AlwaysBreakBeforeMultilineStrings: true
@@ -43,7 +40,10 @@ BraceWrapping:
 BreakBeforeBinaryOperators: None
 BreakBeforeBraces: Attach
 BreakBeforeTernaryOperators: false
+BreakFunctionDefinitionParameters: true
 BreakStringLiterals: true
+BreakConstructorInitializers: BeforeComma
+BreakInheritanceList: BeforeComma
 CommentPragmas: '^ IWYU pragma:'
 ConstructorInitializerAllOnOneLineOrOnePerLine: true
 ConstructorInitializerIndentWidth: 4
@@ -60,13 +60,14 @@ IndentWrappedFunctionNames: false
 KeepEmptyLinesAtTheStartOfBlocks: false
 MaxEmptyLinesToKeep: 1
 NamespaceIndentation: None
-PenaltyBreakAssignment: 2
-PenaltyBreakBeforeFirstCallParameter: 1
+PenaltyBreakAssignment: 0
+PenaltyBreakBeforeFirstCallParameter: 0
 PenaltyBreakComment: 300
 PenaltyBreakFirstLessLess: 120
 PenaltyBreakString: 1000
 PenaltyExcessCharacter: 1000000
 PenaltyReturnTypeOnItsOwnLine: 1000
+PenaltyIndentedWhitespace: 1
 PointerAlignment: Left
 SortUsingDeclarations: true
 SpaceAfterCStyleCast: false
@@ -83,17 +84,13 @@ Standard: c++20
 TabWidth: 4
 UseTab: Never
 
-# Специфичные для проекта настройки
-# Принудительное использование snake_case для функций
-# (требует дополнительных инструментов для проверки)
-
 # Настройки для многострочных функций
 AlignAfterOpenBracket: BlockIndent
-AllowAllParametersOfDeclarationOnNextLine: false
+AllowAllParametersOfDeclarationOnNextLine: true
 
 # Настройки для include директив
 SortIncludes: CaseInsensitive
-IncludeBlocks: Preserve
+IncludeBlocks: Regroup
 
 # Настройки для комментариев
 ReflowComments: true

@@ -7,6 +7,7 @@
 
 #include "vw/core/mat4.h"
 #include "vw/core/vec3.h"
+#include "vw/core/vec4.h"
 
 namespace vw::math {
 constexpr float PI         = 3.14159265359f;
@@ -74,7 +75,7 @@ inline float clamp(float value, float min_val, float max_val) {
 }
 
 inline float lerp(float a, float b, float t) {
-    return a + t * (b - a);
+    return a + (t * (b - a));
 }
 
 inline vec3f lerp(const vec3f& a, const vec3f& b, float t) {

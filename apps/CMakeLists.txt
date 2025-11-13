@@ -6,6 +6,7 @@ project(voxelworld_apps)
 # Подключение отдельных приложений
 add_subdirectory(test_simple_model)
 add_subdirectory(test_window)
+add_subdirectory(test_math_matrix)
 
 # Здесь можно добавлять другие приложения
 # add_subdirectory(another_app)

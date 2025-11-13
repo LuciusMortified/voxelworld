@@ -8,6 +8,11 @@
 #include <array>
 
 namespace vw {
+template<typename T>
+struct vec3;
+template<typename T>
+struct vec4;
+
 template <typename T>
 struct mat4 {
 private:
@@ -17,68 +22,33 @@ private:
 public:
     mat4() = default;
 
-    explicit mat4(const T* values) {
-        memcpy(data_, values, size_ * sizeof(T));
-    }
+    explicit mat4(const T* values);
 
     mat4(const mat4& other)                    = default;
     auto operator=(const mat4& other) -> mat4& = default;
     mat4(mat4&& other)                         = default;
     auto operator=(mat4&& other) -> mat4&      = default;
 
-    auto operator[](int row, int col) -> T& {
-        return data_[(row * 4) + col];
-    }
+    auto operator[](int row, int col) -> T&;
+    auto operator[](int row, int col) const -> const T&;
+    auto operator[](int index) -> T&;
+    auto operator[](int index) const -> const T&;
 
-    auto operator[](int row, int col) const -> const T& {
-        return data_[(row * 4) + col];
-    }
+    auto cptr() -> T*;
+    auto cptr() const -> const T*;
 
-    auto operator[](int index) -> T& {
-        return data_[index];
-    }
+    auto operator*(const mat4& other) const -> mat4;
+    auto operator*(const vec4<T>& v) const -> vec4<T>;
+    auto operator*(const vec3<T>& vec) const -> vec3<T>;
 
-    auto operator[](int index) const -> const T& {
-        return data_[index];
-    }
-
-    auto cptr() -> T* {
-        return data_.data();
-    }
-
-    auto cptr() const -> const T* {
-        return data_.data();
-    }
-
-    auto operator*(const mat4& other) const -> mat4 {
-        mat4 result;
-        for (int i = 0; i < 4; ++i) {
-            for (int j = 0; j < 4; ++j) {
-                result[i, j] = T(0);
-                for (int k = 0; k < 4; ++k) {
-                    result[i, j] += (*this)[i, k] * other[k, j];
-                }
-            }
-        }
-        return result;
-    }
-
-    auto operator==(const mat4& other) const -> bool {
-        for (int i = 0; i < size_; ++i) {
-            if (data_[i] != other.data_[i]) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    auto operator!=(const mat4& other) const -> bool {
-        return !(*this == other);
-    }
+    auto operator==(const mat4& other) const -> bool;
+    auto operator!=(const mat4& other) const -> bool;
 };
 
 using mat4f = mat4<float32>;
 using mat4d = mat4<float64>;
 }  // namespace vw
+
+#include "vw/core/mat4.inl.h"
 
 #endif  // VW_MAT4_H

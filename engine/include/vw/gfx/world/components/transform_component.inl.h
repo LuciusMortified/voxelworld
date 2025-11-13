@@ -35,6 +35,13 @@ inline auto transform_component::get_origin() const -> const vec3f& {
     return transform_.get_origin();
 }
 
+inline auto transform_component::get_local_transform() const -> const transform& {
+    return transform_;
+}
+
+inline auto transform_component::get_world_transform() const -> const transform& {
+    return world_transform_;
+}
 
 }  // namespace vw::gfx
 

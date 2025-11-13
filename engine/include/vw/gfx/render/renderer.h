@@ -36,9 +36,6 @@ struct push_constant_data {
     alignas(16) float32 model[16]{};
 };
 
-struct debug_push_constant_data {
-    alignas(16) float32 view_proj[16]{};
-};
 
 class renderer {
 public:
@@ -71,9 +68,11 @@ public:
 
     void draw_line(const vec3f& a, const vec3f& b, color col = colors::red);
 
-    void draw_box(const vec3f& origin, const vec3f& size, color col = colors::red);
+    void draw_box(const vw::transform& transform, const vec3f& size, color col = colors::red);
+    void draw_box(const vec3f& position, const vec3f& size, color col = colors::red);
 
-    void draw_grid(const vec3f& origin, float cel_size, int lines, color col = colors::gray);
+    void draw_grid(const vw::transform& transform, float cell_size, int cols, int rows, color clr = colors::gray);
+    void draw_grid(const vec3f& position, float cel_size, int cols, int rows, color clr = colors::gray);
 
 private:
     void create_swapchain();
@@ -105,7 +104,7 @@ private:
     void cleanup_depth_resources();
     void recreate_swapchain();
 
-    void render_world(const world& world, const camera& camera) const;
+    void render_world(world& world, const camera& camera) const;
     void update_uniform_buffer(const camera& camera) const;
 
     void render_debug_primitives(const camera& camera);
@@ -215,18 +214,8 @@ private:
     static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 };
 
-inline void renderer::draw_line(const vec3f& a, const vec3f& b, color col) {
-    debug_primitives_.add_line(a, b, col);
-}
-
-inline void renderer::draw_box(const vec3f& origin, const vec3f& size, color col) {
-    debug_primitives_.add_box(origin, size, col);
-}
-
-inline void renderer::draw_grid(const vec3f& origin, float cel_size, int lines, color col) {
-    debug_primitives_.add_grid(origin, cel_size, lines, col);
-}
-
 }  // namespace vw::gfx
+
+#include "vw/gfx/render/renderer.inl.h"
 
 #endif  // VW_GFX_RENDERER_H

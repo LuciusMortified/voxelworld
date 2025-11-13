@@ -61,13 +61,18 @@ public:
         get_pool<T>().add(e, std::forward<T>(value));
     }
 
-    template<typename T>
+    template <typename T>
     [[nodiscard]] auto has(entity ent) const -> bool {
         return get_pool<T>().has(ent);
     }
 
     template <typename T>
     T& get(entity e) {
+        return get_pool<T>().get(e);
+    }
+
+    template <typename T>
+    const T& get(entity e) const {
         return get_pool<T>().get(e);
     }
 
@@ -107,12 +112,12 @@ public:
         size_t index         = 0;
 
         [[nodiscard]]
-        bool operator==(const iterator& rhs) const {
+        auto operator==(const iterator& rhs) const -> bool {
             return index == rhs.index;
         }
 
         [[nodiscard]]
-        bool operator!=(const iterator& rhs) const {
+        auto operator!=(const iterator& rhs) const -> bool {
             return !(*this == rhs);
         }
 
@@ -120,10 +125,12 @@ public:
             advance_();
         }
 
-        [[nodiscard]]
-        auto operator*() {
-            entity e = (*view->entities_)[index];
-            return std::tuple<entity, Cs&...>{e, view->registry_->template get<Cs>(e)...};
+        [[nodiscard]] auto operator*() const -> std::tuple<const entity&, const Cs&...> {
+            const entity& ent = (*view->entities_)[index];
+            return std::tuple<const entity&, const Cs&...>{
+                ent,
+                view->registry_->template get<Cs>(ent)...
+            };
         }
 
     private:
@@ -137,7 +144,7 @@ public:
         }
     };
 
-    iterator begin() {
+    [[nodiscard]] auto begin() -> iterator {
         iterator it{this, 0};
         if (entities_->empty()) [[unlikely]] {
             return it;
@@ -148,7 +155,7 @@ public:
         return it;
     }
 
-    iterator end() {
+    [[nodiscard]] auto end() -> iterator {
         iterator it{this, entities_->size()};
         return it;
     }
@@ -179,7 +186,7 @@ private:
         entities_ = it->second;
     }
 
-    bool present_in_all(entity e) const {
+    [[nodiscard]] auto present_in_all(entity e) const -> bool {
         return (registry_->template get_pool<Cs>().has(e) && ...);
     }
 };

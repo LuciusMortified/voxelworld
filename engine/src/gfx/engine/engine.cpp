@@ -82,9 +82,7 @@ void engine::main_loop() {
 
         window_->poll_events();
 
-        update(delta_time);
-
-        render();
+        render(delta_time);
 
         last_frame_time_ = current_time;
     }
@@ -92,27 +90,18 @@ void engine::main_loop() {
     app_->cleanup();
 }
 
-void engine::update(float delta_time) const {
+void engine::render(float delta_time) const {
     world_->update();
-    world_->update_meshes();
-    debug_tool_->update(delta_time);
-    app_->update(delta_time);
-}
 
-void engine::render() const {
-    try {
-        renderer_->begin_frame();
+    renderer_->begin_frame();
 
-        debug_tool_->render();
+    app_->render(delta_time);
 
-        app_->render();
+    debug_tool_->render(delta_time);
 
-        renderer_->render(*world_, *camera_);
+    renderer_->render(*world_, *camera_);
 
-        renderer_->end_frame();
-    } catch (const std::exception& e) {
-        std::cerr << "Render error: " << e.what() << '\n';
-    }
+    renderer_->end_frame();
 }
 
 }  // namespace vw::gfx
