@@ -4,18 +4,22 @@
 
 namespace vw::gfx {
 
-fps_camera_controller::fps_camera_controller(float mouse_sensitivity, float camera_speed)
-    : mouse_sensitivity_(mouse_sensitivity),
-      camera_speed_(camera_speed),
-      mouse_captured_(false),
-      enabled_(true),
-      last_mouse_x_(0.0),
-      last_mouse_y_(0.0),
-      mouse_initialized_(false),
-      key_press_sub_(0),
-      mouse_move_sub_(0) {}
+fps_camera_controller::fps_camera_controller(
+    float mouse_sensitivity, float camera_speed
+)
+    : mouse_sensitivity_(mouse_sensitivity)
+    , camera_speed_(camera_speed)
+    , mouse_captured_(false)
+    , enabled_(true)
+    , last_mouse_x_(0.0)
+    , last_mouse_y_(0.0)
+    , mouse_initialized_(false)
+    , key_press_sub_(0)
+    , mouse_move_sub_(0) {}
 
-void fps_camera_controller::setup(window& window, camera& camera) {
+void fps_camera_controller::setup(
+    window& window, camera& camera
+) {
     window_ = &window;
     camera_ = &camera;
 
@@ -38,14 +42,18 @@ void fps_camera_controller::setup(window& window, camera& camera) {
     });
 }
 
-void fps_camera_controller::update(float delta_time) {
+void fps_camera_controller::update(
+    float delta_time
+) {
     if (!enabled_ || !camera_ || !window_)
         return;
 
     update_camera_movement(delta_time);
 }
 
-void fps_camera_controller::handle_key_pressed(keyboard::key key) {
+void fps_camera_controller::handle_key_pressed(
+    keyboard::key key
+) {
     switch (key) {
         case keyboard::key::TAB:
             toggle_mouse_captured();
@@ -55,7 +63,9 @@ void fps_camera_controller::handle_key_pressed(keyboard::key key) {
     }
 }
 
-void fps_camera_controller::handle_mouse_moved(double x, double y) {
+void fps_camera_controller::handle_mouse_moved(
+    double x, double y
+) {
     if (!camera_) {
         return;
     }
@@ -76,15 +86,16 @@ void fps_camera_controller::handle_mouse_moved(double x, double y) {
     last_mouse_y_ = y;
 
     if (delta_x != 0 || delta_y != 0) {
-        float yaw_delta   = static_cast<float>(delta_x) * mouse_sensitivity_;
-        float pitch_delta = static_cast<float>(delta_y) * mouse_sensitivity_;
+        const float yaw_delta   = static_cast<float>(delta_x) * mouse_sensitivity_;
+        const float pitch_delta = -static_cast<float>(delta_y) * mouse_sensitivity_;
 
-        camera_->rotate(-pitch_delta,
-                        yaw_delta);  // Инвертируем pitch для Vulkan
+        camera_->rotate(pitch_delta, yaw_delta);
     }
 }
 
-void fps_camera_controller::update_camera_movement(float delta_time) const {
+void fps_camera_controller::update_camera_movement(
+    float delta_time
+) const {
     const float move_speed = camera_speed_ * delta_time;
 
     if (window_->is_key_pressed(keyboard::key::W)) {
@@ -111,7 +122,9 @@ void fps_camera_controller::update_camera_movement(float delta_time) const {
     }
 }
 
-void fps_camera_controller::set_mouse_captured(bool captured) {
+void fps_camera_controller::set_mouse_captured(
+    bool captured
+) {
     mouse_captured_ = captured;
 
     window_->set_cursor_mode(mouse_captured_ ? cursor_mode::DISABLED : cursor_mode::NORMAL);

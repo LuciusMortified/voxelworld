@@ -22,14 +22,14 @@ template <typename T>
 inline auto mat4<T>::operator[](
     int row, int col
 ) -> T& {
-    return data_[(row * 4) + col];
+    return data_[(col * 4) + row];
 }
 
 template <typename T>
 inline auto mat4<T>::operator[](
     int row, int col
 ) const -> const T& {
-    return data_[(row * 4) + col];
+    return data_[(col * 4) + row];
 }
 
 template <typename T>

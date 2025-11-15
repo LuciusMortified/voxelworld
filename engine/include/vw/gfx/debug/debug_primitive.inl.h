@@ -53,16 +53,9 @@ inline void debug_primitives::add_line(
     vertices_.emplace_back(begin, clr);
     vertices_.emplace_back(end, clr);
 }
-
-inline auto debug_primitives::get_vertices() const -> const std::vector<debug_vertex>& {
-    return vertices_;
-}
-
 inline void debug_primitives::add_box(
-    const transform& transform, const vec3f& size, color clr
+    const mat4f& matrix, const vec3f& size, color clr
 ) {
-    const mat4f matrix = transform.calc_matrix();
-
     const vec3f p0 = matrix * vec3f{0.0f, 0.0f, 0.0f};
     const vec3f p1 = matrix * vec3f{size.x, 0.0f, 0.0f};
     const vec3f p2 = matrix * vec3f{size.x, 0.0f, size.z};
@@ -88,11 +81,25 @@ inline void debug_primitives::add_box(
     add_line(p3, p7, clr);
 }
 
-inline void debug_primitives::add_grid(
-    const transform& transform, float cell_size, int cols, int rows, color clr
-) {
-    const mat4f matrix = transform.calc_matrix();
+inline auto debug_primitives::get_vertices() const -> const std::vector<debug_vertex>& {
+    return vertices_;
+}
 
+inline void debug_primitives::add_box(
+    const transform& transform, const vec3f& size, color clr
+) {
+    add_box(transform.calc_matrix(), size, clr);
+}
+
+inline void debug_primitives::add_box(
+    const vec3f& pos, const vec3f& size, color clr
+) {
+    add_box(math::translation_matrix(pos), size, clr);
+}
+
+inline void debug_primitives::add_grid(
+    const mat4f& matrix, float cell_size, int cols, int rows, color clr
+) {
     const float cols_size = cell_size * static_cast<float>(cols);
     for (int i = 0; i <= cols; ++i) {
         const vec3f start = matrix * vec3f{static_cast<float>(i) * cell_size, 0.0f, 0.0f};
@@ -108,20 +115,16 @@ inline void debug_primitives::add_grid(
     }
 }
 
-inline void debug_primitives::add_box(
-    const vec3f& pos, const vec3f& size, color clr
+inline void debug_primitives::add_grid(
+    const transform& transform, float cell_size, int cols, int rows, color clr
 ) {
-    vw::transform t;
-    t.set_position(pos);
-    add_box(t, size, clr);
+    add_grid(transform.calc_matrix(), cell_size, cols, rows, clr);
 }
 
 inline void debug_primitives::add_grid(
-    const vec3f& pos, float cel_size, int cols, int rows, color clr
+    const vec3f& pos, float cell_size, int cols, int rows, color clr
 ) {
-    vw::transform t;
-    t.set_position(pos);
-    add_grid(t, cel_size, cols, rows, clr);
+    add_grid(math::translation_matrix(pos), cell_size, cols, rows, clr);
 }
 
 inline auto debug_primitives::is_empty() const -> bool {

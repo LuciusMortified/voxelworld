@@ -5,6 +5,7 @@
 
 #include <imgui.h>
 #include <vulkan/vulkan.h>
+
 #include <memory>
 #include <vector>
 
@@ -35,7 +36,6 @@ struct uniform_buffer_object {
 struct push_constant_data {
     alignas(16) float32 model[16]{};
 };
-
 
 class renderer {
 public:
@@ -68,11 +68,19 @@ public:
 
     void draw_line(const vec3f& a, const vec3f& b, color col = colors::red);
 
-    void draw_box(const vw::transform& transform, const vec3f& size, color col = colors::red);
+    void draw_box(const mat4f& matrix, const vec3f& size, color col = colors::red);
+    void draw_box(const transform& transform, const vec3f& size, color col = colors::red);
     void draw_box(const vec3f& position, const vec3f& size, color col = colors::red);
 
-    void draw_grid(const vw::transform& transform, float cell_size, int cols, int rows, color clr = colors::gray);
-    void draw_grid(const vec3f& position, float cel_size, int cols, int rows, color clr = colors::gray);
+    void draw_grid(
+        const mat4f& matrix, float cell_size, int cols, int rows, color clr = colors::red
+    );
+    void draw_grid(
+        const transform& transform, float cell_size, int cols, int rows, color clr = colors::red
+    );
+    void draw_grid(
+        const vec3f& position, float cell_size, int cols, int rows, color clr = colors::red
+    );
 
 private:
     void create_swapchain();
@@ -117,9 +125,7 @@ private:
 
     [[nodiscard]]
     VkFormat find_supported_format(
-        const std::vector<VkFormat>& candidates,
-        VkImageTiling tiling,
-        VkFormatFeatureFlags features
+        const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features
     );
 
     void create_image(

@@ -4,36 +4,44 @@
 
 namespace vw::gfx {
 
-camera::camera(float fov, float aspect, float near, float far)
-    : position_(0.0f, 0.0f, 0.0f),
-      pitch_(0.0f),
-      yaw_(-90.0f),
-      fov_(fov),
-      aspect_(aspect),
-      near_(near),
-      far_(far),
-      forward_(0.0f, 0.0f, -1.0f),
-      right_(1.0f, 0.0f, 0.0f),
-      up_(0.0f, 1.0f, 0.0f),
-      vectors_dirty_(false),
-      view_matrix_dirty_(true),
-      projection_matrix_dirty_(true) {
+camera::camera(
+    float fov, float aspect, float near, float far
+)
+    : position_(0.0f, 0.0f, 0.0f)
+    , pitch_(0.0f)
+    , yaw_(0.0f)
+    , fov_(fov)
+    , aspect_(aspect)
+    , near_(near)
+    , far_(far)
+    , forward_(0.0f, 0.0f, 1.0f)
+    , right_(1.0f, 0.0f, 0.0f)
+    , up_(0.0f, 1.0f, 0.0f)
+    , vectors_dirty_(false)
+    , view_matrix_dirty_(true)
+    , projection_matrix_dirty_(true) {
     update_vectors();
 }
 
-void camera::set_position(const vec3f& position) {
+void camera::set_position(
+    const vec3f& position
+) {
     position_          = position;
     view_matrix_dirty_ = true;
 }
 
-void camera::set_rotation(float pitch, float yaw) {
+void camera::set_rotation(
+    float pitch, float yaw
+) {
     pitch_             = pitch;
     yaw_               = yaw;
     vectors_dirty_     = true;
     view_matrix_dirty_ = true;
 }
 
-void camera::set_aspect_ratio(float aspect) {
+void camera::set_aspect_ratio(
+    float aspect
+) {
     aspect_                  = aspect;
     projection_matrix_dirty_ = true;
 }
@@ -56,7 +64,9 @@ mat4f camera::get_view_projection_matrix() const {
     return get_projection_matrix() * get_view_matrix();
 }
 
-void camera::move_forward(float distance) {
+void camera::move_forward(
+    float distance
+) {
     if (vectors_dirty_) {
         update_vectors();
     }
@@ -64,7 +74,9 @@ void camera::move_forward(float distance) {
     view_matrix_dirty_ = true;
 }
 
-void camera::move_right(float distance) {
+void camera::move_right(
+    float distance
+) {
     if (vectors_dirty_) {
         update_vectors();
     }
@@ -72,7 +84,9 @@ void camera::move_right(float distance) {
     view_matrix_dirty_ = true;
 }
 
-void camera::move_up(float distance) {
+void camera::move_up(
+    float distance
+) {
     if (vectors_dirty_) {
         update_vectors();
     }
@@ -80,14 +94,13 @@ void camera::move_up(float distance) {
     view_matrix_dirty_ = true;
 }
 
-void camera::rotate(float delta_pitch, float delta_yaw) {
+void camera::rotate(
+    float delta_pitch, float delta_yaw
+) {
     pitch_ += delta_pitch;
     yaw_ += delta_yaw;
 
-    if (pitch_ > 89.0f)
-        pitch_ = 89.0f;
-    if (pitch_ < -89.0f)
-        pitch_ = -89.0f;
+    pitch_ = math::clamp(pitch_, -89.0f, 89.0f);
 
     vectors_dirty_     = true;
     view_matrix_dirty_ = true;
@@ -115,16 +128,16 @@ vec3f camera::get_up() const {
 }
 
 void camera::update_vectors() const {
-    float pitch_rad = math::radians(pitch_);
-    float yaw_rad   = math::radians(yaw_);
+    const float pitch_rad = math::radians(pitch_);
+    const float yaw_rad   = math::radians(yaw_);
 
-    forward_.x = std::cos(yaw_rad) * std::cos(pitch_rad);
+    forward_.x = std::sin(yaw_rad) * std::cos(pitch_rad);
     forward_.y = std::sin(pitch_rad);
-    forward_.z = std::sin(yaw_rad) * std::cos(pitch_rad);
+    forward_.z = std::cos(yaw_rad) * std::cos(pitch_rad);
 
     forward_ = math::normalize(forward_);
-    right_   = math::normalize(math::cross(forward_, vec3f(0.0f, 1.0f, 0.0f)));
-    up_      = math::normalize(math::cross(right_, forward_));
+    right_   = math::normalize(math::cross(vec3f(0.0f, 1.0f, 0.0f), forward_));
+    up_      = math::normalize(math::cross(forward_, right_));
 
     vectors_dirty_ = false;
 }
@@ -134,7 +147,7 @@ void camera::update_view_matrix() const {
         update_vectors();
     }
 
-    vec3f center       = position_ + forward_;
+    const vec3f center = position_ + forward_;
     view_matrix_       = math::look_at_matrix(position_, center, up_);
     view_matrix_dirty_ = false;
 }

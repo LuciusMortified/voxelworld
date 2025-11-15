@@ -262,9 +262,8 @@ void renderer::render_world(
             continue;
         }
 
-        const mat4f& model_matrix  = transform_comp.get_world_matrix();
-        const mat4f model_matrix_t = math::transpose_matrix(model_matrix);
-        memcpy(push_data.model, model_matrix_t.cptr(), sizeof(mat4f));
+        const mat4f& model_matrix = transform_comp.get_world_matrix();
+        memcpy(push_data.model, model_matrix.cptr(), sizeof(mat4f));
 
         vkCmdPushConstants(
             command_buffers_[current_image_index_],
@@ -640,9 +639,8 @@ void renderer::create_graphics_pipeline() {
     rasterizer.polygonMode             = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth               = 1.0f;
     rasterizer.cullMode                = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace               = VK_FRONT_FACE_CLOCKWISE;  // Изменено для совместимости с
-                                                                   // инвертированной Y
-    rasterizer.depthBiasEnable = VK_FALSE;
+    rasterizer.frontFace               = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable         = VK_FALSE;
 
     // Multisampling state
     VkPipelineMultisampleStateCreateInfo multisampling{};
@@ -763,7 +761,7 @@ void renderer::create_wireframe_pipeline() {
     rasterizer.polygonMode             = VK_POLYGON_MODE_LINE;
     rasterizer.lineWidth               = 1.0f;
     rasterizer.cullMode                = VK_CULL_MODE_NONE;
-    rasterizer.frontFace               = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.frontFace               = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable         = VK_FALSE;
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
@@ -865,9 +863,8 @@ void renderer::create_debug_pipeline() {
     rasterizer.polygonMode             = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth               = 1.0f;
     rasterizer.cullMode                = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace               = VK_FRONT_FACE_CLOCKWISE;  // Изменено для совместимости с
-                                                                   // инвертированной Y
-    rasterizer.depthBiasEnable = VK_FALSE;
+    rasterizer.frontFace               = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+    rasterizer.depthBiasEnable         = VK_FALSE;
 
     // Multisampling state
     VkPipelineMultisampleStateCreateInfo multisampling{};

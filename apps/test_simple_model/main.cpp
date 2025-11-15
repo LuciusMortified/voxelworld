@@ -27,8 +27,8 @@ public:
             return true;
         });
 
-        camera.set_position({-5.0f, 1.5f, 0.0f});
-        camera.set_rotation(math::radians(0.0f), 0.0f);
+        camera.set_position({0.0f, 0.0f, -5.0f});
+        camera.set_rotation(0.0f, 0.0f);
         get_engine().get_renderer().set_clear_color(0.1f, 0.2f, 0.3f, 1.0f);
         get_engine().get_debug_tool().set_visible(true);
 
@@ -45,6 +45,10 @@ public:
     ) override {
         camera_controller_->update(delta_time);
         update_object_rotation(delta_time);
+
+        get_engine().get_renderer().draw_line(vec3f{0, 0, 0}, vec3f{100, 0, 0}, colors::blue);
+        get_engine().get_renderer().draw_line(vec3f{0, 0, 0}, vec3f{0, 100, 0}, colors::green);
+        get_engine().get_renderer().draw_line(vec3f{0, 0, 0}, vec3f{0, 0, 100}, colors::red);
 
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         ImVec2 window_pos       = ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
@@ -109,7 +113,9 @@ private:
         world.add_component(some_entity_, gfx::hierarchy_component{});
 
         // Настраиваем transform
-        transform_system.modify(some_entity_).set_origin({1.5f, 3.0f, 1.5f});
+        transform_system.modify(some_entity_)
+            .set_origin({1.5f, 3.0f, 1.5f})
+            .set_position({-1.5f, 0.0f, -1.5f});
 
         // Настраиваем модель через model_system
         model_system.set_model(some_entity_, model_);
@@ -127,14 +133,15 @@ private:
             object_rotation_ = math::radians(0.0f);
         }
 
-        auto& transform_system = get_engine().get_world().get_transform_system();
+        auto& world            = get_engine().get_world();
+        auto& transform_system = world.get_transform_system();
         transform_system.modify(some_entity_).set_rotation({0.0f, object_rotation_, 0.0f});
 
-        auto grid_transform = transform{};
-        grid_transform.set_origin({1.5f, 3.0f, 1.5f});
-        grid_transform.set_rotation({0.0f, object_rotation_, 0.0f});
-
-        get_engine().get_renderer().draw_grid(grid_transform, 1.f, 3, 3);
+        if (world.has_component<gfx::transform_component>(some_entity_)) {
+            const auto matrix =
+                world.get_component<gfx::transform_component>(some_entity_).get_world_matrix();
+            get_engine().get_renderer().draw_grid(matrix, 1.f, 3, 3, colors::white);
+        }
     }
 
     void handle_key_press(
