@@ -8,7 +8,6 @@
 #include "vw/core/color.h"
 #include "vw/core/voxel.h"
 #include "vw/gfx/model/model.h"
-#include "vw/gfx/resource/mesh.h"
 
 namespace vw::gfx {
 
@@ -18,18 +17,20 @@ class model_system;
 struct model_component final {
 private:
     std::shared_ptr<model> model_;
-    std::shared_ptr<mesh> mesh_;
-    bool dirty_ = true;
 
     template <typename... Cs>
     friend class model_system;
 
 public:
-    [[nodiscard]] auto get_voxel(int x, int y, int z) const -> voxel {
+    [[nodiscard]] auto get_voxel(
+        int x, int y, int z
+    ) const -> voxel {
         return model_ ? model_->get_voxel(x, y, z) : voxel{};
     }
 
-    [[nodiscard]] auto is_empty(int x, int y, int z) const -> bool {
+    [[nodiscard]] auto is_empty(
+        int x, int y, int z
+    ) const -> bool {
         return model_ ? model_->is_empty(x, y, z) : true;
     }
 
@@ -45,8 +46,12 @@ public:
         return model_ ? model_->depth() : 0;
     }
 
-    [[nodiscard]] auto get_mesh() const -> std::shared_ptr<mesh> {
-        return mesh_;
+    [[nodiscard]] auto has_model() const -> bool {
+        return model_ != nullptr;
+    }
+
+    [[nodiscard]] auto get_identity() const -> model_identity {
+        return model_ ? model_->get_identity() : model_identity{};
     }
 };
 

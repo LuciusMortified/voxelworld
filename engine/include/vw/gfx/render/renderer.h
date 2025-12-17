@@ -3,25 +3,20 @@
 #ifndef VW_GFX_RENDERER_H
 #define VW_GFX_RENDERER_H
 
-#include <imgui.h>
 #include <vulkan/vulkan.h>
 
 #include <memory>
 #include <vector>
 
 #include "vw/core.h"
+#include "vw/gfx/camera/camera.h"
 #include "vw/gfx/debug/debug_primitive.h"
+#include "vw/gfx/resource/combined_buffer_pool.h"
+#include "vw/gfx/resource/shader.h"
+#include "vw/gfx/window/window.h"
 #include "vw/gfx/world/world.h"
 
 namespace vw::gfx {
-
-class vertex_buffer;
-class vulkan_context;
-class window;
-class camera;
-class mesh;
-class shader;
-class uniform_buffer;
 
 enum class render_mode { lit, wireframe };
 
@@ -37,8 +32,17 @@ struct push_constant_data {
     alignas(16) float32 model[16]{};
 };
 
-class renderer {
+struct renderer_stats {
+    combined_buffer_pool_stats combined_buffers;
+    uint32 draw_call_count = 0;
+};
+
+template <typename WC = base_world_components>
+class renderer final {
 public:
+    using world_type                = world<WC>;
+    using combined_buffer_pool_type = combined_buffer_pool<WC>;
+
     renderer(vulkan_context& context, window& window);
     ~renderer();
 
@@ -49,12 +53,12 @@ public:
     renderer& operator=(renderer&&) = delete;
 
     void begin_frame();
+    void render(world_type& world, camera& camera);
     void end_frame();
-
-    void render(world& world, camera& camera);
 
     void set_clear_color(float r, float g, float b, float a = 1.0f);
     void set_clear_color(vec4f color);
+
     void wait_idle() const;
 
     void handle_resize();
@@ -65,6 +69,9 @@ public:
     render_mode get_render_mode() const {
         return current_render_mode_;
     }
+
+    [[nodiscard]]
+    renderer_stats get_stats() const;
 
     void draw_line(const vec3f& a, const vec3f& b, color col = colors::red);
 
@@ -112,10 +119,10 @@ private:
     void cleanup_depth_resources();
     void recreate_swapchain();
 
-    void render_world(world& world, const camera& camera) const;
+    void render_world(world_type& world, const camera& camera);
     void update_uniform_buffer(const camera& camera) const;
 
-    void render_debug_primitives(const camera& camera);
+    void render_debug_primitives();
     void update_debug_vertex_buffer();
 
     void render_imgui() const;
@@ -216,6 +223,13 @@ private:
 
     std::unique_ptr<shader> debug_vertex_shader_;
     std::unique_ptr<shader> debug_fragment_shader_;
+
+    // Combined buffer pool для indirect drawing
+    std::unique_ptr<combined_buffer_pool_type> combined_buffer_pool_;
+
+    // Статистика
+    renderer_stats stats_;
+    uint32 draw_call_count_ = 0;
 
     static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 };

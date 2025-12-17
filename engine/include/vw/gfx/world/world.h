@@ -3,34 +3,24 @@
 #ifndef VW_GFX_WORLD_H
 #define VW_GFX_WORLD_H
 
-#include <memory>
-
-#include "vw/core.h"
-#include "vw/gfx/world/entity_pool.h"
-#include "vw/gfx/world/registry.h"
-
 #include "vw/gfx/model/model_registry.h"
-#include "vw/gfx/resource/mesh_pool.h"
-#include "vw/gfx/world/components/hierarchy_component.h"
-#include "vw/gfx/world/components/model_component.h"
-#include "vw/gfx/world/components/transform_component.h"
-
+#include "vw/gfx/world/registry.h"
 #include "vw/gfx/world/systems/hierarchy_system.h"
 #include "vw/gfx/world/systems/model_system.h"
 #include "vw/gfx/world/systems/transform_system.h"
+#include "vw/gfx/world/world_components.h"
 
 namespace vw::gfx {
 
 class vulkan_context;
 
-using default_components = std::tuple<hierarchy_component, transform_component, model_component>;
-
+template <typename WC = base_world_components>
 class world final {
 public:
-    using registry_type         = typename registry_from_tuple<default_components>::type;
-    using transform_system_type = typename transform_system_from_tuple<default_components>::type;
-    using hierarchy_system_type = typename hierarchy_system_from_tuple<default_components>::type;
-    using model_system_type     = typename model_system_from_tuple<default_components>::type;
+    using registry_type         = registry_from_tuple<WC>::type;
+    using transform_system_type = transform_system_from_tuple<WC>::type;
+    using hierarchy_system_type = hierarchy_system_from_tuple<WC>::type;
+    using model_system_type     = model_system_from_tuple<WC>::type;
 
     explicit world(vulkan_context& context);
     ~world()                               = default;
@@ -59,6 +49,8 @@ public:
 
     void destroy_entity(entity ent);
 
+    [[nodiscard]] auto get_mesh_pool() const -> const mesh_pool&;
+
     template <typename... Cs>
     [[nodiscard]] auto view_components() -> component_view<registry_type, Cs...>;
 
@@ -68,16 +60,14 @@ public:
 
     [[nodiscard]] auto get_model_registry() -> model_registry&;
 
-    [[nodiscard]] auto get_mesh_pool() -> mesh_pool&;
-
     [[nodiscard]] auto get_model_system() -> model_system_type&;
 
 private:
     registry_type registry_;
+    mesh_pool mesh_pool_;
     transform_system_type transform_system_;
     hierarchy_system_type hierarchy_system_;
     model_registry model_registry_;
-    mesh_pool mesh_pool_;
     model_system_type model_system_;
 };
 

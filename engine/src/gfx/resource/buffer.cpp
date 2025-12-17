@@ -92,6 +92,14 @@ void buffer::copy_from(const void* data, VkDeviceSize size, VkDeviceSize offset)
     unmap();
 }
 
+void buffer::copy_to(
+    void* data, VkDeviceSize size, VkDeviceSize offset
+) {
+    void* mapped = map();
+    memcpy(data, static_cast<char*>(mapped) + offset, size);
+    unmap();
+}
+
 void buffer::copy_to_buffer(
     buffer& dst,
     VkDeviceSize size,

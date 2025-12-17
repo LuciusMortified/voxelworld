@@ -3,6 +3,7 @@
 #ifndef VW_GFX_MODEL_SYSTEM_H
 #define VW_GFX_MODEL_SYSTEM_H
 
+#include <set>
 #include <vector>
 
 #include "vw/gfx/world/registry.h"
@@ -21,12 +22,12 @@ public:
     explicit model_system(registry_type& registry, mesh_pool& mesh_pool);
 
     void update();
-    void set_model(entity e, std::shared_ptr<vw::gfx::model> model_ptr);
 
     class model_modifier {
     public:
         explicit model_modifier(model_system& system, model_component* component, entity e);
-        
+
+        void set_model(std::shared_ptr<model> model_ptr);
         void set_voxel(int x, int y, int z, const voxel& v);
         void set_voxel(int x, int y, int z, color c);
         void fill(const voxel& v);
@@ -39,7 +40,12 @@ public:
     };
 
     auto modify(entity e) -> model_modifier;
-    void mark_dirty(entity e);
+    void mark_dirty(entity ent);
+
+    [[nodiscard]]
+    auto get_render_dirty_entities() -> std::set<entity>&;
+
+    void mark_render_dirty(entity ent);
 
 private:
     void process_dirty_entities();
@@ -47,8 +53,9 @@ private:
 
     registry_type& registry_;
     mesh_pool& mesh_pool_;
-    std::vector<entity> pending_entities_;
-    std::vector<entity> dirty_entities_;
+    std::set<entity> pending_entities_;
+    std::set<entity> dirty_entities_;
+    std::set<entity> render_dirty_entities_;
 };
 
 template <typename... Cs>

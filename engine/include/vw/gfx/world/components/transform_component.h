@@ -15,20 +15,17 @@ private:
     mutable bool local_dirty_ = true;
 
     mutable mat4f world_matrix_;
-    mutable transform world_transform_;
     mutable bool world_dirty_ = true;
 
 public:
     [[nodiscard]] auto get_local_matrix() const -> mat4f;
     [[nodiscard]] auto get_world_matrix() const -> mat4f;
 
+    [[nodiscard]] auto get_transform() const -> const transform&;
     [[nodiscard]] auto get_position() const -> const vec3f&;
     [[nodiscard]] auto get_rotation() const -> const vec3f&;
     [[nodiscard]] auto get_scale() const -> const vec3f&;
     [[nodiscard]] auto get_origin() const -> const vec3f&;
-
-    [[nodiscard]] auto get_local_transform() const -> const transform&;
-    [[nodiscard]] auto get_world_transform() const -> const transform&;
 
     template <typename... Cs>
     friend class hierarchy_system;

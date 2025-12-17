@@ -8,7 +8,7 @@
 #include "vw/core.h"
 #include "vw/gfx/window/window.h"
 
-#ifdef DEBUG
+#ifndef NDEBUG
 static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
     VkDebugUtilsMessageTypeFlagsEXT message_type,
@@ -51,16 +51,20 @@ void destroy_debug_utils_messenger_ext(
 
 namespace vw::gfx {
 
-vulkan_context::vulkan_context(window& window) : window_(&window) {
+vulkan_context::vulkan_context(
+    window& window
+)
+    : window_(&window) {
     device_extensions_ = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+        VK_EXT_MEMORY_BUDGET_EXTENSION_NAME,
 #ifdef __APPLE__
         "VK_KHR_portability_subset",
 #endif
     };
 
     create_instance();
-#ifdef DEBUG
+#ifndef NDEBUG
     setup_debug_messenger();
 #endif
     create_surface();
@@ -72,7 +76,7 @@ vulkan_context::vulkan_context(window& window) : window_(&window) {
 vulkan_context::~vulkan_context() {
     vkDestroyCommandPool(device_, command_pool_, nullptr);
     vkDestroyDevice(device_, nullptr);
-#ifdef DEBUG
+#ifndef NDEBUG
     destroy_debug_utils_messenger_ext(instance_, debug_messenger_, nullptr);
 #endif
     vkDestroySurfaceKHR(instance_, surface_, nullptr);
@@ -90,7 +94,7 @@ void vulkan_context::create_instance() {
     app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     app_info.pEngineName        = "No Engine";
     app_info.engineVersion      = VK_MAKE_VERSION(1, 0, 0);
-    app_info.apiVersion         = VK_API_VERSION_1_0;
+    app_info.apiVersion         = VK_API_VERSION_1_2;
 
     VkInstanceCreateInfo create_info{};
     create_info.sType            = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -101,8 +105,9 @@ void vulkan_context::create_instance() {
 #endif
 
     auto extensions = window_->get_required_extensions();
+    extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
-#ifdef DEBUG
+#ifndef NDEBUG
     extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 #endif
 
@@ -114,7 +119,7 @@ void vulkan_context::create_instance() {
     create_info.enabledExtensionCount   = static_cast<uint32>(extensions.size());
     create_info.ppEnabledExtensionNames = extensions.data();
 
-#ifdef DEBUG
+#ifndef NDEBUG
     const std::vector<const char*> validation_layers = {"VK_LAYER_KHRONOS_validation"};
 
     // Проверяем доступность слоев валидации
@@ -217,8 +222,7 @@ void vulkan_context::create_logical_device() {
     queue_families_ = find_queue_families(physical_device_);
     std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
     std::set<uint32> unique_queue_families = {
-        queue_families_.graphics_family.value(),
-        queue_families_.present_family.value()
+        queue_families_.graphics_family.value(), queue_families_.present_family.value()
     };
 
     float queue_priority = 1.0f;
@@ -233,16 +237,26 @@ void vulkan_context::create_logical_device() {
 
     VkPhysicalDeviceFeatures device_features{};
     device_features.fillModeNonSolid = VK_TRUE;
+    device_features.multiDrawIndirect = VK_TRUE;
+
+    VkPhysicalDeviceShaderDrawParametersFeatures shader_draw_params{};
+    shader_draw_params.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES;
+    shader_draw_params.shaderDrawParameters = VK_TRUE;
+
+    VkPhysicalDeviceVulkan12Features features12{};
+    features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    features12.pNext = &shader_draw_params;
 
     VkDeviceCreateInfo create_info{};
     create_info.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+    create_info.pNext                   = &features12;
     create_info.queueCreateInfoCount    = static_cast<uint32>(queue_create_infos.size());
     create_info.pQueueCreateInfos       = queue_create_infos.data();
     create_info.pEnabledFeatures        = &device_features;
     create_info.enabledExtensionCount   = static_cast<uint32>(device_extensions_.size());
     create_info.ppEnabledExtensionNames = device_extensions_.data();
 
-#ifdef DEBUG
+#ifndef NDEBUG
     const std::vector<const char*> validation_layers = {"VK_LAYER_KHRONOS_validation"};
     create_info.enabledLayerCount   = static_cast<uint32>(validation_layers.size());
     create_info.ppEnabledLayerNames = validation_layers.data();
@@ -269,7 +283,9 @@ void vulkan_context::create_command_pool() {
     }
 }
 
-bool vulkan_context::is_device_suitable(VkPhysicalDevice device) {
+bool vulkan_context::is_device_suitable(
+    VkPhysicalDevice device
+) {
     VkPhysicalDeviceProperties device_properties;
     vkGetPhysicalDeviceProperties(device, &device_properties);
 
@@ -324,10 +340,7 @@ bool vulkan_context::is_device_suitable(VkPhysicalDevice device) {
         vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_count, nullptr);
         std::vector<VkExtensionProperties> available_extensions(extension_count);
         vkEnumerateDeviceExtensionProperties(
-            device,
-            nullptr,
-            &extension_count,
-            available_extensions.data()
+            device, nullptr, &extension_count, available_extensions.data()
         );
 
         std::cout << "Available Extensions:" << std::endl;
@@ -351,10 +364,7 @@ bool vulkan_context::is_device_suitable(VkPhysicalDevice device) {
 
     VkBool32 surface_support = false;
     vkGetPhysicalDeviceSurfaceSupportKHR(
-        device,
-        indices.graphics_family.value(),
-        surface_,
-        &surface_support
+        device, indices.graphics_family.value(), surface_, &surface_support
     );
     std::cout << "Surface Support: " << (surface_support ? "Yes" : "No") << std::endl;
 
@@ -365,7 +375,9 @@ bool vulkan_context::is_device_suitable(VkPhysicalDevice device) {
     return suitable;
 }
 
-queue_family_indices vulkan_context::find_queue_families(VkPhysicalDevice device) {
+queue_family_indices vulkan_context::find_queue_families(
+    VkPhysicalDevice device
+) {
     queue_family_indices indices;
     uint32 queue_family_count = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(device, &queue_family_count, nullptr);
@@ -394,15 +406,14 @@ queue_family_indices vulkan_context::find_queue_families(VkPhysicalDevice device
     return indices;
 }
 
-bool vulkan_context::check_device_extension_support(VkPhysicalDevice device) {
+bool vulkan_context::check_device_extension_support(
+    VkPhysicalDevice device
+) {
     uint32 extension_count;
     vkEnumerateDeviceExtensionProperties(device, nullptr, &extension_count, nullptr);
     std::vector<VkExtensionProperties> available_extensions(extension_count);
     vkEnumerateDeviceExtensionProperties(
-        device,
-        nullptr,
-        &extension_count,
-        available_extensions.data()
+        device, nullptr, &extension_count, available_extensions.data()
     );
 
     std::set<std::string> required_extensions(device_extensions_.begin(), device_extensions_.end());
@@ -421,7 +432,9 @@ bool vulkan_context::check_device_extension_support(VkPhysicalDevice device) {
     return required_extensions.empty();
 }
 
-swapchain_support_details vulkan_context::query_swapchain_support(VkPhysicalDevice device) const {
+swapchain_support_details vulkan_context::query_swapchain_support(
+    VkPhysicalDevice device
+) const {
     swapchain_support_details details;
     vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface_, &details.capabilities);
 
@@ -430,10 +443,7 @@ swapchain_support_details vulkan_context::query_swapchain_support(VkPhysicalDevi
     if (format_count != 0) {
         details.formats.resize(format_count);
         vkGetPhysicalDeviceSurfaceFormatsKHR(
-            device,
-            surface_,
-            &format_count,
-            details.formats.data()
+            device, surface_, &format_count, details.formats.data()
         );
     }
 
@@ -442,17 +452,14 @@ swapchain_support_details vulkan_context::query_swapchain_support(VkPhysicalDevi
     if (present_mode_count != 0) {
         details.present_modes.resize(present_mode_count);
         vkGetPhysicalDeviceSurfacePresentModesKHR(
-            device,
-            surface_,
-            &present_mode_count,
-            details.present_modes.data()
+            device, surface_, &present_mode_count, details.present_modes.data()
         );
     }
 
     return details;
 }
 
-#ifdef DEBUG
+#ifndef NDEBUG
 void vulkan_context::setup_debug_messenger() {
     VkDebugUtilsMessengerCreateInfoEXT create_info{};
     create_info.sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;

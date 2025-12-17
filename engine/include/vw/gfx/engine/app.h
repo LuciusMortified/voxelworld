@@ -7,10 +7,14 @@
 
 namespace vw::gfx {
 
+template<typename WC>
 class engine;
 
+template<class WC = base_world_components>
 class app {
 public:
+    using engine_type = engine<WC>;
+
     app()          = default;
     virtual ~app() = default;
 
@@ -23,12 +27,12 @@ public:
 
     virtual void render([[maybe_unused]] float delta_time) {}
 
-    void run(engine& engine) {
+    void run(engine_type& engine) {
         engine_ = &engine;
     }
 
 protected:
-    [[nodiscard]] auto get_engine() const -> engine& {
+    [[nodiscard]] auto get_engine() const -> engine_type& {
         if (engine_ == nullptr) {
             throw std::runtime_error("engine not set in app");
         }
@@ -36,7 +40,7 @@ protected:
     }
 
 private:
-    engine* engine_ = nullptr;
+    engine_type* engine_ = nullptr;
 };
 }  // namespace vw::gfx
 

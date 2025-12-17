@@ -14,6 +14,7 @@ set(ENGINE_HEADERS
     "include/vw/gfx/engine/engine.h"
     "include/vw/core/voxel.h"
     "include/vw/gfx/world/world.h"
+    "include/vw/gfx/world/world.inl.h"
     "include/vw/core/transform.h"
     "include/vw/gfx/window/window.h"
     "include/vw/gfx/window/input.h"
@@ -49,25 +50,30 @@ set(ENGINE_HEADERS
     "include/vw/gfx/world/world.inl.h"
     "include/vw/gfx/model/model.h"
     "include/vw/gfx/model/model.inl.h"
-    "include/vw/gfx/model/model_hash.h"
+    "include/vw/gfx/model/model_identity.h"
+    "include/vw/gfx/model/model_identity_pool.h"
     "include/vw/gfx/model/model_registry.h"
     "include/vw/gfx/model/model_registry.inl.h"
     "include/vw/gfx/resource/mesh_pool.h"
     "include/vw/gfx/resource/mesh_pool.inl.h"
+    "include/vw/gfx/resource/combined_buffer.h"
+    "include/vw/gfx/resource/combined_buffer_pool.h"
+    "include/vw/gfx/resource/combined_buffer_pool.inl.h"
+        include/vw/gfx/debug/debug_window.inl.h
+        include/vw/gfx/engine/engine.inl.h
+        include/vw/gfx/world/world_components.h
 )
 
 set(ENGINE_SOURCES
     "src/core/math.cpp"
-    "src/gfx/engine/engine.cpp"
-    "src/gfx/window/window.cpp"
+        "src/gfx/window/window.cpp"
     "src/gfx/resource/buffer.cpp"
     "src/gfx/resource/mesh.cpp"
+    "src/gfx/resource/combined_buffer.cpp"
     "src/gfx/render/vulkan_context.cpp"
     "src/gfx/camera/camera.cpp"
     "src/gfx/camera/camera_controller.cpp"
-    "src/gfx/render/renderer.cpp"
     "src/gfx/resource/shader.cpp"
-    "src/gfx/debug/debug_window.cpp"
 )
 
 # Find required packages

@@ -7,16 +7,26 @@
 
 #include "vw/core/color.h"
 #include "vw/core/voxel.h"
-#include "vw/gfx/model/model_hash.h"
+#include "vw/gfx/model/model_identity.h"
 
 namespace vw::gfx {
 
+class model_identity_pool;
+
 class model {
 public:
-    model(int width, int height, int depth);
+    model(model_identity_pool& identity_pool, int width, int height, int depth);
+    ~model();
+
+    model(const model&)            = delete;
+    model& operator=(const model&) = delete;
+    model(model&&)                 = delete;
+    model& operator=(model&&)      = delete;
 
     void set_voxel(int x, int y, int z, const voxel& voxel);
-    void set_voxel(int x, int y, int z, color color) {
+    void set_voxel(
+        int x, int y, int z, color color
+    ) {
         set_voxel(x, y, z, voxel{color});
     }
 
@@ -46,23 +56,20 @@ public:
     void clear();
 
     [[nodiscard]]
-    auto get_hash() const -> model_hash;
+    auto get_identity() const -> model_identity {
+        return identity_;
+    }
 
 private:
+    model_identity_pool* identity_pool_;
     int width_{0}, height_{0}, depth_{0};
-
     std::vector<voxel> voxels_;
-
-    mutable model_hash hash_;
-    mutable bool hash_dirty_ = true;
+    model_identity identity_;
 
     [[nodiscard]]
     auto index(int x, int y, int z) const -> int;
 
-    void mark_hash_dirty();
-    
-    [[nodiscard]]
-    auto calculate_hash() const -> model_hash;
+    void increment_generation();
 };
 
 }  // namespace vw::gfx

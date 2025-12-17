@@ -8,7 +8,7 @@
 
 using namespace vw;
 
-class simple_model_app final : public gfx::app {
+class simple_model_app final : public gfx::app<> {
 public:
     void setup() override {
         auto& window = get_engine().get_window();
@@ -91,7 +91,7 @@ private:
         auto& model_system     = world.get_model_system();
 
         // Создаем модель и регистрируем ее
-        model_ = std::make_shared<gfx::model>(3, 6, 3);
+        model_ = model_registry.create("flower", 3, 6, 3);
         model_->set_voxel(1, 0, 1, colors::green);
         model_->set_voxel(1, 1, 1, colors::green);
         model_->set_voxel(1, 2, 1, colors::green);
@@ -104,13 +104,11 @@ private:
         model_->set_voxel(0, 4, 1, colors::white);
         model_->set_voxel(2, 4, 1, colors::white);
 
-        model_registry.add("flower_model", model_);
-
         // Создаем сущность с моделью
         some_entity_ = world.create_entity();
-        world.add_component(some_entity_, gfx::transform_component{});
-        world.add_component(some_entity_, gfx::model_component{});
-        world.add_component(some_entity_, gfx::hierarchy_component{});
+        world.add_component<gfx::transform_component>(some_entity_);
+        world.add_component<gfx::model_component>(some_entity_);
+        world.add_component<gfx::hierarchy_component>(some_entity_);
 
         // Настраиваем transform
         transform_system.modify(some_entity_)
@@ -118,10 +116,26 @@ private:
             .set_position({-1.5f, 0.0f, -1.5f});
 
         // Настраиваем модель через model_system
-        model_system.set_model(some_entity_, model_);
+        model_system.modify(some_entity_).set_model(model_);
 
         object_rotation_       = 0.0f;
         object_rotation_speed_ = math::radians(5.0f);
+
+        for (int i = 0; i < 1000; i++) {
+            auto another_entity_ = world.create_entity();
+            world.add_component<gfx::transform_component>(another_entity_);
+            world.add_component<gfx::model_component>(another_entity_);
+
+            transform_system.modify(another_entity_)
+                .set_position({
+                    static_cast<float>(std::rand() % 100),
+                    static_cast<float>(std::rand() % 100),
+                    static_cast<float>(std::rand() % 100),
+                })
+                .set_origin({1.5f, 3.0f, 1.5f});
+
+            model_system.modify(another_entity_).set_model(model_);
+        }
     }
 
     void update_object_rotation(
@@ -141,6 +155,11 @@ private:
             const auto matrix =
                 world.get_component<gfx::transform_component>(some_entity_).get_world_matrix();
             get_engine().get_renderer().draw_grid(matrix, 1.f, 3, 3, colors::white);
+        }
+
+        auto transform_view = world.view_components<gfx::transform_component>();
+        for (const auto& [entity, transform_comp] : transform_view) {
+            transform_system.modify(entity).set_rotation({0.0f, object_rotation_, 0.0f});
         }
     }
 
@@ -170,9 +189,8 @@ private:
 
 int main() {
     try {
-        const auto instance =
-            std::make_shared<gfx::engine>(1280, 720, "Voxel World - Test Simple Model");
-        instance->run(std::make_unique<simple_model_app>());
+        std::make_unique<gfx::engine<>>(1280, 720, "Voxel World - Test Simple Model")
+            ->run(std::make_unique<simple_model_app>());
     } catch (const std::exception& e) {
         std::cerr << "Ошибка: " << e.what() << '\n';
         return 1;

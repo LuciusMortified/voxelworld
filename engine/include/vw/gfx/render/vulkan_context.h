@@ -113,8 +113,8 @@ private:
 
     std::vector<const char*> device_extensions_;
 
-#ifdef DEBUG
-    VkDebugUtilsMessengerEXT debug_messenger_;
+#ifndef NDEBUG
+    VkDebugUtilsMessengerEXT debug_messenger_{};
 
     void setup_debug_messenger();
 #endif

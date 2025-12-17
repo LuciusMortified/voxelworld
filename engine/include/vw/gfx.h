@@ -10,7 +10,7 @@
 #include "vw/gfx/engine/app.h"
 #include "vw/gfx/engine/engine.h"
 #include "vw/gfx/model/model.h"
-#include "vw/gfx/model/model_hash.h"
+#include "vw/gfx/model/model_identity.h"
 #include "vw/gfx/model/model_registry.h"
 #include "vw/gfx/resource/mesh_pool.h"
 #include "vw/gfx/render/renderer.h"

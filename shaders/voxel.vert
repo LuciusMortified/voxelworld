@@ -1,14 +1,10 @@
-#version 450
+#version 460 core
+#extension GL_ARB_shader_draw_parameters : require
 
 // Входные данные от вертексов
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
 layout(location = 2) in uint inColor;
-
-// Push constants для матрицы модели
-layout(push_constant) uniform PushConstants {
-    mat4 model;
-} push;
 
 // Uniform buffer object
 layout(binding = 0) uniform UniformBufferObject {
@@ -18,6 +14,11 @@ layout(binding = 0) uniform UniformBufferObject {
     vec3 lightPos;
     vec3 lightColor;
 } ubo;
+
+// Storage buffer для матриц моделей
+layout(binding = 1, std430) readonly buffer ModelMatrices {
+    mat4 models[];
+} modelMatrices;
 
 // Выходные данные для fragment shader
 layout(location = 0) out vec3 fragPos;
@@ -35,12 +36,18 @@ vec3 unpackColor(uint packedColor) {
 }
 
 void main() {
+    // Получаем индекс объекта через gl_BaseInstanceARB
+    // gl_BaseInstanceARB содержит first_instance из VkDrawIndexedIndirectCommand
+    // В коде first_instance устанавливается в instance_index для каждого draw call
+    // uint draw_index = gl_BaseInstanceARB;
+    mat4 model = modelMatrices.models[gl_DrawID];
+    
     // Трансформация позиции
-    vec4 worldPos = push.model * vec4(inPosition, 1.0);
+    vec4 worldPos = model * vec4(inPosition, 1.0);
     fragPos = worldPos.xyz;
     
     // Трансформация нормали
-    fragNormal = normalize(mat3(transpose(inverse(push.model))) * inNormal);
+    fragNormal = normalize(mat3(transpose(inverse(model))) * inNormal);
     
     // Распаковка цвета
     fragColor = unpackColor(inColor);

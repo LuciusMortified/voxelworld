@@ -4,8 +4,10 @@
 #define VW_GFX_BUFFER_H
 
 #include <vulkan/vulkan.h>
+
 #include <stdexcept>
 #include <vector>
+
 
 namespace vw::gfx {
 class vulkan_context;
@@ -48,27 +50,31 @@ public:
 
     void copy_from(const void* data, VkDeviceSize size, VkDeviceSize offset = 0);
 
+    void copy_to(void* data, VkDeviceSize size, VkDeviceSize offset = 0);
+
     template <typename T>
-    void copy_from_struct(const T& data, VkDeviceSize offset = 0) {
-        if (sizeof(T) > size_) {
-            throw std::runtime_error("data size exceeds buffer size");
-        }
+    void copy_from_struct(
+        const T& data, VkDeviceSize offset = 0
+    ) {
         copy_from(&data, sizeof(T), offset);
     }
 
     template <typename T>
-    void copy_from_vector(const std::vector<T>& data, VkDeviceSize offset = 0) {
-        if (data.size() * sizeof(T) > size_) {
-            throw std::runtime_error("data size exceeds buffer size");
-        }
+    void copy_from_vector(
+        const std::vector<T>& data, VkDeviceSize offset = 0
+    ) {
         copy_from(data.data(), data.size() * sizeof(T), offset);
     }
 
+    template <typename T>
+    void copy_to_struct(
+        T& dst, VkDeviceSize offset = 0
+    ) {
+        copy_to(&dst, sizeof(T), offset);
+    }
+
     void copy_to_buffer(
-        buffer& dst,
-        VkDeviceSize size,
-        VkDeviceSize src_offset = 0,
-        VkDeviceSize dst_offset = 0
+        buffer& dst, VkDeviceSize size, VkDeviceSize src_offset = 0, VkDeviceSize dst_offset = 0
     );
 
 protected:
@@ -90,7 +96,9 @@ private:
 // Специализированные типы буферов
 class vertex_buffer final : public buffer {
 public:
-    vertex_buffer(vulkan_context& context, VkDeviceSize size)
+    vertex_buffer(
+        vulkan_context& context, VkDeviceSize size
+    )
         : buffer(
               context,
               size,
@@ -99,7 +107,9 @@ public:
           ) {}
 
     template <typename T>
-    vertex_buffer(vulkan_context& context, const std::vector<T>& vertices)
+    vertex_buffer(
+        vulkan_context& context, const std::vector<T>& vertices
+    )
         : buffer(
               context,
               sizeof(T) * vertices.size(),
@@ -112,7 +122,9 @@ public:
 
 class index_buffer final : public buffer {
 public:
-    index_buffer(vulkan_context& context, VkDeviceSize size)
+    index_buffer(
+        vulkan_context& context, VkDeviceSize size
+    )
         : buffer(
               context,
               size,
@@ -121,7 +133,9 @@ public:
           ) {}
 
     template <typename T>
-    index_buffer(vulkan_context& context, const std::vector<T>& indices)
+    index_buffer(
+        vulkan_context& context, const std::vector<T>& indices
+    )
         : buffer(
               context,
               sizeof(T) * indices.size(),
@@ -134,7 +148,9 @@ public:
 
 class uniform_buffer final : public buffer {
 public:
-    uniform_buffer(vulkan_context& context, VkDeviceSize size)
+    uniform_buffer(
+        vulkan_context& context, VkDeviceSize size
+    )
         : buffer(
               context,
               size,
@@ -143,7 +159,9 @@ public:
           ) {}
 
     template <typename T>
-    uniform_buffer(vulkan_context& context, const T& data)
+    uniform_buffer(
+        vulkan_context& context, const T& data
+    )
         : buffer(
               context,
               sizeof(T),
@@ -151,6 +169,32 @@ public:
               VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
           ) {
         copy_from(&data, size_);
+    }
+};
+
+class storage_buffer final : public buffer {
+public:
+    storage_buffer(
+        vulkan_context& context, VkDeviceSize size, VkBufferUsageFlags additional_usage = 0
+    )
+        : buffer(
+              context,
+              size,
+              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | additional_usage,
+              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+          ) {}
+
+    template <typename T>
+    storage_buffer(
+        vulkan_context& context, const std::vector<T>& data, VkBufferUsageFlags additional_usage = 0
+    )
+        : buffer(
+              context,
+              sizeof(T) * data.size(),
+              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | additional_usage,
+              VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+          ) {
+        copy_from_vector(data);
     }
 };
 }  // namespace vw::gfx

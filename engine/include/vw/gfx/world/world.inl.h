@@ -3,90 +3,129 @@
 #ifndef VW_GFX_WORLD_WORLD_INL_H
 #define VW_GFX_WORLD_WORLD_INL_H
 
-#include "vw/gfx/world/world.h"
-
-#include "vw/gfx/render/vulkan_context.h"
-
 namespace vw::gfx {
 
-inline world::world(vulkan_context& context)
-    : transform_system_(registry_),
-      hierarchy_system_(registry_, transform_system_),
-      mesh_pool_(context),
-      model_system_(registry_, mesh_pool_) {}
+template <typename Cs>
+world<Cs>::world(
+    vulkan_context& context
+)
+    : mesh_pool_{context},
+transform_system_(registry_)
+    , hierarchy_system_(registry_, transform_system_)
+    , model_system_(registry_, mesh_pool_) {}
 
-inline void world::update() {
+template <typename Cs>
+void world<Cs>::update() {
     transform_system_.update();
     model_system_.update();
 }
 
-// Entity management methods with system notifications
-inline auto world::create_entity() -> entity {
+template <typename Cs>
+auto world<Cs>::create_entity() -> entity {
     return registry_.create();
 }
 
+template <typename Cs>
 template <typename T>
-inline void world::add_component(entity ent, T&& value) {
+void world<Cs>::add_component(
+    entity ent, T&& value
+) {
     registry_.add(ent, std::forward<T>(value));
-    
-    // Notify systems about new components with dirty flags
+
     if constexpr (std::same_as<T, transform_component>) {
-        transform_system_.mark_world_dirty(ent);
+        transform_system_.mark_dirty(ent);
+        transform_system_.mark_render_dirty(ent);
     }
     if constexpr (std::same_as<T, model_component>) {
         model_system_.mark_dirty(ent);
-    }
-    if constexpr (std::same_as<T, hierarchy_component>) {
-        // hierarchy_system doesn't need dirty tracking, but we could add logic here if needed
+        model_system_.mark_render_dirty(ent);
     }
 }
 
-template<typename T>
-inline auto world::has_component(entity ent) const -> bool {
-    return registry_.has<T>(ent);
-}
-
+template <typename Cs>
 template <typename T>
-inline auto world::get_component(entity ent) -> T& {
-    return registry_.get<T>(ent);
+auto world<Cs>::has_component(
+    entity ent
+) const -> bool {
+    return registry_.template has<T>(ent);
 }
 
+template <typename Cs>
 template <typename T>
-inline void world::remove_component(entity ent) {
-    registry_.remove<T>(ent);
+auto world<Cs>::get_component(
+    entity ent
+) -> T& {
+    return registry_.template get<T>(ent);
 }
 
-inline void world::remove_all_components(entity ent) {
+template <typename Cs>
+template <typename T>
+void world<Cs>::remove_component(
+    entity ent
+) {
+    if constexpr (std::same_as<T, transform_component>) {
+        transform_system_.mark_render_dirty(ent);
+    }
+    if constexpr (std::same_as<T, model_component>) {
+        model_system_.mark_render_dirty(ent);
+    }
+    registry_.template remove<T>(ent);
+}
+
+template <typename Cs>
+void world<Cs>::remove_all_components(
+    entity ent
+) {
+    if (registry_.template has<transform_component>(ent)) {
+        transform_system_.mark_render_dirty(ent);
+    }
+    if (registry_.template has<model_component>(ent)) {
+        model_system_.mark_render_dirty(ent);
+    }
     registry_.remove_all(ent);
 }
 
-inline void world::destroy_entity(entity ent) {
+template <typename C>
+void world<C>::destroy_entity(
+    entity ent
+) {
+    if (registry_.template has<transform_component>(ent)) {
+        transform_system_.mark_render_dirty(ent);
+    }
+    if (registry_.template has<model_component>(ent)) {
+        model_system_.mark_render_dirty(ent);
+    }
     registry_.destroy(ent);
 }
 
-template <typename... Cs>
-inline auto world::view_components() -> component_view<registry_type, Cs...> {
-    return registry_.view<Cs...>();
-}
-
-// System and registry accessors
-inline auto world::get_hierarchy_system() -> hierarchy_system_type& {
-    return hierarchy_system_;
-}
-
-inline auto world::get_transform_system() -> transform_system_type& {
-    return transform_system_;
-}
-
-inline auto world::get_model_registry() -> model_registry& {
-    return model_registry_;
-}
-
-inline auto world::get_mesh_pool() -> mesh_pool& {
+template <typename WC>
+auto world<WC>::get_mesh_pool() const -> const mesh_pool& {
     return mesh_pool_;
 }
 
-inline auto world::get_model_system() -> model_system_type& {
+template <typename C>
+template <typename... Cs>
+auto world<C>::view_components() -> component_view<registry_type, Cs...> {
+    return registry_.template view<Cs...>();
+}
+
+template <typename C>
+auto world<C>::get_hierarchy_system() -> hierarchy_system_type& {
+    return hierarchy_system_;
+}
+
+template <typename C>
+auto world<C>::get_transform_system() -> transform_system_type& {
+    return transform_system_;
+}
+
+template <typename C>
+auto world<C>::get_model_registry() -> model_registry& {
+    return model_registry_;
+}
+
+template <typename C>
+auto world<C>::get_model_system() -> model_system_type& {
     return model_system_;
 }
 

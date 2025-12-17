@@ -4,6 +4,7 @@
 #define VW_GFX_MESH_H
 
 #include <vulkan/vulkan.h>
+
 #include <memory>
 #include <vector>
 
@@ -12,17 +13,16 @@
 #include "vw/gfx/model/model.h"
 #include "vw/gfx/resource/buffer.h"
 
-
 namespace vw::gfx {
-class vulkan_context;
-
 struct vertex {
     vec3f position;
     vec3f normal;
     uint32 color;
 
     vertex() : color(0) {}
-    vertex(const vec3f& pos, const vec3f& norm, uint32 col)
+    vertex(
+        const vec3f& pos, const vec3f& norm, uint32 col
+    )
         : position(pos), normal(norm), color(col) {}
 
     [[nodiscard]]
@@ -32,57 +32,15 @@ struct vertex {
     static std::vector<VkVertexInputAttributeDescription> get_attribute_descriptions();
 };
 
-// Структура для хранения данных меша без Vulkan буферов
-struct mesh_data {
+struct mesh {
     std::vector<vertex> vertices;
     std::vector<uint32> indices;
-
-    mesh_data() = default;
-    mesh_data(const std::vector<vertex>& v, const std::vector<uint32>& i)
-        : vertices(v), indices(i) {}
-};
-
-class mesh {
-public:
-    explicit mesh(vulkan_context& context);
-    ~mesh() = default;
-
-    mesh(const mesh&)            = delete;
-    mesh& operator=(const mesh&) = delete;
-
-    mesh(mesh&&)            = default;
-    mesh& operator=(mesh&&) = delete;
-
-    void set_vertices(const std::vector<vertex>& vertices);
-    void set_indices(const std::vector<uint32>& indices);
-    void set_mesh_data(const mesh_data& data);
-
-    void bind(VkCommandBuffer command_buffer) const;
-    void draw(VkCommandBuffer command_buffer) const;
-    void draw_indexed(VkCommandBuffer command_buffer) const;
-
-    [[nodiscard]]
-    size_t get_vertex_count() const {
-        return vertex_count_;
-    }
-
-    [[nodiscard]]
-    size_t get_index_count() const {
-        return index_count_;
-    }
-
-private:
-    vulkan_context* context_;
-    std::unique_ptr<vertex_buffer> vertex_buffer_;
-    std::unique_ptr<index_buffer> index_buffer_;
-    size_t vertex_count_;
-    size_t index_count_;
 };
 
 class simple_mesh_generator {
 public:
     [[nodiscard]]
-    static mesh_data generate_mesh_data(std::shared_ptr<model> model);
+    static mesh generate_mesh_data(std::shared_ptr<model> model);
 
 private:
     static void add_cube_face(
@@ -95,18 +53,14 @@ private:
 
     [[nodiscard]]
     static bool is_face_visible(
-        const std::shared_ptr<model>& model,
-        int x,
-        int y,
-        int z,
-        int face_direction
+        const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
     );
 };
 
 class greedy_mesh_generator {
 public:
     [[nodiscard]]
-    static mesh_data generate_mesh_data(std::shared_ptr<model> model);
+    static mesh generate_mesh_data(std::shared_ptr<model> model);
 
 private:
     static void generate_face_quads(
@@ -126,11 +80,7 @@ private:
 
     [[nodiscard]]
     static bool is_face_visible(
-        const std::shared_ptr<model>& model,
-        int x,
-        int y,
-        int z,
-        int face_direction
+        const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
     );
 };
 }  // namespace vw::gfx

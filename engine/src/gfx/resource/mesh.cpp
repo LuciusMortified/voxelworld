@@ -2,9 +2,6 @@
 
 #include <stdexcept>
 
-#include "vw/gfx/render/vulkan_context.h"
-#include "vw/gfx/resource/buffer.h"
-
 namespace vw::gfx {
 
 // ================== vertex ==================
@@ -41,62 +38,13 @@ std::vector<VkVertexInputAttributeDescription> vertex::get_attribute_description
     return attribute_descriptions;
 }
 
-// ================== mesh ==================
-
-mesh::mesh(vulkan_context& context)
-    : context_(&context),
-      vertex_buffer_(nullptr),
-      index_buffer_(nullptr),
-      vertex_count_(0),
-      index_count_(0) {}
-
-void mesh::set_vertices(const std::vector<vertex>& vertices) {
-    vertex_count_ = vertices.size();
-    if (vertex_count_ > 0) {
-        vertex_buffer_ = std::make_unique<vertex_buffer>(*context_, vertices);
-    }
-}
-
-void mesh::set_indices(const std::vector<uint32>& indices) {
-    index_count_ = indices.size();
-    if (index_count_ > 0) {
-        index_buffer_ = std::make_unique<index_buffer>(*context_, indices);
-    }
-}
-
-void mesh::set_mesh_data(const mesh_data& data) {
-    set_vertices(data.vertices);
-    set_indices(data.indices);
-}
-
-void mesh::bind(VkCommandBuffer command_buffer) const {
-    if (vertex_buffer_) {
-        const VkBuffer vertex_buffers[]  = {vertex_buffer_->get_buffer()};
-        constexpr VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
-    }
-    if (index_buffer_) {
-        vkCmdBindIndexBuffer(command_buffer, index_buffer_->get_buffer(), 0, VK_INDEX_TYPE_UINT32);
-    }
-}
-
-void mesh::draw(VkCommandBuffer command_buffer) const {
-    if (vertex_count_ > 0) {
-        vkCmdDraw(command_buffer, static_cast<uint32>(vertex_count_), 1, 0, 0);
-    }
-}
-
-void mesh::draw_indexed(VkCommandBuffer command_buffer) const {
-    if (index_count_ > 0) {
-        vkCmdDrawIndexed(command_buffer, static_cast<uint32>(index_count_), 1, 0, 0, 0);
-    }
-}
-
 // ================== simple_mesh_generator ==================
 
-mesh_data simple_mesh_generator::generate_mesh_data(std::shared_ptr<model> model) {
+mesh simple_mesh_generator::generate_mesh_data(
+    std::shared_ptr<model> model
+) {
     if (!model) {
-        return mesh_data{};
+        return mesh{};
     }
 
     std::vector<vertex> vertices;
@@ -122,7 +70,7 @@ mesh_data simple_mesh_generator::generate_mesh_data(std::shared_ptr<model> model
         }
     }
 
-    return mesh_data{vertices, indices};
+    return mesh{.vertices = std::move(vertices), .indices = std::move(indices)};
 }
 
 void simple_mesh_generator::add_cube_face(
@@ -178,11 +126,7 @@ void simple_mesh_generator::add_cube_face(
 }
 
 bool simple_mesh_generator::is_face_visible(
-    const std::shared_ptr<model>& model,
-    int x,
-    int y,
-    int z,
-    int face_direction
+    const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
 ) {
     if (!model)
         return false;
@@ -208,7 +152,9 @@ bool simple_mesh_generator::is_face_visible(
 
 // ================== greedy_mesh_generator ==================
 
-mesh_data greedy_mesh_generator::generate_mesh_data(std::shared_ptr<model> model) {
+mesh greedy_mesh_generator::generate_mesh_data(
+    std::shared_ptr<model> model
+) {
     if (!model) {
         throw std::runtime_error("model is null");
     }
@@ -221,7 +167,7 @@ mesh_data greedy_mesh_generator::generate_mesh_data(std::shared_ptr<model> model
         generate_face_quads(vertices, indices, model, face_direction);
     }
 
-    return mesh_data{std::move(vertices), std::move(indices)};
+    return mesh{.vertices = std::move(vertices), .indices = std::move(indices)};
 }
 
 void greedy_mesh_generator::generate_face_quads(
@@ -230,64 +176,30 @@ void greedy_mesh_generator::generate_face_quads(
     const std::shared_ptr<model>& model,
     int face_direction
 ) {
-    if (!model) {
-        throw std::runtime_error("model is null");
-    }
-
     // Определяем размеры и оси для текущего направления грани
-    int width, height, depth;
-    int axis1, axis2, axis3;
+    int width = 0, height = 0, depth = 0;
 
     switch (face_direction) {
         case 0:  // +X
-            width  = model->depth();
-            height = model->height();
-            depth  = model->width();
-            axis1  = 2;
-            axis2  = 1;
-            axis3  = 0;
-            break;
         case 1:  // -X
             width  = model->depth();
             height = model->height();
             depth  = model->width();
-            axis1  = 2;
-            axis2  = 1;
-            axis3  = 0;
             break;
         case 2:  // +Y
-            width  = model->width();
-            height = model->depth();
-            depth  = model->height();
-            axis1  = 0;
-            axis2  = 2;
-            axis3  = 1;
-            break;
         case 3:  // -Y
             width  = model->width();
             height = model->depth();
             depth  = model->height();
-            axis1  = 0;
-            axis2  = 2;
-            axis3  = 1;
             break;
         case 4:  // +Z
-            width  = model->width();
-            height = model->height();
-            depth  = model->depth();
-            axis1  = 0;
-            axis2  = 1;
-            axis3  = 2;
-            break;
         case 5:  // -Z
             width  = model->width();
             height = model->height();
             depth  = model->depth();
-            axis1  = 0;
-            axis2  = 1;
-            axis3  = 2;
             break;
-        default:;
+        default:
+            break;
     }
 
     // Проходим по каждому слою в направлении грани
@@ -298,7 +210,7 @@ void greedy_mesh_generator::generate_face_quads(
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 // Преобразуем координаты обратно в координаты модели
-                int mx, my, mz;
+                int mx = 0, my = 0, mz = 0;
                 switch (face_direction) {
                     case 0:  // +X
                         mx = layer;
@@ -330,7 +242,8 @@ void greedy_mesh_generator::generate_face_quads(
                         my = y;
                         mz = depth - 1 - layer;
                         break;
-                    default:;
+                    default:
+                        break;
                 }
 
                 if (is_face_visible(model, mx, my, mz, face_direction)) {
@@ -421,7 +334,7 @@ void greedy_mesh_generator::add_quad(
     int face_direction,
     color color
 ) {
-    // Направления граней: 0=+X, 1=-X, 2=+Y, 3=-Y, 4=+Z, 5=-Z
+    // Направления нормалей
     static const vec3f face_normals[6] = {
         vec3f(1, 0, 0),   // +X
         vec3f(-1, 0, 0),  // -X
@@ -434,23 +347,41 @@ void greedy_mesh_generator::add_quad(
     // Вершины для каждого направления грани - против часовой стрелки
     // относительно нормали
     static const int vertex_indices[6][4] = {
-        // +X: (max.x, min.y, min.z), (max.x, min.y, max.z), (max.x, max.y,
-        // max.z), (max.x, max.y, min.z)
+        // +X:
+        // (max.x, min.y, min.z),
+        // (max.x, min.y, max.z),
+        // (max.x, max.y, max.z),
+        // (max.x, max.y, min.z)
         {1, 5, 6, 2},
-        // -X: (min.x, min.y, min.z), (min.x, max.y, min.z), (min.x, max.y,
-        // max.z), (min.x, min.y, max.z)
+        // -X:
+        // (min.x, min.y, min.z),
+        // (min.x, max.y, min.z),
+        // (min.x, max.y, max.z),
+        // (min.x, min.y, max.z)
         {0, 3, 7, 4},
-        // +Y: (min.x, max.y, min.z), (max.x, max.y, min.z), (max.x, max.y,
-        // max.z), (min.x, max.y, max.z)
+        // +Y:
+        // (min.x, max.y, min.z),
+        // (max.x, max.y, min.z),
+        // (max.x, max.y, max.z),
+        // (min.x, max.y, max.z)
         {3, 2, 6, 7},
-        // -Y: (min.x, min.y, min.z), (min.x, min.y, max.z), (max.x, min.y,
-        // max.z), (max.x, min.y, min.z)
+        // -Y:
+        // (min.x, min.y, min.z),
+        // (min.x, min.y, max.z),
+        // (max.x, min.y, max.z),
+        // (max.x, min.y, min.z)
         {0, 4, 5, 1},
-        // +Z: (min.x, min.y, max.z), (min.x, max.y, max.z), (max.x, max.y,
-        // max.z), (max.x, min.y, max.z)
+        // +Z:
+        // (min.x, min.y, max.z),
+        // (min.x, max.y, max.z),
+        // (max.x, max.y, max.z),
+        // (max.x, min.y, max.z)
         {4, 7, 6, 5},
-        // -Z: (max.x, min.y, min.z), (max.x, max.y, min.z), (min.x, max.y,
-        // min.z), (min.x, min.y, min.z)
+        // -Z:
+        // (max.x, min.y, min.z),
+        // (max.x, max.y, min.z),
+        // (min.x, max.y, min.z),
+        // (min.x, min.y, min.z)
         {1, 2, 3, 0}
     };
 
@@ -466,8 +397,8 @@ void greedy_mesh_generator::add_quad(
         vec3f(min_pos.x, max_pos.y, max_pos.z)   // 7: (min, max, max)
     };
 
-    uint32 base_vertex = static_cast<uint32>(vertices.size());
-    vec3f normal       = face_normals[face_direction];
+    auto base_vertex = static_cast<uint32>(vertices.size());
+    vec3f normal     = face_normals[face_direction];
 
     // Добавляем 4 вершины грани
     for (int i = 0; i < 4; i++) {
@@ -485,19 +416,15 @@ void greedy_mesh_generator::add_quad(
 }
 
 bool greedy_mesh_generator::is_face_visible(
-    const std::shared_ptr<model>& model,
-    int x,
-    int y,
-    int z,
-    int face_direction
+    const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
 ) {
     if (!model)
         return false;
 
     // Смещения для проверки соседних вокселей
-    static const int dx[6] = {1, -1, 0, 0, 0, 0};
-    static const int dy[6] = {0, 0, 1, -1, 0, 0};
-    static const int dz[6] = {0, 0, 0, 0, 1, -1};
+    static constexpr int dx[6] = {1, -1, 0, 0, 0, 0};
+    static constexpr int dy[6] = {0, 0, 1, -1, 0, 0};
+    static constexpr int dz[6] = {0, 0, 0, 0, 1, -1};
 
     int nx = x + dx[face_direction];
     int ny = y + dy[face_direction];

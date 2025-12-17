@@ -3,6 +3,8 @@
 #ifndef VW_GFX_TRANSFORM_SYSTEM_H
 #define VW_GFX_TRANSFORM_SYSTEM_H
 
+#include <set>
+
 #include "vw/gfx/world/registry.h"
 
 namespace vw {
@@ -20,7 +22,10 @@ public:
     explicit transform_system(registry_type& registry);
 
     void update();
+
     void mark_world_dirty(entity ent);
+
+    void mark_dirty(entity ent);
 
     class transform_modifier {
     public:
@@ -42,19 +47,22 @@ public:
 
     transform_modifier modify(entity ent);
 
+    [[nodiscard]]
+    auto get_render_dirty_entities() -> std::set<entity>&;
+
+    void mark_render_dirty(entity ent);
+
 private:
     void mark_children_world_dirty(entity ent);
 
-    [[nodiscard]] auto calc_world_transform(
-        transform local_transform,
-        const transform_component& parent_comp
-    ) -> transform;
+    void update_entity_world_matrix(entity ent, const transform_component& transform_comp);
 
     [[nodiscard]] auto get_hierarchy_depth(entity ent) const -> size_t;
 
     registry_type* registry_;
 
     std::vector<entity> dirty_entities_;
+    std::set<entity> render_dirty_entities_;
 };
 
 template <typename... Cs>

@@ -15,12 +15,20 @@ struct entity final {
     uint32 index      = invalid_index;
     uint32 generation = 0;
 
-    [[nodiscard]] auto operator==(const entity& rhs) const -> bool {
+    [[nodiscard]] auto operator==(
+        const entity& rhs
+    ) const -> bool {
         return index == rhs.index && generation == rhs.generation;
     }
 
-    [[nodiscard]] auto operator!=(const entity& rhs) const -> bool {
+    [[nodiscard]] auto operator!=(
+        const entity& rhs
+    ) const -> bool {
         return !(*this == rhs);
+    }
+
+    [[nodiscard]] auto operator<(const entity& rhs) const -> bool {
+        return index != rhs.index ? index < rhs.index : generation < rhs.generation;
     }
 
     [[nodiscard]] auto is_valid() const -> bool {
@@ -35,7 +43,9 @@ static constexpr entity invalid_entity = entity{};
 namespace std {
 template <>
 struct hash<vw::gfx::entity> {
-    auto operator()(const vw::gfx::entity& ent) const noexcept -> size_t {
+    auto operator()(
+        const vw::gfx::entity& ent
+    ) const noexcept -> size_t {
         return std::hash<vw::uint32>()(ent.index) ^ (std::hash<vw::uint32>()(ent.generation) << 1);
     }
 };
