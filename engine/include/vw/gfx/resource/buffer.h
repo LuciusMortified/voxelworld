@@ -199,4 +199,6 @@ public:
 };
 }  // namespace vw::gfx
 
+#include "vw/gfx/resource/buffer.inl.h"
+
 #endif  // VW_GFX_BUFFER_H

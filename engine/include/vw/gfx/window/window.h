@@ -31,11 +31,9 @@ public:
     void poll_events();
     void get_framebuffer_size(int* width, int* height) const;
 
-    [[nodiscard]]
-    VkSurfaceKHR create_surface(VkInstance instance);
+    [[nodiscard]] VkSurfaceKHR create_surface(VkInstance instance);
 
-    [[nodiscard]]
-    static std::vector<const char*> get_required_extensions();
+    [[nodiscard]] static std::vector<const char*> get_required_extensions();
 
     [[nodiscard]]
     vec2i get_size() const {
@@ -84,17 +82,20 @@ public:
     }
 
     template <event_type E, event_callback_type<E> F>
-    event_sub<E> sub(F&& callback) {
+    event_sub<E> sub(
+        F&& callback
+    ) {
         return event_dispatcher_.sub<E>(std::forward<F>(callback));
     }
 
     template <event_type E>
-    void unsub(event_sub<E> sub) {
+    void unsub(
+        event_sub<E> sub
+    ) {
         return event_dispatcher_.unsub(sub);
     }
 
 private:
-    // clang-format off
     static void key_callback(GLFWwindow* wptr, int key, int scancode, int action, int mods);
     static void mouse_button_callback(GLFWwindow* wptr, int button, int action, int mods);
     static void mouse_motion_callback(GLFWwindow* wptr, double pos_x, double pos_y);
@@ -102,7 +103,6 @@ private:
     static void window_size_callback(GLFWwindow* wptr, int width, int height);
     static void window_focus_callback(GLFWwindow* wptr, int focused);
     static void window_close_callback(GLFWwindow* wptr);
-    // clang-format on
 
     GLFWwindow* window_;
     std::string title_;
@@ -113,5 +113,7 @@ private:
     event_dispatcher event_dispatcher_;
 };
 }  // namespace vw::gfx
+
+#include "vw/gfx/window/window.inl.h"
 
 #endif  // VW_GFX_WINDOW_H

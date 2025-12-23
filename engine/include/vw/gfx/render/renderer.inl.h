@@ -1363,7 +1363,7 @@ void renderer<WC>::render_world(
         // Indirect draw call
         VkBuffer indirect_buffer = buffer->get_indirect_draw_buffer();
         uint32_t draw_count      = buffer->get_draw_command_count();
-        if (indirect_buffer != VK_NULL_HANDLE && draw_count > 0) {
+        if (draw_count > 0) {
             vkCmdDrawIndexedIndirect(
                 command_buffers_[current_image_index_],
                 indirect_buffer,

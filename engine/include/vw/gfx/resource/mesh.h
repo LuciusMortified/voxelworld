@@ -85,4 +85,6 @@ private:
 };
 }  // namespace vw::gfx
 
+#include "vw/gfx/resource/mesh.inl.h"
+
 #endif  // VW_GFX_MESH_H

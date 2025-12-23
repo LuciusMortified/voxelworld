@@ -16,40 +16,22 @@ public:
     virtual ~fps_camera_controller() = default;
 
     void setup(window& window, camera& camera);
-
     void update(float delta_time);
 
-    void set_mouse_sensitivity(float sensitivity) {
-        mouse_sensitivity_ = sensitivity;
-    }
+    void set_mouse_sensitivity(float sensitivity);
+    [[nodiscard]] float get_mouse_sensitivity() const;
 
-    [[nodiscard]]
-    float get_mouse_sensitivity() const {
-        return mouse_sensitivity_;
-    }
+    void set_camera_speed(float speed);
+    [[nodiscard]] float get_camera_speed() const;
 
-    void set_camera_speed(float speed) {
-        camera_speed_ = speed;
-    }
-
-    [[nodiscard]]
-    float get_camera_speed() const {
-        return camera_speed_;
-    }
-
-    [[nodiscard]]
-    bool is_mouse_captured() const {
-        return mouse_captured_;
-    }
-
+    [[nodiscard]] bool is_mouse_captured() const;
     void set_mouse_captured(bool captured);
-
     void toggle_mouse_captured();
 
 private:
-    void update_camera_movement(float delta_time) const;
-    void handle_key_pressed(keyboard::key key);
-    void handle_mouse_moved(double x, double y);
+    void update_camera_movement_(float delta_time) const;
+    void handle_key_pressed_(keyboard::key key);
+    void handle_mouse_moved_(double x, double y);
 
     float mouse_sensitivity_;
     float camera_speed_;
@@ -67,5 +49,7 @@ private:
     event_sub<mouse_move_event> mouse_move_sub_;
 };
 }  // namespace vw::gfx
+
+#include "vw/gfx/camera/fps_camera_controller.inl.h"
 
 #endif  // VW_GFX_CAMERA_CAMERA_CONTROLLER_H

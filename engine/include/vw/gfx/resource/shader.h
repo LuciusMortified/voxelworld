@@ -44,4 +44,6 @@ private:
 };
 }  // namespace vw::gfx
 
+#include "vw/gfx/resource/shader.inl.h"
+
 #endif  // VW_GFX_SHADER_H

@@ -1,14 +1,12 @@
-#include "../../../include/vw/gfx/resource/shader.h"
+#pragma once
 
+#ifndef VW_GFX_SHADER_INL_H
+#define VW_GFX_SHADER_INL_H
 #include <fstream>
-#include <stdexcept>
-#include <vector>
-
-#include "../../../include/vw/gfx/render/vulkan_context.h"
 
 namespace vw::gfx {
 
-VkShaderStageFlagBits to_vulkan_shader_stage(shader_type type) {
+inline VkShaderStageFlagBits to_vulkan_shader_stage(shader_type type) {
     switch (type) {
         case shader_type::VERTEX:
             return VK_SHADER_STAGE_VERTEX_BIT;
@@ -18,26 +16,27 @@ VkShaderStageFlagBits to_vulkan_shader_stage(shader_type type) {
     throw std::runtime_error("unknown shader type");
 }
 
-shader::shader(vulkan_context& context, const std::string& path, shader_type type) : context_(&context) {
+inline shader::shader(vulkan_context& context, const std::string& path, shader_type type) : context_(&context) {
     stage_ = to_vulkan_shader_stage(type);
     const auto code = read_file(path);
     shader_module_ = create_shader_module(code);
 }
 
-shader::~shader() {
+inline shader::~shader() {
     vkDestroyShaderModule(context_->get_device(), shader_module_, nullptr);
 }
 
-VkPipelineShaderStageCreateInfo shader::get_stage_info() const {
-    VkPipelineShaderStageCreateInfo create_info{};
-    create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    create_info.stage = stage_;
-    create_info.module = shader_module_;
-    create_info.pName = "main";
+inline VkPipelineShaderStageCreateInfo shader::get_stage_info() const {
+    VkPipelineShaderStageCreateInfo create_info{
+        .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+        .stage = stage_,
+        .module = shader_module_,
+        .pName = "main",
+    };
     return create_info;
 }
 
-VkShaderModule shader::create_shader_module(const std::vector<char>& code) const {
+inline VkShaderModule shader::create_shader_module(const std::vector<char>& code) const {
     VkShaderModuleCreateInfo create_info{};
     create_info.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     create_info.codeSize = code.size();
@@ -51,7 +50,7 @@ VkShaderModule shader::create_shader_module(const std::vector<char>& code) const
     return shader_module;
 }
 
-std::vector<char> shader::read_file(const std::string& filename) {
+inline std::vector<char> shader::read_file(const std::string& filename) {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
     if (!file.is_open()) {
         throw std::runtime_error("failed to open file: " + filename);
@@ -62,9 +61,10 @@ std::vector<char> shader::read_file(const std::string& filename) {
 
     file.seekg(0);
     file.read(buffer.data(), file_size);
-    file.close();
 
     return buffer;
 }
 
-}  // namespace vw::gfx
+}// namespace vw::gfx
+
+#endif  // VW_GFX_SHADER_INL_H

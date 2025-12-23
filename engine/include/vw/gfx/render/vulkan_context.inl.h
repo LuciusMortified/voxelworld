@@ -1,11 +1,13 @@
-#include "vw/gfx/render/vulkan_context.h"
+#pragma once
+
+#ifndef VW_GFX_VULKAN_CONTEXT_INL_H
+#define VW_GFX_VULKAN_CONTEXT_INL_H
 
 #include <cstring>
 #include <iostream>
 #include <set>
 #include <stdexcept>
 
-#include "vw/core.h"
 #include "vw/gfx/window/window.h"
 
 #ifndef NDEBUG
@@ -19,7 +21,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     return VK_FALSE;
 }
 
-VkResult create_debug_utils_messenger_ext(
+inline VkResult create_debug_utils_messenger_ext(
     VkInstance instance,
     const VkDebugUtilsMessengerCreateInfoEXT* p_create_info,
     const VkAllocationCallbacks* p_allocator,
@@ -35,7 +37,7 @@ VkResult create_debug_utils_messenger_ext(
     }
 }
 
-void destroy_debug_utils_messenger_ext(
+inline void destroy_debug_utils_messenger_ext(
     VkInstance instance,
     VkDebugUtilsMessengerEXT debug_messenger,
     const VkAllocationCallbacks* p_allocator
@@ -50,30 +52,28 @@ void destroy_debug_utils_messenger_ext(
 #endif
 
 namespace vw::gfx {
-
-vulkan_context::vulkan_context(
+inline vulkan_context::vulkan_context(
     window& window
 )
     : window_(&window) {
-    device_extensions_ = {
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-        VK_EXT_MEMORY_BUDGET_EXTENSION_NAME,
+    device_extensions_ = {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_EXT_MEMORY_BUDGET_EXTENSION_NAME};
 #ifdef __APPLE__
-        "VK_KHR_portability_subset",
+    device_extensions_.push_back("VK_KHR_portability_subset");
 #endif
-    };
 
     create_instance();
+
 #ifndef NDEBUG
     setup_debug_messenger();
 #endif
+
     create_surface();
     pick_physical_device();
     create_logical_device();
     create_command_pool();
 }
 
-vulkan_context::~vulkan_context() {
+inline vulkan_context::~vulkan_context() {
     vkDestroyCommandPool(device_, command_pool_, nullptr);
     vkDestroyDevice(device_, nullptr);
 #ifndef NDEBUG
@@ -83,11 +83,43 @@ vulkan_context::~vulkan_context() {
     vkDestroyInstance(instance_, nullptr);
 }
 
-swapchain_support_details vulkan_context::query_swapchain_support() const {
+inline VkInstance vulkan_context::get_instance() const {
+    return instance_;
+}
+
+inline VkDevice vulkan_context::get_device() const {
+    return device_;
+}
+
+inline VkPhysicalDevice vulkan_context::get_physical_device() const {
+    return physical_device_;
+}
+
+inline VkQueue vulkan_context::get_graphics_queue() const {
+    return graphics_queue_;
+}
+
+inline VkQueue vulkan_context::get_present_queue() const {
+    return present_queue_;
+}
+
+inline VkSurfaceKHR vulkan_context::get_surface() const {
+    return surface_;
+}
+
+inline VkCommandPool vulkan_context::get_command_pool() const  {
+    return command_pool_;
+}
+
+inline queue_family_indices vulkan_context::get_queue_families() const  {
+    return queue_families_;
+}
+
+inline swapchain_support_details vulkan_context::query_swapchain_support() const {
     return query_swapchain_support(physical_device_);
 }
 
-void vulkan_context::create_instance() {
+inline void vulkan_context::create_instance() {
     VkApplicationInfo app_info{};
     app_info.sType              = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName   = "Voxel World";
@@ -185,11 +217,11 @@ void vulkan_context::create_instance() {
     }
 }
 
-void vulkan_context::create_surface() {
+inline void vulkan_context::create_surface() {
     surface_ = window_->create_surface(instance_);
 }
 
-void vulkan_context::pick_physical_device() {
+inline void vulkan_context::pick_physical_device() {
     uint32 device_count = 0;
     vkEnumeratePhysicalDevices(instance_, &device_count, nullptr);
 
@@ -218,7 +250,7 @@ void vulkan_context::pick_physical_device() {
     throw std::runtime_error("failed to find a suitable gpu");
 }
 
-void vulkan_context::create_logical_device() {
+inline void vulkan_context::create_logical_device() {
     queue_families_ = find_queue_families(physical_device_);
     std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
     std::set<uint32> unique_queue_families = {
@@ -236,7 +268,7 @@ void vulkan_context::create_logical_device() {
     }
 
     VkPhysicalDeviceFeatures device_features{};
-    device_features.fillModeNonSolid = VK_TRUE;
+    device_features.fillModeNonSolid  = VK_TRUE;
     device_features.multiDrawIndirect = VK_TRUE;
 
     VkPhysicalDeviceShaderDrawParametersFeatures shader_draw_params{};
@@ -272,7 +304,7 @@ void vulkan_context::create_logical_device() {
     vkGetDeviceQueue(device_, queue_families_.present_family.value(), 0, &present_queue_);
 }
 
-void vulkan_context::create_command_pool() {
+inline void vulkan_context::create_command_pool() {
     VkCommandPoolCreateInfo pool_info{};
     pool_info.sType            = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     pool_info.queueFamilyIndex = queue_families_.graphics_family.value();
@@ -283,7 +315,7 @@ void vulkan_context::create_command_pool() {
     }
 }
 
-bool vulkan_context::is_device_suitable(
+inline bool vulkan_context::is_device_suitable(
     VkPhysicalDevice device
 ) {
     VkPhysicalDeviceProperties device_properties;
@@ -375,7 +407,7 @@ bool vulkan_context::is_device_suitable(
     return suitable;
 }
 
-queue_family_indices vulkan_context::find_queue_families(
+inline queue_family_indices vulkan_context::find_queue_families(
     VkPhysicalDevice device
 ) {
     queue_family_indices indices;
@@ -406,7 +438,7 @@ queue_family_indices vulkan_context::find_queue_families(
     return indices;
 }
 
-bool vulkan_context::check_device_extension_support(
+inline bool vulkan_context::check_device_extension_support(
     VkPhysicalDevice device
 ) {
     uint32 extension_count;
@@ -432,7 +464,7 @@ bool vulkan_context::check_device_extension_support(
     return required_extensions.empty();
 }
 
-swapchain_support_details vulkan_context::query_swapchain_support(
+inline swapchain_support_details vulkan_context::query_swapchain_support(
     VkPhysicalDevice device
 ) const {
     swapchain_support_details details;
@@ -460,7 +492,7 @@ swapchain_support_details vulkan_context::query_swapchain_support(
 }
 
 #ifndef NDEBUG
-void vulkan_context::setup_debug_messenger() {
+inline void vulkan_context::setup_debug_messenger() {
     VkDebugUtilsMessengerCreateInfoEXT create_info{};
     create_info.sType           = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
     create_info.messageSeverity = VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
@@ -479,3 +511,5 @@ void vulkan_context::setup_debug_messenger() {
 #endif
 
 }  // namespace vw::gfx
+
+#endif  // VW_GFX_VULKAN_CONTEXT_INL_H

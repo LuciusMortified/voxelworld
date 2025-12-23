@@ -121,7 +121,8 @@ private:
         object_rotation_       = 0.0f;
         object_rotation_speed_ = math::radians(5.0f);
 
-        for (int i = 0; i < 1000; i++) {
+#if 0
+        for (int i = 0; i < 99; i++) {
             auto another_entity_ = world.create_entity();
             world.add_component<gfx::transform_component>(another_entity_);
             world.add_component<gfx::model_component>(another_entity_);
@@ -136,6 +137,7 @@ private:
 
             model_system.modify(another_entity_).set_model(model_);
         }
+#endif
     }
 
     void update_object_rotation(

@@ -1,14 +1,13 @@
-#include "vw/gfx/resource/buffer.h"
+#pragma once
 
-#include <cstring>
-#include <stdexcept>
-#include <utility>
+#ifndef VW_GFX_BUFFER_INL_H
+#define VW_GFX_BUFFER_INL_H
 
 #include "vw/gfx/render/vulkan_context.h"
 
 namespace vw::gfx {
 
-buffer::buffer(
+inline buffer::buffer(
     vulkan_context& context,
     VkDeviceSize size,
     VkBufferUsageFlags usage,
@@ -44,18 +43,18 @@ buffer::buffer(
     vkBindBufferMemory(context_->get_device(), buffer_, memory_, 0);
 }
 
-buffer::~buffer() {
+inline buffer::~buffer() {
     cleanup();
 }
 
-buffer::buffer(buffer&& other) noexcept
+inline buffer::buffer(buffer&& other) noexcept
     : size_(std::exchange(other.size_, 0)),
       context_(std::exchange(other.context_, nullptr)),
       buffer_(std::exchange(other.buffer_, VK_NULL_HANDLE)),
       memory_(std::exchange(other.memory_, VK_NULL_HANDLE)),
       mapped_memory_(std::exchange(other.mapped_memory_, nullptr)) {}
 
-buffer& buffer::operator=(buffer&& other) noexcept {
+inline buffer& buffer::operator=(buffer&& other) noexcept {
     if (this != &other) {
         cleanup();
 
@@ -67,7 +66,7 @@ buffer& buffer::operator=(buffer&& other) noexcept {
     return *this;
 }
 
-void* buffer::map() {
+inline void* buffer::map() {
     if (mapped_memory_ == nullptr) {
         if (vkMapMemory(context_->get_device(), memory_, 0, size_, 0, &mapped_memory_) !=
             VK_SUCCESS) {
@@ -77,30 +76,30 @@ void* buffer::map() {
     return mapped_memory_;
 }
 
-void buffer::unmap() {
+inline void buffer::unmap() {
     if (mapped_memory_ != nullptr) {
         vkUnmapMemory(context_->get_device(), memory_);
         mapped_memory_ = nullptr;
     }
 }
 
-void buffer::copy_from(const void* data, VkDeviceSize size, VkDeviceSize offset) {
+inline void buffer::copy_from(const void* data, VkDeviceSize size, VkDeviceSize offset) {
     if (size == 0)
         return;
     void* mapped = map();
     memcpy(static_cast<char*>(mapped) + offset, data, size);
-    unmap();
+    // unmap();
 }
 
-void buffer::copy_to(
+inline void buffer::copy_to(
     void* data, VkDeviceSize size, VkDeviceSize offset
 ) {
     void* mapped = map();
     memcpy(data, static_cast<char*>(mapped) + offset, size);
-    unmap();
+    // unmap();
 }
 
-void buffer::copy_to_buffer(
+inline void buffer::copy_to_buffer(
     buffer& dst,
     VkDeviceSize size,
     VkDeviceSize src_offset,
@@ -140,7 +139,7 @@ void buffer::copy_to_buffer(
     vkFreeCommandBuffers(context_->get_device(), context_->get_command_pool(), 1, &command_buffer);
 }
 
-uint32 buffer::find_memory_type(uint32 type_filter, VkMemoryPropertyFlags properties) const {
+inline uint32 buffer::find_memory_type(uint32 type_filter, VkMemoryPropertyFlags properties) const {
     VkPhysicalDeviceMemoryProperties mem_properties;
     vkGetPhysicalDeviceMemoryProperties(context_->get_physical_device(), &mem_properties);
 
@@ -154,7 +153,7 @@ uint32 buffer::find_memory_type(uint32 type_filter, VkMemoryPropertyFlags proper
     throw std::runtime_error("failed to find suitable memory type");
 }
 
-void buffer::cleanup() {
+inline void buffer::cleanup() {
     if (mapped_memory_) {
         unmap();
     }
@@ -167,3 +166,5 @@ void buffer::cleanup() {
 }
 
 }  // namespace vw::gfx
+
+#endif  // VW_GFX_BUFFER_INL_H

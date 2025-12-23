@@ -1,10 +1,13 @@
-#include "vw/gfx/camera/camera_controller.h"
+#pragma once
+
+#ifndef VW_GFX_CAMERA_CAMERA_CONTROLLER_INL_H
+#define VW_GFX_CAMERA_CAMERA_CONTROLLER_INL_H
 
 #include "vw/gfx/window/window.h"
 
 namespace vw::gfx {
 
-fps_camera_controller::fps_camera_controller(
+inline fps_camera_controller::fps_camera_controller(
     float mouse_sensitivity, float camera_speed
 )
     : mouse_sensitivity_(mouse_sensitivity)
@@ -17,7 +20,7 @@ fps_camera_controller::fps_camera_controller(
     , key_press_sub_(0)
     , mouse_move_sub_(0) {}
 
-void fps_camera_controller::setup(
+inline void fps_camera_controller::setup(
     window& window, camera& camera
 ) {
     window_ = &window;
@@ -30,28 +33,52 @@ void fps_camera_controller::setup(
     mouse_initialized_ = true;
 
     key_press_sub_ = window_->sub<key_press_event>([this](const key_press_event& event) -> bool {
-        handle_key_pressed(event.key);
+        handle_key_pressed_(event.key);
         return false;
     });
 
     mouse_move_sub_ = window_->sub<mouse_move_event>([this](const mouse_move_event& event) -> bool {
         if (mouse_captured_) {
-            handle_mouse_moved(event.x, event.y);
+            handle_mouse_moved_(event.x, event.y);
         }
         return false;
     });
 }
 
-void fps_camera_controller::update(
+inline void fps_camera_controller::update(
     float delta_time
 ) {
     if (!enabled_ || !camera_ || !window_)
         return;
 
-    update_camera_movement(delta_time);
+    update_camera_movement_(delta_time);
 }
 
-void fps_camera_controller::handle_key_pressed(
+inline void fps_camera_controller::set_mouse_sensitivity(
+    float sensitivity
+) {
+    mouse_sensitivity_ = sensitivity;
+}
+
+inline float fps_camera_controller::get_mouse_sensitivity() const {
+    return mouse_sensitivity_;
+}
+
+inline void fps_camera_controller::set_camera_speed(
+    float speed
+) {
+    camera_speed_ = speed;
+}
+
+inline float fps_camera_controller::get_camera_speed() const {
+    return camera_speed_;
+}
+
+inline bool fps_camera_controller::is_mouse_captured() const {
+    return mouse_captured_;
+}
+
+inline void fps_camera_controller::handle_key_pressed_(
     keyboard::key key
 ) {
     switch (key) {
@@ -63,7 +90,7 @@ void fps_camera_controller::handle_key_pressed(
     }
 }
 
-void fps_camera_controller::handle_mouse_moved(
+inline void fps_camera_controller::handle_mouse_moved_(
     double x, double y
 ) {
     if (!camera_) {
@@ -93,7 +120,7 @@ void fps_camera_controller::handle_mouse_moved(
     }
 }
 
-void fps_camera_controller::update_camera_movement(
+inline void fps_camera_controller::update_camera_movement_(
     float delta_time
 ) const {
     const float move_speed = camera_speed_ * delta_time;
@@ -122,7 +149,7 @@ void fps_camera_controller::update_camera_movement(
     }
 }
 
-void fps_camera_controller::set_mouse_captured(
+inline void fps_camera_controller::set_mouse_captured(
     bool captured
 ) {
     mouse_captured_ = captured;
@@ -132,8 +159,10 @@ void fps_camera_controller::set_mouse_captured(
     mouse_initialized_ = false;
 }
 
-void fps_camera_controller::toggle_mouse_captured() {
+inline void fps_camera_controller::toggle_mouse_captured() {
     set_mouse_captured(!mouse_captured_);
 }
 
 }  // namespace vw::gfx
+
+#endif  // VW_GFX_CAMERA_CAMERA_CONTROLLER_INL_H

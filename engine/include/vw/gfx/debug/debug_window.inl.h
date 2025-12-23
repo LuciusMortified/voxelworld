@@ -112,13 +112,13 @@ void debug_window<WC>::render_fps_window() {
 
 template <typename WC>
 void debug_window<WC>::render_render_mode_controls() const {
-    ImGui::Text("Render Mode:");
-
-    const char* mode_names[] = {"Lit", "Wireframe"};
-    int current_mode         = static_cast<int>(engine_->get_renderer().get_render_mode());
-
-    if (ImGui::Combo("##RenderMode", &current_mode, mode_names, 2)) {
-        engine_->get_renderer().set_render_mode(static_cast<render_mode>(current_mode));
+    ImGui::Spacing();
+    if (ImGui::Button("lit")) {
+        engine_->get_renderer().set_render_mode(render_mode::lit);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("wire")) {
+        engine_->get_renderer().set_render_mode(render_mode::wireframe);
     }
 }
 

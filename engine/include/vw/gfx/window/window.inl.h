@@ -1,11 +1,16 @@
-#include "vw/gfx/window/window.h"
+#pragma once
+
+#ifndef VW_GFX_WINDOW_INL_H
+#define VW_GFX_WINDOW_INL_H
 
 #include <stdexcept>
-#include <vector>
 
 namespace vw::gfx {
 
-window::window(int width, int height, std::string_view title) : size_(width, height) {
+inline window::window(
+    int width, int height, std::string_view title
+)
+    : size_(width, height) {
     if (!glfwInit()) {
         throw std::runtime_error("failed to initialize glfw");
     }
@@ -30,14 +35,16 @@ window::window(int width, int height, std::string_view title) : size_(width, hei
     glfwSetWindowCloseCallback(window_, window_close_callback);
 }
 
-window::~window() {
+inline window::~window() {
     if (window_) {
         glfwDestroyWindow(window_);
     }
     glfwTerminate();
 }
 
-void window::key_callback(GLFWwindow* wptr, int key, int scancode, int action, int mods) {
+inline void window::key_callback(
+    GLFWwindow* wptr, int key, int scancode, int action, int mods
+) {
     auto* w = static_cast<window*>(glfwGetWindowUserPointer(wptr));
 
     const auto keyboard_mods = static_cast<keyboard::mod>(mods);
@@ -63,7 +70,9 @@ void window::key_callback(GLFWwindow* wptr, int key, int scancode, int action, i
     }
 }
 
-void window::mouse_button_callback(GLFWwindow* wptr, int button, int action, int mods) {
+inline void window::mouse_button_callback(
+    GLFWwindow* wptr, int button, int action, int mods
+) {
     auto* w = static_cast<window*>(glfwGetWindowUserPointer(wptr));
 
     const auto keyboard_mods = static_cast<keyboard::mod>(mods);
@@ -77,7 +86,9 @@ void window::mouse_button_callback(GLFWwindow* wptr, int button, int action, int
     }
 }
 
-void window::mouse_motion_callback(GLFWwindow* wptr, double pos_x, double pos_y) {
+inline void window::mouse_motion_callback(
+    GLFWwindow* wptr, double pos_x, double pos_y
+) {
     auto* w             = static_cast<window*>(glfwGetWindowUserPointer(wptr));
     w->last_cursor_pos_ = {pos_x, pos_y};
 
@@ -85,14 +96,18 @@ void window::mouse_motion_callback(GLFWwindow* wptr, double pos_x, double pos_y)
     w->event_dispatcher_.dispatch(event);
 }
 
-void window::mouse_scroll_callback(GLFWwindow* wptr, double offset_x, double offset_y) {
+inline void window::mouse_scroll_callback(
+    GLFWwindow* wptr, double offset_x, double offset_y
+) {
     auto* w = static_cast<window*>(glfwGetWindowUserPointer(wptr));
 
     mouse_scroll_event event(offset_x, offset_y);
     w->event_dispatcher_.dispatch(event);
 }
 
-void window::window_size_callback(GLFWwindow* wptr, int width, int height) {
+inline void window::window_size_callback(
+    GLFWwindow* wptr, int width, int height
+) {
     auto* w  = static_cast<window*>(glfwGetWindowUserPointer(wptr));
     w->size_ = {width, height};
 
@@ -100,33 +115,41 @@ void window::window_size_callback(GLFWwindow* wptr, int width, int height) {
     w->event_dispatcher_.dispatch(event);
 }
 
-void window::window_focus_callback(GLFWwindow* wptr, int focused) {
+inline void window::window_focus_callback(
+    GLFWwindow* wptr, int focused
+) {
     auto* w = static_cast<window*>(glfwGetWindowUserPointer(wptr));
 
     window_focus_event event{focused == GLFW_TRUE};
     w->event_dispatcher_.dispatch(event);
 }
 
-void window::window_close_callback(GLFWwindow* wptr) {
+inline void window::window_close_callback(
+    GLFWwindow* wptr
+) {
     auto* w = static_cast<window*>(glfwGetWindowUserPointer(wptr));
 
     window_close_event event{};
     w->event_dispatcher_.dispatch(event);
 }
 
-bool window::should_close() const {
+inline bool window::should_close() const {
     return glfwWindowShouldClose(window_);
 }
 
-void window::poll_events() {
+inline void window::poll_events() {
     glfwPollEvents();
 }
 
-void window::get_framebuffer_size(int* width, int* height) const {
+inline void window::get_framebuffer_size(
+    int* width, int* height
+) const {
     glfwGetFramebufferSize(window_, width, height);
 }
 
-VkSurfaceKHR window::create_surface(VkInstance instance) {
+inline VkSurfaceKHR window::create_surface(
+    VkInstance instance
+) {
     VkSurfaceKHR surface;
     VkResult result = glfwCreateWindowSurface(instance, window_, nullptr, &surface);
 
@@ -137,10 +160,9 @@ VkSurfaceKHR window::create_surface(VkInstance instance) {
     return surface;
 }
 
-std::vector<const char*> window::get_required_extensions() {
+inline std::vector<const char*> window::get_required_extensions() {
     uint32_t glfw_extension_count = 0;
     const char** glfw_extensions  = glfwGetRequiredInstanceExtensions(&glfw_extension_count);
-
     std::vector extensions(glfw_extensions, glfw_extensions + glfw_extension_count);
 
 #ifdef __APPLE__
@@ -151,68 +173,92 @@ std::vector<const char*> window::get_required_extensions() {
     return extensions;
 }
 
-bool window::is_key_pressed(keyboard::key key) const {
+inline bool window::is_key_pressed(
+    keyboard::key key
+) const {
     return glfwGetKey(window_, static_cast<int>(key)) == GLFW_PRESS;
 }
 
-bool window::is_mouse_button_pressed(mouse::button button) const {
+inline bool window::is_mouse_button_pressed(
+    mouse::button button
+) const {
     return glfwGetMouseButton(window_, static_cast<int>(button)) == GLFW_PRESS;
 }
 
-vec2d window::get_cursor_pos() const {
+inline vec2d window::get_cursor_pos() const {
     double x, y;
     glfwGetCursorPos(window_, &x, &y);
     return {x, y};
 }
 
-void window::set_cursor_pos(vec2d pos) const {
+inline void window::set_cursor_pos(
+    vec2d pos
+) const {
     glfwSetCursorPos(window_, pos.x, pos.y);
     last_cursor_pos_ = pos;
 }
 
-void window::set_cursor_pos(double x, double y) const {
+inline void window::set_cursor_pos(
+    double x, double y
+) const {
     set_cursor_pos({x, y});
 }
 
-void window::set_cursor_mode(cursor_mode mode) const {
+inline void window::set_cursor_mode(
+    cursor_mode mode
+) const {
     glfwSetInputMode(window_, GLFW_CURSOR, static_cast<int>(mode));
 }
 
-void window::set_input_mode(input_mode mode, bool value) const {
+inline void window::set_input_mode(
+    input_mode mode, bool value
+) const {
     glfwSetInputMode(window_, static_cast<int>(mode), value ? GLFW_TRUE : GLFW_FALSE);
 }
 
-void window::set_title(std::string_view title) const {
+inline void window::set_title(
+    std::string_view title
+) const {
     glfwSetWindowTitle(window_, title.data());
 }
 
-void window::set_size(vec2i size) const {
+inline void window::set_size(
+    vec2i size
+) const {
     glfwSetWindowSize(window_, size.x, size.y);
     size_ = size;
 }
 
-void window::set_size(int width, int height) const {
+inline void window::set_size(
+    int width, int height
+) const {
     set_size({width, height});
 }
 
-void window::set_position(vec2i pos) const {
+inline void window::set_position(
+    vec2i pos
+) const {
     glfwSetWindowPos(window_, pos.x, pos.y);
 }
 
-void window::set_position(int x, int y) const {
+inline void window::set_position(
+    int x, int y
+) const {
     set_position({x, y});
 }
 
-void window::maximize() const {
+inline void window::maximize() const {
     glfwMaximizeWindow(window_);
 }
 
-void window::minimize() const {
+inline void window::minimize() const {
     glfwIconifyWindow(window_);
 }
 
-void window::restore() const {
+inline void window::restore() const {
     glfwRestoreWindow(window_);
 }
 
 }  // namespace vw::gfx
+
+#endif  // VW_GFX_WINDOW_INL_H

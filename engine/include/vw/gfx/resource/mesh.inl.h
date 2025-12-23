@@ -1,46 +1,46 @@
-#include "vw/gfx/resource/mesh.h"
+#pragma once
 
-#include <stdexcept>
+#ifndef VW_GFX_MESH_INL_H
+#define VW_GFX_MESH_INL_H
 
 namespace vw::gfx {
 
-// ================== vertex ==================
-
-std::vector<VkVertexInputBindingDescription> vertex::get_binding_descriptions() {
-    std::vector<VkVertexInputBindingDescription> binding_descriptions(1);
-    binding_descriptions[0].binding   = 0;
-    binding_descriptions[0].stride    = sizeof(vertex);
-    binding_descriptions[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+inline auto vertex::get_binding_descriptions() -> std::vector<VkVertexInputBindingDescription> {
+    std::vector binding_descriptions = {
+        VkVertexInputBindingDescription{
+            .binding   = 0,
+            .stride    = sizeof(vertex),
+            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+        },
+    };
     return binding_descriptions;
 }
 
-std::vector<VkVertexInputAttributeDescription> vertex::get_attribute_descriptions() {
-    std::vector<VkVertexInputAttributeDescription> attribute_descriptions(3);
-
-    // position
-    attribute_descriptions[0].binding  = 0;
-    attribute_descriptions[0].location = 0;
-    attribute_descriptions[0].format   = VK_FORMAT_R32G32B32_SFLOAT;
-    attribute_descriptions[0].offset   = offsetof(vertex, position);
-
-    // normal
-    attribute_descriptions[1].binding  = 0;
-    attribute_descriptions[1].location = 1;
-    attribute_descriptions[1].format   = VK_FORMAT_R32G32B32_SFLOAT;
-    attribute_descriptions[1].offset   = offsetof(vertex, normal);
-
-    // color
-    attribute_descriptions[2].binding  = 0;
-    attribute_descriptions[2].location = 2;
-    attribute_descriptions[2].format   = VK_FORMAT_R32_UINT;
-    attribute_descriptions[2].offset   = offsetof(vertex, color);
-
+inline auto vertex::get_attribute_descriptions() -> std::vector<VkVertexInputAttributeDescription> {
+    std::vector attribute_descriptions = {
+        VkVertexInputAttributeDescription{
+            .location = 0,
+            .binding  = 0,
+            .format   = VK_FORMAT_R32G32B32_SFLOAT,
+            .offset   = offsetof(vertex, position),
+        },
+        VkVertexInputAttributeDescription{
+            .location = 1,
+            .binding  = 0,
+            .format   = VK_FORMAT_R32G32B32_SFLOAT,
+            .offset   = offsetof(vertex, normal),
+        },
+        VkVertexInputAttributeDescription{
+            .location = 2,
+            .binding  = 0,
+            .format   = VK_FORMAT_R32_UINT,
+            .offset   = offsetof(vertex, color),
+        },
+    };
     return attribute_descriptions;
 }
 
-// ================== simple_mesh_generator ==================
-
-mesh simple_mesh_generator::generate_mesh_data(
+inline mesh simple_mesh_generator::generate_mesh_data(
     std::shared_ptr<model> model
 ) {
     if (!model) {
@@ -73,7 +73,7 @@ mesh simple_mesh_generator::generate_mesh_data(
     return mesh{.vertices = std::move(vertices), .indices = std::move(indices)};
 }
 
-void simple_mesh_generator::add_cube_face(
+inline void simple_mesh_generator::add_cube_face(
     std::vector<vertex>& vertices,
     std::vector<uint32>& indices,
     const vec3f& position,
@@ -125,7 +125,7 @@ void simple_mesh_generator::add_cube_face(
     }
 }
 
-bool simple_mesh_generator::is_face_visible(
+inline bool simple_mesh_generator::is_face_visible(
     const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
 ) {
     if (!model)
@@ -152,7 +152,7 @@ bool simple_mesh_generator::is_face_visible(
 
 // ================== greedy_mesh_generator ==================
 
-mesh greedy_mesh_generator::generate_mesh_data(
+inline mesh greedy_mesh_generator::generate_mesh_data(
     std::shared_ptr<model> model
 ) {
     if (!model) {
@@ -170,7 +170,7 @@ mesh greedy_mesh_generator::generate_mesh_data(
     return mesh{.vertices = std::move(vertices), .indices = std::move(indices)};
 }
 
-void greedy_mesh_generator::generate_face_quads(
+inline void greedy_mesh_generator::generate_face_quads(
     std::vector<vertex>& vertices,
     std::vector<uint32>& indices,
     const std::shared_ptr<model>& model,
@@ -326,7 +326,7 @@ void greedy_mesh_generator::generate_face_quads(
     }
 }
 
-void greedy_mesh_generator::add_quad(
+inline void greedy_mesh_generator::add_quad(
     std::vector<vertex>& vertices,
     std::vector<uint32>& indices,
     const vec3f& min_pos,
@@ -415,7 +415,7 @@ void greedy_mesh_generator::add_quad(
     indices.push_back(base_vertex + 0);
 }
 
-bool greedy_mesh_generator::is_face_visible(
+inline bool greedy_mesh_generator::is_face_visible(
     const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
 ) {
     if (!model)
@@ -441,3 +441,5 @@ bool greedy_mesh_generator::is_face_visible(
 }
 
 }  // namespace vw::gfx
+
+#endif  // VW_GFX_MESH_INL_H

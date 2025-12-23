@@ -1,18 +1,11 @@
-#include "vw/gfx/resource/combined_buffer.h"
+#pragma once
 
-#include <algorithm>
-#include <cstring>
+#ifndef VW_GFX_COMBINED_BUFFER_INL_H
+#define VW_GFX_COMBINED_BUFFER_INL_H
 #include <numeric>
 
-#include "vw/gfx/render/vulkan_context.h"
-#include "vw/gfx/resource/mesh.h"
-#include "vw/gfx/world/components/model_component.h"
-#include "vw/gfx/world/components/transform_component.h"
-#include "vw/gfx/world/world.h"
-
 namespace vw::gfx {
-
-combined_buffer::combined_buffer(
+inline combined_buffer::combined_buffer(
     vulkan_context& context, const buffer_chunk_size& chunk_size
 )
     : context_(&context)
@@ -42,7 +35,7 @@ combined_buffer::combined_buffer(
     );
 }
 
-void combined_buffer::allocate(
+inline void combined_buffer::allocate(
     entity e, model_identity model_id, const mesh& mesh_data, const mat4f& transform_matrix
 ) {
     auto vertex_count = mesh_data.vertices.size();
@@ -125,7 +118,7 @@ void combined_buffer::allocate(
     mesh_alloc.ref_count++;
 }
 
-void combined_buffer::write_mesh(
+inline void combined_buffer::write_mesh(
     model_identity model_id, const mesh& mesh_data
 ) {
     auto& mesh_alloc = mesh_allocations_[model_id.index];
@@ -140,7 +133,7 @@ void combined_buffer::write_mesh(
     }
 }
 
-void combined_buffer::write_transform(
+inline void combined_buffer::write_transform(
     entity ent, const mat4f& transform_matrix
 ) {
     auto& ent_alloc = entity_allocations_[ent];
@@ -149,7 +142,7 @@ void combined_buffer::write_transform(
     );
 }
 
-void combined_buffer::free(
+inline void combined_buffer::free(
     entity ent
 ) {
     auto& ent_alloc = entity_allocations_[ent];
@@ -197,7 +190,11 @@ void combined_buffer::free(
     entity_allocations_.erase(ent);
 }
 
-void combined_buffer::expand_mesh_buffers_() {
+inline VkBuffer combined_buffer::get_vertex_buffer() const {
+    return vertex_buffer_->get_buffer();
+}
+
+inline void combined_buffer::expand_mesh_buffers_() {
     mesh_capacity_ *= 2;
 
     auto new_vertex_buffer = std::make_unique<vertex_buffer>(
@@ -214,7 +211,7 @@ void combined_buffer::expand_mesh_buffers_() {
     index_buffer_  = std::move(new_index_buffer);
 }
 
-void combined_buffer::expand_instance_buffers_() {
+inline void combined_buffer::expand_instance_buffers_() {
     instance_capacity_ *= 2;
 
     auto new_model_matrix_buffer = std::make_unique<storage_buffer>(
@@ -241,7 +238,27 @@ void combined_buffer::expand_instance_buffers_() {
     indirect_draw_buffer_ = std::move(new_indirect_draw_buffer);
 }
 
-combined_buffer_stats combined_buffer::get_stats() const {
+inline uint32 combined_buffer::get_draw_command_count() const {
+    return entity_allocations_.size();
+}
+
+inline VkBuffer combined_buffer::get_index_buffer() const {
+    return index_buffer_->get_buffer();
+}
+
+inline VkBuffer combined_buffer::get_indirect_draw_buffer() const {
+    return indirect_draw_buffer_->get_buffer();
+}
+
+inline VkBuffer combined_buffer::get_model_matrix_buffer() const {
+    return model_matrix_buffer_->get_buffer();
+}
+
+inline bool combined_buffer::is_empty() const {
+    return entity_allocations_.empty();
+}
+
+inline combined_buffer_stats combined_buffer::get_stats() const {
     combined_buffer_stats stats;
     stats.chunk_size        = chunk_size_;
     stats.mesh_capacity     = mesh_capacity_;
@@ -290,5 +307,6 @@ combined_buffer_stats combined_buffer::get_stats() const {
 
     return stats;
 }
-
 }  // namespace vw::gfx
+
+#endif  // VW_GFX_COMBINED_BUFFER_INL_H

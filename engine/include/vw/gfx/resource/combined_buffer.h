@@ -4,7 +4,6 @@
 #define VW_GFX_COMBINED_BUFFER_H
 
 #include <memory>
-#include <set>
 #include <unordered_map>
 #include <vector>
 
@@ -67,7 +66,7 @@ struct mesh_allocation {
 };
 
 struct combined_buffer_stats {
-    buffer_chunk_size chunk_size;
+    buffer_chunk_size chunk_size{};
     float32 vertex_load_min  = 0.0f;
     float32 vertex_load_max  = 0.0f;
     float32 vertex_load_avg  = 0.0f;
@@ -98,38 +97,13 @@ public:
     void write_transform(entity ent, const mat4f& transform_matrix);
     void free(entity ent);
 
-    [[nodiscard]]
-    VkBuffer get_vertex_buffer() const {
-        return vertex_buffer_->get_buffer();
-    }
-
-    [[nodiscard]]
-    VkBuffer get_index_buffer() const {
-        return index_buffer_->get_buffer();
-    }
-
-    [[nodiscard]]
-    VkBuffer get_indirect_draw_buffer() const {
-        return indirect_draw_buffer_->get_buffer();
-    }
-
-    [[nodiscard]]
-    uint32 get_draw_command_count() const {
-        return entity_allocations_.size();
-    }
-
-    [[nodiscard]]
-    VkBuffer get_model_matrix_buffer() const {
-        return model_matrix_buffer_->get_buffer();
-    }
-
-    [[nodiscard]]
-    bool is_empty() const {
-        return entity_allocations_.empty();
-    }
-
-    [[nodiscard]]
-    combined_buffer_stats get_stats() const;
+    [[nodiscard]] VkBuffer get_vertex_buffer() const;
+    [[nodiscard]] VkBuffer get_index_buffer() const;
+    [[nodiscard]] VkBuffer get_indirect_draw_buffer() const;
+    [[nodiscard]] VkBuffer get_model_matrix_buffer() const;
+    [[nodiscard]] uint32 get_draw_command_count() const;
+    [[nodiscard]] bool is_empty() const;
+    [[nodiscard]] combined_buffer_stats get_stats() const;
 
 private:
     void expand_mesh_buffers_();
@@ -158,5 +132,7 @@ private:
 };
 
 }  // namespace vw::gfx
+
+#include "vw/gfx/resource/combined_buffer.inl.h"
 
 #endif  // VW_GFX_COMBINED_BUFFER_H
