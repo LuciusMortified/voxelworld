@@ -163,10 +163,9 @@ void renderer<C>::end_frame() {
 }
 
 template <typename C>
-renderer_stats renderer<C>::get_stats() const {
-    renderer_stats result   = stats_;
-    result.combined_buffers = combined_buffer_pool_->get_stats();
-    return result;
+const renderer_stats& renderer<C>::get_stats() const {
+    stats_.combined_buffers = combined_buffer_pool_->get_stats();
+    return stats_;
 }
 
 template <typename C>
@@ -198,6 +197,11 @@ void renderer<C>::set_render_mode(
     render_mode mode
 ) {
     current_render_mode_ = mode;
+}
+
+template <typename WC>
+render_mode renderer<WC>::get_render_mode() const {
+    return current_render_mode_;
 }
 
 template <typename C>

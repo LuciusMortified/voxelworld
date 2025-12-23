@@ -3,6 +3,7 @@
 #ifndef VW_GFX_COMBINED_BUFFER_INL_H
 #define VW_GFX_COMBINED_BUFFER_INL_H
 #include <numeric>
+#include <ranges>
 
 namespace vw::gfx {
 inline combined_buffer::combined_buffer(
@@ -258,54 +259,58 @@ inline bool combined_buffer::is_empty() const {
     return entity_allocations_.empty();
 }
 
-inline combined_buffer_stats combined_buffer::get_stats() const {
-    combined_buffer_stats stats;
-    stats.chunk_size        = chunk_size_;
-    stats.mesh_capacity     = mesh_capacity_;
-    stats.mesh_count        = static_cast<uint32>(mesh_allocations_.size());
-    stats.instance_capacity = instance_capacity_;
-    stats.instance_count    = static_cast<uint32>(entity_allocations_.size());
+inline const combined_buffer_stats& combined_buffer::get_stats() const {
+    stats_.chunk_size        = chunk_size_;
+    stats_.mesh_capacity     = mesh_capacity_;
+    stats_.mesh_count        = static_cast<uint32>(mesh_allocations_.size());
+    stats_.instance_capacity = instance_capacity_;
+    stats_.instance_count    = static_cast<uint32>(entity_allocations_.size());
+    stats_.vertex_load_min   = 0.f;
+    stats_.vertex_load_max   = 0.f;
+    stats_.vertex_load_avg   = 0.f;
+    stats_.index_load_min    = 0.f;
+    stats_.index_load_max    = 0.f;
+    stats_.index_load_avg    = 0.f;
 
     if (mesh_allocations_.empty()) {
-        return stats;
+        return stats_;
     }
 
-    std::vector<float32> vertex_loads;
-    std::vector<float32> index_loads;
-    vertex_loads.reserve(mesh_allocations_.size());
-    index_loads.reserve(mesh_allocations_.size());
+    float32 vertex_load_avg_sum = 0.0f;
+    float32 index_load_avg_sum  = 0.0f;
 
-    for (const auto& [model_index, mesh_alloc] : mesh_allocations_) {
+    for (const auto& mesh_alloc : mesh_allocations_ | std::views::values) {
         float32 vertex_load = 0.0f;
         if (chunk_size_.vertex_count > 0) {
             vertex_load = static_cast<float32>(mesh_alloc.vertex_count) /
                 static_cast<float32>(chunk_size_.vertex_count);
         }
-        vertex_loads.push_back(vertex_load);
+        if (vertex_load < stats_.vertex_load_min || stats_.vertex_load_min == 0.0f) {
+            stats_.vertex_load_min = vertex_load;
+        }
+        if (vertex_load > stats_.vertex_load_max) {
+            stats_.vertex_load_max = vertex_load;
+        }
+        vertex_load_avg_sum += vertex_load;
 
         float32 index_load = 0.0f;
         if (chunk_size_.index_count > 0) {
             index_load = static_cast<float32>(mesh_alloc.index_count) /
                 static_cast<float32>(chunk_size_.index_count);
         }
-        index_loads.push_back(index_load);
+        if (index_load < stats_.index_load_min || stats_.index_load_min == 0.0f) {
+            stats_.index_load_min = index_load;
+        }
+        if (index_load > stats_.index_load_max) {
+            stats_.index_load_max = index_load;
+        }
+        index_load_avg_sum += index_load;
     }
 
-    if (!vertex_loads.empty()) {
-        stats.vertex_load_min = *std::ranges::min_element(vertex_loads);
-        stats.vertex_load_max = *std::ranges::max_element(vertex_loads);
-        stats.vertex_load_avg = std::accumulate(vertex_loads.begin(), vertex_loads.end(), 0.0f) /
-            static_cast<float32>(vertex_loads.size());
-    }
+    stats_.vertex_load_avg = vertex_load_avg_sum / static_cast<float32>(mesh_allocations_.size());
+    stats_.index_load_avg  = index_load_avg_sum / static_cast<float32>(mesh_allocations_.size());
 
-    if (!index_loads.empty()) {
-        stats.index_load_min = *std::ranges::min_element(index_loads);
-        stats.index_load_max = *std::ranges::max_element(index_loads);
-        stats.index_load_avg = std::accumulate(index_loads.begin(), index_loads.end(), 0.0f) /
-            static_cast<float32>(index_loads.size());
-    }
-
-    return stats;
+    return stats_;
 }
 }  // namespace vw::gfx
 

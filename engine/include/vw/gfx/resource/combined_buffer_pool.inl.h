@@ -149,48 +149,58 @@ void combined_buffer_pool<C>::update_transforms_(
 }
 
 template <typename C>
-combined_buffer_pool_stats combined_buffer_pool<C>::get_stats() const {
-    combined_buffer_pool_stats stats;
+const combined_buffer_pool_stats& combined_buffer_pool<C>::get_stats() const {
+    stats_.vertex_load_min   = 0.0f;
+    stats_.vertex_load_max   = 0.0f;
+    stats_.vertex_load_avg   = 0.0f;
+    stats_.index_load_min    = 0.0f;
+    stats_.index_load_max    = 0.0f;
+    stats_.index_load_avg    = 0.0f;
+    stats_.mesh_capacity     = 0;
+    stats_.mesh_count        = 0;
+    stats_.instance_capacity = 0;
+    stats_.instance_count    = 0;
+    stats_.buffers.clear();
 
     if (buffers_.empty()) {
-        return stats;
+        return stats_;
     }
 
-    std::vector<float32> vertex_load_avgs;
-    std::vector<float32> index_load_avgs;
-    vertex_load_avgs.reserve(buffers_.size());
-    index_load_avgs.reserve(buffers_.size());
+    float32 vertex_load_avg_sum = 0.0f;
+    float32 index_load_avg_sum  = 0.0f;
 
     for (const auto& buffer : buffers_) {
-        auto buffer_stats = buffer->get_stats();
-        stats.buffers.push_back(buffer_stats);
+        const auto& buffer_stats = buffer->get_stats();
 
-        vertex_load_avgs.push_back(buffer_stats.vertex_load_avg);
-        index_load_avgs.push_back(buffer_stats.index_load_avg);
+        stats_.buffers.push_back(buffer_stats);
 
-        stats.mesh_capacity += buffer_stats.mesh_capacity;
-        stats.mesh_count += buffer_stats.mesh_count;
-        stats.instance_capacity += buffer_stats.instance_capacity;
-        stats.instance_count += buffer_stats.instance_count;
+        if (buffer_stats.vertex_load_min < stats_.vertex_load_min ||
+            stats_.vertex_load_min == 0.0f) {
+            stats_.vertex_load_min = buffer_stats.vertex_load_min;
+        }
+        if (buffer_stats.vertex_load_max > stats_.vertex_load_max) {
+            stats_.vertex_load_max = buffer_stats.vertex_load_max;
+        }
+        if (buffer_stats.index_load_min < stats_.index_load_min || stats_.index_load_min == 0.0f) {
+            stats_.index_load_min = buffer_stats.index_load_min;
+        }
+        if (buffer_stats.index_load_max > stats_.index_load_max) {
+            stats_.index_load_max = buffer_stats.index_load_max;
+        }
+
+        vertex_load_avg_sum += buffer_stats.vertex_load_avg;
+        index_load_avg_sum += buffer_stats.index_load_avg;
+
+        stats_.mesh_capacity += buffer_stats.mesh_capacity;
+        stats_.mesh_count += buffer_stats.mesh_count;
+        stats_.instance_capacity += buffer_stats.instance_capacity;
+        stats_.instance_count += buffer_stats.instance_count;
     }
 
-    if (!vertex_load_avgs.empty()) {
-        stats.vertex_load_min = *std::ranges::min_element(vertex_load_avgs);
-        stats.vertex_load_max = *std::ranges::max_element(vertex_load_avgs);
-        stats.vertex_load_avg =
-            std::accumulate(vertex_load_avgs.begin(), vertex_load_avgs.end(), 0.0f) /
-            static_cast<float32>(vertex_load_avgs.size());
-    }
+    stats_.vertex_load_avg = vertex_load_avg_sum / buffers_.size();
+    stats_.index_load_avg  = index_load_avg_sum / buffers_.size();
 
-    if (!index_load_avgs.empty()) {
-        stats.index_load_min = *std::ranges::min_element(index_load_avgs);
-        stats.index_load_max = *std::ranges::max_element(index_load_avgs);
-        stats.index_load_avg =
-            std::accumulate(index_load_avgs.begin(), index_load_avgs.end(), 0.0f) /
-            static_cast<float32>(index_load_avgs.size());
-    }
-
-    return stats;
+    return stats_;
 }
 
 }  // namespace vw::gfx

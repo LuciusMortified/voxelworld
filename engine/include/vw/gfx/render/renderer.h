@@ -65,13 +65,9 @@ public:
 
     void set_render_mode(render_mode mode);
 
-    [[nodiscard]]
-    render_mode get_render_mode() const {
-        return current_render_mode_;
-    }
+    [[nodiscard]] render_mode get_render_mode() const;
 
-    [[nodiscard]]
-    renderer_stats get_stats() const;
+    [[nodiscard]] const renderer_stats& get_stats() const;
 
     void draw_line(const vec3f& a, const vec3f& b, color col = colors::red);
 
@@ -228,7 +224,7 @@ private:
     std::unique_ptr<combined_buffer_pool_type> combined_buffer_pool_;
 
     // Статистика
-    renderer_stats stats_;
+    mutable renderer_stats stats_;
     uint32 draw_call_count_ = 0;
 
     static constexpr int MAX_FRAMES_IN_FLIGHT = 2;

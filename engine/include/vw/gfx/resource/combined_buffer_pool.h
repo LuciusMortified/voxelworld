@@ -56,7 +56,7 @@ public:
     static buffer_chunk_size get_chunk_size_for_mesh(uint32 vertex_count, uint32 index_count);
 
     [[nodiscard]]
-    combined_buffer_pool_stats get_stats() const;
+    const combined_buffer_pool_stats& get_stats() const;
 
 private:
     combined_buffer* get_or_create_buffer(const buffer_chunk_size& chunk_size);
@@ -68,6 +68,8 @@ private:
     std::vector<std::unique_ptr<combined_buffer>> buffers_;
     std::unordered_map<entity, entity_buffer_info> entity_buffer_infos_;
     std::map<buffer_chunk_size, size_t> chunk_size_to_buffer_index_;
+
+    mutable combined_buffer_pool_stats stats_;
 };
 
 }  // namespace vw::gfx

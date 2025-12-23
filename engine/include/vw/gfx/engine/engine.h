@@ -50,7 +50,7 @@ public:
     [[nodiscard]] auto get_camera() const -> camera&;
     [[nodiscard]] auto get_world() const -> world_type&;
     [[nodiscard]] auto get_debug_tool() const -> debug_window_type&;
-    [[nodiscard]] engine_stats get_stats() const;
+    [[nodiscard]] const engine_stats& get_stats() const;
 
 private:
     void main_loop();
@@ -69,7 +69,7 @@ private:
     bool running_ = false;
     std::chrono::high_resolution_clock::time_point last_frame_time_;
 
-    engine_stats stats_;
+    mutable engine_stats stats_;
     std::chrono::high_resolution_clock::time_point frame_start_time_;
     std::chrono::high_resolution_clock::time_point world_update_start_time_;
     std::chrono::high_resolution_clock::time_point last_memory_update_time_;

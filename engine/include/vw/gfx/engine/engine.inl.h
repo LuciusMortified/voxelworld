@@ -158,7 +158,7 @@ void engine<WC>::render(
 }
 
 template <typename WC>
-engine_stats engine<WC>::get_stats() const {
+const engine_stats& engine<WC>::get_stats() const {
     return stats_;
 }
 

@@ -103,7 +103,7 @@ public:
     [[nodiscard]] VkBuffer get_model_matrix_buffer() const;
     [[nodiscard]] uint32 get_draw_command_count() const;
     [[nodiscard]] bool is_empty() const;
-    [[nodiscard]] combined_buffer_stats get_stats() const;
+    [[nodiscard]] const combined_buffer_stats& get_stats() const;
 
 private:
     void expand_mesh_buffers_();
@@ -129,6 +129,8 @@ private:
     std::vector<free_slot> free_slots_;
     uint32_t vertex_used_;
     uint32_t index_used_;
+
+    mutable combined_buffer_stats stats_;
 };
 
 }  // namespace vw::gfx
