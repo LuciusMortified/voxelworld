@@ -24,14 +24,13 @@ renderer<C>::renderer(
         std::make_unique<shader>(*context_, "shaders/debug.frag.spv", shader_type::FRAGMENT);
 
     constexpr VkDeviceSize initial_size = 512 * 2 * sizeof(debug_vertex);
-
     debug_vertex_buffer_ = std::make_unique<vertex_buffer>(*context_, initial_size);
 
     create_swapchain();
     create_image_views();
     create_depth_resources();
     create_render_pass();
-    create_descriptor_set_layout();
+    create_descriptor_set_layouts();
     create_graphics_pipeline();
     create_wireframe_pipeline();
     create_debug_pipeline();
@@ -45,12 +44,16 @@ renderer<C>::renderer(
     create_imgui_descriptor_pool();
     init_imgui();
 
-    combined_buffer_pool_ = std::make_unique<combined_buffer_pool_type>(*context_);
+    combined_buffer_pool_ = std::make_unique<combined_buffer_pool_type>(
+        *context_, descriptor_pool_, storage_descriptor_set_layout_
+    );
 }
 
 template <typename C>
 renderer<C>::~renderer() {
     wait_idle();
+
+    combined_buffer_pool_.reset();
 
     cleanup_imgui();
 
@@ -58,12 +61,9 @@ renderer<C>::~renderer() {
     cleanup_depth_resources();
     cleanup_pipelines();
     cleanup_debug_pipeline();
-    cleanup_descriptor_set_layout();
+    cleanup_descriptor_set_layouts();
     cleanup_render_pass();
     cleanup_descriptor_pool();
-
-    vertex_shader_.reset();
-    fragment_shader_.reset();
 }
 
 template <typename C>
@@ -540,7 +540,8 @@ void renderer<C>::create_render_pass() {
 }
 
 template <typename C>
-void renderer<C>::create_descriptor_set_layout() {
+void renderer<C>::create_descriptor_set_layouts() {
+    // Uniform buffer descriptor set layout (set 0, binding 0)
     VkDescriptorSetLayoutBinding ubo_layout_binding{};
     ubo_layout_binding.binding            = 0;
     ubo_layout_binding.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
@@ -548,24 +549,34 @@ void renderer<C>::create_descriptor_set_layout() {
     ubo_layout_binding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;
     ubo_layout_binding.pImmutableSamplers = nullptr;
 
+    VkDescriptorSetLayoutCreateInfo ubo_layout_info{};
+    ubo_layout_info.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    ubo_layout_info.bindingCount = 1;
+    ubo_layout_info.pBindings    = &ubo_layout_binding;
+
+    if (vkCreateDescriptorSetLayout(
+            context_->get_device(), &ubo_layout_info, nullptr, &uniform_descriptor_set_layout_
+        ) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create uniform descriptor set layout");
+    }
+
+    // Storage buffer descriptor set layout (set 1, binding 0)
     VkDescriptorSetLayoutBinding storage_layout_binding{};
-    storage_layout_binding.binding            = 1;
+    storage_layout_binding.binding            = 0;
     storage_layout_binding.descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     storage_layout_binding.descriptorCount    = 1;
     storage_layout_binding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;
     storage_layout_binding.pImmutableSamplers = nullptr;
 
-    std::array bindings = {ubo_layout_binding, storage_layout_binding};
-
-    VkDescriptorSetLayoutCreateInfo layout_info{};
-    layout_info.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layout_info.bindingCount = static_cast<uint32_t>(bindings.size());
-    layout_info.pBindings    = bindings.data();
+    VkDescriptorSetLayoutCreateInfo storage_layout_info{};
+    storage_layout_info.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    storage_layout_info.bindingCount = 1;
+    storage_layout_info.pBindings    = &storage_layout_binding;
 
     if (vkCreateDescriptorSetLayout(
-            context_->get_device(), &layout_info, nullptr, &descriptor_set_layout_
+            context_->get_device(), &storage_layout_info, nullptr, &storage_descriptor_set_layout_
         ) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create descriptor set layout");
+        throw std::runtime_error("failed to create storage descriptor set layout");
     }
 }
 
@@ -651,11 +662,15 @@ void renderer<C>::create_graphics_pipeline() {
     depth_stencil.depthBoundsTestEnable = VK_FALSE;
     depth_stencil.stencilTestEnable     = VK_FALSE;
 
-    // Pipeline layout (без push constants, так как используем storage buffer)
+    // Pipeline layout с двумя descriptor set layouts
+    std::array<VkDescriptorSetLayout, 2> descriptor_set_layouts = {
+        uniform_descriptor_set_layout_, storage_descriptor_set_layout_
+    };
+
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
-    pipeline_layout_info.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeline_layout_info.setLayoutCount         = 1;
-    pipeline_layout_info.pSetLayouts            = &descriptor_set_layout_;
+    pipeline_layout_info.sType          = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipeline_layout_info.setLayoutCount = static_cast<uint32_t>(descriptor_set_layouts.size());
+    pipeline_layout_info.pSetLayouts    = descriptor_set_layouts.data();
     pipeline_layout_info.pushConstantRangeCount = 0;
     pipeline_layout_info.pPushConstantRanges    = nullptr;
 
@@ -881,7 +896,7 @@ void renderer<C>::create_debug_pipeline() {
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
     pipeline_layout_info.sType                  = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipeline_layout_info.setLayoutCount         = 1;
-    pipeline_layout_info.pSetLayouts            = &descriptor_set_layout_;
+    pipeline_layout_info.pSetLayouts            = &uniform_descriptor_set_layout_;
     pipeline_layout_info.pushConstantRangeCount = 0;
     pipeline_layout_info.pPushConstantRanges    = nullptr;
 
@@ -1015,20 +1030,22 @@ void renderer<C>::create_uniform_buffers() {
 
 template <typename C>
 void renderer<C>::create_descriptor_pool() {
+    constexpr uint32_t MAX_DESCRIPTOR_SETS  = 256;  // Поддержка множества буферов
+    constexpr uint32_t STORAGE_BUFFER_COUNT = 256;  // Один storage buffer на буфер
+
     std::array pool_sizes = {
         VkDescriptorPoolSize{
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
         },
-        VkDescriptorPoolSize{
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
-        }
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, STORAGE_BUFFER_COUNT}
     };
 
     VkDescriptorPoolCreateInfo pool_info{};
     pool_info.sType         = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pool_info.flags         = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     pool_info.poolSizeCount = static_cast<uint32_t>(pool_sizes.size());
     pool_info.pPoolSizes    = pool_sizes.data();
-    pool_info.maxSets       = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT);
+    pool_info.maxSets       = MAX_DESCRIPTOR_SETS;
 
     if (vkCreateDescriptorPool(context_->get_device(), &pool_info, nullptr, &descriptor_pool_) !=
         VK_SUCCESS) {
@@ -1038,7 +1055,8 @@ void renderer<C>::create_descriptor_pool() {
 
 template <typename C>
 void renderer<C>::create_descriptor_sets() {
-    std::vector layouts(MAX_FRAMES_IN_FLIGHT, descriptor_set_layout_);
+    // Создаем descriptor sets для uniform buffer (set 0)
+    std::vector layouts(MAX_FRAMES_IN_FLIGHT, uniform_descriptor_set_layout_);
     VkDescriptorSetAllocateInfo alloc_info{};
     alloc_info.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     alloc_info.descriptorPool     = descriptor_pool_;
@@ -1057,34 +1075,16 @@ void renderer<C>::create_descriptor_sets() {
         ubo_buffer_info.offset = 0;
         ubo_buffer_info.range  = sizeof(uniform_buffer_object);
 
-        // Storage buffer будет обновляться позже, когда combined_buffer будет готов
-        // Пока создаем пустой дескриптор
-        // VkDescriptorBufferInfo storage_buffer_info{};
-        // storage_buffer_info.buffer = VK_NULL_HANDLE;
-        // storage_buffer_info.offset = 0;
-        // storage_buffer_info.range  = 0;
+        VkWriteDescriptorSet descriptor_write{};
+        descriptor_write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptor_write.dstSet          = descriptor_sets_[i];
+        descriptor_write.dstBinding      = 0;
+        descriptor_write.dstArrayElement = 0;
+        descriptor_write.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        descriptor_write.descriptorCount = 1;
+        descriptor_write.pBufferInfo     = &ubo_buffer_info;
 
-        std::array<VkWriteDescriptorSet, 1> descriptor_writes{};
-
-        descriptor_writes[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_writes[0].dstSet          = descriptor_sets_[i];
-        descriptor_writes[0].dstBinding      = 0;
-        descriptor_writes[0].dstArrayElement = 0;
-        descriptor_writes[0].descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        descriptor_writes[0].descriptorCount = 1;
-        descriptor_writes[0].pBufferInfo     = &ubo_buffer_info;
-
-        // descriptor_writes[1].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        // descriptor_writes[1].dstSet          = descriptor_sets_[i];
-        // descriptor_writes[1].dstBinding      = 1;
-        // descriptor_writes[1].dstArrayElement = 0;
-        // descriptor_writes[1].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        // descriptor_writes[1].descriptorCount = 1;
-        // descriptor_writes[1].pBufferInfo     = &storage_buffer_info;
-
-        vkUpdateDescriptorSets(
-            context_->get_device(), descriptor_writes.size(), descriptor_writes.data(), 0, nullptr
-        );
+        vkUpdateDescriptorSets(context_->get_device(), 1, &descriptor_write, 0, nullptr);
     }
 }
 
@@ -1186,10 +1186,18 @@ void renderer<C>::cleanup_render_pass() {
 }
 
 template <typename C>
-void renderer<C>::cleanup_descriptor_set_layout() {
-    if (descriptor_set_layout_ != VK_NULL_HANDLE) {
-        vkDestroyDescriptorSetLayout(context_->get_device(), descriptor_set_layout_, nullptr);
-        descriptor_set_layout_ = VK_NULL_HANDLE;
+void renderer<C>::cleanup_descriptor_set_layouts() {
+    if (storage_descriptor_set_layout_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(
+            context_->get_device(), storage_descriptor_set_layout_, nullptr
+        );
+        storage_descriptor_set_layout_ = VK_NULL_HANDLE;
+    }
+    if (uniform_descriptor_set_layout_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(
+            context_->get_device(), uniform_descriptor_set_layout_, nullptr
+        );
+        uniform_descriptor_set_layout_ = VK_NULL_HANDLE;
     }
 }
 
@@ -1306,6 +1314,7 @@ void renderer<WC>::render_world(
         command_buffers_[current_image_index_], VK_PIPELINE_BIND_POINT_GRAPHICS, current_pipeline
     );
 
+    // Биндим uniform buffer descriptor set один раз перед циклом
     vkCmdBindDescriptorSets(
         command_buffers_[current_image_index_],
         VK_PIPELINE_BIND_POINT_GRAPHICS,
@@ -1326,31 +1335,15 @@ void renderer<WC>::render_world(
         VkBuffer vertex_buffer = buffer->get_vertex_buffer();
         VkBuffer index_buffer  = buffer->get_index_buffer();
 
-        VkBuffer model_matrix_buffer = buffer->get_model_matrix_buffer();
-        VkDescriptorBufferInfo storage_buffer_info{};
-        storage_buffer_info.buffer = model_matrix_buffer;
-        storage_buffer_info.offset = 0;
-        storage_buffer_info.range  = VK_WHOLE_SIZE;
-
-        VkWriteDescriptorSet descriptor_write{};
-        descriptor_write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_write.dstSet          = descriptor_sets_[current_frame_];
-        descriptor_write.dstBinding      = 1;  // Предполагаем что binding для storage buffer = 1
-        descriptor_write.dstArrayElement = 0;
-        descriptor_write.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        descriptor_write.descriptorCount = 1;
-        descriptor_write.pBufferInfo     = &storage_buffer_info;
-
-        vkUpdateDescriptorSets(context_->get_device(), 1, &descriptor_write, 0, nullptr);
-
-        // Биндим descriptor set
+        // Биндим storage buffer descriptor set из буфера (set 1)
+        VkDescriptorSet buffer_descriptor_set = buffer->get_descriptor_set();
         vkCmdBindDescriptorSets(
             command_buffers_[current_image_index_],
             VK_PIPELINE_BIND_POINT_GRAPHICS,
             pipeline_layout_,
-            0,
+            1,  // Set index 1 (storage buffer descriptor set layout)
             1,
-            &descriptor_sets_[current_frame_],
+            &buffer_descriptor_set,
             0,
             nullptr
         );

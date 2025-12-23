@@ -3,6 +3,8 @@
 #ifndef VW_GFX_COMBINED_BUFFER_POOL_H
 #define VW_GFX_COMBINED_BUFFER_POOL_H
 
+#include <vulkan/vulkan.h>
+
 #include <map>
 #include <memory>
 #include <unordered_map>
@@ -11,6 +13,7 @@
 #include "vw/gfx/resource/combined_buffer.h"
 #include "vw/gfx/world/entity.h"
 #include "vw/gfx/world/world.h"
+
 
 namespace vw::gfx {
 
@@ -40,7 +43,11 @@ class combined_buffer_pool {
 public:
     using world_type = world<C>;
 
-    explicit combined_buffer_pool(vulkan_context& context);
+    explicit combined_buffer_pool(
+        vulkan_context& context,
+        VkDescriptorPool descriptor_pool,
+        VkDescriptorSetLayout descriptor_set_layout
+    );
     ~combined_buffer_pool() = default;
 
     combined_buffer_pool(const combined_buffer_pool&)            = delete;
@@ -68,6 +75,9 @@ private:
     std::vector<std::unique_ptr<combined_buffer>> buffers_;
     std::unordered_map<entity, entity_buffer_info> entity_buffer_infos_;
     std::map<buffer_chunk_size, size_t> chunk_size_to_buffer_index_;
+
+    VkDescriptorPool descriptor_pool_            = VK_NULL_HANDLE;
+    VkDescriptorSetLayout descriptor_set_layout_ = VK_NULL_HANDLE;
 
     mutable combined_buffer_pool_stats stats_;
 };

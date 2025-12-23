@@ -10,9 +10,13 @@ namespace vw::gfx {
 
 template <typename C>
 combined_buffer_pool<C>::combined_buffer_pool(
-    vulkan_context& context
+    vulkan_context& context,
+    VkDescriptorPool descriptor_pool,
+    VkDescriptorSetLayout descriptor_set_layout
 )
-    : context_(&context) {}
+    : context_(&context)
+    , descriptor_pool_(descriptor_pool)
+    , descriptor_set_layout_(descriptor_set_layout) {}
 
 template <typename C>
 void combined_buffer_pool<C>::update(
@@ -52,7 +56,11 @@ combined_buffer* combined_buffer_pool<C>::get_or_create_buffer(
     }
 
     auto buffer_index = buffers_.size();
-    buffers_.push_back(std::make_unique<combined_buffer>(*context_, chunk_size));
+    buffers_.push_back(
+        std::make_unique<combined_buffer>(
+            *context_, chunk_size, descriptor_pool_, descriptor_set_layout_
+        )
+    );
     chunk_size_to_buffer_index_[chunk_size] = buffer_index;
 
     return buffers_[buffer_index].get();

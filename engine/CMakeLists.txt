@@ -80,15 +80,15 @@ find_package(glfw3 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 
 # Create engine library
-add_library(${PROJECT_NAME} STATIC ${ENGINE_HEADERS} ${ENGINE_SOURCES})
+add_library(${PROJECT_NAME} INTERFACE)
 
 # Set include directories
-target_include_directories(${PROJECT_NAME} PUBLIC include)
-target_include_directories(${PROJECT_NAME} SYSTEM PUBLIC ${Vulkan_INCLUDE_DIRS})
+target_include_directories(${PROJECT_NAME} INTERFACE include)
+target_include_directories(${PROJECT_NAME} SYSTEM INTERFACE ${Vulkan_INCLUDE_DIRS})
 
 # Link libraries
-target_link_libraries(${PROJECT_NAME} PUBLIC ${Vulkan_LIBRARIES} glfw imgui::imgui)
+target_link_libraries(${PROJECT_NAME} INTERFACE ${Vulkan_LIBRARIES} glfw imgui::imgui)
 
 # Compile features - C++23
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
+target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_23)
 

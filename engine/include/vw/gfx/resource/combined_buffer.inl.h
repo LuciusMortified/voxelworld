@@ -6,15 +6,26 @@
 #include <ranges>
 
 namespace vw::gfx {
+inline combined_buffer::~combined_buffer() {
+    if (descriptor_set_ != VK_NULL_HANDLE && descriptor_pool_ != VK_NULL_HANDLE) {
+        vkFreeDescriptorSets(context_->get_device(), descriptor_pool_, 1, &descriptor_set_);
+    }
+}
+
 inline combined_buffer::combined_buffer(
-    vulkan_context& context, const buffer_chunk_size& chunk_size
+    vulkan_context& context,
+    const buffer_chunk_size& chunk_size,
+    VkDescriptorPool descriptor_pool,
+    VkDescriptorSetLayout descriptor_set_layout
 )
     : context_(&context)
     , chunk_size_(chunk_size)
     , mesh_capacity_(default_mesh_capacity_)
     , instance_capacity_(default_instance_capacity_)
     , vertex_used_(0)
-    , index_used_(0) {
+    , index_used_(0)
+    , descriptor_pool_(descriptor_pool)
+    , descriptor_set_layout_(descriptor_set_layout) {
     vertex_buffer_ = std::make_unique<vertex_buffer>(
         *context_, mesh_capacity_ * chunk_size_.vertex_count * sizeof(vertex)
     );
@@ -34,6 +45,35 @@ inline combined_buffer::combined_buffer(
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT |  //
             VK_BUFFER_USAGE_TRANSFER_DST_BIT    //
     );
+
+    // Выделяем descriptor set из pool
+    VkDescriptorSetAllocateInfo alloc_info{};
+    alloc_info.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    alloc_info.descriptorPool     = descriptor_pool_;
+    alloc_info.descriptorSetCount = 1;
+    alloc_info.pSetLayouts        = &descriptor_set_layout_;
+
+    if (vkAllocateDescriptorSets(context_->get_device(), &alloc_info, &descriptor_set_) !=
+        VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate descriptor set for combined_buffer!");
+    }
+
+    // Обновляем descriptor set с storage buffer
+    VkDescriptorBufferInfo storage_buffer_info{};
+    storage_buffer_info.buffer = model_matrix_buffer_->get_buffer();
+    storage_buffer_info.offset = 0;
+    storage_buffer_info.range  = VK_WHOLE_SIZE;
+
+    VkWriteDescriptorSet descriptor_write{};
+    descriptor_write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptor_write.dstSet          = descriptor_set_;
+    descriptor_write.dstBinding      = 0;
+    descriptor_write.dstArrayElement = 0;
+    descriptor_write.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptor_write.descriptorCount = 1;
+    descriptor_write.pBufferInfo     = &storage_buffer_info;
+
+    vkUpdateDescriptorSets(context_->get_device(), 1, &descriptor_write, 0, nullptr);
 }
 
 inline void combined_buffer::allocate(
@@ -237,6 +277,23 @@ inline void combined_buffer::expand_instance_buffers_() {
 
     model_matrix_buffer_  = std::move(new_model_matrix_buffer);
     indirect_draw_buffer_ = std::move(new_indirect_draw_buffer);
+
+    // Обновляем descriptor set с новым storage buffer
+    VkDescriptorBufferInfo storage_buffer_info{};
+    storage_buffer_info.buffer = model_matrix_buffer_->get_buffer();
+    storage_buffer_info.offset = 0;
+    storage_buffer_info.range  = VK_WHOLE_SIZE;
+
+    VkWriteDescriptorSet descriptor_write{};
+    descriptor_write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptor_write.dstSet          = descriptor_set_;
+    descriptor_write.dstBinding      = 0;  // Storage buffer binding (в отдельном layout)
+    descriptor_write.dstArrayElement = 0;
+    descriptor_write.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptor_write.descriptorCount = 1;
+    descriptor_write.pBufferInfo     = &storage_buffer_info;
+
+    vkUpdateDescriptorSets(context_->get_device(), 1, &descriptor_write, 0, nullptr);
 }
 
 inline uint32 combined_buffer::get_draw_command_count() const {

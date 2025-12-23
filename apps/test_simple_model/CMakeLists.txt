@@ -6,7 +6,7 @@ add_executable(${PROJECT_NAME}
 )
 
 # Линковка с движком
-target_link_libraries(${PROJECT_NAME} vwengine)
+target_link_libraries(${PROJECT_NAME} PRIVATE vwengine)
 
 # Компиляционные флаги - C++23
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)

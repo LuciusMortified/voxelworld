@@ -3,6 +3,8 @@
 #ifndef VW_GFX_COMBINED_BUFFER_H
 #define VW_GFX_COMBINED_BUFFER_H
 
+#include <vulkan/vulkan.h>
+
 #include <memory>
 #include <unordered_map>
 #include <vector>
@@ -81,8 +83,13 @@ struct combined_buffer_stats {
 
 class combined_buffer {
 public:
-    explicit combined_buffer(vulkan_context& context, const buffer_chunk_size& chunk_size);
-    ~combined_buffer() = default;
+    explicit combined_buffer(
+        vulkan_context& context,
+        const buffer_chunk_size& chunk_size,
+        VkDescriptorPool descriptor_pool,
+        VkDescriptorSetLayout descriptor_set_layout
+    );
+    ~combined_buffer();
 
     combined_buffer(const combined_buffer&)            = delete;
     combined_buffer& operator=(const combined_buffer&) = delete;
@@ -104,6 +111,9 @@ public:
     [[nodiscard]] uint32 get_draw_command_count() const;
     [[nodiscard]] bool is_empty() const;
     [[nodiscard]] const combined_buffer_stats& get_stats() const;
+    [[nodiscard]] VkDescriptorSet get_descriptor_set() const {
+        return descriptor_set_;
+    }
 
 private:
     void expand_mesh_buffers_();
@@ -129,6 +139,10 @@ private:
     std::vector<free_slot> free_slots_;
     uint32_t vertex_used_;
     uint32_t index_used_;
+
+    VkDescriptorSet descriptor_set_              = VK_NULL_HANDLE;
+    VkDescriptorPool descriptor_pool_            = VK_NULL_HANDLE;
+    VkDescriptorSetLayout descriptor_set_layout_ = VK_NULL_HANDLE;
 
     mutable combined_buffer_stats stats_;
 };

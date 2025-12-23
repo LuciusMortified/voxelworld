@@ -6,8 +6,8 @@ layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
 layout(location = 2) in uint inColor;
 
-// Uniform buffer object
-layout(binding = 0) uniform UniformBufferObject {
+// Uniform buffer object (set 0, binding 0)
+layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
     vec3 viewPos;
@@ -15,8 +15,8 @@ layout(binding = 0) uniform UniformBufferObject {
     vec3 lightColor;
 } ubo;
 
-// Storage buffer для матриц моделей
-layout(binding = 1, std430) readonly buffer ModelMatrices {
+// Storage buffer для матриц моделей (set 1, binding 0)
+layout(set = 1, binding = 0, std430) readonly buffer ModelMatrices {
     mat4 models[];
 } modelMatrices;
 

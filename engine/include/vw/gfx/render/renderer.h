@@ -69,6 +69,13 @@ public:
 
     [[nodiscard]] const renderer_stats& get_stats() const;
 
+    [[nodiscard]] VkDescriptorPool get_descriptor_pool() const {
+        return descriptor_pool_;
+    }
+    [[nodiscard]] VkDescriptorSetLayout get_storage_descriptor_set_layout() const {
+        return storage_descriptor_set_layout_;
+    }
+
     void draw_line(const vec3f& a, const vec3f& b, color col = colors::red);
 
     void draw_box(const mat4f& matrix, const vec3f& size, color col = colors::red);
@@ -90,7 +97,7 @@ private:
     void create_image_views();
     void create_depth_resources();
     void create_render_pass();
-    void create_descriptor_set_layout();
+    void create_descriptor_set_layouts();
     void create_graphics_pipeline();
     void create_wireframe_pipeline();
     void create_debug_pipeline();
@@ -108,7 +115,7 @@ private:
 
     void cleanup_descriptor_pool();
     void cleanup_render_pass();
-    void cleanup_descriptor_set_layout();
+    void cleanup_descriptor_set_layouts();
     void cleanup_pipelines();
     void cleanup_debug_pipeline();
     void cleanup_swapchain();
@@ -176,11 +183,12 @@ private:
     VkImageView depth_image_view_      = VK_NULL_HANDLE;
 
     // Render pass и pipeline
-    VkRenderPass render_pass_                    = VK_NULL_HANDLE;
-    VkDescriptorSetLayout descriptor_set_layout_ = VK_NULL_HANDLE;
-    VkPipelineLayout pipeline_layout_            = VK_NULL_HANDLE;
-    VkPipeline graphics_pipeline_                = VK_NULL_HANDLE;
-    VkPipeline wireframe_pipeline_               = VK_NULL_HANDLE;
+    VkRenderPass render_pass_                            = VK_NULL_HANDLE;
+    VkDescriptorSetLayout uniform_descriptor_set_layout_ = VK_NULL_HANDLE;
+    VkDescriptorSetLayout storage_descriptor_set_layout_ = VK_NULL_HANDLE;
+    VkPipelineLayout pipeline_layout_                    = VK_NULL_HANDLE;
+    VkPipeline graphics_pipeline_                        = VK_NULL_HANDLE;
+    VkPipeline wireframe_pipeline_                       = VK_NULL_HANDLE;
 
     // Framebuffers и команды
     std::vector<VkFramebuffer> framebuffers_;
