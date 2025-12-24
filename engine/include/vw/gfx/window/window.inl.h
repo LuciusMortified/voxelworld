@@ -15,6 +15,9 @@ inline window::window(
         throw std::runtime_error("failed to initialize glfw");
     }
 
+    const char* glfw_version_str = glfwGetVersionString();
+    log::info(lc_, "GLFW {}", glfw_version_str);
+
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 

@@ -1,12 +1,9 @@
 {
-  "dependencies": [
-    "glfw3",
-    {
-      "name": "imgui",
-      "features": [
-        "glfw-binding",
-        "vulkan-binding"
-      ]
-    }
-  ]
+  "dependencies" : [ "glfw3", {
+    "name" : "imgui",
+    "features" : [ "glfw-binding", "vulkan-binding" ]
+  }, {
+    "name" : "spdlog",
+    "version>=" : "1.15.3"
+  } ]
 }

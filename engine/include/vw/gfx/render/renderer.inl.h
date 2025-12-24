@@ -323,7 +323,7 @@ void renderer<C>::draw_grid(
 
 template <typename C>
 void renderer<C>::create_swapchain() {
-    auto swapchain_support = context_->query_swapchain_support();
+    auto swapchain_support = context_->query_swapchain_support_();
 
     VkSurfaceFormatKHR surface_format = choose_swap_surface_format(swapchain_support.formats);
     VkPresentModeKHR present_mode     = choose_swap_present_mode(swapchain_support.present_modes);

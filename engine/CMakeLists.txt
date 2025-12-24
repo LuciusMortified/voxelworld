@@ -70,6 +70,9 @@ set(ENGINE_HEADERS
         "include/vw/gfx/resource/buffer.inl.h"
         "include/vw/gfx/resource/mesh.inl.h"
         "include/vw/gfx/resource/shader.inl.h"
+        "include/vw/log.h"
+        "include/vw/log/logger.h"
+        "include/vw/log/logger.inl.h"
 )
 
 set(ENGINE_SOURCES)
@@ -78,6 +81,7 @@ set(ENGINE_SOURCES)
 find_package(Vulkan REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
 
 # Create engine library
 add_library(${PROJECT_NAME} INTERFACE)
@@ -87,7 +91,7 @@ target_include_directories(${PROJECT_NAME} INTERFACE include)
 target_include_directories(${PROJECT_NAME} SYSTEM INTERFACE ${Vulkan_INCLUDE_DIRS})
 
 # Link libraries
-target_link_libraries(${PROJECT_NAME} INTERFACE ${Vulkan_LIBRARIES} glfw imgui::imgui)
+target_link_libraries(${PROJECT_NAME} INTERFACE ${Vulkan_LIBRARIES} glfw imgui::imgui spdlog::spdlog)
 
 # Compile features - C++23
 target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_23)

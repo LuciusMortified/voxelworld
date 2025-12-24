@@ -1,10 +1,5 @@
 #include <vw/core.h>
 #include <vw/gfx.h>
-#include <vw/gfx/model/model.h>
-
-#include <iostream>
-
-#include "vw/gfx/world/components/hierarchy_component.h"
 
 using namespace vw;
 
@@ -121,7 +116,8 @@ private:
         object_rotation_       = 0.0f;
         object_rotation_speed_ = math::radians(5.0f);
 
-#if 1
+// Стресс-тест инстансами одной модели
+#if 0
         for (int i = 0; i < 9999; i++) {
             auto another_entity_ = world.create_entity();
             world.add_component<gfx::transform_component>(another_entity_);
@@ -194,7 +190,7 @@ int main() {
         std::make_unique<gfx::engine<>>(1280, 720, "Voxel World - Test Simple Model")
             ->run(std::make_unique<simple_model_app>());
     } catch (const std::exception& e) {
-        std::cerr << "Ошибка: " << e.what() << '\n';
+        vw::log::error("Ошибка: {}", e.what());
         return 1;
     }
 

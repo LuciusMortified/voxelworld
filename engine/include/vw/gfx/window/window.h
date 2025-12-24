@@ -11,6 +11,7 @@
 #include <GLFW/glfw3.h>
 
 #include "vw/core.h"
+#include "vw/log.h"
 #include "vw/gfx/window/event.h"
 
 namespace vw::gfx {
@@ -111,6 +112,8 @@ private:
     mutable vec2d last_cursor_pos_ = {0.0, 0.0};
 
     event_dispatcher event_dispatcher_;
+
+    static constexpr log::log_category lc_{"window"};
 };
 }  // namespace vw::gfx
 

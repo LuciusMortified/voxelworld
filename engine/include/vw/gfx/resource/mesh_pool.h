@@ -58,6 +58,8 @@ private:
     std::mutex gen_mutex_;
     std::condition_variable gen_cv_;
     bool gen_running_;
+
+    static constexpr log::log_category lc_{"mesh_pool"};
 };
 
 }  // namespace vw::gfx

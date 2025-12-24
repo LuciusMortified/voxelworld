@@ -53,11 +53,21 @@ inline void mesh_pool::request_mesh(
         return;
     }
 
-    auto task   = std::make_unique<mesh_generation_task>(identity, model_ptr);
-    auto future = task->promise.get_future();
+    log::debug(
+        lc_,
+        "Requesting mesh generation for model {}.{} with size ({},{},{})",
+        identity.index,
+        identity.generation,
+        model_ptr->width(),
+        model_ptr->height(),
+        model_ptr->depth()
+    );
 
     {
-        std::lock_guard<std::mutex> lock(gen_mutex_);
+        auto task   = std::make_unique<mesh_generation_task>(identity, model_ptr);
+        auto future = task->promise.get_future();
+
+        std::lock_guard lock(gen_mutex_);
         pending_meshes_[identity] = std::move(future);
         gen_queue_.push(std::move(task));
     }
@@ -75,13 +85,20 @@ inline void mesh_pool::process_completed() {
     for (auto iter = pending_meshes_.begin(); iter != pending_meshes_.end();) {
         auto status = iter->second.wait_for(std::chrono::seconds(0));
         if (status == std::future_status::ready) {
-            try {
-                auto identity     = iter->first;
-                auto data     = iter->second.get();
-                meshes_[identity] = std::make_shared<mesh>(std::move(data));
-            } catch (const std::exception& e) {
-                // TODO: add logging
-            }
+            auto identity     = iter->first;
+            auto data         = iter->second.get();
+
+            log::debug(
+                lc_,
+                "Completed mesh generation for model {}.{} vertices {} indices {}",
+                identity.index,
+                identity.generation,
+                data.vertices.size(),
+                data.indices.size()
+            );
+
+            meshes_[identity] = std::make_shared<mesh>(std::move(data));
+
             iter = pending_meshes_.erase(iter);
         } else {
             ++iter;

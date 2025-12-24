@@ -9,6 +9,16 @@
 #include <vector>
 
 #include "vw/core.h"
+#include "vw/log.h"
+
+#ifndef NDEBUG
+VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
+    VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+    VkDebugUtilsMessageTypeFlagsEXT message_type,
+    const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
+    void* p_user_data
+);
+#endif
 
 namespace vw::gfx {
 class window;
@@ -45,19 +55,30 @@ public:
     [[nodiscard]] VkSurfaceKHR get_surface() const;
     [[nodiscard]] VkCommandPool get_command_pool() const;
     [[nodiscard]] queue_family_indices get_queue_families() const;
-    [[nodiscard]] swapchain_support_details query_swapchain_support() const;
+    [[nodiscard]] swapchain_support_details query_swapchain_support_() const;
 
 private:
-    void create_instance();
-    void create_surface();
-    void pick_physical_device();
-    void create_logical_device();
-    void create_command_pool();
+    static constexpr log::log_category lc_{"vulkan_context"};
 
-    [[nodiscard]] bool is_device_suitable(VkPhysicalDevice device);
-    [[nodiscard]] queue_family_indices find_queue_families(VkPhysicalDevice device);
-    [[nodiscard]] bool check_device_extension_support(VkPhysicalDevice device);
-    [[nodiscard]] swapchain_support_details query_swapchain_support(VkPhysicalDevice device) const;
+#ifndef NDEBUG
+    friend VKAPI_ATTR VkBool32 VKAPI_CALL ::debug_callback(
+        VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
+        VkDebugUtilsMessageTypeFlagsEXT message_type,
+        const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
+        void* p_user_data
+    );
+#endif
+
+    void create_instance_();
+    void create_surface_();
+    void pick_physical_device_();
+    void create_logical_device_();
+    void create_command_pool_();
+
+    [[nodiscard]] bool is_device_suitable_(VkPhysicalDevice device);
+    [[nodiscard]] queue_family_indices find_queue_families_(VkPhysicalDevice device);
+    [[nodiscard]] bool check_device_extension_support_(VkPhysicalDevice device);
+    [[nodiscard]] swapchain_support_details query_swapchain_support_(VkPhysicalDevice device) const;
 
     window* window_;
 
@@ -75,7 +96,7 @@ private:
 #ifndef NDEBUG
     VkDebugUtilsMessengerEXT debug_messenger_{};
 
-    void setup_debug_messenger();
+    void setup_debug_messenger_();
 #endif
 };
 }  // namespace vw::gfx
