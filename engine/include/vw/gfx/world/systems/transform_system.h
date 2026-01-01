@@ -15,11 +15,18 @@ namespace vw::gfx {
 struct transform_component;
 
 template <typename... Cs>
+class spatial_system;
+
+template <typename... Cs>
 class transform_system final {
 public:
     using registry_type = registry<Cs...>;
+    using spatial_system_type = spatial_system<Cs...>;
 
-    explicit transform_system(registry_type& registry);
+    explicit transform_system(
+        registry_type& registry,
+        spatial_system_type& spatial_sys
+    );
 
     void update();
 
@@ -47,8 +54,7 @@ public:
 
     transform_modifier modify(entity ent);
 
-    [[nodiscard]]
-    auto get_render_dirty_entities() -> std::set<entity>&;
+    [[nodiscard]] auto get_render_dirty_entities() -> std::unordered_set<entity>&;
 
     void mark_render_dirty(entity ent);
 
@@ -60,9 +66,10 @@ private:
     [[nodiscard]] auto get_hierarchy_depth(entity ent) const -> size_t;
 
     registry_type* registry_;
+    spatial_system_type* spatial_system_;
 
     std::vector<entity> dirty_entities_;
-    std::set<entity> render_dirty_entities_;
+    std::unordered_set<entity> render_dirty_entities_;
 };
 
 template <typename... Cs>

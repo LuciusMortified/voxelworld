@@ -104,6 +104,7 @@ private:
         world.add_component<gfx::transform_component>(some_entity_);
         world.add_component<gfx::model_component>(some_entity_);
         world.add_component<gfx::hierarchy_component>(some_entity_);
+        world.add_component<gfx::spatial_component>(some_entity_);
 
         // Настраиваем transform
         transform_system.modify(some_entity_)
@@ -117,11 +118,12 @@ private:
         object_rotation_speed_ = math::radians(5.0f);
 
 // Стресс-тест инстансами одной модели
-#if 0
+#if 1
         for (int i = 0; i < 9999; i++) {
             auto another_entity_ = world.create_entity();
             world.add_component<gfx::transform_component>(another_entity_);
             world.add_component<gfx::model_component>(another_entity_);
+            world.add_component<gfx::spatial_component>(another_entity_);
 
             transform_system.modify(another_entity_)
                 .set_position({
@@ -155,10 +157,12 @@ private:
             get_engine().get_renderer().draw_grid(matrix, 1.f, 3, 3, colors::white);
         }
 
+#if 0
         auto transform_view = world.view_components<gfx::transform_component>();
         for (const auto& [entity, transform_comp] : transform_view) {
             transform_system.modify(entity).set_rotation({0.0f, object_rotation_, 0.0f});
         }
+#endif
     }
 
     void handle_key_press(

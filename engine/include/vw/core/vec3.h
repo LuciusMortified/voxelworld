@@ -14,33 +14,27 @@ struct vec3 {
     explicit vec3(T v) : x(v), y(v), z(v) {}
     vec3(T x_, T y_, T z_) : x(x_), y(y_), z(z_) {}
 
-    [[nodiscard]]
-    vec3 operator+(const vec3& other) const {
+    [[nodiscard]] vec3 operator+(const vec3& other) const {
         return vec3{x + other.x, y + other.y, z + other.z};
     }
 
-    [[nodiscard]]
-    vec3 operator-(const vec3& other) const {
+    [[nodiscard]] vec3 operator-(const vec3& other) const {
         return vec3{x - other.x, y - other.y, z - other.z};
     }
 
-    [[nodiscard]]
-    vec3 operator-() const {
+    [[nodiscard]] vec3 operator-() const {
         return vec3(-x, -y, -z);
     }
 
-    [[nodiscard]]
-    vec3 operator*(T scalar) const {
+    [[nodiscard]] vec3 operator*(T scalar) const {
         return vec3(x * scalar, y * scalar, z * scalar);
     }
 
-    [[nodiscard]]
-    bool operator==(const vec3& other) const {
+    [[nodiscard]] bool operator==(const vec3& other) const {
         return x == other.x && y == other.y && z == other.z;
     }
 
-    [[nodiscard]]
-    bool operator!=(const vec3& other) const {
+    [[nodiscard]] bool operator!=(const vec3& other) const {
         return !(*this == other);
     }
 

@@ -19,7 +19,8 @@ inline camera::camera(
     , up_(0.0f, 1.0f, 0.0f)
     , vectors_dirty_(false)
     , view_matrix_dirty_(true)
-    , projection_matrix_dirty_(true) {
+    , projection_matrix_dirty_(true)
+    , frustum_dirty_(true) {
     update_vectors();
 }
 
@@ -28,6 +29,7 @@ inline void camera::set_position(
 ) {
     position_          = position;
     view_matrix_dirty_ = true;
+    frustum_dirty_     = true;
 }
 
 inline void camera::set_rotation(
@@ -37,6 +39,7 @@ inline void camera::set_rotation(
     yaw_               = yaw;
     vectors_dirty_     = true;
     view_matrix_dirty_ = true;
+    frustum_dirty_     = true;
 }
 
 inline void camera::set_aspect_ratio(
@@ -44,6 +47,7 @@ inline void camera::set_aspect_ratio(
 ) {
     aspect_                  = aspect;
     projection_matrix_dirty_ = true;
+    frustum_dirty_           = true;
 }
 
 inline vec3f camera::get_position() const  {
@@ -84,6 +88,7 @@ inline void camera::move_forward(
     }
     position_          = position_ + forward_ * distance;
     view_matrix_dirty_ = true;
+    frustum_dirty_     = true;
 }
 
 inline void camera::move_right(
@@ -94,6 +99,7 @@ inline void camera::move_right(
     }
     position_          = position_ + right_ * distance;
     view_matrix_dirty_ = true;
+    frustum_dirty_     = true;
 }
 
 inline void camera::move_up(
@@ -104,6 +110,7 @@ inline void camera::move_up(
     }
     position_          = position_ + up_ * distance;
     view_matrix_dirty_ = true;
+    frustum_dirty_     = true;
 }
 
 inline void camera::rotate(
@@ -116,6 +123,7 @@ inline void camera::rotate(
 
     vectors_dirty_     = true;
     view_matrix_dirty_ = true;
+    frustum_dirty_     = true;
 }
 
 inline vec3f camera::get_forward() const {
@@ -167,6 +175,18 @@ inline void camera::update_view_matrix() const {
 inline void camera::update_projection_matrix() const {
     projection_matrix_       = math::perspective_matrix(fov_, aspect_, near_, far_);
     projection_matrix_dirty_ = false;
+}
+
+inline const frustum& camera::get_frustum() const {
+    if (frustum_dirty_) {
+        update_frustum();
+    }
+    return frustum_;
+}
+
+inline void camera::update_frustum() const {
+    frustum_ = frustum::from_view_projection_matrix(get_view_projection_matrix());
+    frustum_dirty_ = false;
 }
 }  // namespace vw::gfx
 

@@ -8,12 +8,13 @@
 #include <map>
 #include <memory>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "vw/gfx/resource/combined_buffer.h"
+#include "vw/gfx/spatial/frustum.h"
 #include "vw/gfx/world/entity.h"
 #include "vw/gfx/world/world.h"
-
 
 namespace vw::gfx {
 
@@ -21,7 +22,7 @@ class vulkan_context;
 
 struct entity_buffer_info {
     buffer_chunk_size chunk_size;
-    size_t buffer_index;  // Индекс буфера в buffers_
+    size_t buffer_index;
 };
 
 struct combined_buffer_pool_stats {
@@ -36,6 +37,13 @@ struct combined_buffer_pool_stats {
     uint32 instance_capacity = 0;
     uint32 instance_count    = 0;
     std::vector<combined_buffer_stats> buffers;
+};
+
+struct visibility_cache {
+    frustum frustum;
+    std::unordered_set<entity> visible;
+    std::unordered_set<entity> tmp_visible;
+    std::unordered_set<entity> changed;
 };
 
 template <typename C>
@@ -55,21 +63,24 @@ public:
     combined_buffer_pool(combined_buffer_pool&&)                 = delete;
     combined_buffer_pool& operator=(combined_buffer_pool&&)      = delete;
 
-    void update(world_type& world);
+    void update(world_type& world, const frustum& view_frustum);
 
     [[nodiscard]] auto get_buffers() const -> const std::vector<std::unique_ptr<combined_buffer>>&;
 
-    [[nodiscard]]
-    static buffer_chunk_size get_chunk_size_for_mesh(uint32 vertex_count, uint32 index_count);
+    [[nodiscard]] static buffer_chunk_size get_chunk_size_for_mesh(
+        uint32 vertex_count, uint32 index_count
+    );
 
-    [[nodiscard]]
-    const combined_buffer_pool_stats& get_stats() const;
+    [[nodiscard]] const combined_buffer_pool_stats& get_stats() const;
 
 private:
     combined_buffer* get_or_create_buffer(const buffer_chunk_size& chunk_size);
 
-    void update_meshes_(world_type& world);
-    void update_transforms_(world_type& world);
+    void update_meshes_(world_type& world, const frustum& view_frustum);
+    void update_transforms_(world_type& world, const frustum& view_frustum);
+    void update_visibility_cache_(
+        world_type& world, const frustum& view_frustum
+    );
 
     vulkan_context* context_;
     std::vector<std::unique_ptr<combined_buffer>> buffers_;
@@ -78,6 +89,9 @@ private:
 
     VkDescriptorPool descriptor_pool_            = VK_NULL_HANDLE;
     VkDescriptorSetLayout descriptor_set_layout_ = VK_NULL_HANDLE;
+
+    visibility_cache visibility_cache_{};
+    std::unordered_set<entity> entities_to_process_;
 
     mutable combined_buffer_pool_stats stats_;
 };

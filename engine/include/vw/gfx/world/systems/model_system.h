@@ -15,11 +15,19 @@ namespace vw::gfx {
 class model;
 
 template <typename... Cs>
+class spatial_system;
+
+template <typename... Cs>
 class model_system {
 public:
     using registry_type = registry<Cs...>;
+    using spatial_system_type = spatial_system<Cs...>;
 
-    explicit model_system(registry_type& registry, mesh_pool& mesh_pool);
+    explicit model_system(
+        registry_type& registry,
+        mesh_pool& mesh_pool,
+        spatial_system_type& spatial_sys
+    );
 
     void update();
 
@@ -43,7 +51,7 @@ public:
     void mark_dirty(entity ent);
 
     [[nodiscard]]
-    auto get_render_dirty_entities() -> std::set<entity>&;
+    auto get_render_dirty_entities() -> std::unordered_set<entity>&;
 
     void mark_render_dirty(entity ent);
 
@@ -51,11 +59,12 @@ private:
     void process_dirty_entities();
     void update_completed_meshes();
 
-    registry_type& registry_;
-    mesh_pool& mesh_pool_;
-    std::set<entity> pending_entities_;
-    std::set<entity> dirty_entities_;
-    std::set<entity> render_dirty_entities_;
+    registry_type* registry_;
+    mesh_pool* mesh_pool_;
+    spatial_system_type* spatial_system_;
+    std::unordered_set<entity> pending_entities_;
+    std::unordered_set<entity> dirty_entities_;
+    std::unordered_set<entity> render_dirty_entities_;
 };
 
 template <typename... Cs>

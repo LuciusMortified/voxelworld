@@ -3,14 +3,14 @@
 #ifndef VW_MAT4_H
 #define VW_MAT4_H
 
-#include "vw/core/types.h"
-
 #include <array>
 
+#include "vw/core/types.h"
+
 namespace vw {
-template<typename T>
+template <typename T>
 struct vec3;
-template<typename T>
+template <typename T>
 struct vec4;
 
 template <typename T>

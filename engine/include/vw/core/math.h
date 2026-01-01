@@ -9,9 +9,10 @@
 #include "vw/core/vec3.h"
 
 namespace vw::math {
-constexpr float PI         = 3.14159265359f;
-constexpr float DEG_TO_RAD = PI / 180.0f;
-constexpr float RAD_TO_DEG = 180.0f / PI;
+
+constexpr float pi         = 3.14159265359f;
+constexpr float deg_to_rad = pi / 180.0f;
+constexpr float rad_to_deg = 180.0f / pi;
 
 float radians(float degrees);
 float degrees(float radians);
@@ -24,6 +25,8 @@ float dot(const vec3f& a, const vec3f& b);
 float clamp(float value, float min_val, float max_val);
 float lerp(float a, float b, float t);
 vec3f lerp(const vec3f& a, const vec3f& b, float t);
+
+bool is_safe_zero(float a, float b, float epsilon = 1e-5f);
 
 mat4f perspective_matrix(float fov, float aspect, float near, float far);
 mat4f look_at_matrix(const vec3f& eye, const vec3f& center, const vec3f& up);
@@ -40,6 +43,7 @@ mat4f transform_matrix(
 
 mat4f identity_matrix();
 mat4f transpose_matrix(const mat4f& matrix);
+mat4f inverse_matrix(const mat4f& matrix);
 
 }  // namespace vw::math
 

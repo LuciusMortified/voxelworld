@@ -4,6 +4,7 @@
 #define VW_GFX_CAMERA_H
 
 #include "vw/core.h"
+#include "vw/gfx/spatial/frustum.h"
 
 namespace vw::gfx {
 class camera {
@@ -23,6 +24,8 @@ public:
     mat4f get_view_matrix() const;
     mat4f get_projection_matrix() const;
     mat4f get_view_projection_matrix() const;
+    
+    [[nodiscard]] const frustum& get_frustum() const;
 
     void move_forward(float distance);
     void move_right(float distance);
@@ -37,6 +40,7 @@ private:
     void update_vectors() const;
     void update_view_matrix() const;
     void update_projection_matrix() const;
+    void update_frustum() const;
 
     vec3f position_;
     float pitch_, yaw_;
@@ -49,6 +53,9 @@ private:
     mutable mat4f projection_matrix_;
     mutable bool view_matrix_dirty_;
     mutable bool projection_matrix_dirty_;
+    
+    mutable frustum frustum_;
+    mutable bool frustum_dirty_ = true;
 };
 }  // namespace vw::gfx
 

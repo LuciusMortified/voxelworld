@@ -1306,7 +1306,11 @@ void renderer<WC>::render_world(
 ) {
     update_uniform_buffer(camera);
 
-    combined_buffer_pool_->update(world);
+    // Получить frustum из камеры (кэшированный)
+    const frustum& view_frustum = camera.get_frustum();
+    
+    // Обновить буферы с учетом frustum culling
+    combined_buffer_pool_->update(world, view_frustum);
 
     VkPipeline current_pipeline =
         (current_render_mode_ == render_mode::lit) ? graphics_pipeline_ : wireframe_pipeline_;

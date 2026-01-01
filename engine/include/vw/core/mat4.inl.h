@@ -12,52 +12,52 @@
 namespace vw {
 
 template <typename T>
-inline mat4<T>::mat4(
+mat4<T>::mat4(
     const T* values
 ) {
     memcpy(data_, values, size_ * sizeof(T));
 }
 
 template <typename T>
-inline auto mat4<T>::operator[](
+auto mat4<T>::operator[](
     int row, int col
 ) -> T& {
     return data_[(col * 4) + row];
 }
 
 template <typename T>
-inline auto mat4<T>::operator[](
+auto mat4<T>::operator[](
     int row, int col
 ) const -> const T& {
     return data_[(col * 4) + row];
 }
 
 template <typename T>
-inline auto mat4<T>::operator[](
+auto mat4<T>::operator[](
     int index
 ) -> T& {
     return data_[index];
 }
 
 template <typename T>
-inline auto mat4<T>::operator[](
+auto mat4<T>::operator[](
     int index
 ) const -> const T& {
     return data_[index];
 }
 
 template <typename T>
-inline auto mat4<T>::cptr() -> T* {
+auto mat4<T>::cptr() -> T* {
     return data_.data();
 }
 
 template <typename T>
-inline auto mat4<T>::cptr() const -> const T* {
+auto mat4<T>::cptr() const -> const T* {
     return data_.data();
 }
 
 template <typename T>
-inline auto mat4<T>::operator*(
+auto mat4<T>::operator*(
     const mat4& other
 ) const -> mat4 {
     mat4 result;
@@ -73,7 +73,7 @@ inline auto mat4<T>::operator*(
 }
 
 template <typename T>
-inline auto mat4<T>::operator*(
+auto mat4<T>::operator*(
     const vec4<T>& v
 ) const -> vec4<T> {
     auto& m = *this;
@@ -88,7 +88,7 @@ inline auto mat4<T>::operator*(
 }
 
 template <typename T>
-inline auto mat4<T>::operator*(
+auto mat4<T>::operator*(
     const vec3<T>& vec
 ) const -> vec3<T> {
     vec4<T> h{vec.x, vec.y, vec.z, T(1)};
@@ -104,7 +104,7 @@ inline auto mat4<T>::operator*(
 }
 
 template <typename T>
-inline auto mat4<T>::operator==(
+auto mat4<T>::operator==(
     const mat4& other
 ) const -> bool {
     for (int i = 0; i < size_; ++i) {
@@ -116,7 +116,7 @@ inline auto mat4<T>::operator==(
 }
 
 template <typename T>
-inline auto mat4<T>::operator!=(
+auto mat4<T>::operator!=(
     const mat4& other
 ) const -> bool {
     return !(*this == other);

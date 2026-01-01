@@ -1,0 +1,245 @@
+#pragma once
+
+#ifndef VW_GFX_WORLD_SYSTEMS_SPATIAL_SYSTEM_INL_H
+#define VW_GFX_WORLD_SYSTEMS_SPATIAL_SYSTEM_INL_H
+
+#include <algorithm>
+#include <limits>
+
+#include "vw/gfx/world/components/model_component.h"
+#include "vw/gfx/world/components/transform_component.h"
+#include "vw/gfx/world/systems/spatial_system.h"
+
+namespace vw::gfx {
+
+template <typename... Cs>
+spatial_system<Cs...>::spatial_system(
+    registry_type& registry
+)
+    : registry_(&registry) {
+    dirty_entities_.reserve(128);
+}
+
+template <typename... Cs>
+void spatial_system<Cs...>::update() {
+    // Обработать только dirty entities (оптимизация - не проходим по всем сущностям)
+    if (dirty_entities_.empty()) {
+        return;
+    }
+
+    // Обновить spatial index для dirty entities
+    for (entity ent : dirty_entities_) {
+        if (!registry_->template has<spatial_component>(ent)) {
+            continue;
+        }
+        update_entity(ent);
+    }
+
+    dirty_entities_.clear();
+}
+
+template <typename... Cs>
+void spatial_system<Cs...>::update_entity(
+    entity ent
+) {
+    auto& spatial = registry_->template get<spatial_component>(ent);
+
+    // Вычислить новые bounds
+    const auto& model_comp     = registry_->template get<model_component>(ent);
+    const auto& transform_comp = registry_->template get<transform_component>(ent);
+    aabb new_bounds            = calculate_aabb_from_model(ent, model_comp, transform_comp);
+
+    // Проверить, изменились ли bounds или требуется первоначальная вставка
+    bool bounds_changed =  //
+        spatial.bounds_.min != new_bounds.min || spatial.bounds_.max != new_bounds.max;
+
+    if (bounds_changed) {
+        // Проверить, находится ли новый AABB внутри Fat AABB
+        bool needs_tree_update = spatial.dirty_ || 
+            new_bounds.min.x < spatial.fat_bounds_.min.x ||
+            new_bounds.min.y < spatial.fat_bounds_.min.y ||
+            new_bounds.min.z < spatial.fat_bounds_.min.z ||
+            new_bounds.max.x > spatial.fat_bounds_.max.x ||
+            new_bounds.max.y > spatial.fat_bounds_.max.y ||
+            new_bounds.max.z > spatial.fat_bounds_.max.z;
+
+        if (needs_tree_update) {
+            // Вычислить новый Fat AABB
+            aabb new_fat_bounds = expand_aabb_for_fat(new_bounds);
+            
+            // Обновить дерево (если не первая вставка)
+            if (!spatial.dirty_) {
+                tree_.update(ent, new_fat_bounds);
+            } else {
+                tree_.insert(ent, new_fat_bounds);
+            }
+
+            // Обновить компонент (friend доступ к приватным полям)
+            spatial.bounds_     = new_bounds;
+            spatial.fat_bounds_ = new_fat_bounds;
+            spatial.dirty_      = false;
+        } else {
+            // Новый AABB находится внутри Fat AABB, обновить только bounds без пересчета дерева
+            spatial.bounds_ = new_bounds;
+            spatial.dirty_  = false;
+        }
+    } else {
+        // Если bounds не изменились, но сущность была помечена как dirty,
+        // просто сбросить флаг dirty (возможно, была помечена ошибочно)
+        spatial.dirty_ = false;
+    }
+}
+
+template <typename... Cs>
+aabb spatial_system<Cs...>::expand_aabb_for_fat(
+    const aabb& bounds
+) const {
+    // Коэффициент расширения: 10% от размера или минимум 0.1 единицы
+    constexpr float expansion_factor = 0.1f;
+    constexpr float min_expansion = 0.1f;
+    
+    vec3f size = bounds.size();
+    vec3f expansion{
+        std::max(size.x * expansion_factor, min_expansion),
+        std::max(size.y * expansion_factor, min_expansion),
+        std::max(size.z * expansion_factor, min_expansion)
+    };
+    
+    return aabb{
+        vec3f{
+            bounds.min.x - expansion.x,
+            bounds.min.y - expansion.y,
+            bounds.min.z - expansion.z
+        },
+        vec3f{
+            bounds.max.x + expansion.x,
+            bounds.max.y + expansion.y,
+            bounds.max.z + expansion.z
+        }
+    };
+}
+
+template <typename... Cs>
+aabb spatial_system<Cs...>::calculate_aabb_from_model(
+    entity ent, const model_component& model_comp, const transform_component& transform_comp
+) const {
+    if (!model_comp.has_model()) {
+        // Если нет модели, вернуть пустой AABB
+        return aabb{{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}};
+    }
+
+    // Получить размеры модели
+    int width  = model_comp.width();
+    int height = model_comp.height();
+    int depth  = model_comp.depth();
+
+    // Создать локальный AABB модели (от 0,0,0 до width,height,depth)
+    vec3f local_min{0.0f, 0.0f, 0.0f};
+    vec3f local_max{
+        static_cast<float>(width), static_cast<float>(height), static_cast<float>(depth)
+    };
+
+    // Получить world matrix для трансформации
+    mat4f world_matrix = transform_comp.get_world_matrix();
+
+    // Трансформировать 8 вершин локального AABB в мировые координаты
+    vec3f vertices[8] = {
+        {local_min.x, local_min.y, local_min.z},
+        {local_max.x, local_min.y, local_min.z},
+        {local_max.x, local_max.y, local_min.z},
+        {local_min.x, local_max.y, local_min.z},
+        {local_min.x, local_min.y, local_max.z},
+        {local_max.x, local_min.y, local_max.z},
+        {local_max.x, local_max.y, local_max.z},
+        {local_min.x, local_max.y, local_max.z}
+    };
+
+    // Трансформировать все вершины и найти min/max
+    vec3f min_point{std::numeric_limits<float>::max()};
+    vec3f max_point{std::numeric_limits<float>::lowest()};
+
+    for (auto vertice : vertices) {
+        vec3f world_vertex = world_matrix * vertice;
+        min_point.x        = std::min(min_point.x, world_vertex.x);
+        min_point.y        = std::min(min_point.y, world_vertex.y);
+        min_point.z        = std::min(min_point.z, world_vertex.z);
+
+        max_point.x = std::max(max_point.x, world_vertex.x);
+        max_point.y = std::max(max_point.y, world_vertex.y);
+        max_point.z = std::max(max_point.z, world_vertex.z);
+    }
+
+    return aabb{min_point, max_point};
+}
+
+template <typename... Cs>
+void spatial_system<Cs...>::query_all(
+    const frustum& f, std::unordered_set<entity>& result_out
+) const {
+    tree_.query_all(f, result_out);
+
+    // Дополнительная проверка для точности (BVH может вернуть немного больше результатов)
+    for (auto it = result_out.begin(), ite = result_out.end(); it != ite;) {
+        const auto& spatial = registry_->template get<spatial_component>(*it);
+        if (!f.intersects(spatial.get_bounds())) {
+            it = result_out.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+template <typename... Cs>
+void spatial_system<Cs...>::query_all(
+    const ray& r, std::unordered_set<entity>& result_out
+) const {
+    tree_.query_all(r, result_out);
+
+    // Дополнительная проверка для точности (BVH может вернуть немного больше результатов)
+    for (auto it = result_out.begin(), ite = result_out.end(); it != ite;) {
+        const auto& spatial = registry_->template get<spatial_component>(*it);
+        if (!spatial.get_bounds().intersects(r)) {
+            it = result_out.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+template <typename... Cs>
+void spatial_system<Cs...>::query_all(
+    const aabb& bounds, std::unordered_set<entity>& result_out
+) const {
+    tree_.query_all(bounds, result_out);
+
+    // Дополнительная проверка для точности (BVH может вернуть немного больше результатов)
+    for (auto it = result_out.begin(), ite = result_out.end(); it != ite;) {
+        const auto& spatial = registry_->template get<spatial_component>(*it);
+        if (!spatial.get_bounds().intersects(bounds)) {
+            it = result_out.erase(it);
+        } else {
+            ++it;
+        }
+    }
+}
+
+template <typename... Cs>
+void spatial_system<Cs...>::mark_dirty(
+    entity ent
+) {
+    dirty_entities_.insert(ent);
+}
+
+template <typename... Cs>
+void spatial_system<Cs...>::cleanup(
+    entity ent
+) {
+    // Удалить entity из spatial tree перед удалением компонента
+    tree_.remove(ent);
+    // Также удалить из dirty_entities_ если там есть
+    dirty_entities_.erase(ent);
+}
+
+}  // namespace vw::gfx
+
+#endif  // VW_GFX_WORLD_SYSTEMS_SPATIAL_SYSTEM_INL_H

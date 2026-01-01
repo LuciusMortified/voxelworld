@@ -7,19 +7,22 @@
 #include <utility>
 
 #include "vw/gfx/model/model.h"
+#include "vw/gfx/world/components/spatial_component.h"
 #include "vw/gfx/world/systems/model_system.h"
 
 namespace vw::gfx {
 
 template <typename... Cs>
 model_system<Cs...>::model_system(
-    registry_type& registry, mesh_pool& mesh_pool
+    registry_type& registry,
+    mesh_pool& mesh_pool,
+    spatial_system_type& spatial_sys
 )
-    : registry_(registry), mesh_pool_(mesh_pool) {}
+    : registry_(&registry), mesh_pool_(&mesh_pool), spatial_system_(&spatial_sys) {}
 
 template <typename... Cs>
 void model_system<Cs...>::update() {
-    mesh_pool_.process_completed();
+    mesh_pool_->process_completed();
     update_completed_meshes();
     process_dirty_entities();
 }
@@ -28,7 +31,7 @@ template <typename... Cs>
 auto model_system<Cs...>::modify(
     entity e
 ) -> model_modifier {
-    auto& comp = registry_.template get<model_component>(e);
+    auto& comp = registry_->template get<model_component>(e);
     return model_modifier(*this, &comp, e);
 }
 
@@ -40,7 +43,7 @@ void model_system<Cs...>::mark_dirty(
 }
 
 template <typename... Cs>
-auto model_system<Cs...>::get_render_dirty_entities() -> std::set<entity>& {
+auto model_system<Cs...>::get_render_dirty_entities() -> std::unordered_set<entity>& {
     return render_dirty_entities_;
 }
 
@@ -54,14 +57,14 @@ void model_system<Cs...>::mark_render_dirty(
 template <typename... Cs>
 void model_system<Cs...>::process_dirty_entities() {
     for (auto ent : dirty_entities_) {
-        auto& comp = registry_.template get<model_component>(ent);
+        auto& comp = registry_->template get<model_component>(ent);
         if (!comp.model_) {
             continue;
         }
 
         auto identity = comp.model_->get_identity();
-        if (!mesh_pool_.has(identity) && !mesh_pool_.is_pending(identity)) {
-            mesh_pool_.request_mesh(comp.model_);
+        if (!mesh_pool_->has(identity) && !mesh_pool_->is_pending(identity)) {
+            mesh_pool_->request_mesh(comp.model_);
             pending_entities_.insert(ent);
         }
     }
@@ -72,9 +75,9 @@ template <typename... Cs>
 void model_system<Cs...>::update_completed_meshes() {
     for (auto it = pending_entities_.begin(); it != pending_entities_.end();) {
         auto ent      = *it;
-        auto& comp    = registry_.template get<model_component>(ent);
+        auto& comp    = registry_->template get<model_component>(ent);
         auto identity = comp.model_->get_identity();
-        if (mesh_pool_.has(identity)) {
+        if (mesh_pool_->has(identity)) {
             it = pending_entities_.erase(it);
             render_dirty_entities_.insert(ent);
         } else {
@@ -96,6 +99,12 @@ void model_system<Cs...>::model_modifier::set_model(
     component_->model_ = std::move(model_ptr);
     system_->mark_dirty(entity_);
     system_->mark_render_dirty(entity_);
+    
+    // Пометить spatial_component как dirty
+    if (system_->spatial_system_ &&
+        system_->registry_->template has<spatial_component>(entity_)) {
+        system_->spatial_system_->mark_dirty(entity_);
+    }
 }
 
 template <typename... Cs>
@@ -106,6 +115,12 @@ void model_system<Cs...>::model_modifier::set_voxel(
         component_->model_->set_voxel(x, y, z, v);
         system_->mark_dirty(entity_);
         system_->mark_render_dirty(entity_);
+        
+        // Пометить spatial_component как dirty
+        if (system_->spatial_system_ &&
+            system_->registry_->template has<spatial_component>(entity_)) {
+            system_->spatial_system_->mark_dirty(entity_);
+        }
     }
 }
 
@@ -117,6 +132,12 @@ void model_system<Cs...>::model_modifier::set_voxel(
         component_->model_->set_voxel(x, y, z, c);
         system_->mark_dirty(entity_);
         system_->mark_render_dirty(entity_);
+        
+        // Пометить spatial_component как dirty
+        if (system_->spatial_system_ &&
+            system_->registry_->template has<spatial_component>(entity_)) {
+            system_->spatial_system_->mark_dirty(entity_);
+        }
     }
 }
 
@@ -128,6 +149,12 @@ void model_system<Cs...>::model_modifier::fill(
         component_->model_->fill(v);
         system_->mark_dirty(entity_);
         system_->mark_render_dirty(entity_);
+        
+        // Пометить spatial_component как dirty
+        if (system_->spatial_system_ &&
+            system_->registry_->template has<spatial_component>(entity_)) {
+            system_->spatial_system_->mark_dirty(entity_);
+        }
     }
 }
 
@@ -137,6 +164,12 @@ void model_system<Cs...>::model_modifier::clear() {
         component_->model_->clear();
         system_->mark_dirty(entity_);
         system_->mark_render_dirty(entity_);
+        
+        // Пометить spatial_component как dirty
+        if (system_->spatial_system_ &&
+            system_->registry_->template has<spatial_component>(entity_)) {
+            system_->spatial_system_->mark_dirty(entity_);
+        }
     }
 }
 

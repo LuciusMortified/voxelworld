@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <numeric>
+#include <ranges>
 
 namespace vw::gfx {
 
@@ -20,10 +21,11 @@ combined_buffer_pool<C>::combined_buffer_pool(
 
 template <typename C>
 void combined_buffer_pool<C>::update(
-    world_type& world
+    world_type& world, const frustum& view_frustum
 ) {
-    update_meshes_(world);
-    update_transforms_(world);
+    update_visibility_cache_(world, view_frustum);
+    update_meshes_(world, view_frustum);
+    update_transforms_(world, view_frustum);
 }
 
 template <typename C>
@@ -68,12 +70,28 @@ combined_buffer* combined_buffer_pool<C>::get_or_create_buffer(
 
 template <typename C>
 void combined_buffer_pool<C>::update_meshes_(
-    world_type& world
+    world_type& world, const frustum& view_frustum
 ) {
     auto& model_system   = world.get_model_system();
     auto& dirty_entities = model_system.get_render_dirty_entities();
-    for (auto it = dirty_entities.begin(); it != dirty_entities.end();) {
-        auto ent           = *it;
+
+    entities_to_process_.clear();
+    entities_to_process_.insert_range(visibility_cache_.changed);
+    entities_to_process_.insert_range(dirty_entities);
+
+    for (entity ent : entities_to_process_) {
+        bool has_spatial = world.template has_component<spatial_component>(ent);
+        bool is_visible  = visibility_cache_.visible.contains(ent);
+        if (has_spatial && !is_visible) {
+            if (entity_buffer_infos_.contains(ent)) {
+                auto& buffer_info = entity_buffer_infos_[ent];
+                buffers_[buffer_info.buffer_index]->free(ent);
+                entity_buffer_infos_.erase(ent);
+            }
+            dirty_entities.erase(ent);
+            continue;
+        }
+
         bool has_model     = world.template has_component<model_component>(ent);
         bool has_transform = world.template has_component<transform_component>(ent);
         bool is_renderable = has_model && has_transform;
@@ -84,20 +102,18 @@ void combined_buffer_pool<C>::update_meshes_(
                 buffers_[buffer_info.buffer_index]->free(ent);
                 entity_buffer_infos_.erase(ent);
             }
-            ++it;
+            dirty_entities.erase(ent);
             continue;
         }
 
         const auto& model_comp = world.template get_component<model_component>(ent);
         if (!model_comp.has_model()) {
-            ++it;
             continue;
         }
 
         auto model_id = model_comp.get_identity();
         auto mesh_ptr = world.get_mesh_pool().get(model_id);
         if (!mesh_ptr) {
-            ++it;
             continue;
         }
 
@@ -110,7 +126,7 @@ void combined_buffer_pool<C>::update_meshes_(
             auto& buffer_info = entity_buffer_infos_[ent];
             if (buffer_info.chunk_size == required_chunk_size) {
                 buffers_[buffer_info.buffer_index]->write_mesh(model_id, *mesh_ptr);
-                ++it;
+                dirty_entities.erase(ent);
                 continue;
             }
 
@@ -125,19 +141,29 @@ void combined_buffer_pool<C>::update_meshes_(
         buffer->allocate(ent, model_id, *mesh_ptr, transform_matrix);
 
         entity_buffer_infos_[ent] = entity_buffer_info{required_chunk_size, buffer_index};
-
-        it = dirty_entities.erase(it);
+        dirty_entities.erase(ent);
     }
 }
 
 template <typename C>
 void combined_buffer_pool<C>::update_transforms_(
-    world_type& world
+    world_type& world, const frustum& view_frustum
 ) {
     auto& transform_system = world.get_transform_system();
     auto& dirty_entities   = transform_system.get_render_dirty_entities();
-    for (auto it = dirty_entities.begin(); it != dirty_entities.end();) {
-        auto ent           = *it;
+
+    entities_to_process_.clear();
+    entities_to_process_.insert_range(visibility_cache_.changed);
+    entities_to_process_.insert_range(dirty_entities);
+
+    for (entity ent : entities_to_process_) {
+        bool has_spatial = world.template has_component<spatial_component>(ent);
+        bool is_visible  = visibility_cache_.visible.contains(ent);
+        if (has_spatial && !is_visible) {
+            dirty_entities.erase(ent);
+            continue;
+        }
+
         bool has_model     = world.template has_component<model_component>(ent);
         bool has_transform = world.template has_component<transform_component>(ent);
         bool is_renderable = has_model && has_transform;
@@ -149,10 +175,42 @@ void combined_buffer_pool<C>::update_transforms_(
             const mat4f& transform_matrix = transform_comp.get_world_matrix();
             buffers_[info.buffer_index]->write_transform(ent, transform_matrix);
 
-            it = dirty_entities.erase(it);
-        } else {
-            ++it;
+            dirty_entities.erase(ent);
         }
+    }
+}
+
+template <typename C>
+void combined_buffer_pool<C>::update_visibility_cache_(
+    world_type& world, const frustum& view_frustum
+) {
+    auto& spatial_system = world.get_spatial_system();
+
+    const float angle_threshold        = math::radians(2.f);
+    constexpr float distance_threshold = 0.5f;
+
+    const bool frustum_changed =  //
+        !visibility_cache_.frustum.approximately_equal(
+            view_frustum, angle_threshold, distance_threshold
+        );
+
+    visibility_cache_.changed.clear();
+    if (frustum_changed) {
+        spatial_system.query_all(view_frustum, visibility_cache_.tmp_visible);
+
+        for (auto ent : visibility_cache_.visible) {
+            if (!visibility_cache_.tmp_visible.contains(ent)) {
+                visibility_cache_.changed.insert(ent);
+            }
+        }
+        for (auto ent : visibility_cache_.tmp_visible) {
+            if (!visibility_cache_.visible.contains(ent)) {
+                visibility_cache_.changed.insert(ent);
+            }
+        }
+
+        visibility_cache_.visible = visibility_cache_.tmp_visible;
+        visibility_cache_.frustum = view_frustum;
     }
 }
 

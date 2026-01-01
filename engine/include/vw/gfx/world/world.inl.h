@@ -10,14 +10,16 @@ world<Cs>::world(
     vulkan_context& context
 )
     : mesh_pool_{context},
-transform_system_(registry_)
-    , hierarchy_system_(registry_, transform_system_)
-    , model_system_(registry_, mesh_pool_) {}
+      spatial_system_(registry_),
+      transform_system_(registry_, spatial_system_),
+      hierarchy_system_(registry_, transform_system_),
+      model_system_(registry_, mesh_pool_, spatial_system_) {}
 
 template <typename Cs>
 void world<Cs>::update() {
     transform_system_.update();
     model_system_.update();
+    spatial_system_.update();
 }
 
 template <typename Cs>
@@ -39,6 +41,9 @@ void world<Cs>::add_component(
     if constexpr (std::same_as<T, model_component>) {
         model_system_.mark_dirty(ent);
         model_system_.mark_render_dirty(ent);
+    }
+    if constexpr (std::same_as<T, spatial_component>) {
+        spatial_system_.mark_dirty(ent);
     }
 }
 
@@ -69,6 +74,9 @@ void world<Cs>::remove_component(
     if constexpr (std::same_as<T, model_component>) {
         model_system_.mark_render_dirty(ent);
     }
+    if constexpr (std::same_as<T, spatial_component>) {
+        spatial_system_.cleanup(ent);
+    }
     registry_.template remove<T>(ent);
 }
 
@@ -82,6 +90,9 @@ void world<Cs>::remove_all_components(
     if (registry_.template has<model_component>(ent)) {
         model_system_.mark_render_dirty(ent);
     }
+    if (registry_.template has<spatial_component>(ent)) {
+        spatial_system_.cleanup(ent);
+    }
     registry_.remove_all(ent);
 }
 
@@ -94,6 +105,9 @@ void world<C>::destroy_entity(
     }
     if (registry_.template has<model_component>(ent)) {
         model_system_.mark_render_dirty(ent);
+    }
+    if (registry_.template has<spatial_component>(ent)) {
+        spatial_system_.cleanup(ent);
     }
     registry_.destroy(ent);
 }
@@ -127,6 +141,11 @@ auto world<C>::get_model_registry() -> model_registry& {
 template <typename C>
 auto world<C>::get_model_system() -> model_system_type& {
     return model_system_;
+}
+
+template <typename C>
+auto world<C>::get_spatial_system() -> spatial_system_type& {
+    return spatial_system_;
 }
 
 }  // namespace vw::gfx

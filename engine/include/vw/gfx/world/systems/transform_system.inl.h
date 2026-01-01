@@ -9,6 +9,7 @@
 #include <stdexcept>
 
 #include "vw/gfx/world/components/hierarchy_component.h"
+#include "vw/gfx/world/components/spatial_component.h"
 #include "vw/gfx/world/components/transform_component.h"
 #include "vw/gfx/world/systems/transform_system.h"
 
@@ -16,9 +17,10 @@ namespace vw::gfx {
 
 template <typename... Cs>
 inline transform_system<Cs...>::transform_system(
-    registry_type& registry
+    registry_type& registry,
+    spatial_system_type& spatial_sys
 )
-    : registry_(&registry) {}
+    : registry_(&registry), spatial_system_(&spatial_sys) {}
 
 template <typename... Cs>
 inline transform_system<Cs...>::transform_modifier::transform_modifier(
@@ -33,7 +35,7 @@ inline auto transform_system<Cs...>::modify(
     return transform_modifier(this, ent);
 }
 template <typename... Cs>
-auto transform_system<Cs...>::get_render_dirty_entities() -> std::set<entity>& {
+auto transform_system<Cs...>::get_render_dirty_entities() -> std::unordered_set<entity>& {
     return render_dirty_entities_;
 }
 
@@ -59,6 +61,12 @@ inline auto transform_system<Cs...>::transform_modifier::set_position(
 
     system_->dirty_entities_.push_back(entity_);
     system_->mark_children_world_dirty(entity_);
+    
+    // Пометить spatial_component как dirty
+    if (system_->spatial_system_ &&
+        system_->registry_->template has<spatial_component>(entity_)) {
+        system_->spatial_system_->mark_dirty(entity_);
+    }
 
     return *this;
 }
@@ -78,6 +86,12 @@ inline auto transform_system<Cs...>::transform_modifier::set_rotation(
 
     system_->dirty_entities_.push_back(entity_);
     system_->mark_children_world_dirty(entity_);
+    
+    // Пометить spatial_component как dirty
+    if (system_->spatial_system_ &&
+        system_->registry_->template has<spatial_component>(entity_)) {
+        system_->spatial_system_->mark_dirty(entity_);
+    }
 
     return *this;
 }
@@ -97,6 +111,12 @@ inline auto transform_system<Cs...>::transform_modifier::set_scale(
 
     system_->dirty_entities_.push_back(entity_);
     system_->mark_children_world_dirty(entity_);
+    
+    // Пометить spatial_component как dirty
+    if (system_->spatial_system_ &&
+        system_->registry_->template has<spatial_component>(entity_)) {
+        system_->spatial_system_->mark_dirty(entity_);
+    }
 
     return *this;
 }
@@ -116,6 +136,12 @@ inline auto transform_system<Cs...>::transform_modifier::set_origin(
 
     system_->dirty_entities_.push_back(entity_);
     system_->mark_children_world_dirty(entity_);
+    
+    // Пометить spatial_component как dirty
+    if (system_->spatial_system_ &&
+        system_->registry_->template has<spatial_component>(entity_)) {
+        system_->spatial_system_->mark_dirty(entity_);
+    }
 
     return *this;
 }
@@ -135,6 +161,12 @@ inline auto transform_system<Cs...>::transform_modifier::translate(
 
     system_->dirty_entities_.push_back(entity_);
     system_->mark_children_world_dirty(entity_);
+    
+    // Пометить spatial_component как dirty
+    if (system_->spatial_system_ &&
+        system_->registry_->template has<spatial_component>(entity_)) {
+        system_->spatial_system_->mark_dirty(entity_);
+    }
 
     return *this;
 }
@@ -154,6 +186,12 @@ inline auto transform_system<Cs...>::transform_modifier::rotate(
 
     system_->dirty_entities_.push_back(entity_);
     system_->mark_children_world_dirty(entity_);
+    
+    // Пометить spatial_component как dirty
+    if (system_->spatial_system_ &&
+        system_->registry_->template has<spatial_component>(entity_)) {
+        system_->spatial_system_->mark_dirty(entity_);
+    }
 
     return *this;
 }
@@ -173,6 +211,12 @@ inline auto transform_system<Cs...>::transform_modifier::scale(
 
     system_->dirty_entities_.push_back(entity_);
     system_->mark_children_world_dirty(entity_);
+    
+    // Пометить spatial_component как dirty
+    if (system_->spatial_system_ &&
+        system_->registry_->template has<spatial_component>(entity_)) {
+        system_->spatial_system_->mark_dirty(entity_);
+    }
 
     return *this;
 }
@@ -190,6 +234,11 @@ inline void transform_system<Cs...>::mark_world_dirty(
 
     dirty_entities_.push_back(ent);
     mark_children_world_dirty(ent);
+    
+    // Пометить spatial_component как dirty
+    if (spatial_system_ && registry_->template has<spatial_component>(ent)) {
+        spatial_system_->mark_dirty(ent);
+    }
 }
 
 template <typename... Cs>
@@ -259,7 +308,7 @@ void transform_system<Cs...>::update_entity_world_matrix(
     mat4f local_matrix           = transform_comp.get_local_matrix();
     transform_comp.world_matrix_ = local_matrix;
 
-    if (registry_->template has<hierarchy_component>(ent)) [[likely]] {
+    if (registry_->template has<hierarchy_component>(ent)) {
         const auto& hierarchy_comp = registry_->template get<hierarchy_component>(ent);
         if (hierarchy_comp.has_parent()) {
             entity parent = hierarchy_comp.get_parent();
