@@ -22,6 +22,11 @@ public:
             return true;
         });
 
+        window.sub<gfx::mouse_press_event>([this](gfx::mouse_press_event& ev) {
+            handle_mouse_press(ev);
+            return true;
+        });
+
         camera.set_position({0.0f, 0.0f, -5.0f});
         camera.set_rotation(0.0f, 0.0f);
         get_engine().get_renderer().set_clear_color(0.1f, 0.2f, 0.3f, 1.0f);
@@ -180,6 +185,14 @@ private:
         }
     }
 
+    void handle_mouse_press(
+        const gfx::mouse_press_event& event
+    ) const {
+        if (event.button == gfx::mouse::button::LEFT) {
+            const auto& world = get_engine().get_world();
+        }
+    }
+
     std::unique_ptr<gfx::fps_camera_controller> camera_controller_;
 
     std::shared_ptr<gfx::model> model_;
@@ -187,6 +200,8 @@ private:
     float object_rotation_speed_{};
 
     gfx::entity some_entity_;
+
+    std::unordered_set<gfx::entity> selected_entities_;
 };
 
 int main() {

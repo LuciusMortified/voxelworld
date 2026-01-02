@@ -3,7 +3,11 @@
 #ifndef VW_GFX_WORLD_H
 #define VW_GFX_WORLD_H
 
+#include <optional>
+#include <unordered_set>
+
 #include "vw/gfx/model/model_registry.h"
+#include "vw/gfx/spatial/ray.h"
 #include "vw/gfx/world/registry.h"
 #include "vw/gfx/world/systems/hierarchy_system.h"
 #include "vw/gfx/world/systems/model_system.h"
@@ -65,6 +69,11 @@ public:
     [[nodiscard]] auto get_model_system() -> model_system_type&;
 
     [[nodiscard]] auto get_spatial_system() -> spatial_system_type&;
+
+    [[nodiscard]] auto voxel_ray_cast(
+        const ray& r,
+        std::unordered_set<entity>& candidates
+    ) const -> std::optional<voxel_ray_hit>;
 
 private:
     registry_type registry_;

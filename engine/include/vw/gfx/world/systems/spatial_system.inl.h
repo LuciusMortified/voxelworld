@@ -4,8 +4,11 @@
 #define VW_GFX_WORLD_SYSTEMS_SPATIAL_SYSTEM_INL_H
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
+#include "vw/core/math.h"
+#include "vw/gfx/spatial/aabb.h"
 #include "vw/gfx/world/components/model_component.h"
 #include "vw/gfx/world/components/transform_component.h"
 #include "vw/gfx/world/systems/spatial_system.h"
@@ -29,7 +32,11 @@ void spatial_system<Cs...>::update() {
 
     // Обновить spatial index для dirty entities
     for (entity ent : dirty_entities_) {
-        if (!registry_->template has<spatial_component>(ent)) {
+        const bool can_be_updated =  //
+            registry_->template has<model_component>(ent) &&
+            registry_->template has<transform_component>(ent) &&
+            registry_->template has<spatial_component>(ent);
+        if (!can_be_updated) {
             continue;
         }
         update_entity(ent);
@@ -55,8 +62,7 @@ void spatial_system<Cs...>::update_entity(
 
     if (bounds_changed) {
         // Проверить, находится ли новый AABB внутри Fat AABB
-        bool needs_tree_update = spatial.dirty_ || 
-            new_bounds.min.x < spatial.fat_bounds_.min.x ||
+        bool needs_tree_update = spatial.dirty_ || new_bounds.min.x < spatial.fat_bounds_.min.x ||
             new_bounds.min.y < spatial.fat_bounds_.min.y ||
             new_bounds.min.z < spatial.fat_bounds_.min.z ||
             new_bounds.max.x > spatial.fat_bounds_.max.x ||
@@ -66,7 +72,7 @@ void spatial_system<Cs...>::update_entity(
         if (needs_tree_update) {
             // Вычислить новый Fat AABB
             aabb new_fat_bounds = expand_aabb_for_fat(new_bounds);
-            
+
             // Обновить дерево (если не первая вставка)
             if (!spatial.dirty_) {
                 tree_.update(ent, new_fat_bounds);
@@ -96,26 +102,18 @@ aabb spatial_system<Cs...>::expand_aabb_for_fat(
 ) const {
     // Коэффициент расширения: 10% от размера или минимум 0.1 единицы
     constexpr float expansion_factor = 0.1f;
-    constexpr float min_expansion = 0.1f;
-    
+    constexpr float min_expansion    = 0.1f;
+
     vec3f size = bounds.size();
     vec3f expansion{
         std::max(size.x * expansion_factor, min_expansion),
         std::max(size.y * expansion_factor, min_expansion),
         std::max(size.z * expansion_factor, min_expansion)
     };
-    
+
     return aabb{
-        vec3f{
-            bounds.min.x - expansion.x,
-            bounds.min.y - expansion.y,
-            bounds.min.z - expansion.z
-        },
-        vec3f{
-            bounds.max.x + expansion.x,
-            bounds.max.y + expansion.y,
-            bounds.max.z + expansion.z
-        }
+        vec3f{bounds.min.x - expansion.x, bounds.min.y - expansion.y, bounds.min.z - expansion.z},
+        vec3f{bounds.max.x + expansion.x, bounds.max.y + expansion.y, bounds.max.z + expansion.z}
     };
 }
 
@@ -238,6 +236,165 @@ void spatial_system<Cs...>::cleanup(
     tree_.remove(ent);
     // Также удалить из dirty_entities_ если там есть
     dirty_entities_.erase(ent);
+}
+
+template <typename... Cs>
+auto spatial_system<Cs...>::voxel_ray_cast(
+    const ray& r,
+    std::unordered_set<entity>& candidates
+) const -> std::optional<voxel_ray_hit> {
+    // Получить кандидатов через spatial tree
+    query_all(r, candidates);
+
+    std::optional<voxel_ray_hit> closest_hit;
+    float closest_distance_sq = std::numeric_limits<float>::max();
+
+    // Обработать каждого кандидата
+    for (entity ent : candidates) {
+        // Проверить наличие необходимых компонентов
+        if (!registry_->template has<model_component>(ent) ||
+            !registry_->template has<transform_component>(ent)) {
+            continue;
+        }
+
+        const auto& model_comp     = registry_->template get<model_component>(ent);
+        const auto& transform_comp = registry_->template get<transform_component>(ent);
+
+        if (!model_comp.has_model()) {
+            continue;
+        }
+
+        // Получить размеры модели
+        const vw::vec3i model_size = model_comp.size();
+
+        if (model_size.x <= 0 || model_size.y <= 0 || model_size.z <= 0) {
+            continue;
+        }
+
+        const int width  = model_size.x;
+        const int height = model_size.y;
+        const int depth  = model_size.z;
+
+        // Преобразовать луч в локальное пространство модели
+        const mat4f world_matrix      = transform_comp.get_world_matrix();
+        const mat4f inverse_world     = vw::math::inverse_matrix(world_matrix);
+        const vec3f local_start       = inverse_world * r.start;
+        const vec3f local_end         = inverse_world * r.end;
+        const vec3f local_direction   = vw::math::normalize(local_end - local_start);
+
+        // AABB модели в локальных координатах (от (0,0,0) до (width, height, depth))
+        const aabb model_aabb{
+            vec3f{0.0f, 0.0f, 0.0f},
+            vec3f{static_cast<float>(width), static_cast<float>(height), static_cast<float>(depth)}
+        };
+
+        // Проверить пересечение луча с AABB модели
+        float t_entry = 0.0f;
+        ray local_ray{local_start, local_end};
+        if (!model_aabb.intersects(local_ray, &t_entry)) {
+            continue;
+        }
+
+        // Найти точку входа в AABB
+        vec3f entry_point = local_ray.point_at(t_entry);
+
+        // Ограничить начальную точку границами модели
+        entry_point.x = vw::math::clamp(entry_point.x, 0.0f, static_cast<float>(width));
+        entry_point.y = vw::math::clamp(entry_point.y, 0.0f, static_cast<float>(height));
+        entry_point.z = vw::math::clamp(entry_point.z, 0.0f, static_cast<float>(depth));
+
+        // Начальная позиция вокселя
+        int x = static_cast<int>(std::floor(entry_point.x));
+        int y = static_cast<int>(std::floor(entry_point.y));
+        int z = static_cast<int>(std::floor(entry_point.z));
+
+        // Ограничить начальную позицию границами
+        x = std::max(0, std::min(width - 1, x));
+        y = std::max(0, std::min(height - 1, y));
+        z = std::max(0, std::min(depth - 1, z));
+
+        // Шаги по осям
+        const int step_x = local_direction.x > 0.0f ? 1 : -1;
+        const int step_y = local_direction.y > 0.0f ? 1 : -1;
+        const int step_z = local_direction.z > 0.0f ? 1 : -1;
+
+        // Расстояния до следующей границы вокселя (tMax)
+        float t_max_x = 0.0f;
+        float t_max_y = 0.0f;
+        float t_max_z = 0.0f;
+
+        // Вычислить начальные tMax
+        if (local_direction.x != 0.0f) {
+            const float next_boundary_x = static_cast<float>(step_x > 0 ? x + 1 : x);
+            t_max_x                     = (next_boundary_x - entry_point.x) / local_direction.x;
+        } else {
+            t_max_x = std::numeric_limits<float>::max();
+        }
+
+        if (local_direction.y != 0.0f) {
+            const float next_boundary_y = static_cast<float>(step_y > 0 ? y + 1 : y);
+            t_max_y                     = (next_boundary_y - entry_point.y) / local_direction.y;
+        } else {
+            t_max_y = std::numeric_limits<float>::max();
+        }
+
+        if (local_direction.z != 0.0f) {
+            const float next_boundary_z = static_cast<float>(step_z > 0 ? z + 1 : z);
+            t_max_z                     = (next_boundary_z - entry_point.z) / local_direction.z;
+        } else {
+            t_max_z = std::numeric_limits<float>::max();
+        }
+
+        // Расстояние между границами вокселей (tDelta)
+        const float t_delta_x = local_direction.x != 0.0f ? step_x / local_direction.x : std::numeric_limits<float>::max();
+        const float t_delta_y = local_direction.y != 0.0f ? step_y / local_direction.y : std::numeric_limits<float>::max();
+        const float t_delta_z = local_direction.z != 0.0f ? step_z / local_direction.z : std::numeric_limits<float>::max();
+
+        // DDA traversal
+        constexpr int max_iterations = 10000;  // Защита от бесконечного цикла
+        int iterations               = 0;
+
+        while (iterations < max_iterations) {
+            // Проверить, что воксель в пределах границ
+            if (x < 0 || x >= width || y < 0 || y >= height || z < 0 || z >= depth) {
+                break;
+            }
+
+            // Проверить воксель
+            if (!model_comp.is_empty(x, y, z)) {
+                // Найдено попадание!
+                vec3f hit_point_local{
+                    static_cast<float>(x) + 0.5f,
+                    static_cast<float>(y) + 0.5f,
+                    static_cast<float>(z) + 0.5f
+                };
+                vec3f hit_point_world = world_matrix * hit_point_local;
+                float distance_sq     = vw::math::length_squared(hit_point_world - r.start);
+
+                if (distance_sq < closest_distance_sq) {
+                    closest_distance_sq = distance_sq;
+                    closest_hit         = voxel_ray_hit{ent, vw::vec3i{x, y, z}};
+                }
+                break;  // Найдено первое попадание в этой модели, переходим к следующему кандидату
+            }
+
+            // Переместиться к следующему вокселю
+            if (t_max_x < t_max_y && t_max_x < t_max_z) {
+                x += step_x;
+                t_max_x += t_delta_x;
+            } else if (t_max_y < t_max_z) {
+                y += step_y;
+                t_max_y += t_delta_y;
+            } else {
+                z += step_z;
+                t_max_z += t_delta_z;
+            }
+
+            ++iterations;
+        }
+    }
+
+    return closest_hit;
 }
 
 }  // namespace vw::gfx

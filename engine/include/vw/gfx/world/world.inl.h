@@ -3,6 +3,7 @@
 #ifndef VW_GFX_WORLD_WORLD_INL_H
 #define VW_GFX_WORLD_WORLD_INL_H
 
+
 namespace vw::gfx {
 
 template <typename Cs>
@@ -146,6 +147,14 @@ auto world<C>::get_model_system() -> model_system_type& {
 template <typename C>
 auto world<C>::get_spatial_system() -> spatial_system_type& {
     return spatial_system_;
+}
+
+template <typename WC>
+auto world<WC>::voxel_ray_cast(
+    const ray& r,
+    std::unordered_set<entity>& candidates
+) const -> std::optional<voxel_ray_hit> {
+    return spatial_system_.voxel_ray_cast(r, candidates);
 }
 
 }  // namespace vw::gfx

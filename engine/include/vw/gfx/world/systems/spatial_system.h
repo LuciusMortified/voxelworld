@@ -45,6 +45,11 @@ public:
         std::unordered_set<entity>& result_out
     ) const;
     
+    [[nodiscard]] auto voxel_ray_cast(
+        const ray& r,
+        std::unordered_set<entity>& candidates
+    ) const -> std::optional<voxel_ray_hit>;
+    
     void mark_dirty(entity ent);
 
     void cleanup(entity ent);

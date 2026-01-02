@@ -5,6 +5,7 @@
 
 #include <memory>
 
+#include "vw/core.h"
 #include "vw/core/color.h"
 #include "vw/core/voxel.h"
 #include "vw/gfx/model/model.h"
@@ -44,6 +45,10 @@ public:
 
     [[nodiscard]] auto depth() const -> int {
         return model_ ? model_->depth() : 0;
+    }
+
+    [[nodiscard]] auto size() const -> vw::vec3i {
+        return model_ ? model_->size() : vw::vec3i{0, 0, 0};
     }
 
     [[nodiscard]] auto has_model() const -> bool {

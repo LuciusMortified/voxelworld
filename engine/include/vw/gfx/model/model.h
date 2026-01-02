@@ -5,6 +5,7 @@
 
 #include <vector>
 
+#include "vw/core.h"
 #include "vw/core/color.h"
 #include "vw/core/voxel.h"
 #include "vw/gfx/model/model_identity.h"
@@ -49,6 +50,11 @@ public:
     [[nodiscard]]
     auto depth() const -> int {
         return depth_;
+    }
+
+    [[nodiscard]]
+    auto size() const -> vw::vec3i {
+        return vw::vec3i{width_, height_, depth_};
     }
 
     void fill(const voxel& voxel);
