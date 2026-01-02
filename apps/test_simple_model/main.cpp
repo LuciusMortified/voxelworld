@@ -46,9 +46,14 @@ public:
         camera_controller_->update(delta_time);
         update_object_rotation(delta_time);
 
-        get_engine().get_renderer().draw_line(vec3f{0, 0, 0}, vec3f{100, 0, 0}, colors::blue);
-        get_engine().get_renderer().draw_line(vec3f{0, 0, 0}, vec3f{0, 100, 0}, colors::green);
-        get_engine().get_renderer().draw_line(vec3f{0, 0, 0}, vec3f{0, 0, 100}, colors::red);
+        auto& renderer = get_engine().get_renderer();
+
+        // Отрисовка осей координат
+        renderer.draw_line(vec3f{0, 0, 0}, vec3f{100, 0, 0}, colors::blue);
+        renderer.draw_line(vec3f{0, 0, 0}, vec3f{0, 100, 0}, colors::green);
+        renderer.draw_line(vec3f{0, 0, 0}, vec3f{0, 0, 100}, colors::red);
+
+        render_selected_voxel();
 
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         ImVec2 window_pos       = ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
@@ -79,7 +84,6 @@ public:
         ImGui::Text("Rotation speed:");
         ImGui::SliderFloat("##", &object_rotation_speed_, 0.0f, 20.0f);
         ImGui::Text("Current angle: %.2f degrees", vw::math::degrees(object_rotation_));
-
         ImGui::End();
     }
 
@@ -114,7 +118,8 @@ private:
         // Настраиваем transform
         transform_system.modify(some_entity_)
             .set_origin({1.5f, 3.0f, 1.5f})
-            .set_position({-1.5f, 0.0f, -1.5f});
+            .set_position({-1.5f, 0.0f, -1.5f})
+            .set_scale({2.0f, 2.0f, 2.0f});
 
         // Настраиваем модель через model_system
         model_system.modify(some_entity_).set_model(model_);
@@ -123,7 +128,7 @@ private:
         object_rotation_speed_ = math::radians(5.0f);
 
 // Стресс-тест инстансами одной модели
-#if 1
+#if 0
         for (int i = 0; i < 9999; i++) {
             auto another_entity_ = world.create_entity();
             world.add_component<gfx::transform_component>(another_entity_);
@@ -187,10 +192,56 @@ private:
 
     void handle_mouse_press(
         const gfx::mouse_press_event& event
-    ) const {
+    ) {
         if (event.button == gfx::mouse::button::LEFT) {
-            const auto& world = get_engine().get_world();
+            const auto& world  = get_engine().get_world();
+            const auto& window = get_engine().get_window();
+            const auto& camera = get_engine().get_camera();
+
+            auto ray    = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
+            select_ray_ = ray;
+
+            auto voxel_hit = world.voxel_ray_cast(ray, selected_entities_);
+            if (voxel_hit.has_value()) {
+                selected_entity_ = voxel_hit->ent;
+                selected_voxel_  = voxel_hit->position;
+                log::info(
+                    "Selected entity: {}.{}, voxel: ({}, {}, {})",
+                    selected_entity_.index,
+                    selected_entity_.generation,
+                    selected_voxel_.x,
+                    selected_voxel_.y,
+                    selected_voxel_.z
+                );
+            } else {
+                selected_entity_ = gfx::invalid_entity;
+                selected_voxel_  = vec3i{-1, -1, -1};
+                log::info("No voxel hit");
+            }
         }
+    }
+
+    void render_selected_voxel() {
+        auto& world                = get_engine().get_world();
+        const bool can_be_rendered =  //
+            selected_entity_.is_valid() &&
+            world.has_component<gfx::transform_component>(selected_entity_);
+        if (!can_be_rendered) {
+            return;
+        }
+
+        auto& renderer       = get_engine().get_renderer();
+        auto voxel_local_pos = vec3f{
+            static_cast<float>(selected_voxel_.x),
+            static_cast<float>(selected_voxel_.y),
+            static_cast<float>(selected_voxel_.z)
+        };
+        auto voxel_world_pos =  //
+            world.get_component<gfx::transform_component>(selected_entity_).get_world_matrix() *
+            math::translation_matrix(voxel_local_pos) *    //
+            math::scale_matrix(vec3f{1.1f, 1.1f, 1.1f}) *  //
+            math::translation_matrix(vec3f{-0.05f, -0.05f, -0.05f});
+        renderer.draw_box(voxel_world_pos, vec3f{1.0f, 1.0f, 1.0f}, colors::black);
     }
 
     std::unique_ptr<gfx::fps_camera_controller> camera_controller_;
@@ -202,6 +253,9 @@ private:
     gfx::entity some_entity_;
 
     std::unordered_set<gfx::entity> selected_entities_;
+    gfx::entity selected_entity_ = gfx::invalid_entity;
+    vec3i selected_voxel_{-1, -1, -1};
+    gfx::ray select_ray_{vec3f{}, vec3f{}};
 };
 
 int main() {

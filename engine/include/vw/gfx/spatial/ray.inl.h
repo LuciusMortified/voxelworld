@@ -29,7 +29,7 @@ inline vec3f ray::point_at(float t) const {
     return start + direction * t;
 }
 
-inline bool ray::intersects(const aabb& bounds, float* t_out) const {
+inline bool ray::intersects_at(const aabb& bounds, float& t_out) const {
     float ray_len = length();
     float t_min = 0.0f;
     float t_max = ray_len;
@@ -66,10 +66,8 @@ inline bool ray::intersects(const aabb& bounds, float* t_out) const {
     t_min = t0_z > t_min ? t0_z : t_min;
     t_max = t1_z < t_max ? t1_z : t_max;
     if (t_max < t_min) return false;
-    
-    if (t_out) {
-        *t_out = t_min;
-    }
+
+    t_out = t_min;
     
     return true;
 }

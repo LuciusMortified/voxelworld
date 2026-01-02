@@ -5,6 +5,7 @@
 
 #include "vw/core.h"
 #include "vw/gfx/spatial/frustum.h"
+#include "vw/gfx/spatial/ray.h"
 
 namespace vw::gfx {
 class camera {
@@ -35,6 +36,11 @@ public:
     vec3f get_forward() const;
     vec3f get_right() const;
     vec3f get_up() const;
+
+    [[nodiscard]] auto screen_to_world_ray(
+        const vec2d& mouse_pos,
+        const vec2i& window_size
+    ) const -> ray;
 
 private:
     void update_vectors() const;

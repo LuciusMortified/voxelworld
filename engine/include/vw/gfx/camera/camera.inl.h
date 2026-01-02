@@ -188,6 +188,58 @@ inline void camera::update_frustum() const {
     frustum_ = frustum::from_view_projection_matrix(get_view_projection_matrix());
     frustum_dirty_ = false;
 }
+
+inline auto camera::screen_to_world_ray(
+    const vec2d& mouse_pos,
+    const vec2i& window_size
+) const -> ray {
+    // Проверка валидности размера окна
+    if (window_size.x <= 0 || window_size.y <= 0) {
+        // Возвращаем нулевой луч в случае невалидного размера
+        return ray{vec3f{0.0f, 0.0f, 0.0f}, vec3f{0.0f, 0.0f, 1.0f}};
+    }
+
+    // Преобразование screen coordinates в NDC (Normalized Device Coordinates)
+    const float ndc_x = (static_cast<float>(mouse_pos.x) / static_cast<float>(window_size.x)) * 2.0f - 1.0f;
+    const float ndc_y = (static_cast<float>(mouse_pos.y) / static_cast<float>(window_size.y)) * 2.0f - 1.0f;
+
+    // Получить view-projection матрицу и обратную к ней
+    const mat4f view_proj      = get_view_projection_matrix();
+    const mat4f inverse_view_proj = vw::math::inverse_matrix(view_proj);
+
+    // Unproject точки на near plane (ndc_z = -1.0)
+    vec4f near_ndc{ndc_x, ndc_y, -1.0f, 1.0f};
+    vec4f near_homogeneous = inverse_view_proj * near_ndc;
+    
+    vec3f near_point;
+    if (near_homogeneous.w != 0.0f && near_homogeneous.w != 1.0f) {
+        near_point = vec3f{
+            near_homogeneous.x / near_homogeneous.w,
+            near_homogeneous.y / near_homogeneous.w,
+            near_homogeneous.z / near_homogeneous.w
+        };
+    } else {
+        near_point = vec3f{near_homogeneous.x, near_homogeneous.y, near_homogeneous.z};
+    }
+
+    // Unproject точки на far plane (ndc_z = 1.0)
+    vec4f far_ndc{ndc_x, ndc_y, 1.0f, 1.0f};
+    vec4f far_homogeneous = inverse_view_proj * far_ndc;
+    
+    vec3f far_point;
+    if (far_homogeneous.w != 0.0f && far_homogeneous.w != 1.0f) {
+        far_point = vec3f{
+            far_homogeneous.x / far_homogeneous.w,
+            far_homogeneous.y / far_homogeneous.w,
+            far_homogeneous.z / far_homogeneous.w
+        };
+    } else {
+        far_point = vec3f{far_homogeneous.x, far_homogeneous.y, far_homogeneous.z};
+    }
+
+    // Создать и вернуть луч от near до far точки
+    return ray{near_point, far_point};
+}
 }  // namespace vw::gfx
 
 #endif  // VW_GFX_CAMERA_INL_H

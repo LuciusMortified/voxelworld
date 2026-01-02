@@ -240,8 +240,7 @@ void spatial_system<Cs...>::cleanup(
 
 template <typename... Cs>
 auto spatial_system<Cs...>::voxel_ray_cast(
-    const ray& r,
-    std::unordered_set<entity>& candidates
+    const ray& r, std::unordered_set<entity>& candidates
 ) const -> std::optional<voxel_ray_hit> {
     // Получить кандидатов через spatial tree
     query_all(r, candidates);
@@ -251,9 +250,10 @@ auto spatial_system<Cs...>::voxel_ray_cast(
 
     // Обработать каждого кандидата
     for (entity ent : candidates) {
-        // Проверить наличие необходимых компонентов
-        if (!registry_->template has<model_component>(ent) ||
-            !registry_->template has<transform_component>(ent)) {
+        const bool can_be_processed =  //
+            registry_->template has<model_component>(ent) &&
+            registry_->template has<transform_component>(ent);
+        if (!can_be_processed) {
             continue;
         }
 
@@ -265,7 +265,7 @@ auto spatial_system<Cs...>::voxel_ray_cast(
         }
 
         // Получить размеры модели
-        const vw::vec3i model_size = model_comp.size();
+        const vec3i model_size = model_comp.size();
 
         if (model_size.x <= 0 || model_size.y <= 0 || model_size.z <= 0) {
             continue;
@@ -276,11 +276,11 @@ auto spatial_system<Cs...>::voxel_ray_cast(
         const int depth  = model_size.z;
 
         // Преобразовать луч в локальное пространство модели
-        const mat4f world_matrix      = transform_comp.get_world_matrix();
-        const mat4f inverse_world     = vw::math::inverse_matrix(world_matrix);
-        const vec3f local_start       = inverse_world * r.start;
-        const vec3f local_end         = inverse_world * r.end;
-        const vec3f local_direction   = vw::math::normalize(local_end - local_start);
+        const mat4f world_matrix    = transform_comp.get_world_matrix();
+        const mat4f inverse_world   = math::inverse_matrix(world_matrix);
+        const vec3f local_start     = inverse_world * r.start;
+        const vec3f local_end       = inverse_world * r.end;
+        const vec3f local_direction = math::normalize(local_end - local_start);
 
         // AABB модели в локальных координатах (от (0,0,0) до (width, height, depth))
         const aabb model_aabb{
@@ -291,7 +291,7 @@ auto spatial_system<Cs...>::voxel_ray_cast(
         // Проверить пересечение луча с AABB модели
         float t_entry = 0.0f;
         ray local_ray{local_start, local_end};
-        if (!model_aabb.intersects(local_ray, &t_entry)) {
+        if (!local_ray.intersects_at(model_aabb, t_entry)) {
             continue;
         }
 
@@ -299,9 +299,9 @@ auto spatial_system<Cs...>::voxel_ray_cast(
         vec3f entry_point = local_ray.point_at(t_entry);
 
         // Ограничить начальную точку границами модели
-        entry_point.x = vw::math::clamp(entry_point.x, 0.0f, static_cast<float>(width));
-        entry_point.y = vw::math::clamp(entry_point.y, 0.0f, static_cast<float>(height));
-        entry_point.z = vw::math::clamp(entry_point.z, 0.0f, static_cast<float>(depth));
+        entry_point.x = math::clamp(entry_point.x, 0.0f, static_cast<float>(width));
+        entry_point.y = math::clamp(entry_point.y, 0.0f, static_cast<float>(height));
+        entry_point.z = math::clamp(entry_point.z, 0.0f, static_cast<float>(depth));
 
         // Начальная позиция вокселя
         int x = static_cast<int>(std::floor(entry_point.x));
@@ -325,30 +325,42 @@ auto spatial_system<Cs...>::voxel_ray_cast(
 
         // Вычислить начальные tMax
         if (local_direction.x != 0.0f) {
-            const float next_boundary_x = static_cast<float>(step_x > 0 ? x + 1 : x);
-            t_max_x                     = (next_boundary_x - entry_point.x) / local_direction.x;
+            const auto next_boundary_x =  //
+                static_cast<float>(step_x > 0 ? x + 1 : x);
+            t_max_x = (next_boundary_x - entry_point.x) / local_direction.x;
         } else {
             t_max_x = std::numeric_limits<float>::max();
         }
 
         if (local_direction.y != 0.0f) {
-            const float next_boundary_y = static_cast<float>(step_y > 0 ? y + 1 : y);
-            t_max_y                     = (next_boundary_y - entry_point.y) / local_direction.y;
+            const auto next_boundary_y =  //
+                static_cast<float>(step_y > 0 ? y + 1 : y);
+            t_max_y = (next_boundary_y - entry_point.y) / local_direction.y;
         } else {
             t_max_y = std::numeric_limits<float>::max();
         }
 
         if (local_direction.z != 0.0f) {
-            const float next_boundary_z = static_cast<float>(step_z > 0 ? z + 1 : z);
-            t_max_z                     = (next_boundary_z - entry_point.z) / local_direction.z;
+            const auto next_boundary_z =  //
+                static_cast<float>(step_z > 0 ? z + 1 : z);
+            t_max_z = (next_boundary_z - entry_point.z) / local_direction.z;
         } else {
             t_max_z = std::numeric_limits<float>::max();
         }
 
         // Расстояние между границами вокселей (tDelta)
-        const float t_delta_x = local_direction.x != 0.0f ? step_x / local_direction.x : std::numeric_limits<float>::max();
-        const float t_delta_y = local_direction.y != 0.0f ? step_y / local_direction.y : std::numeric_limits<float>::max();
-        const float t_delta_z = local_direction.z != 0.0f ? step_z / local_direction.z : std::numeric_limits<float>::max();
+        const float t_delta_x =  //
+            local_direction.x != 0.0f ?
+            static_cast<float>(step_x) / local_direction.x :
+            std::numeric_limits<float>::max();
+        const float t_delta_y =  //
+            local_direction.y != 0.0f ?
+            static_cast<float>(step_y) / local_direction.y :
+            std::numeric_limits<float>::max();
+        const float t_delta_z =  //
+            local_direction.z != 0.0f ?
+            static_cast<float>(step_z) / local_direction.z :
+            std::numeric_limits<float>::max();
 
         // DDA traversal
         constexpr int max_iterations = 10000;  // Защита от бесконечного цикла
@@ -369,11 +381,11 @@ auto spatial_system<Cs...>::voxel_ray_cast(
                     static_cast<float>(z) + 0.5f
                 };
                 vec3f hit_point_world = world_matrix * hit_point_local;
-                float distance_sq     = vw::math::length_squared(hit_point_world - r.start);
+                float distance_sq     = math::length_squared(hit_point_world - r.start);
 
                 if (distance_sq < closest_distance_sq) {
                     closest_distance_sq = distance_sq;
-                    closest_hit         = voxel_ray_hit{ent, vw::vec3i{x, y, z}};
+                    closest_hit         = voxel_ray_hit{ent, vec3i{x, y, z}};
                 }
                 break;  // Найдено первое попадание в этой модели, переходим к следующему кандидату
             }
