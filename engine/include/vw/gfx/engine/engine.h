@@ -41,7 +41,9 @@ public:
     engine(const engine&)                    = delete;
     auto operator=(const engine&) -> engine& = delete;
 
-    void run(std::unique_ptr<app_type> app);
+    template <typename TApp, typename... TArgs>
+    void run(TArgs&&... args);
+
     void shutdown();
 
     [[nodiscard]] auto get_window() const -> window&;

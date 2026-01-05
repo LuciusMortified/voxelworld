@@ -34,7 +34,7 @@ engine<WC>::engine(
     debug_tool_ = std::make_unique<debug_window_type>(*this);
 
     // Default empty app to avoid null checks
-    app_ = std::make_unique<app_type>();
+    app_ = std::make_unique<app_type>(*this);
 
     window_resize_sub_ =
         window_->sub<window_resize_event>([this](const window_resize_event& event) -> bool {
@@ -63,21 +63,17 @@ engine<WC>::~engine() {
 }
 
 template <typename WC>
+template <typename TApp, typename... TArgs>
 void engine<WC>::run(
-    std::unique_ptr<app_type> app
+    TArgs&&... args
 ) {
-    app_ = std::move(app);
-    app_->run(*this);
-
+    app_ = std::make_unique<TApp>(*this, std::forward<TArgs>(args)...);
     main_loop();
 }
 
 template <typename WC>
 void engine<WC>::shutdown() {
     running_ = false;
-
-    app_->cleanup();
-
     renderer_->wait_idle();
 }
 
@@ -116,8 +112,6 @@ void engine<WC>::main_loop() {
     running_         = true;
     last_frame_time_ = std::chrono::high_resolution_clock::now();
 
-    app_->setup();
-
     while (running_ && !window_->should_close()) {
         frame_start_time_ = std::chrono::high_resolution_clock::now();
 
@@ -132,8 +126,6 @@ void engine<WC>::main_loop() {
         update_stats();
         last_frame_time_ = current_time;
     }
-
-    app_->cleanup();
 }
 
 template <typename WC>

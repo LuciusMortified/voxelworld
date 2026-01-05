@@ -5,7 +5,10 @@ using namespace vw;
 
 class simple_model_app final : public gfx::app<> {
 public:
-    void setup() override {
+    explicit simple_model_app(
+        gfx::engine<>& eng
+    )
+        : app{eng} {
         auto& window = get_engine().get_window();
         auto& camera = get_engine().get_camera();
 
@@ -35,7 +38,7 @@ public:
         create_flower_model();
     }
 
-    void cleanup() override {
+    ~simple_model_app() override {
         auto& world = get_engine().get_world();
         world.destroy_entity(some_entity_);
     }
@@ -261,9 +264,9 @@ private:
 int main() {
     try {
         std::make_unique<gfx::engine<>>(1280, 720, "Voxel World - Test Simple Model")
-            ->run(std::make_unique<simple_model_app>());
+            ->run<simple_model_app>();
     } catch (const std::exception& e) {
-        vw::log::error("Ошибка: {}", e.what());
+        log::error("Ошибка исполнения: {}", e.what());
         return 1;
     }
 

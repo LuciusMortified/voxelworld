@@ -1,0 +1,16 @@
+#pragma once
+
+#ifndef VW_SCULPTOR_VERSION_H
+#define VW_SCULPTOR_VERSION_H
+
+#include <string_view>
+
+namespace vw::sculptor {
+    constexpr int version_major = @PROJECT_VERSION_MAJOR@;
+    constexpr int version_minor = @PROJECT_VERSION_MINOR@;
+    constexpr int version_patch = @PROJECT_VERSION_PATCH@;
+
+    inline constexpr std::string_view version_string = "@PROJECT_VERSION@";
+} // namespace vw::sculptor
+
+#endif // VW_SCULPTOR_VERSION_H
