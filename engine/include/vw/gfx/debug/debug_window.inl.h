@@ -48,20 +48,17 @@ bool debug_window<WC>::is_visible() const {
 
 template <typename WC>
 void debug_window<WC>::render_fps_window() {
-    ImGuiWindowFlags window_flags =            //
-        ImGuiWindowFlags_NoResize |            //
-        ImGuiWindowFlags_NoScrollbar |         //
-        ImGuiWindowFlags_NoCollapse |          //
-        ImGuiWindowFlags_AlwaysAutoResize |    //
-        ImGuiWindowFlags_NoSavedSettings |     //
-        ImGuiWindowFlags_NoFocusOnAppearing |  //
-        ImGuiWindowFlags_NoNav |               //
-        ImGuiWindowFlags_NoMove;
+    ImGuiWindowFlags window_flags =          //
+        ImGuiWindowFlags_NoResize |          //
+        ImGuiWindowFlags_NoScrollbar |       //
+        ImGuiWindowFlags_NoCollapse |        //
+        ImGuiWindowFlags_AlwaysAutoResize |  //
+        ImGuiWindowFlags_NoSavedSettings;
 
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImVec2 window_pos =
         ImVec2(viewport->WorkPos.x + viewport->WorkSize.x - 10, viewport->WorkPos.y + 10);
-    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(1.0f, 0.0f));
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Appearing, ImVec2(1.0f, 0.0f));
 
     if (ImGui::Begin("Debug Tool", &visible_, window_flags)) {
         const auto& eng_stats = engine_->get_stats();

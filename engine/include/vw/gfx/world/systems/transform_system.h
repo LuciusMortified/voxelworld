@@ -6,26 +6,31 @@
 #include <set>
 
 #include "vw/gfx/world/registry.h"
+#include "vw/gfx/world/world.h"
 
 namespace vw {
 struct transform;
 }  // namespace vw
 
 namespace vw::gfx {
+
 struct transform_component;
 
 template <typename... Cs>
 class spatial_system;
 
+template <typename WC>
+class world;
+
 template <typename... Cs>
 class transform_system final {
 public:
+    using world_type = world<std::tuple<Cs...>>;
     using registry_type = registry<Cs...>;
-    using spatial_system_type = spatial_system<Cs...>;
 
     explicit transform_system(
-        registry_type& registry,
-        spatial_system_type& spatial_sys
+        world_type& world,
+        registry_type& registry
     );
 
     void update();
@@ -63,12 +68,12 @@ private:
 
     void update_entity_world_matrix(entity ent, const transform_component& transform_comp);
 
-    [[nodiscard]] auto get_hierarchy_depth(entity ent) const -> size_t;
-
+    world_type* world_;
     registry_type* registry_;
-    spatial_system_type* spatial_system_;
 
-    std::vector<entity> dirty_entities_;
+    std::unordered_set<entity> dirty_entities_;
+    std::vector<entity> sorted_dirty_entities_;
+
     std::unordered_set<entity> render_dirty_entities_;
 };
 

@@ -178,6 +178,15 @@ inline void camera::update_projection_matrix() const {
 }
 
 inline const frustum& camera::get_frustum() const {
+    if (vectors_dirty_) {
+        update_vectors();
+    }
+    if (view_matrix_dirty_) {
+        update_view_matrix();
+    }
+    if (projection_matrix_dirty_) {
+        update_projection_matrix();
+    }
     if (frustum_dirty_) {
         update_frustum();
     }

@@ -8,10 +8,10 @@
 #include "vw/gfx/world/components/hierarchy_component.h"
 #include "vw/gfx/world/components/transform_component.h"
 
-#include "vw/gfx/world/systems/transform_system.h"
-
 namespace vw::gfx {
 
+template <typename... Cs>
+class transform_system;
 
 template <typename... Cs>
 class hierarchy_system final {
@@ -35,6 +35,8 @@ public:
     };
     
     [[nodiscard]] auto modify(entity ent) -> hierarchy_modifier;
+
+    [[nodiscard]] auto get_hierarchy_depth(entity ent) const -> size_t;
 
 private:
     [[nodiscard]] auto check_hierarchy_cycle(entity parent, entity child) const -> bool;

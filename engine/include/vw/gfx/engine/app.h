@@ -31,9 +31,6 @@ public:
 
 protected:
     [[nodiscard]] auto get_engine() const -> engine_type& {
-        if (engine_ == nullptr) {
-            throw std::runtime_error("engine not set in app");
-        }
         return *engine_;
     }
 

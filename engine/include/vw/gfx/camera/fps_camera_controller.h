@@ -28,6 +28,10 @@ public:
     void set_mouse_captured(bool captured);
     void toggle_mouse_captured();
 
+    [[nodiscard]] bool keyboard_control_enabled() const;
+    void set_keyboard_control_enabled(bool enabled);
+    void toggle_keyboard_control_enabled();
+
 private:
     void update_camera_movement_(float delta_time) const;
     void handle_key_pressed_(keyboard::key key);
@@ -35,8 +39,9 @@ private:
 
     float mouse_sensitivity_;
     float camera_speed_;
+
     bool mouse_captured_;
-    bool enabled_;
+    bool keyboard_control_enabled_;
 
     double last_mouse_x_;
     double last_mouse_y_;

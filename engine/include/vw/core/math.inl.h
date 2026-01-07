@@ -182,11 +182,10 @@ inline mat4f transform_matrix(
 ) {
     const mat4f trans        = translation_matrix(position);
     const mat4f orig_back    = translation_matrix(origin);
-    const mat4f orig_forward = translation_matrix(-origin);
     const mat4f rot          = rotation_matrix(rotation);
     const mat4f scl          = scale_matrix(scale);
 
-    return trans * orig_back * rot * scl * orig_forward;
+    return trans * rot * scl * orig_back;
 }
 
 inline mat4f transpose_matrix(

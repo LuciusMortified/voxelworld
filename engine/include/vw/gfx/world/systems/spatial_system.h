@@ -53,6 +53,10 @@ public:
     void mark_dirty(entity ent);
 
     void cleanup(entity ent);
+
+    [[nodiscard]] auto get_render_dirty_entities() -> std::unordered_set<entity>&;
+
+    void mark_render_dirty(entity ent);
     
 private:
     void update_entity(entity ent);
@@ -66,6 +70,7 @@ private:
     registry_type* registry_;
     dynamic_aabb_tree tree_;
     std::unordered_set<entity> dirty_entities_;
+    std::unordered_set<entity> render_dirty_entities_;
 };
 
 template <typename... Cs>

@@ -120,9 +120,9 @@ private:
 
         // Настраиваем transform
         transform_system.modify(some_entity_)
-            .set_origin({1.5f, 3.0f, 1.5f})
+            .set_origin({1.5f, 0.f, 1.5f})
             .set_position({-1.5f, 0.0f, -1.5f})
-            .set_scale({2.0f, 2.0f, 2.0f});
+            .set_scale({0.5f, 0.5f, 0.5f});
 
         // Настраиваем модель через model_system
         model_system.modify(some_entity_).set_model(model_);

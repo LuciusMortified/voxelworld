@@ -4,6 +4,18 @@ add_executable(${PROJECT_NAME}
         src/main.cpp
         src/app/app.h
         src/app/app.inl.h
+        src/app/state.h
+        src/app/state.inl.h
+        src/ui/tool_panel.h
+        src/ui/tool_panel.inl.h
+        src/ui/color_palette_panel.h
+        src/ui/color_palette_panel.inl.h
+        src/ui/entity_properties_panel.h
+        src/ui/entity_properties_panel.inl.h
+        src/ui/entity_tree_panel.h
+        src/ui/entity_tree_panel.inl.h
+        src/tools/entity_creation_tool.h
+        src/tools/entity_creation_tool.inl.h
 )
 
 target_link_libraries(${PROJECT_NAME} vwengine)
@@ -17,6 +29,10 @@ configure_file(
 
 target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_CURRENT_BINARY_DIR}/include
+)
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 add_custom_command(TARGET ${PROJECT_NAME} PRE_BUILD

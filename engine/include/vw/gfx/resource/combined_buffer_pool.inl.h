@@ -189,13 +189,16 @@ void combined_buffer_pool<C>::update_visibility_cache_(
     const float angle_threshold        = math::radians(2.f);
     constexpr float distance_threshold = 0.5f;
 
+    auto& render_dirty_entities = spatial_system.get_render_dirty_entities();
+    const bool has_render_dirty = !render_dirty_entities.empty();
+
     const bool frustum_changed =  //
         !visibility_cache_.frustum.approximately_equal(
             view_frustum, angle_threshold, distance_threshold
         );
 
     visibility_cache_.changed.clear();
-    if (frustum_changed) {
+    if (frustum_changed || has_render_dirty) {
         spatial_system.query_all(view_frustum, visibility_cache_.tmp_visible);
 
         for (auto ent : visibility_cache_.visible) {
@@ -211,6 +214,10 @@ void combined_buffer_pool<C>::update_visibility_cache_(
 
         visibility_cache_.visible = visibility_cache_.tmp_visible;
         visibility_cache_.frustum = view_frustum;
+
+        if (has_render_dirty) {
+            render_dirty_entities.clear();
+        }
     }
 }
 

@@ -11,7 +11,8 @@
 
 namespace vw::gfx {
 
-using base_world_components = std::tuple<hierarchy_component, transform_component, model_component, spatial_component>;
+using base_world_components =
+    std::tuple<hierarchy_component, transform_component, model_component, spatial_component>;
 
 }
 

@@ -51,17 +51,14 @@ void spatial_system<Cs...>::update_entity(
 ) {
     auto& spatial = registry_->template get<spatial_component>(ent);
 
-    // Вычислить новые bounds
     const auto& model_comp     = registry_->template get<model_component>(ent);
     const auto& transform_comp = registry_->template get<transform_component>(ent);
     aabb new_bounds            = calculate_aabb_from_model(ent, model_comp, transform_comp);
 
-    // Проверить, изменились ли bounds или требуется первоначальная вставка
     bool bounds_changed =  //
         spatial.bounds_.min != new_bounds.min || spatial.bounds_.max != new_bounds.max;
 
     if (bounds_changed) {
-        // Проверить, находится ли новый AABB внутри Fat AABB
         bool needs_tree_update = spatial.dirty_ || new_bounds.min.x < spatial.fat_bounds_.min.x ||
             new_bounds.min.y < spatial.fat_bounds_.min.y ||
             new_bounds.min.z < spatial.fat_bounds_.min.z ||
@@ -70,30 +67,26 @@ void spatial_system<Cs...>::update_entity(
             new_bounds.max.z > spatial.fat_bounds_.max.z;
 
         if (needs_tree_update) {
-            // Вычислить новый Fat AABB
             aabb new_fat_bounds = expand_aabb_for_fat(new_bounds);
 
-            // Обновить дерево (если не первая вставка)
             if (!spatial.dirty_) {
                 tree_.update(ent, new_fat_bounds);
             } else {
                 tree_.insert(ent, new_fat_bounds);
             }
 
-            // Обновить компонент (friend доступ к приватным полям)
             spatial.bounds_     = new_bounds;
             spatial.fat_bounds_ = new_fat_bounds;
             spatial.dirty_      = false;
         } else {
-            // Новый AABB находится внутри Fat AABB, обновить только bounds без пересчета дерева
             spatial.bounds_ = new_bounds;
             spatial.dirty_  = false;
         }
     } else {
-        // Если bounds не изменились, но сущность была помечена как dirty,
-        // просто сбросить флаг dirty (возможно, была помечена ошибочно)
         spatial.dirty_ = false;
     }
+
+    mark_render_dirty(ent);
 }
 
 template <typename... Cs>
@@ -236,6 +229,18 @@ void spatial_system<Cs...>::cleanup(
     tree_.remove(ent);
     // Также удалить из dirty_entities_ если там есть
     dirty_entities_.erase(ent);
+}
+
+template <typename... Cs>
+auto spatial_system<Cs...>::get_render_dirty_entities() -> std::unordered_set<entity>& {
+    return render_dirty_entities_;
+}
+
+template <typename... Cs>
+void spatial_system<Cs...>::mark_render_dirty(
+    entity ent
+) {
+    render_dirty_entities_.insert(ent);
 }
 
 template <typename... Cs>

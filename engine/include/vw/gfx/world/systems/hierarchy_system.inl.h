@@ -6,33 +6,54 @@
 
 #include <stdexcept>
 
-#include "vw/gfx/world/systems/hierarchy_system.h"
-
-#include "vw/gfx/world/components/transform_component.h"
-
 namespace vw::gfx {
 
 template <typename... Cs>
-inline hierarchy_system<Cs...>::hierarchy_system(
+hierarchy_system<Cs...>::hierarchy_system(
     registry_type& registry,
     transform_system_type& transform_sys
 )
     : registry_{&registry}, transform_system_{&transform_sys} {}
 
 template <typename... Cs>
-inline hierarchy_system<Cs...>::hierarchy_modifier::hierarchy_modifier(
+hierarchy_system<Cs...>::hierarchy_modifier::hierarchy_modifier(
     hierarchy_system* system,
     entity ent
 )
     : system_{system}, entity_{ent} {}
 
 template <typename... Cs>
-inline auto hierarchy_system<Cs...>::modify(entity ent) -> hierarchy_modifier {
+auto hierarchy_system<Cs...>::modify(entity ent) -> hierarchy_modifier {
     return hierarchy_modifier{this, ent};
 }
 
 template <typename... Cs>
-inline auto hierarchy_system<Cs...>::hierarchy_modifier::set_parent(entity parent)
+auto hierarchy_system<Cs...>::get_hierarchy_depth(
+    entity ent
+) const -> size_t {
+    constexpr int MAX_HIERARCHY_DEPTH = 64;
+
+    int depth      = 0;
+    entity current = ent;
+
+    while (registry_->template has<hierarchy_component>(current)) {
+        const auto& hierarchy_comp = registry_->template get<hierarchy_component>(current);
+        if (!hierarchy_comp.has_parent()) {
+            break;
+        }
+        current = hierarchy_comp.get_parent();
+        depth++;
+
+        if (depth >= MAX_HIERARCHY_DEPTH) {
+            throw std::runtime_error("hierarchy depth is too deep");
+        }
+    }
+
+    return depth;
+}
+
+template <typename... Cs>
+auto hierarchy_system<Cs...>::hierarchy_modifier::set_parent(entity parent)
     -> hierarchy_modifier& {
     if (!parent.is_valid()) {
         throw std::invalid_argument("parent is not valid");
@@ -66,7 +87,7 @@ inline auto hierarchy_system<Cs...>::hierarchy_modifier::set_parent(entity paren
 }
 
 template <typename... Cs>
-inline auto hierarchy_system<Cs...>::hierarchy_modifier::remove_parent() -> hierarchy_modifier& {
+auto hierarchy_system<Cs...>::hierarchy_modifier::remove_parent() -> hierarchy_modifier& {
     if (system_->registry_->template has<hierarchy_component>(entity_)) {
         auto& child_component = system_->registry_->template get<hierarchy_component>(entity_);
 

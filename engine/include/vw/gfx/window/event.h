@@ -20,11 +20,15 @@ struct key_press_event final : event {
     int scancode;
     keyboard::mod mods;
 
-    key_press_event(keyboard::key key, int scancode, keyboard::mod mods)
+    key_press_event(
+        keyboard::key key, int scancode, keyboard::mod mods
+    )
         : key(key), scancode(scancode), mods(mods) {}
 
     [[nodiscard]]
-    bool with(keyboard::mod mod) const {
+    bool with(
+        keyboard::mod mod
+    ) const {
         return (static_cast<int>(mods) & static_cast<int>(mod)) == static_cast<int>(mod);
     }
 };
@@ -34,7 +38,9 @@ struct key_release_event final : event {
     int scancode;
     keyboard::mod mods;
 
-    key_release_event(keyboard::key key, int scancode, keyboard::mod mods)
+    key_release_event(
+        keyboard::key key, int scancode, keyboard::mod mods
+    )
         : key(key), scancode(scancode), mods(mods) {}
 };
 
@@ -43,7 +49,9 @@ struct key_repeat_event final : event {
     int scancode;
     keyboard::mod mods;
 
-    key_repeat_event(keyboard::key key, int scancode, keyboard::mod mods)
+    key_repeat_event(
+        keyboard::key key, int scancode, keyboard::mod mods
+    )
         : key(key), scancode(scancode), mods(mods) {}
 };
 
@@ -51,41 +59,59 @@ struct mouse_move_event final : event {
     double x;
     double y;
 
-    mouse_move_event(double x, double y) : x(x), y(y) {}
+    mouse_move_event(
+        double x, double y
+    )
+        : x(x), y(y) {}
 };
 
 struct mouse_press_event final : event {
     mouse::button button;
     keyboard::mod mods;
 
-    mouse_press_event(mouse::button button, keyboard::mod mods) : button(button), mods(mods) {}
+    mouse_press_event(
+        mouse::button button, keyboard::mod mods
+    )
+        : button(button), mods(mods) {}
 };
 
 struct mouse_release_event final : event {
     mouse::button button;
     keyboard::mod mods;
 
-    mouse_release_event(mouse::button button, keyboard::mod mods) : button(button), mods(mods) {}
+    mouse_release_event(
+        mouse::button button, keyboard::mod mods
+    )
+        : button(button), mods(mods) {}
 };
 
 struct mouse_scroll_event final : event {
     double offset_x;
     double offset_y;
 
-    mouse_scroll_event(double offset_x, double offset_y) : offset_x(offset_x), offset_y(offset_y) {}
+    mouse_scroll_event(
+        double offset_x, double offset_y
+    )
+        : offset_x(offset_x), offset_y(offset_y) {}
 };
 
 struct window_resize_event final : event {
     int width;
     int height;
 
-    window_resize_event(int width, int height) : width(width), height(height) {}
+    window_resize_event(
+        int width, int height
+    )
+        : width(width), height(height) {}
 };
 
 struct window_focus_event final : event {
     bool focused;
 
-    explicit window_focus_event(bool focused) : focused(focused) {}
+    explicit window_focus_event(
+        bool focused
+    )
+        : focused(focused) {}
 };
 
 struct window_close_event final : event {};
@@ -105,7 +131,9 @@ struct event_sub {
 class event_dispatcher {
 public:
     template <event_type E, event_callback_type<E> F>
-    event_sub<E> sub(F&& callback) {
+    event_sub<E> sub(
+        F&& callback
+    ) {
         auto& callbacks     = get_callbacks<E>();
         event_sub<E> id     = {.value = next_id_++};
         callbacks[id.value] = std::forward<F>(callback);
@@ -113,21 +141,22 @@ public:
     }
 
     template <event_type E>
-    void unsub(event_sub<E> id) {
+    void unsub(
+        event_sub<E> id
+    ) {
         auto& callbacks = get_callbacks<E>();
         callbacks.erase(id);
     }
 
     template <event_type E>
-    bool dispatch(E& event) {
+    void dispatch(
+        E& event
+    ) {
         for (auto& [id, callback] : get_callbacks<E>()) {
             if (callback(event)) {
                 event.handled = true;
-                return true;
             }
         }
-
-        return false;
     }
 
 private:

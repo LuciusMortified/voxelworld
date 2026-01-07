@@ -12,7 +12,7 @@ world<Cs>::world(
 )
     : mesh_pool_{context},
       spatial_system_(registry_),
-      transform_system_(registry_, spatial_system_),
+      transform_system_(*this, registry_),
       hierarchy_system_(registry_, transform_system_),
       model_system_(registry_, mesh_pool_, spatial_system_) {}
 

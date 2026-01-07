@@ -13,7 +13,7 @@ inline fps_camera_controller::fps_camera_controller(
     : mouse_sensitivity_(mouse_sensitivity)
     , camera_speed_(camera_speed)
     , mouse_captured_(false)
-    , enabled_(true)
+    , keyboard_control_enabled_(false)
     , last_mouse_x_(0.0)
     , last_mouse_y_(0.0)
     , mouse_initialized_(false)
@@ -48,7 +48,7 @@ inline void fps_camera_controller::setup(
 inline void fps_camera_controller::update(
     float delta_time
 ) {
-    if (!enabled_ || !camera_ || !window_)
+    if (!camera_ || !window_)
         return;
 
     update_camera_movement_(delta_time);
@@ -83,7 +83,7 @@ inline void fps_camera_controller::handle_key_pressed_(
 ) {
     switch (key) {
         case keyboard::key::TAB:
-            toggle_mouse_captured();
+            //toggle_mouse_captured();
             break;
         default:
             break;
@@ -97,7 +97,6 @@ inline void fps_camera_controller::handle_mouse_moved_(
         return;
     }
 
-    // Инициализация позиции мыши при первом захвате
     if (!mouse_initialized_) {
         last_mouse_x_      = x;
         last_mouse_y_      = y;
@@ -105,7 +104,6 @@ inline void fps_camera_controller::handle_mouse_moved_(
         return;
     }
 
-    // Вычисляем дельту движения мыши
     double delta_x = x - last_mouse_x_;
     double delta_y = y - last_mouse_y_;
 
@@ -123,6 +121,10 @@ inline void fps_camera_controller::handle_mouse_moved_(
 inline void fps_camera_controller::update_camera_movement_(
     float delta_time
 ) const {
+    if (!keyboard_control_enabled_) {
+        return;
+    }
+
     const float move_speed = camera_speed_ * delta_time;
 
     if (window_->is_key_pressed(keyboard::key::W)) {
@@ -161,6 +163,20 @@ inline void fps_camera_controller::set_mouse_captured(
 
 inline void fps_camera_controller::toggle_mouse_captured() {
     set_mouse_captured(!mouse_captured_);
+}
+
+inline bool fps_camera_controller::keyboard_control_enabled() const {
+    return keyboard_control_enabled_;
+}
+
+inline void fps_camera_controller::set_keyboard_control_enabled(
+    bool enabled
+) {
+    keyboard_control_enabled_ = enabled;
+}
+
+inline void fps_camera_controller::toggle_keyboard_control_enabled() {
+    keyboard_control_enabled_ = !keyboard_control_enabled_;
 }
 
 }  // namespace vw::gfx
