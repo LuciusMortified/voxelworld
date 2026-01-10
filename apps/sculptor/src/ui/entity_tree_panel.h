@@ -3,7 +3,9 @@
 #ifndef VW_SCULPTOR_ENTITY_TREE_PANEL_H
 #define VW_SCULPTOR_ENTITY_TREE_PANEL_H
 
-#include "app/state.h"
+#include "app/app_state.h"
+#include "create_entity_modal.h"
+#include "delete_entity_modal.h"
 
 namespace vw::sculptor {
 
@@ -11,25 +13,22 @@ template <typename WC = gfx::base_world_components>
 class entity_tree_panel {
 public:
     using engine_type = gfx::engine<WC>;
-    using creation_tool_type = entity_creation_tool<WC>;
+    using create_entity_modal_type = create_entity_modal<WC>;
+    using delete_entity_modal_type = delete_entity_modal<WC>;
 
-    entity_tree_panel(engine_type& eng, state& st, creation_tool_type& creation_tool);
+    entity_tree_panel(engine_type& eng, app_state& st, operation_manager& op_manager);
 
     void render(float delta_time);
 
 private:
     engine_type* engine_;
-    state* state_;
-    creation_tool_type* creation_tool_;
+    app_state* state_;
+    operation_manager* op_manager_;
 
-    bool create_root_dialog_open_ = false;
+    create_entity_modal_type creation_modal_;
+    delete_entity_modal_type deletion_modal_;
 
-    std::unordered_set<gfx::entity> open_nodes_;
-
-    void render_title();
-    void render_entity_node(gfx::entity);
-    void render_create_root_dialog();
-    void render_context_menu();
+    void render_entity_node(const std::string& name);
 };
 
 }  // namespace vw::sculptor

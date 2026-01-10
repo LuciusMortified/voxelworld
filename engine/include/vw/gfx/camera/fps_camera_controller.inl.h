@@ -79,10 +79,10 @@ inline bool fps_camera_controller::is_mouse_captured() const {
 }
 
 inline void fps_camera_controller::handle_key_pressed_(
-    keyboard::key key
+    keyboard::keys key
 ) {
     switch (key) {
-        case keyboard::key::TAB:
+        case keyboard::keys::TAB:
             //toggle_mouse_captured();
             break;
         default:
@@ -127,25 +127,25 @@ inline void fps_camera_controller::update_camera_movement_(
 
     const float move_speed = camera_speed_ * delta_time;
 
-    if (window_->is_key_pressed(keyboard::key::W)) {
+    if (window_->is_key_pressed(keyboard::keys::W)) {
         camera_->move_forward(move_speed);
     }
-    if (window_->is_key_pressed(keyboard::key::S)) {
+    if (window_->is_key_pressed(keyboard::keys::S)) {
         camera_->move_forward(-move_speed);
     }
 
-    if (window_->is_key_pressed(keyboard::key::A)) {
+    if (window_->is_key_pressed(keyboard::keys::A)) {
         camera_->move_right(-move_speed);
     }
-    if (window_->is_key_pressed(keyboard::key::D)) {
+    if (window_->is_key_pressed(keyboard::keys::D)) {
         camera_->move_right(move_speed);
     }
 
-    if (window_->is_key_pressed(keyboard::key::SPACE)) {
+    if (window_->is_key_pressed(keyboard::keys::SPACE)) {
         const vec3f world_up(0.0f, 1.0f, 0.0f);
         camera_->set_position(camera_->get_position() + world_up * move_speed);
     }
-    if (window_->is_key_pressed(keyboard::key::LEFT_SHIFT)) {
+    if (window_->is_key_pressed(keyboard::keys::LEFT_SHIFT)) {
         const vec3f world_up(0.0f, 1.0f, 0.0f);
         camera_->set_position(camera_->get_position() - world_up * move_speed);
     }

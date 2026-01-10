@@ -33,7 +33,9 @@ public:
         hierarchy_system* system_;
         entity entity_;
     };
-    
+
+    void cleanup(entity ent);
+
     [[nodiscard]] auto modify(entity ent) -> hierarchy_modifier;
 
     [[nodiscard]] auto get_hierarchy_depth(entity ent) const -> size_t;

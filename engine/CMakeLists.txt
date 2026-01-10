@@ -91,7 +91,12 @@ target_include_directories(${PROJECT_NAME} INTERFACE include)
 target_include_directories(${PROJECT_NAME} SYSTEM INTERFACE ${Vulkan_INCLUDE_DIRS})
 
 # Link libraries
-target_link_libraries(${PROJECT_NAME} INTERFACE ${Vulkan_LIBRARIES} glfw imgui::imgui spdlog::spdlog)
+target_link_libraries(${PROJECT_NAME} INTERFACE
+        ${Vulkan_LIBRARIES}
+        glfw
+        imgui::imgui
+        spdlog::spdlog_header_only
+)
 
 # Compile features - C++23
 target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_23)

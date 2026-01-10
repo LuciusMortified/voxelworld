@@ -4,8 +4,7 @@ add_executable(${PROJECT_NAME}
         src/main.cpp
         src/app/app.h
         src/app/app.inl.h
-        src/app/state.h
-        src/app/state.inl.h
+        src/app/app_state.h
         src/ui/tool_panel.h
         src/ui/tool_panel.inl.h
         src/ui/color_palette_panel.h
@@ -14,8 +13,22 @@ add_executable(${PROJECT_NAME}
         src/ui/entity_properties_panel.inl.h
         src/ui/entity_tree_panel.h
         src/ui/entity_tree_panel.inl.h
-        src/tools/entity_creation_tool.h
-        src/tools/entity_creation_tool.inl.h
+        src/ui/ui_utils.h
+        src/operations/base_operation.h
+        src/operations/operation_manager.h
+        src/operations/operation_manager.inl.h
+        src/operations/create_entity_operation.h
+        src/operations/create_entity_operation.inl.h
+        src/operations/delete_entity_operation.h
+        src/operations/delete_entity_operation.inl.h
+        src/ui/create_entity_modal.h
+        src/ui/create_entity_modal.inl.h
+        src/ui/menu_bar.h
+        src/ui/menu_bar.inl.h
+        src/ui/delete_entity_modal.h
+        src/ui/delete_entity_modal.inl.h
+        src/operations/set_transform_operation.h
+        src/operations/set_transform_operation.inl.h
 )
 
 target_link_libraries(${PROJECT_NAME} vwengine)

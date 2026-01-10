@@ -179,13 +179,13 @@ private:
     }
 
     void handle_key_press(
-        gfx::keyboard::key key
+        gfx::keyboard::keys key
     ) const {
         switch (key) {
-            case gfx::keyboard::key::ESCAPE:
+            case gfx::keyboard::keys::ESCAPE:
                 get_engine().shutdown();
                 break;
-            case gfx::keyboard::key::F1:
+            case gfx::keyboard::keys::F1:
                 camera_controller_->toggle_mouse_captured();
                 break;
             default:

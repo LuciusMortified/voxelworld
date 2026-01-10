@@ -23,6 +23,36 @@ hierarchy_system<Cs...>::hierarchy_modifier::hierarchy_modifier(
     : system_{system}, entity_{ent} {}
 
 template <typename... Cs>
+void hierarchy_system<Cs...>::cleanup(
+    entity ent
+) {
+    if (!registry_->template has<hierarchy_component>(ent)) {
+        return;
+    }
+
+    auto& hierarchy_comp = registry_->template get<hierarchy_component>(ent);
+    auto parent = invalid_entity;
+
+    if (hierarchy_comp.has_parent()) {
+        parent = hierarchy_comp.get_parent();
+        if (registry_->template has<hierarchy_component>(parent)) {
+            auto& parent_comp = registry_->template get<hierarchy_component>(parent);
+            parent_comp.children_.erase(ent);
+        }
+    }
+
+    const auto& children = hierarchy_comp.get_children();
+    for (entity child : children) {
+        if (registry_->template has<hierarchy_component>(child)) {
+            auto& child_comp = registry_->template get<hierarchy_component>(child);
+            child_comp.parent_ = invalid_entity;
+
+            transform_system_->mark_world_dirty(child);
+        }
+    }
+}
+
+template <typename... Cs>
 auto hierarchy_system<Cs...>::modify(entity ent) -> hierarchy_modifier {
     return hierarchy_modifier{this, ent};
 }

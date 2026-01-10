@@ -14,8 +14,8 @@ extern "C" {
 #define NOMINMAX
 #endif
 
-#include <Windows.h>
 #include <Psapi.h>
+#include <Windows.h>
 }
 #endif
 
@@ -48,7 +48,10 @@ engine<WC>::engine(
         });
 
     key_press_sub_ = window_->sub<key_press_event>([this](const key_press_event& event) -> bool {
-        if (event.key == keyboard::key::F12 && event.with(keyboard::mod::CTRL)) {
+        using keys = keyboard::keys;
+        using mods = keyboard::mods;
+
+        if (event.key == keys::F12 && event.with(mods::CTRL)) {
             debug_tool_->toggle_visibility();
         }
         return false;
@@ -209,8 +212,8 @@ uint64 engine<WC>::calculate_vram_usage() const {
 
         uint64 total_usage = 0;
         for (uint32 i = 0; i < mem_props.memoryProperties.memoryHeapCount; ++i) {
-            if ((mem_props.memoryProperties.memoryHeaps[i].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT
-                ) != 0) {
+            if ((mem_props.memoryProperties.memoryHeaps[i].flags &
+                 VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) != 0) {
                 total_usage += budget_props.heapUsage[i];
             }
         }

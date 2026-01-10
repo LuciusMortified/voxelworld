@@ -50,21 +50,21 @@ inline void window::key_callback(
 ) {
     auto* w = static_cast<window*>(glfwGetWindowUserPointer(wptr));
 
-    const auto keyboard_mods = static_cast<keyboard::mod>(mods);
+    const auto keyboard_mods = static_cast<keyboard::mods>(mods);
 
     switch (action) {
         case GLFW_PRESS: {
-            key_press_event event(static_cast<keyboard::key>(key), scancode, keyboard_mods);
+            key_press_event event(static_cast<keyboard::keys>(key), scancode, keyboard_mods);
             w->event_dispatcher_.dispatch(event);
             break;
         }
         case GLFW_RELEASE: {
-            key_release_event event(static_cast<keyboard::key>(key), scancode, keyboard_mods);
+            key_release_event event(static_cast<keyboard::keys>(key), scancode, keyboard_mods);
             w->event_dispatcher_.dispatch(event);
             break;
         }
         case GLFW_REPEAT: {
-            key_repeat_event event(static_cast<keyboard::key>(key), scancode, keyboard_mods);
+            key_repeat_event event(static_cast<keyboard::keys>(key), scancode, keyboard_mods);
             w->event_dispatcher_.dispatch(event);
             break;
         }
@@ -78,7 +78,7 @@ inline void window::mouse_button_callback(
 ) {
     auto* w = static_cast<window*>(glfwGetWindowUserPointer(wptr));
 
-    const auto keyboard_mods = static_cast<keyboard::mod>(mods);
+    const auto keyboard_mods = static_cast<keyboard::mods>(mods);
 
     if (action == GLFW_PRESS) {
         mouse_press_event event(static_cast<mouse::button>(button), keyboard_mods);
@@ -177,7 +177,7 @@ inline std::vector<const char*> window::get_required_extensions() {
 }
 
 inline bool window::is_key_pressed(
-    keyboard::key key
+    keyboard::keys key
 ) const {
     return glfwGetKey(window_, static_cast<int>(key)) == GLFW_PRESS;
 }

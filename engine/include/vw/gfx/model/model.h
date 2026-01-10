@@ -31,39 +31,38 @@ public:
         set_voxel(x, y, z, voxel{color});
     }
 
-    [[nodiscard]]
-    auto get_voxel(int x, int y, int z) const -> voxel;
+    [[nodiscard]] auto get_voxel(int x, int y, int z) const -> voxel;
 
-    [[nodiscard]]
-    auto is_empty(int x, int y, int z) const -> bool;
+    [[nodiscard]] auto is_empty(int x, int y, int z) const -> bool;
 
-    [[nodiscard]]
-    auto width() const -> int {
+    [[nodiscard]] auto width() const -> int {
         return width_;
     }
 
-    [[nodiscard]]
-    auto height() const -> int {
+    [[nodiscard]] auto height() const -> int {
         return height_;
     }
 
-    [[nodiscard]]
-    auto depth() const -> int {
+    [[nodiscard]] auto depth() const -> int {
         return depth_;
     }
 
-    [[nodiscard]]
-    auto size() const -> vw::vec3i {
-        return vw::vec3i{width_, height_, depth_};
+    [[nodiscard]] auto size() const -> vec3i {
+        return vec3i{width_, height_, depth_};
     }
 
     void fill(const voxel& voxel);
 
     void clear();
 
-    [[nodiscard]]
-    auto get_identity() const -> model_identity {
+    [[nodiscard]] auto get_identity() const -> model_identity {
         return identity_;
+    }
+
+    void set_voxels(const std::vector<voxel>& voxels);
+
+    [[nodiscard]] auto get_voxels() const -> const std::vector<voxel>& {
+        return voxels_;
     }
 
 private:

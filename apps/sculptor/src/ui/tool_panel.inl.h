@@ -6,7 +6,7 @@
 namespace vw::sculptor {
 
 inline tool_panel::tool_panel(
-    state& st
+    app_state& st
 )
     : state_(&st) {}
 
@@ -14,20 +14,19 @@ inline void tool_panel::render(
     float delta_time
 ) {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImVec2 window_pos       = ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
-    ImGui::SetNextWindowPos(window_pos, ImGuiCond_FirstUseEver);
+    ImVec2 window_pos =
+        ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + state_->ui.right_side_voffset + 10);
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
 
     ImGuiWindowFlags window_flags =         //
         ImGuiWindowFlags_NoCollapse |       //
         ImGuiWindowFlags_NoSavedSettings |  //
-        ImGuiWindowFlags_NoTitleBar |       //
-        ImGuiWindowFlags_NoMove |           //
+        // ImGuiWindowFlags_NoTitleBar |       //
+        // ImGuiWindowFlags_NoMove |           //
         ImGuiWindowFlags_AlwaysAutoResize;
 
     ImGui::Begin("Tools", nullptr, window_flags);
-
-    ImGui::Text("Select Tool:");
-    ImGui::Spacing();
+    //imgui_clamp_window_pos_to_viewport();
 
     ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
 

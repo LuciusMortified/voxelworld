@@ -52,7 +52,7 @@ public:
     }
 
     [[nodiscard]]
-    bool is_key_pressed(keyboard::key key) const;
+    bool is_key_pressed(keyboard::keys key) const;
 
     [[nodiscard]]
     bool is_mouse_button_pressed(mouse::button button) const;

@@ -19,7 +19,9 @@ public:
     [[nodiscard]] auto get(std::string_view name) const -> std::shared_ptr<model>;
     [[nodiscard]] auto create(std::string_view name, int width, int height, int depth)
         -> std::shared_ptr<model>;
+    [[nodiscard]] auto create(std::string_view name, vec3i size) -> std::shared_ptr<model>;
     [[nodiscard]] auto create_unnamed(int width, int height, int depth) -> std::shared_ptr<model>;
+    [[nodiscard]] auto create_unnamed(vec3i size) -> std::shared_ptr<model>;
     [[nodiscard]] auto create_clone(std::string_view name) -> std::shared_ptr<model>;
 
 private:

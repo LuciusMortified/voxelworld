@@ -6,7 +6,7 @@
 namespace vw::gfx {
 
 namespace keyboard {
-enum class key {
+enum class keys {
     // Буквы
     A = 65,
     B = 66,
@@ -123,7 +123,7 @@ enum class key {
     NUM_EQUAL    = 336
 };
 
-enum class mod : int {
+enum class mods : int {
     SHIFT     = 0x0001,
     CTRL      = 0x0002,
     ALT       = 0x0004,
@@ -131,6 +131,11 @@ enum class mod : int {
     CAPS_LOCK = 0x0010,
     NUM_LOCK  = 0x0020
 };
+
+[[nodiscard]] inline bool operator&(mods lhs, mods rhs) {
+    return (static_cast<int>(lhs) & static_cast<int>(rhs)) != 0;
+}
+
 }  // namespace keyboard
 
 namespace mouse {

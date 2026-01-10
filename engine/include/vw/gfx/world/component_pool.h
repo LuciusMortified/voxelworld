@@ -12,18 +12,24 @@ class component_pool final {
 public:
     static constexpr size_t default_sparse_capacity = 1024;
 
-    explicit component_pool(size_t sparse_capacity = default_sparse_capacity) {
+    explicit component_pool(
+        size_t sparse_capacity = default_sparse_capacity
+    ) {
         sparse_indices_.resize(sparse_capacity, entity::invalid_index);
     }
 
     [[nodiscard]]
-    bool has(entity ent) const {
+    bool has(
+        entity ent
+    ) const {
         return ent.index != entity::invalid_index && ent.index < sparse_indices_.size() &&
             sparse_indices_[ent.index] != entity::invalid_index &&
             dense_entities_[sparse_indices_[ent.index]] == ent;
     }
 
-    void add(entity ent, T&& value = {}) {
+    void add(
+        entity ent, T&& value = {}
+    ) {
         if (ent.index >= sparse_indices_.size()) [[unlikely]] {
             sparse_indices_.resize(ent.index + 1, entity::invalid_index);
         }
@@ -39,33 +45,39 @@ public:
         sparse_indices_[ent.index] = index;
     }
 
-    void remove(entity ent) {
+    void remove(
+        entity ent
+    ) {
         if (!has(ent)) [[unlikely]] {
             return;
         }
 
-        const uint32 index      = sparse_indices_[ent.index];
-        const uint32 last_index = dense_data_.size() - 1;
+        const uint32 dense_index = sparse_indices_[ent.index];
+        const uint32 last_index  = dense_data_.size() - 1;
 
-        if (index != last_index) {
-            std::swap(dense_data_[index], dense_data_[last_index]);
-            std::swap(dense_entities_[index], dense_entities_[last_index]);
-            sparse_indices_[dense_entities_[index].index] = index;
+        if (dense_index != last_index) {
+            std::swap(dense_data_[dense_index], dense_data_[last_index]);
+            std::swap(dense_entities_[dense_index], dense_entities_[last_index]);
+            sparse_indices_[dense_entities_[dense_index].index] = dense_index;
         }
 
         dense_data_.pop_back();
         dense_entities_.pop_back();
 
-        sparse_indices_[index] = entity::invalid_index;
+        sparse_indices_[ent.index] = entity::invalid_index;
     }
 
     [[nodiscard]]
-    T& get(entity e) {
+    T& get(
+        entity e
+    ) {
         return dense_data_[sparse_indices_[e.index]];
     }
 
     [[nodiscard]]
-    const T& get(entity e) const {
+    const T& get(
+        entity e
+    ) const {
         return dense_data_[sparse_indices_[e.index]];
     }
 

@@ -169,8 +169,12 @@ void spatial_system<Cs...>::query_all(
 ) const {
     tree_.query_all(f, result_out);
 
-    // Дополнительная проверка для точности (BVH может вернуть немного больше результатов)
     for (auto it = result_out.begin(), ite = result_out.end(); it != ite;) {
+        if (!registry_->template has<spatial_component>(*it)) {
+            it = result_out.erase(it);
+            continue;
+        }
+
         const auto& spatial = registry_->template get<spatial_component>(*it);
         if (!f.intersects(spatial.get_bounds())) {
             it = result_out.erase(it);
@@ -186,8 +190,12 @@ void spatial_system<Cs...>::query_all(
 ) const {
     tree_.query_all(r, result_out);
 
-    // Дополнительная проверка для точности (BVH может вернуть немного больше результатов)
     for (auto it = result_out.begin(), ite = result_out.end(); it != ite;) {
+        if (!registry_->template has<spatial_component>(*it)) {
+            it = result_out.erase(it);
+            continue;
+        }
+
         const auto& spatial = registry_->template get<spatial_component>(*it);
         if (!spatial.get_bounds().intersects(r)) {
             it = result_out.erase(it);
@@ -203,8 +211,12 @@ void spatial_system<Cs...>::query_all(
 ) const {
     tree_.query_all(bounds, result_out);
 
-    // Дополнительная проверка для точности (BVH может вернуть немного больше результатов)
     for (auto it = result_out.begin(), ite = result_out.end(); it != ite;) {
+        if (!registry_->template has<spatial_component>(*it)) {
+            it = result_out.erase(it);
+            continue;
+        }
+
         const auto& spatial = registry_->template get<spatial_component>(*it);
         if (!spatial.get_bounds().intersects(bounds)) {
             it = result_out.erase(it);

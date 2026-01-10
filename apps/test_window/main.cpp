@@ -17,16 +17,16 @@ int main() {
             window.poll_events();
 
             // Проверка нажатий клавиш (используем алиасы)
-            if (window.is_key_pressed(gfx::keyboard::key::W)) {
+            if (window.is_key_pressed(gfx::keyboard::keys::W)) {
                 log::info("Нажата клавиша W");
             }
-            if (window.is_key_pressed(gfx::keyboard::key::A)) {
+            if (window.is_key_pressed(gfx::keyboard::keys::A)) {
                 log::info("Нажата клавиша A");
             }
-            if (window.is_key_pressed(gfx::keyboard::key::S)) {
+            if (window.is_key_pressed(gfx::keyboard::keys::S)) {
                 log::info("Нажата клавиша S");
             }
-            if (window.is_key_pressed(gfx::keyboard::key::D)) {
+            if (window.is_key_pressed(gfx::keyboard::keys::D)) {
                 log::info("Нажата клавиша D");
             }
 

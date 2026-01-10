@@ -155,7 +155,7 @@ inline auto transform_system<Cs...>::transform_modifier::translate(
     system_->mark_children_world_dirty(entity_);
 
     auto& spatial_system = system_->world_->get_spatial_system();
-    if (spatial_system && system_->registry_->template has<spatial_component>(entity_)) {
+    if (system_->registry_->template has<spatial_component>(entity_)) {
         spatial_system->mark_dirty(entity_);
     }
 
@@ -179,7 +179,7 @@ inline auto transform_system<Cs...>::transform_modifier::rotate(
     system_->mark_children_world_dirty(entity_);
 
     auto& spatial_system = system_->world_->get_spatial_system();
-    if (spatial_system && system_->registry_->template has<spatial_component>(entity_)) {
+    if (system_->registry_->template has<spatial_component>(entity_)) {
         spatial_system->mark_dirty(entity_);
     }
 
@@ -203,7 +203,7 @@ inline auto transform_system<Cs...>::transform_modifier::scale(
     system_->mark_children_world_dirty(entity_);
 
     auto& spatial_system = system_->world_->get_spatial_system();
-    if (spatial_system && system_->registry_->template has<spatial_component>(entity_)) {
+    if (system_->registry_->template has<spatial_component>(entity_)) {
         spatial_system->mark_dirty(entity_);
     }
 
@@ -234,6 +234,30 @@ void transform_system<Cs...>::mark_dirty(
     entity ent
 ) {
     dirty_entities_.insert(ent);
+}
+
+template <typename... Cs>
+transform_system<Cs...>::transform_modifier& transform_system<Cs...>::transform_modifier::
+    set_transform(
+        const transform& transform
+    ) {
+    if (!system_->registry_->template has<transform_component>(entity_)) {
+        return *this;
+    }
+
+    auto& transform_comp        = system_->registry_->template get<transform_component>(entity_);
+    transform_comp.transform_   = transform;
+    transform_comp.local_dirty_ = true;
+    transform_comp.world_dirty_ = true;
+
+    system_->dirty_entities_.insert(entity_);
+    system_->mark_children_world_dirty(entity_);
+
+    if (system_->registry_->template has<spatial_component>(entity_)) {
+        system_->world_->get_spatial_system().mark_dirty(entity_);
+    }
+
+    return *this;
 }
 
 template <typename... Cs>
@@ -307,8 +331,11 @@ void transform_system<Cs...>::update_entity_world_matrix(
             if (registry_->template has<transform_component>(parent)) {
                 const auto& parent_transform_comp =
                     registry_->template get<transform_component>(parent);
-                transform_comp.world_matrix_ =
-                    parent_transform_comp.get_world_matrix() * local_matrix;
+
+                auto parent_world_matrix = parent_transform_comp.get_world_matrix() *
+                    math::translation_matrix(-parent_transform_comp.get_origin());
+
+                transform_comp.world_matrix_ = parent_world_matrix * local_matrix;
             }
         }
     }

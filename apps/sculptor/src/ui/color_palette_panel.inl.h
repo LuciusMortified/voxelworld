@@ -6,7 +6,7 @@
 namespace vw::sculptor {
 
 inline color_palette_panel::color_palette_panel(
-    state& st
+    app_state& st
 )
     : state_(&st) {}
 
@@ -16,19 +16,17 @@ inline void color_palette_panel::render(
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImVec2 window_pos =
         ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + viewport->WorkSize.y - 10);
-    ImGui::SetNextWindowPos(window_pos, ImGuiCond_FirstUseEver, ImVec2(0.0f, 1.0f));
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.0f, 1.0f));
 
     ImGuiWindowFlags window_flags =         //
-        ImGuiWindowFlags_NoCollapse |       //
+        //ImGuiWindowFlags_NoCollapse |       //
         ImGuiWindowFlags_NoSavedSettings |  //
-        ImGuiWindowFlags_NoTitleBar |       //
+        //ImGuiWindowFlags_NoTitleBar |       //
         ImGuiWindowFlags_NoMove |           //
         ImGuiWindowFlags_AlwaysAutoResize;
 
     ImGui::Begin("Color Palette", nullptr, window_flags);
-
-    ImGui::Text("Selected Color:");
-    ImGui::Spacing();
+    //clamp_window_pos_to_viewport();
 
     const ImVec4 selected_color_imvec4 = to_imvec4(state_->selected_color);
     ImGui::ColorButton(
@@ -85,7 +83,7 @@ inline void color_palette_panel::render(
         }
 #endif
 
-        if (++idx % 8 != 0) {
+        if (++idx % 6 != 0) {
             ImGui::SameLine(0, 0);
         }
     }

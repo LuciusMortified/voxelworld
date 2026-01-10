@@ -16,41 +16,41 @@ struct event {
 };
 
 struct key_press_event final : event {
-    keyboard::key key;
+    keyboard::keys key;
     int scancode;
-    keyboard::mod mods;
+    keyboard::mods mods;
 
     key_press_event(
-        keyboard::key key, int scancode, keyboard::mod mods
+        keyboard::keys key, int scancode, keyboard::mods mods
     )
         : key(key), scancode(scancode), mods(mods) {}
 
     [[nodiscard]]
     bool with(
-        keyboard::mod mod
+        keyboard::mods mod
     ) const {
         return (static_cast<int>(mods) & static_cast<int>(mod)) == static_cast<int>(mod);
     }
 };
 
 struct key_release_event final : event {
-    keyboard::key key;
+    keyboard::keys key;
     int scancode;
-    keyboard::mod mods;
+    keyboard::mods mods;
 
     key_release_event(
-        keyboard::key key, int scancode, keyboard::mod mods
+        keyboard::keys key, int scancode, keyboard::mods mods
     )
         : key(key), scancode(scancode), mods(mods) {}
 };
 
 struct key_repeat_event final : event {
-    keyboard::key key;
+    keyboard::keys key;
     int scancode;
-    keyboard::mod mods;
+    keyboard::mods mods;
 
     key_repeat_event(
-        keyboard::key key, int scancode, keyboard::mod mods
+        keyboard::keys key, int scancode, keyboard::mods mods
     )
         : key(key), scancode(scancode), mods(mods) {}
 };
@@ -67,20 +67,20 @@ struct mouse_move_event final : event {
 
 struct mouse_press_event final : event {
     mouse::button button;
-    keyboard::mod mods;
+    keyboard::mods mods;
 
     mouse_press_event(
-        mouse::button button, keyboard::mod mods
+        mouse::button button, keyboard::mods mods
     )
         : button(button), mods(mods) {}
 };
 
 struct mouse_release_event final : event {
     mouse::button button;
-    keyboard::mod mods;
+    keyboard::mods mods;
 
     mouse_release_event(
-        mouse::button button, keyboard::mod mods
+        mouse::button button, keyboard::mods mods
     )
         : button(button), mods(mods) {}
 };

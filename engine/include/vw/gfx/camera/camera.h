@@ -61,7 +61,7 @@ private:
     mutable bool projection_matrix_dirty_;
     
     mutable frustum frustum_;
-    mutable bool frustum_dirty_ = true;
+    mutable bool frustum_dirty_;
 };
 }  // namespace vw::gfx
 

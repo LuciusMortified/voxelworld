@@ -34,7 +34,7 @@ public:
 
 private:
     void update_camera_movement_(float delta_time) const;
-    void handle_key_pressed_(keyboard::key key);
+    void handle_key_pressed_(keyboard::keys key);
     void handle_mouse_moved_(double x, double y);
 
     float mouse_sensitivity_;

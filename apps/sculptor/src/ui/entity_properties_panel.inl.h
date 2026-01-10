@@ -7,78 +7,91 @@ namespace vw::sculptor {
 
 template <typename WC>
 entity_properties_panel<WC>::entity_properties_panel(
-    engine_type& eng, state& st
+    engine_type& eng, app_state& st, operation_manager& op_manager
 )
-    : engine_(&eng), state_(&st) {}
+    : engine_(&eng), state_(&st), op_manager_(&op_manager) {}
 
 template <typename WC>
 void entity_properties_panel<WC>::render(
     float delta_time
 ) {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImVec2 window_pos =
-        ImVec2(viewport->WorkPos.x + viewport->WorkSize.x - 10, viewport->WorkPos.y + 10);
+    ImVec2 window_pos       = ImVec2(
+        viewport->WorkPos.x + viewport->WorkSize.x - 10,
+        viewport->WorkPos.y + state_->ui.right_side_voffset + 10
+    );
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(1.0f, 0.0f));
 
     ImGuiWindowFlags window_flags =         //
-        ImGuiWindowFlags_NoCollapse |       //
         ImGuiWindowFlags_NoSavedSettings |  //
-        ImGuiWindowFlags_NoTitleBar |       //
         ImGuiWindowFlags_NoMove |           //
         ImGuiWindowFlags_AlwaysAutoResize;
 
     ImGui::Begin("Entity Properties", nullptr, window_flags);
+    // clamp_window_pos_to_viewport();
 
-    if (!state_->selected_entity.is_valid()) {
+    if (state_->selected_name.empty()) {
         ImGui::TextDisabled("No entity selected");
-        ImGui::End();
-        return;
+    } else {
+        auto ent = state_->name_to_entity[state_->selected_name];
+
+        ImGui::Text("Selected: %s %u.%u", state_->selected_name.c_str(), ent.index, ent.generation);
+
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
+
+        auto& world            = engine_->get_world();
+        auto& transform_system = world.get_transform_system();
+
+        if (!world.template has_component<gfx::transform_component>(ent)) {
+            ImGui::TextColored(ImVec4(1.f, 1.f, 0.f, 1.f), "Entity has no transform component");
+        } else {
+            render_position();
+            render_rotation();
+            render_scale();
+            render_origin();
+
+            ImGui::Spacing();
+            ImGui::Separator();
+            ImGui::Spacing();
+
+            render_actions();
+        }
     }
 
-    render_entity_id();
+    ImGui::Dummy({200.0f, 0.0f});
 
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    render_position();
-    render_rotation();
-    render_scale();
-    render_origin();
-
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    render_actions();
+    state_->ui.right_side_voffset += ImGui::GetWindowHeight() + 10.0f;
 
     ImGui::End();
 }
 
 template <typename WC>
-void entity_properties_panel<WC>::render_entity_id() {
-    ImGui::Text(
-        "Entity Properties: %u.%u",
-        state_->selected_entity.index,
-        state_->selected_entity.generation
-    );
-}
-
-template <typename WC>
 void entity_properties_panel<WC>::render_position() {
-    auto ent               = state_->selected_entity;
+    auto ent = state_->name_to_entity[state_->selected_name];
+
     auto& world            = engine_->get_world();
     auto& transform_system = world.get_transform_system();
     auto& transform_comp   = world.template get_component<gfx::transform_component>(ent);
     vec3f position         = transform_comp.get_position();
     if (render_vec3f_field("Position", position)) {
-        transform_system.modify(ent).set_position(position);
+        transform new_transform = transform_comp.get_transform();
+        new_transform.set_position(position);
+
+        set_transform_params params = {
+            .name = state_->selected_name,
+            .transform = new_transform,
+        };
+        auto op = std::make_unique<operation_type>(*engine_, *state_, params);
+        op_manager_->execute(std::move(op));
     }
 }
 
 template <typename WC>
 void entity_properties_panel<WC>::render_rotation() {
-    auto ent               = state_->selected_entity;
+    auto ent = state_->name_to_entity[state_->selected_name];
+
     auto& world            = engine_->get_world();
     auto& transform_system = world.get_transform_system();
     auto& transform_comp   = world.template get_component<gfx::transform_component>(ent);
@@ -95,40 +108,62 @@ void entity_properties_panel<WC>::render_rotation() {
             math::radians(rotation_deg.y),
             math::radians(rotation_deg.z),
         };
-        transform_system.modify(ent).set_rotation(rotation_rad);
+        transform new_transform = transform_comp.get_transform();
+        new_transform.set_rotation(rotation_rad);
+
+        set_transform_params params = {
+            .name = state_->selected_name,
+            .transform = new_transform,
+        };
+        auto op = std::make_unique<operation_type>(*engine_, *state_, params);
+        op_manager_->execute(std::move(op));
     }
 }
 
 template <typename WC>
 void entity_properties_panel<WC>::render_scale() {
-    auto ent               = state_->selected_entity;
+    auto ent = state_->name_to_entity[state_->selected_name];
+
     auto& world            = engine_->get_world();
     auto& transform_system = world.get_transform_system();
     auto& transform_comp   = world.template get_component<gfx::transform_component>(ent);
     vec3f scale            = transform_comp.get_scale();
     if (render_vec3f_field("Scale", scale)) {
-        transform_system.modify(ent).set_scale(scale);
+        transform new_transform = transform_comp.get_transform();
+        new_transform.set_scale(scale);
+
+        set_transform_params params = {
+            .name = state_->selected_name,
+            .transform = new_transform,
+        };
+        auto op = std::make_unique<operation_type>(*engine_, *state_, params);
+        op_manager_->execute(std::move(op));
     }
 }
 
 template <typename WC>
 void entity_properties_panel<WC>::render_origin() {
-    auto ent               = state_->selected_entity;
+    auto ent = state_->name_to_entity[state_->selected_name];
+
     auto& world            = engine_->get_world();
     auto& transform_system = world.get_transform_system();
     auto& transform_comp   = world.template get_component<gfx::transform_component>(ent);
     vec3f origin           = transform_comp.get_origin();
     if (render_vec3f_field("Origin", origin)) {
-        transform_system.modify(ent).set_origin(origin);
+        transform new_transform = transform_comp.get_transform();
+        new_transform.set_origin(origin);
+
+        set_transform_params params = {
+            .name = state_->selected_name,
+            .transform = new_transform,
+        };
+        auto op = std::make_unique<operation_type>(*engine_, *state_, params);
+        op_manager_->execute(std::move(op));
     }
 }
 
 template <typename WC>
-void entity_properties_panel<WC>::render_actions() {
-    ImGui::Dummy(ImVec2{ImGui::GetContentRegionAvail().x - 100.f, 0});
-    ImGui::SameLine(0, 0);
-    ImGui::Button("Reset all", ImVec2{100.f, 20.f});
-}
+void entity_properties_panel<WC>::render_actions() {}
 
 template <typename WC>
 bool entity_properties_panel<WC>::render_vec3f_field(

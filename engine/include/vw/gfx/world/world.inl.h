@@ -69,6 +69,9 @@ template <typename T>
 void world<Cs>::remove_component(
     entity ent
 ) {
+    if constexpr (std::same_as<T, hierarchy_component>) {
+        hierarchy_system_.cleanup(ent);
+    }
     if constexpr (std::same_as<T, transform_component>) {
         transform_system_.mark_render_dirty(ent);
     }
@@ -85,6 +88,9 @@ template <typename Cs>
 void world<Cs>::remove_all_components(
     entity ent
 ) {
+    if (registry_.template has<hierarchy_component>(ent)) {
+        hierarchy_system_.cleanup(ent);
+    }
     if (registry_.template has<transform_component>(ent)) {
         transform_system_.mark_render_dirty(ent);
     }
@@ -101,6 +107,9 @@ template <typename C>
 void world<C>::destroy_entity(
     entity ent
 ) {
+    if (registry_.template has<hierarchy_component>(ent)) {
+        hierarchy_system_.cleanup(ent);
+    }
     if (registry_.template has<transform_component>(ent)) {
         transform_system_.mark_render_dirty(ent);
     }

@@ -26,29 +26,33 @@ public:
     [[nodiscard]] auto get_voxel(
         int x, int y, int z
     ) const -> voxel {
-        return model_ ? model_->get_voxel(x, y, z) : voxel{};
+        return model_->get_voxel(x, y, z);
+    }
+
+    [[nodiscard]] auto get_voxels() const -> const std::vector<voxel>& {
+        return model_->get_voxels();
     }
 
     [[nodiscard]] auto is_empty(
         int x, int y, int z
     ) const -> bool {
-        return model_ ? model_->is_empty(x, y, z) : true;
+        return model_->is_empty(x, y, z);
     }
 
     [[nodiscard]] auto width() const -> int {
-        return model_ ? model_->width() : 0;
+        return model_->width();
     }
 
     [[nodiscard]] auto height() const -> int {
-        return model_ ? model_->height() : 0;
+        return model_->height();
     }
 
     [[nodiscard]] auto depth() const -> int {
-        return model_ ? model_->depth() : 0;
+        return model_->depth();
     }
 
-    [[nodiscard]] auto size() const -> vw::vec3i {
-        return model_ ? model_->size() : vw::vec3i{0, 0, 0};
+    [[nodiscard]] auto size() const -> vec3i {
+        return model_->size();
     }
 
     [[nodiscard]] auto has_model() const -> bool {
@@ -56,7 +60,7 @@ public:
     }
 
     [[nodiscard]] auto get_identity() const -> model_identity {
-        return model_ ? model_->get_identity() : model_identity{};
+        return model_ ? model_->get_identity() : invalid_model_identity;
     }
 };
 

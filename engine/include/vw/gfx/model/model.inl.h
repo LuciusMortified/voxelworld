@@ -73,6 +73,16 @@ inline void model::increment_generation() {
     }
 }
 
+inline void model::set_voxels(
+    const std::vector<voxel>& voxels
+) {
+    if (voxels.size() != voxels_.size()) {
+        throw std::runtime_error("Voxels container size does not match model size.");
+    }
+    voxels_ = voxels;
+    increment_generation();
+}
+
 }  // namespace vw::gfx
 
 #endif  // VW_GFX_MODEL_MODEL_INL_H
