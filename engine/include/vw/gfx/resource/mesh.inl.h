@@ -176,7 +176,6 @@ inline void greedy_mesh_generator::generate_face_quads(
     const std::shared_ptr<model>& model,
     int face_direction
 ) {
-    // Определяем размеры и оси для текущего направления грани
     int width = 0, height = 0, depth = 0;
 
     switch (face_direction) {
@@ -202,14 +201,11 @@ inline void greedy_mesh_generator::generate_face_quads(
             break;
     }
 
-    // Проходим по каждому слою в направлении грани
     for (int layer = 0; layer < depth; layer++) {
-        // Создаем маску видимых граней для текущего слоя
         std::vector mask(width, std::vector(height, colors::empty));
 
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
-                // Преобразуем координаты обратно в координаты модели
                 int mx = 0, my = 0, mz = 0;
                 switch (face_direction) {
                     case 0:  // +X
@@ -246,28 +242,25 @@ inline void greedy_mesh_generator::generate_face_quads(
                         break;
                 }
 
-                if (is_face_visible(model, mx, my, mz, face_direction)) {
-                    mask[x][y] = model->get_voxel(mx, my, mz).value;
+                auto voxel = model->get_voxel(mx, my, mz);
+                if (!voxel.is_empty() && is_face_visible(model, mx, my, mz, face_direction)) {
+                    mask[x][y] = voxel.value;
                 }
             }
         }
 
-        // Жадный алгоритм: объединяем соседние квадраты одного цвета
         std::vector visited(width, std::vector(height, false));
-
         for (int x = 0; x < width; x++) {
             for (int y = 0; y < height; y++) {
                 if (!visited[x][y] && mask[x][y] != colors::empty) {
                     color color = mask[x][y];
 
-                    // Находим максимальную ширину прямоугольника
                     int w = 1;
 
                     while (x + w < width && mask[x + w][y] == color && !visited[x + w][y]) {
                         w++;
                     }
 
-                    // Находим максимальную высоту прямоугольника
                     int h = 1;
 
                     bool can_extend = true;
@@ -282,14 +275,12 @@ inline void greedy_mesh_generator::generate_face_quads(
                             h++;
                     }
 
-                    // Помечаем все квадраты в прямоугольнике как посещенные
                     for (int i = 0; i < w; i++) {
                         for (int j = 0; j < h; j++) {
                             visited[x + i][y + j] = true;
                         }
                     }
 
-                    // Преобразуем координаты обратно в координаты модели
                     vec3f min_pos, max_pos;
                     switch (face_direction) {
                         case 0:  // +X
@@ -334,7 +325,6 @@ inline void greedy_mesh_generator::add_quad(
     int face_direction,
     color color
 ) {
-    // Направления нормалей
     static const vec3f face_normals[6] = {
         vec3f(1, 0, 0),   // +X
         vec3f(-1, 0, 0),  // -X
@@ -344,8 +334,6 @@ inline void greedy_mesh_generator::add_quad(
         vec3f(0, 0, -1)   // -Z
     };
 
-    // Вершины для каждого направления грани - против часовой стрелки
-    // относительно нормали
     static const int vertex_indices[6][4] = {
         // +X:
         // (max.x, min.y, min.z),
@@ -385,7 +373,6 @@ inline void greedy_mesh_generator::add_quad(
         {1, 2, 3, 0}
     };
 
-    // Создаем 8 вершин куба
     vec3f cube_vertices[8] = {
         vec3f(min_pos.x, min_pos.y, min_pos.z),  // 0: (min, min, min)
         vec3f(max_pos.x, min_pos.y, min_pos.z),  // 1: (max, min, min)
@@ -400,13 +387,11 @@ inline void greedy_mesh_generator::add_quad(
     auto base_vertex = static_cast<uint32>(vertices.size());
     vec3f normal     = face_normals[face_direction];
 
-    // Добавляем 4 вершины грани
     for (int i = 0; i < 4; i++) {
         int vertex_idx = vertex_indices[face_direction][i];
         vertices.emplace_back(cube_vertices[vertex_idx], normal, color.value);
     }
 
-    // Добавляем 6 индексов для двух треугольников
     indices.push_back(base_vertex + 0);
     indices.push_back(base_vertex + 1);
     indices.push_back(base_vertex + 2);
@@ -418,8 +403,9 @@ inline void greedy_mesh_generator::add_quad(
 inline bool greedy_mesh_generator::is_face_visible(
     const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
 ) {
-    if (!model)
+    if (!model) {
         return false;
+    }
 
     // Смещения для проверки соседних вокселей
     static constexpr int dx[6] = {1, -1, 0, 0, 0, 0};
@@ -430,13 +416,11 @@ inline bool greedy_mesh_generator::is_face_visible(
     int ny = y + dy[face_direction];
     int nz = z + dz[face_direction];
 
-    // Проверяем границы модели
     if (nx < 0 || nx >= model->width() || ny < 0 || ny >= model->height() || nz < 0 ||
         nz >= model->depth()) {
-        return true;  // Грань видна, если выходит за границы модели
+        return true;
     }
 
-    // Грань видна, если соседний воксель не существует (прозрачный)
     return model->is_empty(nx, ny, nz);
 }
 

@@ -48,9 +48,6 @@ inline auto model::get_voxel(
 inline auto model::is_empty(
     int x, int y, int z
 ) const -> bool {
-    if (x < 0 || x >= width_ || y < 0 || y >= height_ || z < 0 || z >= depth_) {
-        return true;
-    }
     return voxels_[index(x, y, z)].is_empty();
 }
 

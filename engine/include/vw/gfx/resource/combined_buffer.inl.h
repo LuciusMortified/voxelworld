@@ -138,7 +138,8 @@ inline void combined_buffer::allocate(
     }
 
     draw_command cmd{
-        .index_count    = mesh_alloc.index_count,
+        //.index_count    = mesh_alloc.index_count,
+        .index_count    = chunk_size_.index_count,
         .instance_count = 1,
         .first_index    = mesh_alloc.index_offset,
         .vertex_offset  = static_cast<int32>(mesh_alloc.vertex_offset),
@@ -167,10 +168,20 @@ inline void combined_buffer::write_mesh(
         vertex_buffer_->copy_from_vector(
             mesh_data.vertices, mesh_alloc.vertex_offset * sizeof(vertex)
         );
+
+        auto free_space_offset =
+            (mesh_alloc.vertex_offset + mesh_data.vertices.size()) * sizeof(vertex);
+        auto free_space_size =
+            (chunk_size_.vertex_count - mesh_data.vertices.size()) * sizeof(vertex);
+        void* vertex_data = vertex_buffer_->map();
+        std::memset(static_cast<std::byte*>(vertex_data) + free_space_offset, 0, free_space_size);
+
         index_buffer_->copy_from_vector(
             mesh_data.indices, mesh_alloc.index_offset * sizeof(uint32_t)
         );
-        mesh_alloc.generation = model_id.generation;
+        mesh_alloc.vertex_count = mesh_data.vertices.size();
+        mesh_alloc.index_count  = mesh_data.indices.size();
+        mesh_alloc.generation   = model_id.generation;
     }
 }
 

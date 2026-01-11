@@ -40,7 +40,7 @@ buffer_chunk_size combined_buffer_pool<C>::get_chunk_size_for_mesh(
     uint32 vertex_chunk = 256;
     uint32 index_chunk  = 512;
 
-    while (vertex_chunk < vertex_count && index_chunk < index_count) {
+    while (vertex_chunk < vertex_count || index_chunk < index_count) {
         vertex_chunk *= 2;
         index_chunk *= 2;
     }
