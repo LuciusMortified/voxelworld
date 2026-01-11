@@ -196,7 +196,7 @@ private:
     void handle_mouse_press(
         const gfx::mouse_press_event& event
     ) {
-        if (event.button == gfx::mouse::button::LEFT) {
+        if (event.button == gfx::mouse::buttons::LEFT) {
             const auto& world  = get_engine().get_world();
             const auto& window = get_engine().get_window();
             const auto& camera = get_engine().get_camera();

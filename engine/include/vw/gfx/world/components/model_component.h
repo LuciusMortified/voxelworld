@@ -29,6 +29,10 @@ public:
         return model_->get_voxel(x, y, z);
     }
 
+    [[nodiscard]] auto get_voxel(vec3i pos) const -> voxel {
+        return model_->get_voxel(pos);
+    }
+
     [[nodiscard]] auto get_voxels() const -> const std::vector<voxel>& {
         return model_->get_voxels();
     }

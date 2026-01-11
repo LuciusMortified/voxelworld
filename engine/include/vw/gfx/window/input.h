@@ -139,7 +139,7 @@ enum class mods : int {
 }  // namespace keyboard
 
 namespace mouse {
-enum class button {
+enum class buttons {
     LEFT     = 0,
     RIGHT    = 1,
     MIDDLE   = 2,
@@ -151,13 +151,13 @@ enum class button {
 };
 }  // namespace mouse
 
-enum class cursor_mode {
+enum class cursor_modes {
     NORMAL   = 0x00034001,  // Обычный курсор
     HIDDEN   = 0x00034002,  // Скрытый курсор
     DISABLED = 0x00034003   // Заблокированный курсор (для FPS камеры)
 };
 
-enum class input_mode {
+enum class input_modes {
     CURSOR               = 0x00033001,  // Режим курсора
     STICKY_KEYS          = 0x00033002,  // Залипающие клавиши
     STICKY_MOUSE_BUTTONS = 0x00033003,  // Залипающие кнопки мыши

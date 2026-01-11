@@ -55,7 +55,7 @@ public:
     bool is_key_pressed(keyboard::keys key) const;
 
     [[nodiscard]]
-    bool is_mouse_button_pressed(mouse::button button) const;
+    bool is_mouse_button_pressed(mouse::buttons button) const;
 
     [[nodiscard]]
     vec2d get_cursor_pos() const;
@@ -63,8 +63,8 @@ public:
     void set_cursor_pos(vec2d pos) const;
     void set_cursor_pos(double x, double y) const;
 
-    void set_cursor_mode(cursor_mode mode) const;
-    void set_input_mode(input_mode mode, bool value) const;
+    void set_cursor_mode(cursor_modes mode) const;
+    void set_input_mode(input_modes mode, bool value) const;
 
     void set_title(std::string_view title) const;
 

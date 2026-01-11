@@ -15,57 +15,52 @@ inline void tool_panel::render(
 ) {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImVec2 window_pos =
-        ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + state_->ui.right_side_voffset + 10);
+        ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + state_->ui.left_size_voffset + 10);
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
 
     ImGuiWindowFlags window_flags =         //
         ImGuiWindowFlags_NoCollapse |       //
         ImGuiWindowFlags_NoSavedSettings |  //
-        // ImGuiWindowFlags_NoTitleBar |       //
-        // ImGuiWindowFlags_NoMove |           //
         ImGuiWindowFlags_AlwaysAutoResize;
 
     ImGui::Begin("Tools", nullptr, window_flags);
-    //imgui_clamp_window_pos_to_viewport();
 
     ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
 
-    ImGui::Button("Select entity", ImVec2(100, 0));
-    ImGui::SameLine();
-    ImGui::TextDisabled("(S)");
-    ImGui::Spacing();
-
-    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
-    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
-    ImGui::Button("Add voxel", ImVec2(100, 0));
-    ImGui::PopStyleColor(2);
-
-    ImGui::SameLine();
-    ImGui::TextDisabled("(A)");
-    ImGui::Spacing();
-
-    ImGui::Button("Remove voxel", ImVec2(100, 0));
-
-    ImGui::SameLine();
-    ImGui::TextDisabled("(R)");
-    ImGui::Spacing();
-
-    ImGui::Button("Paint voxel", ImVec2(100, 0));
-
-    ImGui::SameLine();
-    ImGui::TextDisabled("(P)");
-    ImGui::Spacing();
-
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
-
-    ImGui::Text("Active Tool:");
-    ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), "%s", "Add Voxel");
+    render_tool_button(tools::select_entity, "Select entity", "(S)");
+    render_tool_button(tools::add_voxel, "Add voxel", "(A)");
+    render_tool_button(tools::remove_voxel, "Remove voxel", "(R)");
+    render_tool_button(tools::paint_voxel, "Paint voxel", "(P)");
 
     ImGui::PopStyleVar(1);
 
+    state_->ui.left_size_voffset += ImGui::GetWindowHeight() + 10.f;
+
     ImGui::End();
+}
+
+inline void tool_panel::render_tool_button(
+    tools tool, std::string_view label, std::string_view shortcut
+) {
+    if (state_->selected_tool == tool) {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
+        ImGui::PushStyleColor(
+            ImGuiCol_ButtonHovered, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]
+        );
+    } else {
+        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_Button]);
+        ImGui::PushStyleColor(
+            ImGuiCol_ButtonHovered, ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered]
+        );
+    }
+    if (ImGui::Button(label.data(), ImVec2(100, 0))) {
+        state_->selected_tool = tool;
+    }
+    ImGui::PopStyleColor(2);
+
+    ImGui::SameLine();
+    ImGui::TextDisabled(shortcut.data());
+    ImGui::Spacing();
 }
 
 }  // namespace vw::sculptor

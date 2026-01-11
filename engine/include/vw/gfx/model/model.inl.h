@@ -39,6 +39,12 @@ inline auto model::get_voxel(
     return voxels_[index(x, y, z)];
 }
 
+inline auto model::get_voxel(
+    vec3i pos
+) const -> voxel {
+    return voxels_[index(pos.x, pos.y, pos.z)];
+}
+
 inline auto model::is_empty(
     int x, int y, int z
 ) const -> bool {
@@ -46,6 +52,12 @@ inline auto model::is_empty(
         return true;
     }
     return voxels_[index(x, y, z)].is_empty();
+}
+
+inline auto model::is_empty(
+    vec3i pos
+) const -> bool {
+    return is_empty(pos.x, pos.y, pos.z);
 }
 
 inline void model::clear() {

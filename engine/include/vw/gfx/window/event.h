@@ -66,21 +66,21 @@ struct mouse_move_event final : event {
 };
 
 struct mouse_press_event final : event {
-    mouse::button button;
+    mouse::buttons button;
     keyboard::mods mods;
 
     mouse_press_event(
-        mouse::button button, keyboard::mods mods
+        mouse::buttons button, keyboard::mods mods
     )
         : button(button), mods(mods) {}
 };
 
 struct mouse_release_event final : event {
-    mouse::button button;
+    mouse::buttons button;
     keyboard::mods mods;
 
     mouse_release_event(
-        mouse::button button, keyboard::mods mods
+        mouse::buttons button, keyboard::mods mods
     )
         : button(button), mods(mods) {}
 };

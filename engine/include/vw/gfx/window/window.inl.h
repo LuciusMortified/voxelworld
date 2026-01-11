@@ -81,10 +81,10 @@ inline void window::mouse_button_callback(
     const auto keyboard_mods = static_cast<keyboard::mods>(mods);
 
     if (action == GLFW_PRESS) {
-        mouse_press_event event(static_cast<mouse::button>(button), keyboard_mods);
+        mouse_press_event event(static_cast<mouse::buttons>(button), keyboard_mods);
         w->event_dispatcher_.dispatch(event);
     } else if (action == GLFW_RELEASE) {
-        mouse_release_event event(static_cast<mouse::button>(button), keyboard_mods);
+        mouse_release_event event(static_cast<mouse::buttons>(button), keyboard_mods);
         w->event_dispatcher_.dispatch(event);
     }
 }
@@ -183,7 +183,7 @@ inline bool window::is_key_pressed(
 }
 
 inline bool window::is_mouse_button_pressed(
-    mouse::button button
+    mouse::buttons button
 ) const {
     return glfwGetMouseButton(window_, static_cast<int>(button)) == GLFW_PRESS;
 }
@@ -208,13 +208,13 @@ inline void window::set_cursor_pos(
 }
 
 inline void window::set_cursor_mode(
-    cursor_mode mode
+    cursor_modes mode
 ) const {
     glfwSetInputMode(window_, GLFW_CURSOR, static_cast<int>(mode));
 }
 
 inline void window::set_input_mode(
-    input_mode mode, bool value
+    input_modes mode, bool value
 ) const {
     glfwSetInputMode(window_, static_cast<int>(mode), value ? GLFW_TRUE : GLFW_FALSE);
 }

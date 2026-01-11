@@ -31,11 +31,11 @@ int main() {
             }
 
             // Проверка кнопок мыши
-            if (window.is_mouse_button_pressed(gfx::mouse::button::LEFT)) {
+            if (window.is_mouse_button_pressed(gfx::mouse::buttons::LEFT)) {
                 vec2d mouse_pos = window.get_cursor_pos();
                 log::info("Нажата левая кнопка мыши ({}, {})", mouse_pos.x, mouse_pos.y);
             }
-            if (window.is_mouse_button_pressed(gfx::mouse::button::RIGHT)) {
+            if (window.is_mouse_button_pressed(gfx::mouse::buttons::RIGHT)) {
                 vec2d mouse_pos = window.get_cursor_pos();
                 log::info("Нажата правая кнопка мыши ({}, {})", mouse_pos.x, mouse_pos.y);
             }

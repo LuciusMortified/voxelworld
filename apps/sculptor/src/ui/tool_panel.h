@@ -16,6 +16,8 @@ public:
 
 private:
     app_state* state_;
+
+    void render_tool_button(tools tool, std::string_view label, std::string_view shortcut);
 };
 
 }  // namespace vw::sculptor

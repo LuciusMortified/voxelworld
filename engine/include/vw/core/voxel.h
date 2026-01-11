@@ -17,6 +17,9 @@ struct voxel {
         return value.is_empty();
     }
 };
+
+static constexpr auto empty_voxel = voxel{colors::empty};
+
 }  // namespace vw
 
 #endif  // VW_CORE_VOXEL_H

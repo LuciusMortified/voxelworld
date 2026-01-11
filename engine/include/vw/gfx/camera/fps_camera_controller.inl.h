@@ -156,7 +156,7 @@ inline void fps_camera_controller::set_mouse_captured(
 ) {
     mouse_captured_ = captured;
 
-    window_->set_cursor_mode(mouse_captured_ ? cursor_mode::DISABLED : cursor_mode::NORMAL);
+    window_->set_cursor_mode(mouse_captured_ ? cursor_modes::DISABLED : cursor_modes::NORMAL);
 
     mouse_initialized_ = false;
 }

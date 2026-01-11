@@ -14,9 +14,7 @@ namespace vw::gfx {
 
 template <typename... Cs>
 model_system<Cs...>::model_system(
-    registry_type& registry,
-    mesh_pool& mesh_pool,
-    spatial_system_type& spatial_sys
+    registry_type& registry, mesh_pool& mesh_pool, spatial_system_type& spatial_sys
 )
     : registry_(&registry), mesh_pool_(&mesh_pool), spatial_system_(&spatial_sys) {}
 
@@ -99,10 +97,8 @@ void model_system<Cs...>::model_modifier::set_model(
     component_->model_ = std::move(model_ptr);
     system_->mark_dirty(entity_);
     system_->mark_render_dirty(entity_);
-    
-    // Пометить spatial_component как dirty
-    if (system_->spatial_system_ &&
-        system_->registry_->template has<spatial_component>(entity_)) {
+
+    if (system_->registry_->template has<spatial_component>(entity_)) {
         system_->spatial_system_->mark_dirty(entity_);
     }
 }
@@ -115,10 +111,8 @@ void model_system<Cs...>::model_modifier::set_voxel(
         component_->model_->set_voxel(x, y, z, v);
         system_->mark_dirty(entity_);
         system_->mark_render_dirty(entity_);
-        
-        // Пометить spatial_component как dirty
-        if (system_->spatial_system_ &&
-            system_->registry_->template has<spatial_component>(entity_)) {
+
+        if (system_->registry_->template has<spatial_component>(entity_)) {
             system_->spatial_system_->mark_dirty(entity_);
         }
     }
@@ -132,10 +126,36 @@ void model_system<Cs...>::model_modifier::set_voxel(
         component_->model_->set_voxel(x, y, z, c);
         system_->mark_dirty(entity_);
         system_->mark_render_dirty(entity_);
-        
-        // Пометить spatial_component как dirty
-        if (system_->spatial_system_ &&
-            system_->registry_->template has<spatial_component>(entity_)) {
+
+        if (system_->registry_->template has<spatial_component>(entity_)) {
+            system_->spatial_system_->mark_dirty(entity_);
+        }
+    }
+}
+template <typename... Cs>
+void model_system<Cs...>::model_modifier::set_voxel(
+    vec3i pos, const voxel& v
+) {
+    if (component_->model_) {
+        component_->model_->set_voxel(pos.x, pos.y, pos.z, v);
+        system_->mark_dirty(entity_);
+        system_->mark_render_dirty(entity_);
+
+        if (system_->registry_->template has<spatial_component>(entity_)) {
+            system_->spatial_system_->mark_dirty(entity_);
+        }
+    }
+}
+template <typename... Cs>
+void model_system<Cs...>::model_modifier::set_voxel(
+    vec3i pos, color c
+) {
+    if (component_->model_) {
+        component_->model_->set_voxel(pos.x, pos.y, pos.z, c);
+        system_->mark_dirty(entity_);
+        system_->mark_render_dirty(entity_);
+
+        if (system_->registry_->template has<spatial_component>(entity_)) {
             system_->spatial_system_->mark_dirty(entity_);
         }
     }
@@ -149,7 +169,7 @@ void model_system<Cs...>::model_modifier::fill(
         component_->model_->fill(v);
         system_->mark_dirty(entity_);
         system_->mark_render_dirty(entity_);
-        
+
         // Пометить spatial_component как dirty
         if (system_->spatial_system_ &&
             system_->registry_->template has<spatial_component>(entity_)) {
@@ -164,7 +184,7 @@ void model_system<Cs...>::model_modifier::clear() {
         component_->model_->clear();
         system_->mark_dirty(entity_);
         system_->mark_render_dirty(entity_);
-        
+
         // Пометить spatial_component как dirty
         if (system_->spatial_system_ &&
             system_->registry_->template has<spatial_component>(entity_)) {
