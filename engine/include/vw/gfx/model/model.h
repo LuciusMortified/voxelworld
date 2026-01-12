@@ -21,15 +21,18 @@ public:
 
     model(const model&)            = delete;
     model& operator=(const model&) = delete;
-    model(model&&)                 = delete;
-    model& operator=(model&&)      = delete;
+
+    model(model&&)            = default;
+    model& operator=(model&&) = default;
+
+    [[nodiscard]] auto operator[](vec3i pos) -> voxel&;
+    [[nodiscard]] auto operator[](vec3i pos) const -> const voxel&;
+
+    [[nodiscard]] auto operator[](int x, int y, int z) -> voxel&;
+    [[nodiscard]] auto operator[](int x, int y, int z) const -> const voxel&;
 
     void set_voxel(int x, int y, int z, const voxel& voxel);
-    void set_voxel(
-        int x, int y, int z, color color
-    ) {
-        set_voxel(x, y, z, voxel{color});
-    }
+    void set_voxel(int x, int y, int z, color color);
 
     [[nodiscard]] auto get_voxel(int x, int y, int z) const -> voxel;
     [[nodiscard]] auto get_voxel(vec3i pos) const -> voxel;
@@ -37,35 +40,18 @@ public:
     [[nodiscard]] auto is_empty(int x, int y, int z) const -> bool;
     [[nodiscard]] auto is_empty(vec3i pos) const -> bool;
 
-    [[nodiscard]] auto width() const -> int {
-        return width_;
-    }
-
-    [[nodiscard]] auto height() const -> int {
-        return height_;
-    }
-
-    [[nodiscard]] auto depth() const -> int {
-        return depth_;
-    }
-
-    [[nodiscard]] auto size() const -> vec3i {
-        return vec3i{width_, height_, depth_};
-    }
+    [[nodiscard]] auto width() const -> int;
+    [[nodiscard]] auto height() const -> int;
+    [[nodiscard]] auto depth() const -> int;
+    [[nodiscard]] auto size() const -> vec3i;
 
     void fill(const voxel& voxel);
 
-    void clear();
-
-    [[nodiscard]] auto get_identity() const -> model_identity {
-        return identity_;
-    }
+    [[nodiscard]] auto get_identity() const -> model_identity;
 
     void set_voxels(const std::vector<voxel>& voxels);
 
-    [[nodiscard]] auto get_voxels() const -> const std::vector<voxel>& {
-        return voxels_;
-    }
+    [[nodiscard]] auto get_voxels() const -> const std::vector<voxel>&;
 
 private:
     model_identity_pool* identity_pool_;
@@ -73,10 +59,10 @@ private:
     std::vector<voxel> voxels_;
     model_identity identity_;
 
-    [[nodiscard]]
-    auto index(int x, int y, int z) const -> int;
+    [[nodiscard]] auto index_at(int x, int y, int z) const -> int;
+    [[nodiscard]] auto index_at(vec3i pos) const -> int;
 
-    void increment_generation();
+    void increment_generation_();
 };
 
 }  // namespace vw::gfx

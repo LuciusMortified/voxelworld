@@ -3,6 +3,7 @@
 #ifndef VW_SCULPTOR_APP_INL_H
 #define VW_SCULPTOR_APP_INL_H
 
+#include "tools/add_voxel_tool.h"
 #include "tools/dummy_tool.h"
 #include "tools/remove_voxel_tool.h"
 #include "tools/select_entity_tool.h"
@@ -24,7 +25,7 @@ inline app::app(
     auto& camera = eng.get_camera();
 
     tools_[tools::select_entity] = std::make_unique<select_entity_tool<>>(eng, state_);
-    tools_[tools::add_voxel]     = std::make_unique<dummy_tool>();
+    tools_[tools::add_voxel]     = std::make_unique<add_voxel_tool<>>(eng, state_, op_manager_);
     tools_[tools::remove_voxel]  = std::make_unique<remove_voxel_tool<>>(eng, state_, op_manager_);
     tools_[tools::paint_voxel]   = std::make_unique<dummy_tool>();
 
@@ -88,40 +89,39 @@ inline void app::render(
 inline void app::handle_key_press(
     const gfx::key_press_event& ev
 ) {
-#if 0
-    auto& io = ImGui::GetIO();
-    if (io.WantCaptureKeyboard) {
+    auto& io                  = ImGui::GetIO();
+    bool really_want_keyboard = ImGui::IsAnyItemActive() || ImGui::IsAnyItemFocused();
+    if (io.WantCaptureKeyboard && really_want_keyboard) {
         return;
     }
-#endif
 
-    if (!camera_movement_enabled_) {
-        using keys = gfx::keyboard::keys;
-        using mods = gfx::keyboard::mods;
-
-        if (ev.key == keys::Z && ev.with(mods::CTRL) && !ev.with(mods::SHIFT)) {
-            op_manager_.undo();
-        }
-        if (ev.key == keys::Z && ev.with(mods::CTRL) && ev.with(mods::SHIFT)) {
-            op_manager_.redo();
-        }
-        if (ev.key == keys::S) {
-            state_.selected_tool = tools::select_entity;
-        }
-        if (ev.key == keys::A) {
-            state_.selected_tool = tools::add_voxel;
-        }
-        if (ev.key == keys::R) {
-            state_.selected_tool = tools::remove_voxel;
-        }
-        if (ev.key == keys::P) {
-            state_.selected_tool = tools::paint_voxel;
-        }
+    if (camera_movement_enabled_) {
+        return;
     }
 
-    if (!camera_movement_enabled_) {
-        tools_[state_.selected_tool]->on_key_press(ev);
+    using keys = gfx::keyboard::keys;
+    using mods = gfx::keyboard::mods;
+
+    if (ev.key == keys::Z && ev.with(mods::CTRL) && !ev.with(mods::SHIFT)) {
+        op_manager_.undo();
     }
+    if (ev.key == keys::Z && ev.with(mods::CTRL) && ev.with(mods::SHIFT)) {
+        op_manager_.redo();
+    }
+    if (ev.key == keys::S) {
+        state_.selected_tool = tools::select_entity;
+    }
+    if (ev.key == keys::A) {
+        state_.selected_tool = tools::add_voxel;
+    }
+    if (ev.key == keys::R) {
+        state_.selected_tool = tools::remove_voxel;
+    }
+    if (ev.key == keys::P) {
+        state_.selected_tool = tools::paint_voxel;
+    }
+
+    tools_[state_.selected_tool]->on_key_press(ev);
 }
 
 inline void app::handle_mouse_move(

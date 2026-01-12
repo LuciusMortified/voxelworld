@@ -33,10 +33,10 @@ void main() {
     vec3 result = (ambient + diffuse + specular) * fragColor;
     
     // Add some fog effect based on distance
-    float distance = length(viewPos - fragPos);
-    float fogFactor = exp(-distance * 0.01);
-    vec3 fogColor = vec3(0.7, 0.8, 0.9);
-    result = mix(fogColor, result, fogFactor);
+    //float distance = length(viewPos - fragPos);
+    //float fogFactor = exp(-distance * 0.001);
+    //vec3 fogColor = vec3(0.7, 0.8, 0.9);
+    //result = mix(fogColor, result, fogFactor);
     
     outColor = vec4(result, 1.0);
 }

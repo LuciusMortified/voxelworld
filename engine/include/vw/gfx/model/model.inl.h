@@ -5,7 +5,6 @@
 
 #include <algorithm>
 
-#include "vw/gfx/model/model.h"
 #include "vw/gfx/model/model_identity_pool.h"
 
 namespace vw::gfx {
@@ -21,34 +20,63 @@ inline model::model(
 }
 
 inline model::~model() {
-    if (identity_pool_ && identity_.is_valid()) {
-        identity_pool_->destroy(identity_);
-    }
+    identity_pool_->destroy(identity_);
+}
+
+inline auto model::operator[](
+    vec3i pos
+) -> voxel& {
+    return voxels_[index_at(pos)];
+}
+
+inline auto model::operator[](
+    vec3i pos
+) const -> const voxel& {
+    return voxels_[index_at(pos)];
+}
+
+inline auto model::operator[](
+    int x, int y, int z
+) -> voxel& {
+    return voxels_[index_at(x, y, z)];
+}
+
+inline auto model::operator[](
+    int x, int y, int z
+) const -> const voxel& {
+    return voxels_[index_at(x, y, z)];
 }
 
 inline void model::set_voxel(
     int x, int y, int z, const voxel& voxel
 ) {
-    voxels_[index(x, y, z)] = voxel;
-    increment_generation();
+    voxels_[index_at(x, y, z)] = voxel;
+    increment_generation_();
+}
+
+inline void model::set_voxel(
+    int x, int y, int z, color color
+) {
+    voxels_[index_at(x, y, z)] = voxel{color};
+    increment_generation_();
 }
 
 inline auto model::get_voxel(
     int x, int y, int z
 ) const -> voxel {
-    return voxels_[index(x, y, z)];
+    return voxels_[index_at(x, y, z)];
 }
 
 inline auto model::get_voxel(
     vec3i pos
 ) const -> voxel {
-    return voxels_[index(pos.x, pos.y, pos.z)];
+    return voxels_[index_at(pos)];
 }
 
 inline auto model::is_empty(
     int x, int y, int z
 ) const -> bool {
-    return voxels_[index(x, y, z)].is_empty();
+    return voxels_[index_at(x, y, z)].is_empty();
 }
 
 inline auto model::is_empty(
@@ -57,29 +85,47 @@ inline auto model::is_empty(
     return is_empty(pos.x, pos.y, pos.z);
 }
 
-inline void model::clear() {
-    std::ranges::fill(voxels_, voxel{});
-    increment_generation();
+inline auto model::width() const -> int {
+    return width_;
+}
+
+inline auto model::height() const -> int {
+    return height_;
+}
+
+inline auto model::depth() const -> int {
+    return depth_;
+}
+
+inline auto model::size() const -> vec3i {
+    return vec3i{width_, height_, depth_};
 }
 
 inline void model::fill(
     const voxel& voxel
 ) {
     std::ranges::fill(voxels_, voxel);
-    increment_generation();
+    increment_generation_();
 }
 
-inline auto model::index(
+inline auto model::get_identity() const -> model_identity {
+    return identity_;
+}
+
+inline auto model::index_at(
     int x, int y, int z
 ) const -> int {
     return x + (y * width_) + (z * width_ * height_);
 }
 
-inline void model::increment_generation() {
-    if (identity_pool_ && identity_.is_valid()) {
-        identity_pool_->destroy(identity_);
-        identity_ = identity_pool_->create();
-    }
+inline auto model::index_at(
+    vec3i pos
+) const -> int {
+    return index_at(pos.x, pos.y, pos.z);
+}
+
+inline void model::increment_generation_() {
+    identity_ = identity_pool_->next_generation(identity_);
 }
 
 inline void model::set_voxels(
@@ -89,7 +135,11 @@ inline void model::set_voxels(
         throw std::runtime_error("Voxels container size does not match model size.");
     }
     voxels_ = voxels;
-    increment_generation();
+    increment_generation_();
+}
+
+inline auto model::get_voxels() const -> const std::vector<voxel>& {
+    return voxels_;
 }
 
 }  // namespace vw::gfx

@@ -18,9 +18,9 @@ inline void tool_panel::render(
         ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + state_->ui.left_size_voffset + 10);
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
 
-    ImGuiWindowFlags window_flags =         //
-        ImGuiWindowFlags_NoCollapse |       //
-        ImGuiWindowFlags_NoSavedSettings |  //
+    ImGuiWindowFlags window_flags =            //
+        ImGuiWindowFlags_NoCollapse |          //
+        ImGuiWindowFlags_NoSavedSettings |     //
         ImGuiWindowFlags_AlwaysAutoResize;
 
     ImGui::Begin("Tools", nullptr, window_flags);

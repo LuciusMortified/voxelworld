@@ -45,7 +45,7 @@ struct std::hash<vw::gfx::model_identity> {
     ) const noexcept {
         size_t x = (size_t{id.generation} << 32) | size_t{id.index};
 
-        // splitmix64 finalizer (хороший миксер)
+        // splitmix64 finalizer
         x += 0x9e3779b97f4a7c15ull;
         x = (x ^ (x >> 30)) * 0xbf58476d1ce4e5b9ull;
         x = (x ^ (x >> 27)) * 0x94d049bb133111ebull;

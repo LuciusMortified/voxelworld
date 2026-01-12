@@ -84,7 +84,8 @@ find_package(imgui CONFIG REQUIRED)
 find_package(spdlog CONFIG REQUIRED)
 
 # Create engine library
-add_library(${PROJECT_NAME} INTERFACE)
+add_library(${PROJECT_NAME} INTERFACE
+        include/vw/gfx/world/components/model_component.inl.h)
 
 # Set include directories
 target_include_directories(${PROJECT_NAME} INTERFACE include)

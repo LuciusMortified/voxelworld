@@ -117,7 +117,32 @@ inline void combined_buffer::allocate(
         }
 
         vertex_buffer_->copy_from_vector(mesh_data.vertices, vertex_offset * sizeof(vertex));
-        index_buffer_->copy_from_vector(mesh_data.indices, index_offset * sizeof(uint32_t));
+        auto vertex_free_space_offset =
+            (vertex_offset + mesh_data.vertices.size()) * sizeof(vertex);
+        auto vertex_free_space_size =
+            (chunk_size_.vertex_count - mesh_data.vertices.size()) * sizeof(vertex);
+        if (vertex_free_space_size > 0) {
+            void* vertex_data = vertex_buffer_->map();
+            std::memset(
+                static_cast<std::byte*>(vertex_data) + vertex_free_space_offset,
+                0,
+                vertex_free_space_size
+            );
+        }
+
+        index_buffer_->copy_from_vector(mesh_data.indices, index_offset * sizeof(uint32));
+        auto index_free_space_offset =  //
+            (index_offset + mesh_data.indices.size()) * sizeof(uint32);
+        auto index_free_space_size =
+            (chunk_size_.index_count - mesh_data.indices.size()) * sizeof(uint32);
+        if (index_free_space_size > 0) {
+            void* index_data = index_buffer_->map();
+            std::memset(
+                static_cast<std::byte*>(index_data) + index_free_space_offset,
+                0,
+                index_free_space_size
+            );
+        }
 
         mesh_allocation new_mesh_alloc{};
         new_mesh_alloc.vertex_offset = vertex_offset;
@@ -168,17 +193,35 @@ inline void combined_buffer::write_mesh(
         vertex_buffer_->copy_from_vector(
             mesh_data.vertices, mesh_alloc.vertex_offset * sizeof(vertex)
         );
-
-        auto free_space_offset =
+        auto vertex_free_space_offset =
             (mesh_alloc.vertex_offset + mesh_data.vertices.size()) * sizeof(vertex);
-        auto free_space_size =
+        auto vertex_free_space_size =
             (chunk_size_.vertex_count - mesh_data.vertices.size()) * sizeof(vertex);
-        void* vertex_data = vertex_buffer_->map();
-        std::memset(static_cast<std::byte*>(vertex_data) + free_space_offset, 0, free_space_size);
+        if (vertex_free_space_size > 0) {
+            void* vertex_data = vertex_buffer_->map();
+            std::memset(
+                static_cast<std::byte*>(vertex_data) + vertex_free_space_offset,
+                0,
+                vertex_free_space_size
+            );
+        }
 
         index_buffer_->copy_from_vector(
             mesh_data.indices, mesh_alloc.index_offset * sizeof(uint32_t)
         );
+        auto index_free_space_offset =
+            (mesh_alloc.index_offset + mesh_data.indices.size()) * sizeof(uint32);
+        auto index_free_space_size =
+            (chunk_size_.index_count - mesh_data.indices.size()) * sizeof(uint32);
+        if (index_free_space_size > 0) {
+            void* index_data = index_buffer_->map();
+            std::memset(
+                static_cast<std::byte*>(index_data) + index_free_space_offset,
+                0,
+                index_free_space_size
+            );
+        }
+
         mesh_alloc.vertex_count = mesh_data.vertices.size();
         mesh_alloc.index_count  = mesh_data.indices.size();
         mesh_alloc.generation   = model_id.generation;

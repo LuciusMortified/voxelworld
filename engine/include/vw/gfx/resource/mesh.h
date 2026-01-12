@@ -25,11 +25,11 @@ struct vertex {
     )
         : position(pos), normal(norm), color(col) {}
 
-    [[nodiscard]]
-    static std::vector<VkVertexInputBindingDescription> get_binding_descriptions();
+    [[nodiscard]] static auto get_binding_descriptions()
+        -> std::vector<VkVertexInputBindingDescription>;
 
-    [[nodiscard]]
-    static std::vector<VkVertexInputAttributeDescription> get_attribute_descriptions();
+    [[nodiscard]] static auto get_attribute_descriptions()
+        -> std::vector<VkVertexInputAttributeDescription>;
 };
 
 struct mesh {

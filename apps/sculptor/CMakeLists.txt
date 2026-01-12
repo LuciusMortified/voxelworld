@@ -37,6 +37,8 @@ add_executable(${PROJECT_NAME}
         src/tools/remove_voxel_tool.inl.h
         src/operations/remove_voxel_operation.h
         src/operations/remove_voxel_operation.inl.h
+        src/tools/add_voxel_tool.h
+        src/tools/add_voxel_tool.inl.h
 )
 
 target_link_libraries(${PROJECT_NAME} vwengine)
