@@ -84,10 +84,41 @@ inline mat4f orthographic_matrix(
 }
 
 inline mat4f look_at_matrix(
-    const vec3f& eye, const vec3f& center, const vec3f& up
+    const vec3f& eye, const vec3f& target
 ) {
     mat4f matrix  = identity_matrix();
-    const vec3f f = normalize(center - eye);
+    const vec3f f = normalize(target - eye);
+    auto up       = vec3f{0.0f, 1.0f, 0.0f};
+    if (std::abs(dot(f, up)) > 0.999f) {
+        up = vec3f{1.0f, 0.0f, 0.0f};
+    }
+
+    const vec3f s = normalize(cross(up, f));
+    const vec3f u = cross(f, s);
+
+    matrix[0, 0] = s.x;
+    matrix[0, 1] = s.y;
+    matrix[0, 2] = s.z;
+    matrix[0, 3] = -dot(s, eye);
+
+    matrix[1, 0] = u.x;
+    matrix[1, 1] = u.y;
+    matrix[1, 2] = u.z;
+    matrix[1, 3] = -dot(u, eye);
+
+    matrix[2, 0] = -f.x;
+    matrix[2, 1] = -f.y;
+    matrix[2, 2] = -f.z;
+    matrix[2, 3] = dot(f, eye);
+
+    return matrix;
+}
+
+inline mat4f look_at_matrix(
+    const vec3f& eye, const vec3f& target, const vec3f& up
+) {
+    mat4f matrix  = identity_matrix();
+    const vec3f f = normalize(target - eye);
     const vec3f s = normalize(cross(up, f));
     const vec3f u = cross(f, s);
 
@@ -236,6 +267,19 @@ inline vec3f lerp(
     const vec3f& a, const vec3f& b, float t
 ) {
     return {lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t)};
+}
+
+inline vec3f perpendicular(
+    const vec3f& eye, const vec3f& target
+) {
+    auto dir = normalize(target - eye);
+    auto up  = vec3f{0.0f, 1.0f, 0.0f};
+
+    if (std::abs(dot(dir, up)) > 0.999f) {
+        up = vec3f{1.0f, 0.0f, 0.0f};
+    }
+
+    return normalize(cross(up, dir));
 }
 
 inline bool is_safe_zero(

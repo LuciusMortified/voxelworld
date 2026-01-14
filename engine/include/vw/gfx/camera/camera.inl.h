@@ -58,6 +58,14 @@ inline float camera::get_far() const {
     return far_;
 }
 
+inline float camera::get_fov() const {
+    return fov_;
+}
+
+inline float camera::get_aspect_ratio() const {
+    return aspect_;
+}
+
 inline vec3f camera::get_position() const  {
     return position_;
 }

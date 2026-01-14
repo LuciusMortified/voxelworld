@@ -11,7 +11,7 @@ namespace vw::gfx {
 class camera {
 public:
     explicit camera(
-        float fov = 45.0f, float aspect = 16.0f / 9.0f, float near = 0.1f, float far = 1000.0f
+        float fov = 60.0f, float aspect = 16.0f / 9.0f, float near = 0.1f, float far = 1000.0f
     );
 
     void set_position(const vec3f& position);
@@ -20,14 +20,16 @@ public:
 
     [[nodiscard]] float get_near() const;
     [[nodiscard]] float get_far() const;
+    [[nodiscard]] float get_fov() const;
+    [[nodiscard]] float get_aspect_ratio() const;
 
     [[nodiscard]] vec3f get_position() const;
     [[nodiscard]] float get_pitch() const;
     [[nodiscard]] float get_yaw() const;
 
-    mat4f get_view_matrix() const;
-    mat4f get_projection_matrix() const;
-    mat4f get_view_projection_matrix() const;
+    [[nodiscard]] mat4f get_view_matrix() const;
+    [[nodiscard]] mat4f get_projection_matrix() const;
+    [[nodiscard]] mat4f get_view_projection_matrix() const;
     
     [[nodiscard]] const frustum& get_frustum() const;
 

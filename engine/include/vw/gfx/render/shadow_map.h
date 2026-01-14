@@ -53,6 +53,8 @@ private:
     VkRenderPass shadow_render_pass_    = VK_NULL_HANDLE;
     
     mat4f light_space_matrix_;
+
+    float max_shadow_distance_ = 200.0f;
 };
 
 }  // namespace vw::gfx

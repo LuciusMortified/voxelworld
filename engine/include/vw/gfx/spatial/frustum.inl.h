@@ -127,7 +127,7 @@ inline bool frustum::intersects(
     const vec3f& point
 ) const {
     for (int i = 0; i < 6; ++i) {
-        float dist = vw::math::dot(planes[i].normal, point) + planes[i].distance;
+        float dist = math::dot(planes[i].normal, point) + planes[i].distance;
         if (dist < 0.0f) {
             return false;
         }

@@ -189,79 +189,45 @@ inline void shadow_map::create_framebuffer() {
 inline void shadow_map::update_light_matrix(
     const camera& camera, const vec3f& light_direction
 ) {
-    const mat4f view_proj     = camera.get_view_projection_matrix();
-    const mat4f inv_view_proj = math::inverse_matrix(view_proj);
-
-    const std::array<vec4f, 8> ndc = {
-        vec4f{-1.0f, -1.0f, -1.0f, 1.0f},
-        vec4f{+1.0f, -1.0f, -1.0f, 1.0f},
-        vec4f{+1.0f, +1.0f, -1.0f, 1.0f},
-        vec4f{-1.0f, +1.0f, -1.0f, 1.0f},
-
-        vec4f{-1.0f, -1.0f, +1.0f, 1.0f},
-        vec4f{+1.0f, -1.0f, +1.0f, 1.0f},
-        vec4f{+1.0f, +1.0f, +1.0f, 1.0f},
-        vec4f{-1.0f, +1.0f, +1.0f, 1.0f},
-    };
-
-    std::array<vec3f, 8> frustum_ws{};
-    vec3f center_ws{0.0f, 0.0f, 0.0f};
-
-    for (size_t i = 0; i < ndc.size(); ++i) {
-        const vec4f p     = inv_view_proj * ndc[i];
-        const float inv_w = (p.w != 0.0f) ? (1.0f / p.w) : 1.0f;
-        frustum_ws[i]     = vec3f{p.x * inv_w, p.y * inv_w, p.z * inv_w};
-        center_ws         = center_ws + frustum_ws[i];
-    }
-
     const vec3f light_dir = math::normalize(light_direction);
 
-    vec3f light_up    = vec3f{0.0f, 1.0f, 0.0f};
-    vec3f light_right = math::cross(light_up, light_dir);
+    // 1. Получаем параметры камеры
+    const vec3f cam_pos     = camera.get_position();
+    const vec3f cam_forward = camera.get_forward();
+    const float cam_near    = camera.get_near();
+    const float cam_far     = camera.get_far();
+    const float fov_rad     = math::radians(camera.get_fov());
+    const float aspect      = camera.get_aspect_ratio();
 
-    light_right = math::normalize(light_right);
-    light_up    = math::normalize(math::cross(light_dir, light_right));
+    // 2. Вычисляем центр frustum
+    const float center_distance =
+        std::min((cam_near + cam_far) * 0.5f, max_shadow_distance_ * 0.5f);
+    const vec3f frustum_center = cam_pos + cam_forward * center_distance;
 
+    // 3. Вычисляем размер frustum на расстоянии центра
+    const float tan_half_fov  = std::tan(fov_rad * 0.5f);
+    const float center_height = center_distance * tan_half_fov;
+    const float center_width  = center_height * aspect;
+    const float max_size      = std::max(center_width, center_height);
+    const float half_size     = max_size * 1.5f;  // Небольшой запас для надёжности
 
-    vec3f light_target = camera.get_position();
-    vec3f light_pos = light_target - light_dir * camera.get_far();
-    mat4f light_view = math::look_at_matrix(light_pos, light_target, light_up);
+    // 4. Позиция источника света
+    const vec3f target         = frustum_center;
+    const float light_distance = cam_far * 0.5f;
+    const vec3f eye            = target - light_dir * light_distance;
 
-    vec3f min_ls{
-        std::numeric_limits<float>::max(),
-        std::numeric_limits<float>::max(),
-        std::numeric_limits<float>::max()
-    };
-    vec3f max_ls{
-        -std::numeric_limits<float>::max(),
-        -std::numeric_limits<float>::max(),
-        -std::numeric_limits<float>::max()
-    };
-
-    for (const vec3f& p_ws : frustum_ws) {
-        const vec4f p_ls4 = light_view * vec4f{p_ws.x, p_ws.y, p_ws.z, 1.0f};
-        const vec3f p_ls{p_ls4.x, p_ls4.y, p_ls4.z};
-
-        min_ls.x = std::min(min_ls.x, p_ls.x);
-        min_ls.y = std::min(min_ls.y, p_ls.y);
-        min_ls.z = std::min(min_ls.z, p_ls.z);
-
-        max_ls.x = std::max(max_ls.x, p_ls.x);
-        max_ls.y = std::max(max_ls.y, p_ls.y);
-        max_ls.z = std::max(max_ls.z, p_ls.z);
+    // 5. Вычисляем up вектор
+    vec3f up = vec3f{0.0f, 1.0f, 0.0f};
+    if (std::abs(math::dot(up, light_dir)) > 0.99f) {
+        up = vec3f{1.0f, 0.0f, 0.0f};
     }
 
-    constexpr float pad_xy = 10.0f;
-    min_ls.x -= pad_xy;
-    min_ls.y -= pad_xy;
-    max_ls.x += pad_xy;
-    max_ls.y += pad_xy;
+    // 6. Создаем light_view матрицу
+    const mat4f light_view = math::look_at_matrix(eye, target, up);
 
-    mat4f light_proj =
-        math::orthographic_matrix(min_ls.x, max_ls.x, min_ls.y, max_ls.y, min_ls.z, max_ls.z);
-
-    light_view = math::look_at_matrix(vec3f{0, 20, 0}, vec3f{0, 0, 0}, vec3f{1, 0, 0});
-    light_proj = math::orthographic_matrix(-50, 50, -50, 50, 0.1f, 100.0f);
+    // 7. Ортографическая проекция
+    auto light_proj =
+        math::orthographic_matrix(-half_size, half_size, -half_size, half_size, cam_near, cam_far);
 
     light_space_matrix_ = light_proj * light_view;
 }
