@@ -54,7 +54,7 @@ private:
     
     mat4f light_space_matrix_;
 
-    float max_shadow_distance_ = 200.0f;
+    float max_shadow_distance_ = 100.0f;
 };
 
 }  // namespace vw::gfx

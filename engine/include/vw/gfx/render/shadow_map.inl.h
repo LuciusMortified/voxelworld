@@ -209,12 +209,12 @@ inline void shadow_map::update_light_matrix(
     const float center_height = center_distance * tan_half_fov;
     const float center_width  = center_height * aspect;
     const float max_size      = std::max(center_width, center_height);
-    const float half_size     = max_size * 1.5f;  // Небольшой запас для надёжности
+    float half_size           = max_size * 1.5f;  // Небольшой запас для надёжности
 
     // 4. Позиция источника света
-    const vec3f target         = frustum_center;
-    const float light_distance = cam_far * 0.5f;
-    const vec3f eye            = target - light_dir * light_distance;
+    vec3f target         = frustum_center;
+    const float light_distance = cam_far * 0.75f;
+    vec3f eye            = target - light_dir * light_distance;
 
     // 5. Вычисляем up вектор
     vec3f up = vec3f{0.0f, 1.0f, 0.0f};
@@ -225,9 +225,34 @@ inline void shadow_map::update_light_matrix(
     // 6. Создаем light_view матрицу
     const mat4f light_view = math::look_at_matrix(eye, target, up);
 
-    // 7. Ортографическая проекция
-    auto light_proj =
-        math::orthographic_matrix(-half_size, half_size, -half_size, half_size, cam_near, cam_far);
+    // 7. Light Space Snap: стабилизация теней путём привязки к сетке текселей
+    // Вычисляем размер одного текселя в пространстве света (в единицах ортографической проекции)
+    const float texel_size = (2.0f * half_size) / static_cast<float>(shadow_map_size);
+
+    // Используем более крупную сетку для snap (4x размер текселя) - уменьшает частоту дергания
+    constexpr float snap_multiplier = 1.0f;
+    const float snap_size = texel_size * snap_multiplier;
+
+    // Преобразуем frustum_center в пространство света
+    const vec4f frustum_center_light_space = light_view * vec4f{frustum_center.x, frustum_center.y, frustum_center.z, 1.0f};
+
+    // Округляем координаты X и Y в пространстве света до кратных размеру snap сетки
+    const float snapped_x = std::floor(frustum_center_light_space.x / snap_size) * snap_size;
+    const float snapped_y = std::floor(frustum_center_light_space.y / snap_size) * snap_size;
+
+    // Вычисляем смещение для ортографической проекции
+    const float offset_x = snapped_x - frustum_center_light_space.x;
+    const float offset_y = snapped_y - frustum_center_light_space.y;
+
+    // Округляем half_size до кратных размеру текселя для дополнительной стабильности
+    half_size = std::ceil(half_size / texel_size) * texel_size;
+
+    // 8. Ортографическая проекция с учетом смещения для стабилизации
+    // Смещаем границы проекции на offset_x и offset_y, чтобы центр был выровнен по сетке
+    auto light_proj = math::orthographic_matrix(
+        -half_size + offset_x, half_size + offset_x, -half_size + offset_y, half_size + offset_y,
+        cam_near, cam_far
+    );
 
     light_space_matrix_ = light_proj * light_view;
 }
