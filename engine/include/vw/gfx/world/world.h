@@ -10,6 +10,7 @@
 #include "vw/gfx/spatial/ray.h"
 #include "vw/gfx/world/registry.h"
 #include "vw/gfx/world/systems/hierarchy_system.h"
+#include "vw/gfx/world/systems/light_system.h"
 #include "vw/gfx/world/systems/model_system.h"
 #include "vw/gfx/world/systems/spatial_system.h"
 #include "vw/gfx/world/systems/transform_system.h"
@@ -27,6 +28,7 @@ public:
     using hierarchy_system_type = hierarchy_system_from_tuple<WC>::type;
     using model_system_type     = model_system_from_tuple<WC>::type;
     using spatial_system_type   = spatial_system_from_tuple<WC>::type;
+    using light_system_type     = light_system_from_tuple<WC>::type;
 
     explicit world(vulkan_context& context);
     ~world()                               = default;
@@ -70,6 +72,8 @@ public:
 
     [[nodiscard]] auto get_spatial_system() -> spatial_system_type&;
 
+    [[nodiscard]] auto get_light_system() -> light_system_type&;
+
     [[nodiscard]] auto voxel_ray_cast(
         const ray& r,
         std::unordered_set<entity>& candidates
@@ -83,6 +87,7 @@ private:
     hierarchy_system_type hierarchy_system_;
     model_registry model_registry_;
     model_system_type model_system_;
+    light_system_type light_system_;
 };
 
 }  // namespace vw::gfx

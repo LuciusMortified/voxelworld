@@ -2,6 +2,7 @@
 
 #ifndef VW_CORE_MATH_INL_H
 #define VW_CORE_MATH_INL_H
+#include <limits>
 
 namespace vw::math {
 
@@ -63,6 +64,21 @@ inline mat4f perspective_matrix(
     matrix[2, 3] = (2.0f * far * near) / (near - far);
     matrix[3, 2] = -1.0f;
     matrix[3, 3] = 0.0f;
+
+    return matrix;
+}
+
+inline mat4f orthographic_matrix(
+    float left, float right, float bottom, float top, float near, float far
+) {
+    mat4f matrix = identity_matrix();
+
+    matrix[0, 0] = 2.0f / (right - left);
+    matrix[1, 1] = 2.0f / (top - bottom);
+    matrix[2, 2] = -1.0f / (far - near);
+    matrix[3, 0] = -(right + left) / (right - left);
+    matrix[3, 1] = -(top + bottom) / (top - bottom);
+    matrix[3, 2] = -near / (far - near);
 
     return matrix;
 }
@@ -180,10 +196,10 @@ inline mat4f scale_matrix(
 inline mat4f transform_matrix(
     const vec3f& position, const vec3f& rotation, const vec3f& scale, const vec3f& origin
 ) {
-    const mat4f trans        = translation_matrix(position);
-    const mat4f orig_back    = translation_matrix(origin);
-    const mat4f rot          = rotation_matrix(rotation);
-    const mat4f scl          = scale_matrix(scale);
+    const mat4f trans     = translation_matrix(position);
+    const mat4f orig_back = translation_matrix(origin);
+    const mat4f rot       = rotation_matrix(rotation);
+    const mat4f scl       = scale_matrix(scale);
 
     return trans * rot * scl * orig_back;
 }
@@ -231,89 +247,105 @@ inline bool is_safe_zero(
 inline mat4f inverse_matrix(
     const mat4f& matrix
 ) {
-    // Вычисление обратной матрицы методом алгебраических дополнений
     mat4f inv;
-    
-    inv[0, 0] = matrix[1, 1] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2]) -
-                matrix[1, 2] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1]) +
-                matrix[1, 3] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1]);
-    
-    inv[0, 1] = -(matrix[0, 1] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2]) -
-                   matrix[0, 2] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1]) +
-                   matrix[0, 3] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1]));
-    
-    inv[0, 2] = matrix[0, 1] * (matrix[1, 2] * matrix[3, 3] - matrix[1, 3] * matrix[3, 2]) -
-                 matrix[0, 2] * (matrix[1, 1] * matrix[3, 3] - matrix[1, 3] * matrix[3, 1]) +
-                 matrix[0, 3] * (matrix[1, 1] * matrix[3, 2] - matrix[1, 2] * matrix[3, 1]);
-    
-    inv[0, 3] = -(matrix[0, 1] * (matrix[1, 2] * matrix[2, 3] - matrix[1, 3] * matrix[2, 2]) -
-                   matrix[0, 2] * (matrix[1, 1] * matrix[2, 3] - matrix[1, 3] * matrix[2, 1]) +
-                   matrix[0, 3] * (matrix[1, 1] * matrix[2, 2] - matrix[1, 2] * matrix[2, 1]));
-    
-    inv[1, 0] = -(matrix[1, 0] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2]) -
-                   matrix[1, 2] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0]) +
-                   matrix[1, 3] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0]));
-    
-    inv[1, 1] = matrix[0, 0] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2]) -
-                 matrix[0, 2] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0]) +
-                 matrix[0, 3] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0]);
-    
-    inv[1, 2] = -(matrix[0, 0] * (matrix[1, 2] * matrix[3, 3] - matrix[1, 3] * matrix[3, 2]) -
-                   matrix[0, 2] * (matrix[1, 0] * matrix[3, 3] - matrix[1, 3] * matrix[3, 0]) +
-                   matrix[0, 3] * (matrix[1, 0] * matrix[3, 2] - matrix[1, 2] * matrix[3, 0]));
-    
-    inv[1, 3] = matrix[0, 0] * (matrix[1, 2] * matrix[2, 3] - matrix[1, 3] * matrix[2, 2]) -
-                 matrix[0, 2] * (matrix[1, 0] * matrix[2, 3] - matrix[1, 3] * matrix[2, 0]) +
-                 matrix[0, 3] * (matrix[1, 0] * matrix[2, 2] - matrix[1, 2] * matrix[2, 0]);
-    
-    inv[2, 0] = matrix[1, 0] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1]) -
-                 matrix[1, 1] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0]) +
-                 matrix[1, 3] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0]);
-    
-    inv[2, 1] = -(matrix[0, 0] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1]) -
-                   matrix[0, 1] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0]) +
-                   matrix[0, 3] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0]));
-    
-    inv[2, 2] = matrix[0, 0] * (matrix[1, 1] * matrix[3, 3] - matrix[1, 3] * matrix[3, 1]) -
-                 matrix[0, 1] * (matrix[1, 0] * matrix[3, 3] - matrix[1, 3] * matrix[3, 0]) +
-                 matrix[0, 3] * (matrix[1, 0] * matrix[3, 1] - matrix[1, 1] * matrix[3, 0]);
-    
-    inv[2, 3] = -(matrix[0, 0] * (matrix[1, 1] * matrix[2, 3] - matrix[1, 3] * matrix[2, 1]) -
-                   matrix[0, 1] * (matrix[1, 0] * matrix[2, 3] - matrix[1, 3] * matrix[2, 0]) +
-                   matrix[0, 3] * (matrix[1, 0] * matrix[2, 1] - matrix[1, 1] * matrix[2, 0]));
-    
-    inv[3, 0] = -(matrix[1, 0] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1]) -
-                   matrix[1, 1] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0]) +
-                   matrix[1, 2] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0]));
-    
-    inv[3, 1] = matrix[0, 0] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1]) -
-                 matrix[0, 1] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0]) +
-                 matrix[0, 2] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0]);
-    
-    inv[3, 2] = -(matrix[0, 0] * (matrix[1, 1] * matrix[3, 2] - matrix[1, 2] * matrix[3, 1]) -
-                   matrix[0, 1] * (matrix[1, 0] * matrix[3, 2] - matrix[1, 2] * matrix[3, 0]) +
-                   matrix[0, 2] * (matrix[1, 0] * matrix[3, 1] - matrix[1, 1] * matrix[3, 0]));
-    
-    inv[3, 3] = matrix[0, 0] * (matrix[1, 1] * matrix[2, 2] - matrix[1, 2] * matrix[2, 1]) -
-                 matrix[0, 1] * (matrix[1, 0] * matrix[2, 2] - matrix[1, 2] * matrix[2, 0]) +
-                 matrix[0, 2] * (matrix[1, 0] * matrix[2, 1] - matrix[1, 1] * matrix[2, 0]);
-    
-    // Вычислить определитель
-    float det = matrix[0, 0] * inv[0, 0] + matrix[0, 1] * inv[1, 0] + matrix[0, 2] * inv[2, 0] + matrix[0, 3] * inv[3, 0];
-    
-    if (std::abs(det) < 1e-6f) {
-        // Матрица вырождена, возвращаем единичную
+
+    inv[0, 0] =  //
+        matrix[1, 1] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2]) -
+        matrix[1, 2] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1]) +
+        matrix[1, 3] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1]);
+
+    inv[0, 1] =  //
+        -(matrix[0, 1] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2]) -
+          matrix[0, 2] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1]) +
+          matrix[0, 3] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1]));
+
+    inv[0, 2] =  //
+        matrix[0, 1] * (matrix[1, 2] * matrix[3, 3] - matrix[1, 3] * matrix[3, 2]) -
+        matrix[0, 2] * (matrix[1, 1] * matrix[3, 3] - matrix[1, 3] * matrix[3, 1]) +
+        matrix[0, 3] * (matrix[1, 1] * matrix[3, 2] - matrix[1, 2] * matrix[3, 1]);
+
+    inv[0, 3] =  //
+        -(matrix[0, 1] * (matrix[1, 2] * matrix[2, 3] - matrix[1, 3] * matrix[2, 2]) -
+          matrix[0, 2] * (matrix[1, 1] * matrix[2, 3] - matrix[1, 3] * matrix[2, 1]) +
+          matrix[0, 3] * (matrix[1, 1] * matrix[2, 2] - matrix[1, 2] * matrix[2, 1]));
+
+    inv[1, 0] =  //
+        -(matrix[1, 0] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2]) -
+          matrix[1, 2] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0]) +
+          matrix[1, 3] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0]));
+
+    inv[1, 1] =  //
+        matrix[0, 0] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2]) -
+        matrix[0, 2] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0]) +
+        matrix[0, 3] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0]);
+
+    inv[1, 2] =  //
+        -(matrix[0, 0] * (matrix[1, 2] * matrix[3, 3] - matrix[1, 3] * matrix[3, 2]) -
+          matrix[0, 2] * (matrix[1, 0] * matrix[3, 3] - matrix[1, 3] * matrix[3, 0]) +
+          matrix[0, 3] * (matrix[1, 0] * matrix[3, 2] - matrix[1, 2] * matrix[3, 0]));
+
+    inv[1, 3] =  //
+        matrix[0, 0] * (matrix[1, 2] * matrix[2, 3] - matrix[1, 3] * matrix[2, 2]) -
+        matrix[0, 2] * (matrix[1, 0] * matrix[2, 3] - matrix[1, 3] * matrix[2, 0]) +
+        matrix[0, 3] * (matrix[1, 0] * matrix[2, 2] - matrix[1, 2] * matrix[2, 0]);
+
+    inv[2, 0] =  //
+        matrix[1, 0] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1]) -
+        matrix[1, 1] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0]) +
+        matrix[1, 3] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0]);
+
+    inv[2, 1] =  //
+        -(matrix[0, 0] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1]) -
+          matrix[0, 1] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0]) +
+          matrix[0, 3] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0]));
+
+    inv[2, 2] =  //
+        matrix[0, 0] * (matrix[1, 1] * matrix[3, 3] - matrix[1, 3] * matrix[3, 1]) -
+        matrix[0, 1] * (matrix[1, 0] * matrix[3, 3] - matrix[1, 3] * matrix[3, 0]) +
+        matrix[0, 3] * (matrix[1, 0] * matrix[3, 1] - matrix[1, 1] * matrix[3, 0]);
+
+    inv[2, 3] =  //
+        -(matrix[0, 0] * (matrix[1, 1] * matrix[2, 3] - matrix[1, 3] * matrix[2, 1]) -
+          matrix[0, 1] * (matrix[1, 0] * matrix[2, 3] - matrix[1, 3] * matrix[2, 0]) +
+          matrix[0, 3] * (matrix[1, 0] * matrix[2, 1] - matrix[1, 1] * matrix[2, 0]));
+
+    inv[3, 0] =  //
+        -(matrix[1, 0] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1]) -
+          matrix[1, 1] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0]) +
+          matrix[1, 2] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0]));
+
+    inv[3, 1] =  //
+        matrix[0, 0] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1]) -
+        matrix[0, 1] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0]) +
+        matrix[0, 2] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0]);
+
+    inv[3, 2] =  //
+        -(matrix[0, 0] * (matrix[1, 1] * matrix[3, 2] - matrix[1, 2] * matrix[3, 1]) -
+          matrix[0, 1] * (matrix[1, 0] * matrix[3, 2] - matrix[1, 2] * matrix[3, 0]) +
+          matrix[0, 2] * (matrix[1, 0] * matrix[3, 1] - matrix[1, 1] * matrix[3, 0]));
+
+    inv[3, 3] =  //
+        matrix[0, 0] * (matrix[1, 1] * matrix[2, 2] - matrix[1, 2] * matrix[2, 1]) -
+        matrix[0, 1] * (matrix[1, 0] * matrix[2, 2] - matrix[1, 2] * matrix[2, 0]) +
+        matrix[0, 2] * (matrix[1, 0] * matrix[2, 1] - matrix[1, 1] * matrix[2, 0]);
+
+    float det =                     //
+        matrix[0, 0] * inv[0, 0] +  //
+        matrix[0, 1] * inv[1, 0] +  //
+        matrix[0, 2] * inv[2, 0] +  //
+        matrix[0, 3] * inv[3, 0];
+
+    if (std::abs(det) < std::numeric_limits<float>::epsilon()) {
         return identity_matrix();
     }
-    
-    // Нормализовать обратную матрицу
+
     float inv_det = 1.0f / det;
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
             inv[i, j] *= inv_det;
         }
     }
-    
+
     return inv;
 }
 

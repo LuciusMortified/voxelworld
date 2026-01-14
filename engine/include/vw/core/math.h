@@ -29,6 +29,7 @@ vec3f lerp(const vec3f& a, const vec3f& b, float t);
 bool is_safe_zero(float a, float b, float epsilon = 1e-5f);
 
 mat4f perspective_matrix(float fov, float aspect, float near, float far);
+mat4f orthographic_matrix(float left, float right, float bottom, float top, float near, float far);
 mat4f look_at_matrix(const vec3f& eye, const vec3f& center, const vec3f& up);
 
 mat4f translation_matrix(const vec3f& translation);

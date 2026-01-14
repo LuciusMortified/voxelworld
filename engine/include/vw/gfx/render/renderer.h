@@ -11,7 +11,9 @@
 #include "vw/core.h"
 #include "vw/gfx/camera/camera.h"
 #include "vw/gfx/debug/debug_primitive.h"
+#include "vw/gfx/render/shadow_map.h"
 #include "vw/gfx/resource/combined_buffer_pool.h"
+#include "vw/gfx/resource/light_buffer.h"
 #include "vw/gfx/resource/shader.h"
 #include "vw/gfx/window/window.h"
 #include "vw/gfx/world/world.h"
@@ -20,12 +22,42 @@ namespace vw::gfx {
 
 enum class render_mode { lit, wireframe };
 
+// Настройки directional light (для CPU)
+struct directional_light_settings {
+    vec3f direction;
+    vec3f color;
+    float32 intensity;
+
+    directional_light_settings()
+        : direction(math::normalize(vec3f(0.0f, -1.0f, 0.0f)))
+        , color(vec3f{1.f, 1.f, 1.f})
+        , intensity(0.5f) {}
+};
+
+// Для directional light (в UBO)
+struct directional_light_data {
+    alignas(16) mat4f light_space_matrix;
+    alignas(16) vec3f direction;
+    alignas(16) vec3f color;
+    alignas(4) float32 intensity;
+};
+
 struct uniform_buffer_object {
+    // Камера
     alignas(16) float32 view[16]{};
     alignas(16) float32 projection[16]{};
     alignas(16) vec3f view_pos;
-    alignas(16) vec3f light_pos;
-    alignas(16) vec3f light_color;
+
+    // Directional light
+    alignas(16) directional_light_data directional_light;
+
+    // Point lights count (для расширяемости)
+    alignas(4) uint32 point_lights_count;
+};
+
+// Uniform buffer для shadow pass (только light_space_matrix)
+struct shadow_uniform_buffer_object {
+    alignas(16) mat4f light_space_matrix;
 };
 
 struct push_constant_data {
@@ -42,6 +74,7 @@ class renderer final {
 public:
     using world_type                = world<WC>;
     using combined_buffer_pool_type = combined_buffer_pool<WC>;
+    using light_buffer_type         = light_buffer<WC>;
 
     renderer(vulkan_context& context, window& window);
     ~renderer();
@@ -92,6 +125,12 @@ public:
         const vec3f& position, float cell_size, int cols, int rows, color clr = colors::red
     );
 
+    [[nodiscard]] auto get_directional_light_settings() -> directional_light_settings&;
+
+    // Получить ImTextureID для shadow map (для отображения в ImGui::Image)
+    // В Vulkan это VkDescriptorSet, приведенный к void*
+    [[nodiscard]] void* get_shadow_map_texture_id() const;
+
 private:
     void create_swapchain();
     void create_image_views();
@@ -100,13 +139,17 @@ private:
     void create_descriptor_set_layouts();
     void create_graphics_pipeline();
     void create_wireframe_pipeline();
+    void create_shadow_pipeline();
     void create_debug_pipeline();
     void create_framebuffers();
     void create_command_buffers();
     void create_sync_objects();
     void create_uniform_buffers();
+    void create_shadow_uniform_buffers();
     void create_descriptor_pool();
     void create_descriptor_sets();
+    void create_shadow_descriptor_sets();
+    void create_shadow_map_descriptor_sets();
 
     void init_imgui();
     void setup_imgui_style();
@@ -117,13 +160,18 @@ private:
     void cleanup_render_pass();
     void cleanup_descriptor_set_layouts();
     void cleanup_pipelines();
+    void cleanup_shadow_pipeline();
     void cleanup_debug_pipeline();
     void cleanup_swapchain();
     void cleanup_depth_resources();
     void recreate_swapchain();
 
+    void create_point_lights_descriptor_set_layout();
+    void cleanup_point_lights_resources();
+
     void render_world(world_type& world, const camera& camera);
     void update_uniform_buffer(const camera& camera) const;
+    void render_shadow_pass(world_type& world, const camera& camera);
 
     void render_debug_primitives();
     void update_debug_vertex_buffer();
@@ -183,12 +231,16 @@ private:
     VkImageView depth_image_view_      = VK_NULL_HANDLE;
 
     // Render pass и pipeline
-    VkRenderPass render_pass_                            = VK_NULL_HANDLE;
-    VkDescriptorSetLayout uniform_descriptor_set_layout_ = VK_NULL_HANDLE;
-    VkDescriptorSetLayout storage_descriptor_set_layout_ = VK_NULL_HANDLE;
-    VkPipelineLayout pipeline_layout_                    = VK_NULL_HANDLE;
-    VkPipeline graphics_pipeline_                        = VK_NULL_HANDLE;
-    VkPipeline wireframe_pipeline_                       = VK_NULL_HANDLE;
+    VkRenderPass render_pass_                                 = VK_NULL_HANDLE;
+    VkDescriptorSetLayout uniform_descriptor_set_layout_      = VK_NULL_HANDLE;
+    VkDescriptorSetLayout storage_descriptor_set_layout_      = VK_NULL_HANDLE;
+    VkDescriptorSetLayout shadow_descriptor_set_layout_       = VK_NULL_HANDLE;
+    VkDescriptorSetLayout point_lights_descriptor_set_layout_ = VK_NULL_HANDLE;
+    VkPipelineLayout pipeline_layout_                         = VK_NULL_HANDLE;
+    VkPipeline graphics_pipeline_                             = VK_NULL_HANDLE;
+    VkPipeline wireframe_pipeline_                            = VK_NULL_HANDLE;
+    VkPipeline shadow_pipeline_                               = VK_NULL_HANDLE;
+    VkPipelineLayout shadow_pipeline_layout_                  = VK_NULL_HANDLE;
 
     // Framebuffers и команды
     std::vector<VkFramebuffer> framebuffers_;
@@ -201,12 +253,17 @@ private:
 
     // Uniform buffers
     std::vector<std::unique_ptr<uniform_buffer>> uniform_buffers_;
+    std::vector<std::unique_ptr<uniform_buffer>> shadow_uniform_buffers_;
     VkDescriptorPool descriptor_pool_ = VK_NULL_HANDLE;
     std::vector<VkDescriptorSet> descriptor_sets_;
+    std::vector<VkDescriptorSet> shadow_descriptor_sets_;
+    std::vector<VkDescriptorSet> shadow_map_descriptor_sets_;
 
     // Шейдеры
     std::unique_ptr<shader> vertex_shader_;
     std::unique_ptr<shader> fragment_shader_;
+    std::unique_ptr<shader> shadow_vertex_shader_;
+    std::unique_ptr<shader> shadow_fragment_shader_;
 
     // Состояние рендеринга
     uint32_t current_frame_       = 0;
@@ -231,6 +288,15 @@ private:
     // Combined buffer pool для indirect drawing
     std::unique_ptr<combined_buffer_pool_type> combined_buffer_pool_;
 
+    // Light buffer для point lights
+    std::unique_ptr<light_buffer_type> light_buffer_;
+
+    // Shadow map для directional light
+    std::unique_ptr<shadow_map> shadow_map_;
+
+    // Настройки directional light
+    directional_light_settings directional_light_settings_;
+
     // Статистика
     mutable renderer_stats stats_;
     uint32 draw_call_count_ = 0;
@@ -241,5 +307,7 @@ private:
 }  // namespace vw::gfx
 
 #include "vw/gfx/render/renderer.inl.h"
+#include "vw/gfx/render/renderer_point_lights.inl.h"
+#include "vw/gfx/render/renderer_shadow.inl.h"
 
 #endif  // VW_GFX_RENDERER_H

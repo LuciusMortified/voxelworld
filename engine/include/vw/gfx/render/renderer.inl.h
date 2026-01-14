@@ -23,29 +23,45 @@ renderer<C>::renderer(
     debug_fragment_shader_ =
         std::make_unique<shader>(*context_, "shaders/debug.frag.spv", shader_type::FRAGMENT);
 
+    shadow_vertex_shader_ =
+        std::make_unique<shader>(*context_, "shaders/shadow.vert.spv", shader_type::VERTEX);
+    shadow_fragment_shader_ =
+        std::make_unique<shader>(*context_, "shaders/shadow.frag.spv", shader_type::FRAGMENT);
+
     constexpr VkDeviceSize initial_size = 512 * 2 * sizeof(debug_vertex);
-    debug_vertex_buffer_ = std::make_unique<vertex_buffer>(*context_, initial_size);
+    debug_vertex_buffer_                = std::make_unique<vertex_buffer>(*context_, initial_size);
+
+    shadow_map_ = std::make_unique<shadow_map>(*context_);
 
     create_swapchain();
     create_image_views();
     create_depth_resources();
     create_render_pass();
     create_descriptor_set_layouts();
+    create_point_lights_descriptor_set_layout();
     create_graphics_pipeline();
     create_wireframe_pipeline();
+    create_shadow_pipeline();
     create_debug_pipeline();
     create_framebuffers();
     create_command_buffers();
     create_sync_objects();
     create_uniform_buffers();
+    create_shadow_uniform_buffers();
     create_descriptor_pool();
     create_descriptor_sets();
+    create_shadow_descriptor_sets();
+    create_shadow_map_descriptor_sets();
 
     create_imgui_descriptor_pool();
     init_imgui();
 
     combined_buffer_pool_ = std::make_unique<combined_buffer_pool_type>(
         *context_, descriptor_pool_, storage_descriptor_set_layout_
+    );
+
+    light_buffer_ = std::make_unique<light_buffer_type>(
+        *context_, descriptor_pool_, point_lights_descriptor_set_layout_
     );
 }
 
@@ -54,13 +70,17 @@ renderer<C>::~renderer() {
     wait_idle();
 
     combined_buffer_pool_.reset();
+    light_buffer_.reset();
+    shadow_map_.reset();
 
     cleanup_imgui();
 
     cleanup_swapchain();
     cleanup_depth_resources();
     cleanup_pipelines();
+    cleanup_shadow_pipeline();
     cleanup_debug_pipeline();
+    cleanup_point_lights_resources();
     cleanup_descriptor_set_layouts();
     cleanup_render_pass();
     cleanup_descriptor_pool();
@@ -169,6 +189,11 @@ const renderer_stats& renderer<C>::get_stats() const {
 }
 
 template <typename C>
+auto renderer<C>::get_directional_light_settings() -> directional_light_settings& {
+    return directional_light_settings_;
+}
+
+template <typename C>
 void renderer<C>::set_clear_color(
     float r, float g, float b, float a
 ) {
@@ -216,6 +241,14 @@ void renderer<C>::render(
     if (vkBeginCommandBuffer(command_buffers_[current_image_index_], &begin_info) != VK_SUCCESS) {
         throw std::runtime_error("Failed to begin recording command buffer!");
     }
+    
+    update_uniform_buffer(camera);
+
+    const frustum& view_frustum = camera.get_frustum();
+    combined_buffer_pool_->update(world, view_frustum);
+
+    // Рендерим shadow pass ДО основного прохода
+    render_shadow_pass(world, camera);
 
     // Начинаем рендер пасс
     VkRenderPassBeginInfo render_pass_info{};
@@ -543,10 +576,10 @@ template <typename C>
 void renderer<C>::create_descriptor_set_layouts() {
     // Uniform buffer descriptor set layout (set 0, binding 0)
     VkDescriptorSetLayoutBinding ubo_layout_binding{};
-    ubo_layout_binding.binding            = 0;
-    ubo_layout_binding.descriptorType     = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    ubo_layout_binding.descriptorCount    = 1;
-    ubo_layout_binding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;
+    ubo_layout_binding.binding         = 0;
+    ubo_layout_binding.descriptorType  = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    ubo_layout_binding.descriptorCount = 1;
+    ubo_layout_binding.stageFlags      = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     ubo_layout_binding.pImmutableSamplers = nullptr;
 
     VkDescriptorSetLayoutCreateInfo ubo_layout_info{};
@@ -577,6 +610,25 @@ void renderer<C>::create_descriptor_set_layouts() {
             context_->get_device(), &storage_layout_info, nullptr, &storage_descriptor_set_layout_
         ) != VK_SUCCESS) {
         throw std::runtime_error("failed to create storage descriptor set layout");
+    }
+
+    // Shadow map descriptor set layout (set 2, binding 0)
+    VkDescriptorSetLayoutBinding shadow_layout_binding{};
+    shadow_layout_binding.binding            = 0;
+    shadow_layout_binding.descriptorType     = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    shadow_layout_binding.descriptorCount    = 1;
+    shadow_layout_binding.stageFlags         = VK_SHADER_STAGE_FRAGMENT_BIT;
+    shadow_layout_binding.pImmutableSamplers = nullptr;
+
+    VkDescriptorSetLayoutCreateInfo shadow_layout_info{};
+    shadow_layout_info.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    shadow_layout_info.bindingCount = 1;
+    shadow_layout_info.pBindings    = &shadow_layout_binding;
+
+    if (vkCreateDescriptorSetLayout(
+            context_->get_device(), &shadow_layout_info, nullptr, &shadow_descriptor_set_layout_
+        ) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create shadow descriptor set layout");
     }
 }
 
@@ -662,9 +714,12 @@ void renderer<C>::create_graphics_pipeline() {
     depth_stencil.depthBoundsTestEnable = VK_FALSE;
     depth_stencil.stencilTestEnable     = VK_FALSE;
 
-    // Pipeline layout с двумя descriptor set layouts
-    std::array<VkDescriptorSetLayout, 2> descriptor_set_layouts = {
-        uniform_descriptor_set_layout_, storage_descriptor_set_layout_
+    // Pipeline layout с четырьмя descriptor set layouts
+    std::array<VkDescriptorSetLayout, 4> descriptor_set_layouts = {
+        uniform_descriptor_set_layout_,
+        storage_descriptor_set_layout_,
+        shadow_descriptor_set_layout_,
+        point_lights_descriptor_set_layout_
     };
 
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
@@ -1035,9 +1090,14 @@ void renderer<C>::create_descriptor_pool() {
 
     std::array pool_sizes = {
         VkDescriptorPoolSize{
-            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)
+            VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 2)  // Основные + shadow uniform buffers
         },
-        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, STORAGE_BUFFER_COUNT}
+        VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, STORAGE_BUFFER_COUNT},
+        VkDescriptorPoolSize{
+            VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT)  // Shadow map для каждого кадра
+        }
     };
 
     VkDescriptorPoolCreateInfo pool_info{};
@@ -1193,6 +1253,12 @@ void renderer<C>::cleanup_descriptor_set_layouts() {
         );
         storage_descriptor_set_layout_ = VK_NULL_HANDLE;
     }
+    if (shadow_descriptor_set_layout_ != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(
+            context_->get_device(), shadow_descriptor_set_layout_, nullptr
+        );
+        shadow_descriptor_set_layout_ = VK_NULL_HANDLE;
+    }
     if (uniform_descriptor_set_layout_ != VK_NULL_HANDLE) {
         vkDestroyDescriptorSetLayout(
             context_->get_device(), uniform_descriptor_set_layout_, nullptr
@@ -1214,6 +1280,18 @@ void renderer<C>::cleanup_pipelines() {
     if (pipeline_layout_ != VK_NULL_HANDLE) {
         vkDestroyPipelineLayout(context_->get_device(), pipeline_layout_, nullptr);
         pipeline_layout_ = VK_NULL_HANDLE;
+    }
+}
+
+template <typename C>
+void renderer<C>::cleanup_shadow_pipeline() {
+    if (shadow_pipeline_ != VK_NULL_HANDLE) {
+        vkDestroyPipeline(context_->get_device(), shadow_pipeline_, nullptr);
+        shadow_pipeline_ = VK_NULL_HANDLE;
+    }
+    if (shadow_pipeline_layout_ != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(context_->get_device(), shadow_pipeline_layout_, nullptr);
+        shadow_pipeline_layout_ = VK_NULL_HANDLE;
     }
 }
 
@@ -1304,13 +1382,8 @@ template <typename WC>
 void renderer<WC>::render_world(
     world_type& world, const camera& camera
 ) {
-    update_uniform_buffer(camera);
-
-    // Получить frustum из камеры (кэшированный)
-    const frustum& view_frustum = camera.get_frustum();
-    
-    // Обновить буферы с учетом frustum culling
-    combined_buffer_pool_->update(world, view_frustum);
+    // Обновить light buffer
+    light_buffer_->update(world);
 
     VkPipeline current_pipeline =
         (current_render_mode_ == render_mode::lit) ? graphics_pipeline_ : wireframe_pipeline_;
@@ -1326,6 +1399,31 @@ void renderer<WC>::render_world(
         0,
         1,
         &descriptor_sets_[current_frame_],
+        0,
+        nullptr
+    );
+
+    // Биндим shadow map descriptor set (set 2)
+    vkCmdBindDescriptorSets(
+        command_buffers_[current_image_index_],
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        pipeline_layout_,
+        2,  // Set index 2 (shadow map descriptor set layout)
+        1,
+        &shadow_map_descriptor_sets_[current_frame_],
+        0,
+        nullptr
+    );
+
+    // Биндим point lights descriptor set (set 3)
+    VkDescriptorSet point_lights_descriptor_set = light_buffer_->get_descriptor_set();
+    vkCmdBindDescriptorSets(
+        command_buffers_[current_image_index_],
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        pipeline_layout_,
+        3,  // Set index 3 (point lights descriptor set layout)
+        1,
+        &point_lights_descriptor_set,
         0,
         nullptr
     );
@@ -1394,9 +1492,17 @@ void renderer<C>::update_uniform_buffer(
     // View position
     ubo.view_pos = camera.get_position();
 
-    // Light position and color (hardcoded for now)
-    ubo.light_pos   = vec3f(10.0f, 10.0f, 10.0f);
-    ubo.light_color = vec3f(1.0f, 1.0f, 1.0f);
+    // Обновить light space matrix в shadow map
+    shadow_map_->update_light_matrix(camera, directional_light_settings_.direction);
+
+    // Directional light data
+    ubo.directional_light.light_space_matrix = shadow_map_->get_light_space_matrix();
+    ubo.directional_light.direction          = directional_light_settings_.direction;
+    ubo.directional_light.color              = directional_light_settings_.color;
+    ubo.directional_light.intensity          = directional_light_settings_.intensity;
+
+    // Point lights count
+    ubo.point_lights_count = light_buffer_->get_lights_count();
 
     uniform_buffers_[current_frame_]->copy_from_struct(ubo);
 }
@@ -1453,6 +1559,20 @@ template <typename C>
 void renderer<C>::render_imgui() const {
     ImGui::Render();
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), command_buffers_[current_image_index_]);
+}
+
+template <typename C>
+void* renderer<C>::get_shadow_map_texture_id() const {
+    // Создаем ImGui texture ID из VkImageView и VkSampler shadow map
+    // Используем VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, т.к. shadow map
+    // хранится в этом layout после shadow pass
+    static VkDescriptorSet descriptor_set = ImGui_ImplVulkan_AddTexture(
+        shadow_map_->get_sampler(),
+        shadow_map_->get_image_view(),
+        VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+    );
+    // VkDescriptorSet приводим к void* (который является ImTextureID в Vulkan)
+    return descriptor_set;
 }
 
 template <typename C>

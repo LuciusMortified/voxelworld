@@ -18,6 +18,9 @@ public:
     void set_rotation(float pitch, float yaw);
     void set_aspect_ratio(float aspect);
 
+    [[nodiscard]] float get_near() const;
+    [[nodiscard]] float get_far() const;
+
     [[nodiscard]] vec3f get_position() const;
     [[nodiscard]] float get_pitch() const;
     [[nodiscard]] float get_yaw() const;

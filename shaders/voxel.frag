@@ -1,42 +1,223 @@
-#version 450
+#version 460 core
 
 // Входные данные от vertex shader
 layout(location = 0) in vec3 fragPos;
 layout(location = 1) in vec3 fragNormal;
 layout(location = 2) in vec3 fragColor;
 layout(location = 3) in vec3 viewPos;
-layout(location = 4) in vec3 lightPos;
-layout(location = 5) in vec3 lightColor;
+layout(location = 6) in vec4 fragPosLightSpace;
+
+// Структура directional light данных (соответствует directional_light_data в C++)
+struct DirectionalLightData {
+    mat4 light_space_matrix;
+    vec3 direction;
+    vec3 color;
+    float intensity;
+};
+
+// Uniform buffer object (set 0, binding = 0)
+layout(set = 0, binding = 0) uniform UniformBufferObject {
+    mat4 view;
+    mat4 proj;
+    vec3 viewPos;
+// Directional light
+    DirectionalLightData directional_light;
+// Point lights count
+    uint point_lights_count;
+} ubo;
+
+// Shadow map (set 2, binding 0)
+layout(set = 2, binding = 0) uniform sampler2DShadow shadowMap;
+
+// Структура point light данных (соответствует point_light_data в C++)
+struct PointLightData {
+    vec4 position;
+    vec4 color;
+    float intensity;
+    float range;
+    float attenuation_constant;
+    float attenuation_linear;
+    float attenuation_quadratic;
+};
+
+// Point lights SSBO (set 3, binding 0)
+layout(set = 3, binding = 0, std430) readonly buffer PointLights {
+    PointLightData lights[];
+} pointLights;
+
+float calculateShadow(vec4 fragPosLightSpace, vec3 normal) {
+    // Проецируем координаты в диапазон [-1, 1]
+    vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
+
+    //projCoords = projCoords * 0.5 + 0.5;
+
+    // Преобразуем в диапазон [0, 1] только xy
+    projCoords.xy = projCoords.xy * 0.5 + 0.5;
+
+    // Проверяем, что координаты в пределах [0, 1]
+    if (projCoords.x < 0.0 || projCoords.x > 1.0 ||
+        projCoords.y < 0.0 || projCoords.y > 1.0 ||
+        projCoords.z > 1.0)
+    {
+        return 1.0;
+    }
+
+    ivec2 texDim = textureSize(shadowMap, 0).xy;
+    float scale = 0.75;
+    float dx = scale * 1.0 / float(texDim.x);
+    float dy = scale * 1.0 / float(texDim.y);
+
+    float shadow = 0;
+    int count = 0;
+    int range = 0; // 0 for off, 1 for 3x3, 2 for 5x5
+    for (int x = -range; x <= range; ++x) {
+        for (int y = -range; y <= range; ++y) {
+            shadow += texture(
+                shadowMap,
+                vec3(
+                    vec2(projCoords.x + x*dx, projCoords.y + y*dy),
+                    projCoords.z
+                )
+            );
+            count++;
+        }
+    }
+
+    return shadow / count;
+}
+
+vec3 calculateDirectionalLight(vec3 normal, vec3 viewDir, float shadow) {
+    // Вычисляем sun_factor: если direction.y > 0, свет идет вверх (ночь)
+    float sunFactor = step(0.0, -ubo.directional_light.direction.y);
+
+    // Направление света (нормализованное)
+    vec3 lightDir = normalize(-ubo.directional_light.direction);
+
+    // Diffuse
+    float diff = max(dot(lightDir, normal), 0.0);
+
+    // Specular
+    vec3 reflectDir = reflect(-lightDir, normal);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 64.0);
+
+    // Комбинируем освещение с учетом shadow и sun_factor
+    vec3 diffuse = diff * ubo.directional_light.color * ubo.directional_light.intensity * sunFactor * shadow;
+    vec3 specular = spec * ubo.directional_light.color * ubo.directional_light.intensity * sunFactor * shadow * 0.5;
+
+    return diffuse + specular;
+}
+
+vec3 calculatePointLight(uint lightIndex, vec3 normal, vec3 fragPos, vec3 viewDir) {
+    PointLightData light = pointLights.lights[lightIndex];
+
+    // Направление к свету
+    vec3 lightDir = normalize(light.position.xyz - fragPos);
+    float distance = length(light.position.xyz - fragPos);
+
+    // Проверка range (если distance > range, не учитываем свет)
+    if (distance > light.range) {
+        return vec3(0.0);
+    }
+
+    // Затухание
+    float attenuation = light.attenuation_constant +
+    light.attenuation_linear * distance +
+    light.attenuation_quadratic * distance * distance;
+    attenuation = 1.0 / max(attenuation, 0.0001);// Защита от деления на ноль
+
+    // Diffuse
+    float diff = max(dot(normal, lightDir), 0.0);
+
+    // Specular
+    vec3 reflectDir = reflect(-lightDir, normal);
+    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 64.0);
+
+    vec3 diffuse = diff * light.color.xyz * light.intensity * attenuation;
+    vec3 specular = spec * light.color.xyz * light.intensity * attenuation * 0.5;
+
+    return diffuse + specular;
+}
+
+// Вычисляет rim lighting (Fresnel эффект) для подсветки краёв
+float calculateRimLight(vec3 normal, vec3 viewDir, float shadow) {
+    // Чем больше угол между нормалью и направлением взгляда, тем сильнее rim
+    float rimFactor = 1.0 - max(dot(normal, viewDir), 0.0);
+    // Усиливаем rim в тенях
+    float shadowBoost = 1.0 + (1.0 - shadow) * 2.0;
+    // Применяем степенную функцию для более плавного перехода
+    rimFactor = pow(rimFactor, 3.0) * shadowBoost;
+    return rimFactor;
+}
+
+// Вычисляет hemisphere ambient - ambient, зависящий от нормали
+vec3 calculateHemisphereAmbient(vec3 normal) {
+    // Верхнее небо (светлее)
+    vec3 skyColor = vec3(0.3, 0.4, 0.5);
+    // Нижняя земля (темнее)
+    vec3 groundColor = vec3(0.1, 0.1, 0.15);
+
+    // Смешиваем цвета в зависимости от направления нормали
+    float upFactor = normal.y * 0.5 + 0.5; // Преобразуем [-1, 1] в [0, 1]
+    return mix(groundColor, skyColor, upFactor);
+}
 
 // Выходной цвет пикселя
 layout(location = 0) out vec4 outColor;
 
 void main() {
-    // Ambient lighting
-    float ambientStrength = 0.1;
-    vec3 ambient = ambientStrength * lightColor;
-    
-    // Diffuse lighting
-    vec3 norm = normalize(fragNormal);
-    vec3 lightDir = normalize(lightPos - fragPos);
-    float diff = max(dot(norm, lightDir), 0.0);
-    vec3 diffuse = diff * lightColor;
-    
-    // Specular lighting
-    float specularStrength = 0.5;
+    vec3 normal = normalize(fragNormal);
     vec3 viewDir = normalize(viewPos - fragPos);
-    vec3 reflectDir = reflect(-lightDir, norm);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 64);
-    vec3 specular = specularStrength * spec * lightColor;
-    
-    // Combine lighting
-    vec3 result = (ambient + diffuse + specular) * fragColor;
-    
-    // Add some fog effect based on distance
-    //float distance = length(viewPos - fragPos);
-    //float fogFactor = exp(-distance * 0.001);
-    //vec3 fogColor = vec3(0.7, 0.8, 0.9);
-    //result = mix(fogColor, result, fogFactor);
-    
+
+    // Смещение позиции фрагмента вдоль нормали для уменьшения артефактов shadow acne
+    float ndotl = max(dot(normal, normalize(-ubo.directional_light.direction)), 0.0);
+    float normalBias = max(0.05 * (1.0 - ndotl), 0.01);
+    //float normalBias = max(0.005 * (1.0 - ndotl), 0.002);
+    vec3 newFragPos = fragPos + fragNormal * normalBias;
+    vec4 newFragPosLightSpace = ubo.directional_light.light_space_matrix * vec4(newFragPos, 1.0);
+
+    // Вычисляем shadow
+    float shadow = calculateShadow(
+        newFragPosLightSpace, normal
+    );
+
+    // Ambient lighting
+    float ambientStrength = 0.15;
+    vec3 baseAmbient =
+        ambientStrength * ubo.directional_light.color * ubo.directional_light.intensity;
+
+    // Hemisphere ambient для более выразительного объёма
+    vec3 hemisphereAmbient = calculateHemisphereAmbient(normal) * 0.3;
+
+    // Комбинируем ambient освещение
+    vec3 ambient = baseAmbient + hemisphereAmbient;
+
+    // Directional light с sun_factor
+    vec3 directional = calculateDirectionalLight(normal, viewDir, shadow);
+
+    // Point lights
+    vec3 pointLighting = vec3(0.0);
+    for (uint i = 0; i < ubo.point_lights_count; i++) {
+        pointLighting += calculatePointLight(i, normal, fragPos, viewDir);
+    }
+
+    // Rim lighting для подсветки краёв (особенно эффективно в тенях)
+    float rimIntensity = 0.01;
+    float rimLighting = calculateRimLight(normal, viewDir, shadow);
+    vec3 rimColor = ubo.directional_light.color * rimLighting * rimIntensity;
+
+    // Усиление контраста на гранях вокселей (edge enhancement)
+    // Используем dot product нормали и направления взгляда для определения "краёв"
+    float edgeIntensity = 0.02;
+    float edgeFactor = abs(dot(normal, viewDir));
+    // Грани, перпендикулярные взгляду (края вокселей), получают дополнительное освещение
+    float edgeEnhancement = (1.0 - edgeFactor) * edgeIntensity * (1.0 - shadow);
+
+    // Комбинируем все освещение
+    vec3 lighting = ambient + directional + pointLighting + rimColor;
+    vec3 result = lighting * fragColor;
+
+    // Применяем edge enhancement
+    result += edgeEnhancement * fragColor;
+
     outColor = vec4(result, 1.0);
 }

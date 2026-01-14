@@ -58,9 +58,38 @@ target_include_directories(${PROJECT_NAME} PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-add_custom_command(TARGET ${PROJECT_NAME} PRE_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/shaders
-        $<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders
-        COMMENT "Copying shaders to ${PROJECT_NAME} build directory"
+find_program(GLSLC_EXECUTABLE glslc REQUIRED)
+set(SHADERS_SRC_DIR ${CMAKE_SOURCE_DIR}/shaders)
+set(SHADERS_BIN_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders_compiled)
+
+file(GLOB SHADER_VERTS CONFIGURE_DEPENDS ${SHADERS_SRC_DIR}/*.vert)
+file(GLOB SHADER_FRAGS CONFIGURE_DEPENDS ${SHADERS_SRC_DIR}/*.frag)
+set(SHADER_SOURCES ${SHADER_VERTS} ${SHADER_FRAGS})
+
+set(SHADER_SPV_OUTPUTS)
+foreach(SHADER ${SHADER_SOURCES})
+    get_filename_component(SHADER_NAME ${SHADER} NAME) # e.g. mesh.vert
+    set(SPV_OUT ${SHADERS_BIN_DIR}/${SHADER_NAME}.spv)  # e.g. mesh.vert.spv
+
+    add_custom_command(
+            OUTPUT ${SPV_OUT}
+            COMMAND ${CMAKE_COMMAND} -E make_directory ${SHADERS_BIN_DIR}
+            COMMAND ${GLSLC_EXECUTABLE} ${SHADER} -o ${SPV_OUT}
+            DEPENDS ${SHADER}
+            VERBATIM
+            COMMENT "Compiling shader ${SHADER_NAME}"
+    )
+
+    list(APPEND SHADER_SPV_OUTPUTS ${SPV_OUT})
+endforeach()
+
+add_custom_target(compile_shaders ALL DEPENDS ${SHADER_SPV_OUTPUTS})
+
+add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${SHADERS_SRC_DIR} $<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders
+        COMMAND ${CMAKE_COMMAND} -E copy_directory ${SHADERS_BIN_DIR} $<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders
+        COMMENT "Copying shaders (and .spv) to ${PROJECT_NAME} build directory"
 )
+
+add_dependencies(${PROJECT_NAME} compile_shaders)

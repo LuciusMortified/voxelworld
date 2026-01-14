@@ -23,6 +23,7 @@ inline app::app(
     , entity_tree_panel_(eng, state_, op_manager_) {
     auto& window = eng.get_window();
     auto& camera = eng.get_camera();
+    auto& renderer = eng.get_renderer();
 
     tools_[tools::select_entity] = std::make_unique<select_entity_tool<>>(eng, state_);
     tools_[tools::add_voxel]     = std::make_unique<add_voxel_tool<>>(eng, state_, op_manager_);
@@ -58,6 +59,8 @@ inline app::app(
 
     camera.set_position({0.0f, 0.0f, -15.0f});
     camera.set_rotation(0.0f, 0.0f);
+
+    renderer.set_clear_color(vec4f{0.15f, 0.27f, 0.45f, 1.0f});
 }
 
 inline void app::render(
@@ -84,6 +87,18 @@ inline void app::render(
     entity_tree_panel_.render(delta_time);
 
     tools_[state_.selected_tool]->render(delta_time);
+
+    ImGui::Begin("Shadow Map Debug");
+    void* shadow_map_texture_id = renderer.get_shadow_map_texture_id();
+    ImGui::Image(
+        reinterpret_cast<ImTextureID>(shadow_map_texture_id),
+        ImVec2(512, 512),  // размер изображения
+        ImVec2(0, 0),      // UV координаты верхнего левого угла
+        ImVec2(1, 1),      // UV координаты нижнего правого угла
+        ImVec4(1, 1, 1, 1), // tint цвет
+        ImVec4(0, 0, 0, 0)  // border цвет
+    );
+    ImGui::End();
 }
 
 inline void app::handle_key_press(

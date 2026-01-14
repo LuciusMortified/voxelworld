@@ -50,6 +50,14 @@ inline void camera::set_aspect_ratio(
     frustum_dirty_           = true;
 }
 
+inline float camera::get_near() const {
+    return near_;
+}
+
+inline float camera::get_far() const {
+    return far_;
+}
+
 inline vec3f camera::get_position() const  {
     return position_;
 }

@@ -6,13 +6,23 @@ layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
 layout(location = 2) in uint inColor;
 
+// Структура directional light данных (соответствует directional_light_data в C++)
+struct DirectionalLightData {
+    mat4 light_space_matrix;
+    vec3 direction;
+    vec3 color;
+    float intensity;
+};
+
 // Uniform buffer object (set 0, binding 0)
 layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
     vec3 viewPos;
-    vec3 lightPos;
-    vec3 lightColor;
+    // Directional light
+    DirectionalLightData directional_light;
+    // Point lights count
+    uint point_lights_count;
 } ubo;
 
 // Storage buffer для матриц моделей (set 1, binding 0)
@@ -25,8 +35,7 @@ layout(location = 0) out vec3 fragPos;
 layout(location = 1) out vec3 fragNormal;
 layout(location = 2) out vec3 fragColor;
 layout(location = 3) out vec3 viewPos;
-layout(location = 4) out vec3 lightPos;
-layout(location = 5) out vec3 lightColor;
+layout(location = 6) out vec4 fragPosLightSpace;
 
 vec3 unpackColor(uint packedColor) {
     float r = float((packedColor >> 24) & uint(0xFF)) / 255.0;
@@ -54,8 +63,9 @@ void main() {
     
     // Передача данных освещения
     viewPos = ubo.viewPos;
-    lightPos = ubo.lightPos;
-    lightColor = ubo.lightColor;
+    
+    // Вычисляем позицию в light space для shadow mapping
+    fragPosLightSpace = ubo.directional_light.light_space_matrix * worldPos;
     
     // Финальная позиция вершины
     gl_Position = ubo.proj * ubo.view * worldPos;

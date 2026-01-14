@@ -14,7 +14,8 @@ world<Cs>::world(
       spatial_system_(registry_),
       transform_system_(*this, registry_),
       hierarchy_system_(registry_, transform_system_),
-      model_system_(registry_, mesh_pool_, spatial_system_) {}
+      model_system_(registry_, mesh_pool_, spatial_system_),
+      light_system_(registry_) {}
 
 template <typename Cs>
 void world<Cs>::update() {
@@ -45,6 +46,9 @@ void world<Cs>::add_component(
     }
     if constexpr (std::same_as<T, spatial_component>) {
         spatial_system_.mark_dirty(ent);
+    }
+    if constexpr (std::same_as<T, light_component>) {
+        light_system_.mark_render_dirty(ent);
     }
 }
 
@@ -80,6 +84,9 @@ void world<Cs>::remove_component(
     }
     if constexpr (std::same_as<T, spatial_component>) {
         spatial_system_.cleanup(ent);
+    }
+    if constexpr (std::same_as<T, light_component>) {
+        light_system_.mark_render_dirty(ent);
     }
     registry_.template remove<T>(ent);
 }
@@ -156,6 +163,11 @@ auto world<C>::get_model_system() -> model_system_type& {
 template <typename C>
 auto world<C>::get_spatial_system() -> spatial_system_type& {
     return spatial_system_;
+}
+
+template <typename C>
+auto world<C>::get_light_system() -> light_system_type& {
+    return light_system_;
 }
 
 template <typename WC>
