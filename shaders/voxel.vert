@@ -8,7 +8,8 @@ layout(location = 2) in uint inColor;
 
 // Структура directional light данных (соответствует directional_light_data в C++)
 struct DirectionalLightData {
-    mat4 light_space_matrix;
+    mat4 light_space_matrices[4];
+    vec4 cascade_splits; // x = split0, y = split1, z = split2, w = split3
     vec3 direction;
     vec3 color;
     float intensity;
@@ -34,8 +35,7 @@ layout(set = 1, binding = 0, std430) readonly buffer ModelMatrices {
 layout(location = 0) out vec3 fragPos;
 layout(location = 1) out vec3 fragNormal;
 layout(location = 2) out vec3 fragColor;
-layout(location = 3) out vec3 viewPos;
-layout(location = 6) out vec4 fragPosLightSpace;
+layout(location = 4) out float viewDepth;
 
 vec3 unpackColor(uint packedColor) {
     float r = float((packedColor >> 24) & uint(0xFF)) / 255.0;
@@ -45,10 +45,6 @@ vec3 unpackColor(uint packedColor) {
 }
 
 void main() {
-    // Получаем индекс объекта через gl_BaseInstanceARB
-    // gl_BaseInstanceARB содержит first_instance из VkDrawIndexedIndirectCommand
-    // В коде first_instance устанавливается в instance_index для каждого draw call
-    // uint draw_index = gl_BaseInstanceARB;
     mat4 model = modelMatrices.models[gl_DrawID];
     
     // Трансформация позиции
@@ -60,12 +56,9 @@ void main() {
     
     // Распаковка цвета
     fragColor = unpackColor(inColor);
-    
-    // Передача данных освещения
-    viewPos = ubo.viewPos;
-    
-    // Вычисляем позицию в light space для shadow mapping
-    fragPosLightSpace = ubo.directional_light.light_space_matrix * worldPos;
+
+    // Вычисление глубины вида
+    viewDepth = -(ubo.view * worldPos).z;
     
     // Финальная позиция вершины
     gl_Position = ubo.proj * ubo.view * worldPos;

@@ -3,6 +3,8 @@
 #ifndef VW_SCULPTOR_APP_INL_H
 #define VW_SCULPTOR_APP_INL_H
 
+#include <cstdio>
+
 #include "tools/add_voxel_tool.h"
 #include "tools/dummy_tool.h"
 #include "tools/remove_voxel_tool.h"
@@ -89,15 +91,18 @@ inline void app::render(
     tools_[state_.selected_tool]->render(delta_time);
 
     ImGui::Begin("Shadow Map Debug");
-    void* shadow_map_texture_id = renderer.get_shadow_map_texture_id();
-    ImGui::Image(
-        reinterpret_cast<ImTextureID>(shadow_map_texture_id),
-        ImVec2(512, 512),  // размер изображения
-        ImVec2(0, 0),      // UV координаты верхнего левого угла
-        ImVec2(1, 1),      // UV координаты нижнего правого угла
-        ImVec4(1, 1, 1, 1), // tint цвет
-        ImVec4(0, 0, 0, 0)  // border цвет
-    );
+    // Сетка 2x2 для всех каскадов
+    for (uint32 i = 0; i < 4; ++i) {
+        void* shadow_map_texture_id = renderer.get_shadow_map_texture_id(i);
+        ImGui::Image(
+            reinterpret_cast<ImTextureID>(shadow_map_texture_id),
+            ImVec2(256, 256),  // Уменьшенный размер для сетки
+            ImVec2(0, 0),      // UV координаты верхнего левого угла
+            ImVec2(1, 1),      // UV координаты нижнего правого угла
+            ImVec4(1, 1, 1, 1), // tint цвет
+            ImVec4(0, 0, 0, 0)  // border цвет
+        );
+    }
     ImGui::End();
 }
 

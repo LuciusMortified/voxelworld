@@ -5,12 +5,10 @@
 
 #include <vulkan/vulkan.h>
 
-#include <vulkan/vulkan.h>
-
 #include "vw/gfx/render/renderer.h"
 #include "vw/gfx/render/vulkan_context.h"
-#include "vw/gfx/resource/mesh.h"
 #include "vw/gfx/resource/combined_buffer.h"
+#include "vw/gfx/resource/mesh.h"
 
 namespace vw::gfx {
 
@@ -34,8 +32,9 @@ void renderer<C>::create_shadow_descriptor_sets() {
     alloc_info.pSetLayouts        = layouts.data();
 
     shadow_descriptor_sets_.resize(MAX_FRAMES_IN_FLIGHT);
-    if (vkAllocateDescriptorSets(context_->get_device(), &alloc_info, shadow_descriptor_sets_.data()) !=
-        VK_SUCCESS) {
+    if (vkAllocateDescriptorSets(
+            context_->get_device(), &alloc_info, shadow_descriptor_sets_.data()
+        ) != VK_SUCCESS) {
         throw std::runtime_error("Failed to allocate shadow descriptor sets!");
     }
 
@@ -74,11 +73,11 @@ void renderer<C>::create_shadow_map_descriptor_sets() {
         throw std::runtime_error("Failed to allocate shadow map descriptor sets!");
     }
 
-    // Обновляем descriptor sets с shadow map image view и sampler
+    // Обновляем descriptor sets с shadow map array image view и sampler
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         VkDescriptorImageInfo image_info{};
         image_info.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-        image_info.imageView   = shadow_map_->get_image_view();
+        image_info.imageView   = shadow_map_->get_array_image_view();
         image_info.sampler     = shadow_map_->get_sampler();
 
         VkWriteDescriptorSet descriptor_write{};
@@ -176,15 +175,15 @@ void renderer<C>::create_shadow_pipeline() {
     depth_stencil.stencilTestEnable     = VK_FALSE;
 
     // Pipeline layout для shadow pass (uniform и storage descriptor set layouts)
-    std::array<VkDescriptorSetLayout, 2> shadow_descriptor_set_layouts = {
-        uniform_descriptor_set_layout_,
-        storage_descriptor_set_layout_
+    std::array shadow_descriptor_set_layouts = {
+        uniform_descriptor_set_layout_, storage_descriptor_set_layout_
     };
 
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
-    pipeline_layout_info.sType          = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipeline_layout_info.setLayoutCount = static_cast<uint32_t>(shadow_descriptor_set_layouts.size());
-    pipeline_layout_info.pSetLayouts    = shadow_descriptor_set_layouts.data();
+    pipeline_layout_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipeline_layout_info.setLayoutCount =
+        static_cast<uint32_t>(shadow_descriptor_set_layouts.size());
+    pipeline_layout_info.pSetLayouts            = shadow_descriptor_set_layouts.data();
     pipeline_layout_info.pushConstantRangeCount = 0;
     pipeline_layout_info.pPushConstantRanges    = nullptr;
 
@@ -224,108 +223,115 @@ template <typename WC>
 void renderer<WC>::render_shadow_pass(
     world_type& world, const camera& camera
 ) {
-    // Обновить shadow uniform buffer с light_space_matrix
-    shadow_uniform_buffer_object shadow_ubo{};
-    shadow_ubo.light_space_matrix = shadow_map_->get_light_space_matrix();
-    shadow_uniform_buffers_[current_frame_]->copy_from_struct(shadow_ubo);
+    // Рендерим каждый каскад отдельно
+    for (uint32 cascade_index = 0; cascade_index < shadow_map::cascade_count; ++cascade_index) {
+        // Обновить shadow uniform buffer с light_space_matrix для текущего каскада
+        shadow_uniform_buffer_object shadow_ubo{};
+        shadow_ubo.light_space_matrix = shadow_map_->get_light_space_matrix(cascade_index);
+        shadow_uniform_buffers_[current_frame_]->copy_from_struct(shadow_ubo);
 
-    // Начинаем shadow render pass
-    VkRenderPassBeginInfo render_pass_info{};
-    render_pass_info.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    render_pass_info.renderPass        = shadow_map_->get_render_pass();
-    render_pass_info.framebuffer       = shadow_map_->get_framebuffer();
-    render_pass_info.renderArea.offset = {0, 0};
-    render_pass_info.renderArea.extent = {shadow_map::shadow_map_size, shadow_map::shadow_map_size};
+        // Начинаем shadow render pass для текущего каскада
+        VkRenderPassBeginInfo render_pass_info{};
+        render_pass_info.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+        render_pass_info.renderPass        = shadow_map_->get_render_pass();
+        render_pass_info.framebuffer       = shadow_map_->get_framebuffer(cascade_index);
+        render_pass_info.renderArea.offset = {0, 0};
+        render_pass_info.renderArea.extent = {
+            shadow_map::shadow_map_size, shadow_map::shadow_map_size
+        };
 
-    VkClearValue clear_value{};
-    clear_value.depthStencil = {1.0f, 0};
+        VkClearValue clear_value{};
+        clear_value.depthStencil = {1.0f, 0};
 
-    render_pass_info.clearValueCount = 1;
-    render_pass_info.pClearValues    = &clear_value;
+        render_pass_info.clearValueCount = 1;
+        render_pass_info.pClearValues    = &clear_value;
 
-    vkCmdBeginRenderPass(
-        command_buffers_[current_image_index_], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE
-    );
+        vkCmdBeginRenderPass(
+            command_buffers_[current_image_index_], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE
+        );
 
-    // Устанавливаем viewport и scissor для shadow map
-    VkViewport viewport{};
-    viewport.x        = 0.0f;
-    viewport.y        = 0.0f;
-    viewport.width    = static_cast<float>(shadow_map::shadow_map_size);
-    viewport.height   = static_cast<float>(shadow_map::shadow_map_size);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-    vkCmdSetViewport(command_buffers_[current_image_index_], 0, 1, &viewport);
+        // Устанавливаем viewport и scissor для shadow map
+        VkViewport viewport{};
+        viewport.x        = 0.0f;
+        viewport.y        = 0.0f;
+        viewport.width    = static_cast<float>(shadow_map::shadow_map_size);
+        viewport.height   = static_cast<float>(shadow_map::shadow_map_size);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+        vkCmdSetViewport(command_buffers_[current_image_index_], 0, 1, &viewport);
 
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = {shadow_map::shadow_map_size, shadow_map::shadow_map_size};
-    vkCmdSetScissor(command_buffers_[current_image_index_], 0, 1, &scissor);
+        VkRect2D scissor{};
+        scissor.offset = {0, 0};
+        scissor.extent = {shadow_map::shadow_map_size, shadow_map::shadow_map_size};
+        vkCmdSetScissor(command_buffers_[current_image_index_], 0, 1, &scissor);
 
-    // Биндим shadow pipeline
-    vkCmdBindPipeline(
-        command_buffers_[current_image_index_], VK_PIPELINE_BIND_POINT_GRAPHICS, shadow_pipeline_
-    );
+        // Биндим shadow pipeline
+        vkCmdBindPipeline(
+            command_buffers_[current_image_index_],
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            shadow_pipeline_
+        );
 
-    // Биндим shadow uniform buffer descriptor set (set 0)
-    vkCmdBindDescriptorSets(
-        command_buffers_[current_image_index_],
-        VK_PIPELINE_BIND_POINT_GRAPHICS,
-        shadow_pipeline_layout_,
-        0,
-        1,
-        &shadow_descriptor_sets_[current_frame_],
-        0,
-        nullptr
-    );
-
-    // Рендерим все объекты из combined_buffer_pool
-    const auto& buffers = combined_buffer_pool_->get_buffers();
-    for (const auto& buffer : buffers) {
-        if (buffer->is_empty()) {
-            continue;
-        }
-
-        VkBuffer vertex_buffer = buffer->get_vertex_buffer();
-        VkBuffer index_buffer  = buffer->get_index_buffer();
-
-        // Биндим storage buffer descriptor set из буфера (set 1)
-        VkDescriptorSet buffer_descriptor_set = buffer->get_descriptor_set();
+        // Биндим shadow uniform buffer descriptor set (set 0)
         vkCmdBindDescriptorSets(
             command_buffers_[current_image_index_],
             VK_PIPELINE_BIND_POINT_GRAPHICS,
             shadow_pipeline_layout_,
-            1,  // Set index 1 (storage buffer descriptor set layout)
+            0,
             1,
-            &buffer_descriptor_set,
+            &shadow_descriptor_sets_[current_frame_],
             0,
             nullptr
         );
 
-        // Биндим vertex и index буферы
-        constexpr VkDeviceSize vertex_offset = 0;
-        vkCmdBindVertexBuffers(
-            command_buffers_[current_image_index_], 0, 1, &vertex_buffer, &vertex_offset
-        );
-        vkCmdBindIndexBuffer(
-            command_buffers_[current_image_index_], index_buffer, 0, VK_INDEX_TYPE_UINT32
-        );
+        // Рендерим все объекты из combined_buffer_pool
+        const auto& buffers = combined_buffer_pool_->get_buffers();
+        for (const auto& buffer : buffers) {
+            if (buffer->is_empty()) {
+                continue;
+            }
 
-        // Indirect draw call
-        VkBuffer indirect_buffer = buffer->get_indirect_draw_buffer();
-        uint32_t draw_count      = buffer->get_draw_command_count();
-        if (draw_count > 0) {
-            vkCmdDrawIndexedIndirect(
+            VkBuffer vertex_buffer = buffer->get_vertex_buffer();
+            VkBuffer index_buffer  = buffer->get_index_buffer();
+
+            // Биндим storage buffer descriptor set из буфера (set 1)
+            VkDescriptorSet buffer_descriptor_set = buffer->get_descriptor_set();
+            vkCmdBindDescriptorSets(
                 command_buffers_[current_image_index_],
-                indirect_buffer,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                shadow_pipeline_layout_,
+                1,  // Set index 1 (storage buffer descriptor set layout)
+                1,
+                &buffer_descriptor_set,
                 0,
-                draw_count,
-                sizeof(VkDrawIndexedIndirectCommand)
+                nullptr
             );
-        }
-    }
 
-    vkCmdEndRenderPass(command_buffers_[current_image_index_]);
+            // Биндим vertex и index буферы
+            constexpr VkDeviceSize vertex_offset = 0;
+            vkCmdBindVertexBuffers(
+                command_buffers_[current_image_index_], 0, 1, &vertex_buffer, &vertex_offset
+            );
+            vkCmdBindIndexBuffer(
+                command_buffers_[current_image_index_], index_buffer, 0, VK_INDEX_TYPE_UINT32
+            );
+
+            // Indirect draw call
+            VkBuffer indirect_buffer = buffer->get_indirect_draw_buffer();
+            uint32_t draw_count      = buffer->get_draw_command_count();
+            if (draw_count > 0) {
+                vkCmdDrawIndexedIndirect(
+                    command_buffers_[current_image_index_],
+                    indirect_buffer,
+                    0,
+                    draw_count,
+                    sizeof(VkDrawIndexedIndirectCommand)
+                );
+            }
+        }
+
+        vkCmdEndRenderPass(command_buffers_[current_image_index_]);
+    }
 }
 
 }  // namespace vw::gfx

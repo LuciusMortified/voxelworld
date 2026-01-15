@@ -1492,14 +1492,21 @@ void renderer<C>::update_uniform_buffer(
     // View position
     ubo.view_pos = camera.get_position();
 
-    // Обновить light space matrix в shadow map
-    shadow_map_->update_light_matrix(camera, directional_light_settings_.direction);
+    // Обновить cascade matrices в shadow map
+    shadow_map_->update_cascade_matrices(camera, directional_light_settings_.direction);
 
     // Directional light data
-    ubo.directional_light.light_space_matrix = shadow_map_->get_light_space_matrix();
-    ubo.directional_light.direction          = directional_light_settings_.direction;
-    ubo.directional_light.color              = directional_light_settings_.color;
-    ubo.directional_light.intensity          = directional_light_settings_.intensity;
+    const auto& light_space_matrices = shadow_map_->get_light_space_matrices();
+    const auto& cascade_splits = shadow_map_->get_cascade_splits();
+    for (uint32 i = 0; i < shadow_map::cascade_count; ++i) {
+        ubo.directional_light.light_space_matrices[i] = light_space_matrices[i];
+    }
+    ubo.directional_light.cascade_splits = vec4f{
+        cascade_splits[0], cascade_splits[1], cascade_splits[2], cascade_splits[3]
+    };
+    ubo.directional_light.direction = directional_light_settings_.direction;
+    ubo.directional_light.color     = directional_light_settings_.color;
+    ubo.directional_light.intensity = directional_light_settings_.intensity;
 
     // Point lights count
     ubo.point_lights_count = light_buffer_->get_lights_count();
@@ -1562,17 +1569,40 @@ void renderer<C>::render_imgui() const {
 }
 
 template <typename C>
-void* renderer<C>::get_shadow_map_texture_id() const {
-    // Создаем ImGui texture ID из VkImageView и VkSampler shadow map
-    // Используем VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL, т.к. shadow map
-    // хранится в этом layout после shadow pass
-    static VkDescriptorSet descriptor_set = ImGui_ImplVulkan_AddTexture(
-        shadow_map_->get_sampler(),
-        shadow_map_->get_image_view(),
-        VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
-    );
-    // VkDescriptorSet приводим к void* (который является ImTextureID в Vulkan)
-    return descriptor_set;
+void* renderer<C>::get_shadow_map_texture_id(uint32 cascade_index) const {
+    struct Cache {
+        std::array<VkDescriptorSet, shadow_map::cascade_count> sets{};
+        std::array<VkImageView, shadow_map::cascade_count> views{};
+        VkSampler sampler = VK_NULL_HANDLE;
+        bool valid = false;
+    };
+
+    static Cache cache;
+
+    VkSampler current_sampler = shadow_map_->get_debug_sampler();
+    bool need_rebuild = !cache.valid || cache.sampler != current_sampler;
+
+    for (uint32 i = 0; i < shadow_map::cascade_count; ++i) {
+        VkImageView v = shadow_map_->get_image_view(i);
+        if (!cache.valid || cache.views[i] != v) {
+            need_rebuild = true;
+        }
+    }
+
+    if (need_rebuild) {
+        cache.sampler = current_sampler;
+        for (uint32 i = 0; i < shadow_map::cascade_count; ++i) {
+            cache.views[i] = shadow_map_->get_image_view(i);
+            cache.sets[i] = ImGui_ImplVulkan_AddTexture(
+                cache.sampler,
+                cache.views[i],
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+            );
+        }
+        cache.valid = true;
+    }
+
+    return cache.sets[cascade_index];
 }
 
 template <typename C>

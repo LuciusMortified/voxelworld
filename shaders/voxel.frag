@@ -4,12 +4,12 @@
 layout(location = 0) in vec3 fragPos;
 layout(location = 1) in vec3 fragNormal;
 layout(location = 2) in vec3 fragColor;
-layout(location = 3) in vec3 viewPos;
-layout(location = 6) in vec4 fragPosLightSpace;
+layout(location = 4) in float viewDepth;
 
 // Структура directional light данных (соответствует directional_light_data в C++)
 struct DirectionalLightData {
-    mat4 light_space_matrix;
+    mat4 light_space_matrices[4];
+    vec4 cascade_splits;// x = split0, y = split1, z = split2, w = split3
     vec3 direction;
     vec3 color;
     float intensity;
@@ -26,8 +26,8 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     uint point_lights_count;
 } ubo;
 
-// Shadow map (set 2, binding 0)
-layout(set = 2, binding = 0) uniform sampler2DShadow shadowMap;
+// Shadow map array (set 2, binding 0)
+layout(set = 2, binding = 0) uniform sampler2DArrayShadow shadowMapArray;
 
 // Структура point light данных (соответствует point_light_data в C++)
 struct PointLightData {
@@ -45,38 +45,60 @@ layout(set = 3, binding = 0, std430) readonly buffer PointLights {
     PointLightData lights[];
 } pointLights;
 
-float calculateShadow(vec4 fragPosLightSpace, vec3 normal) {
+const mat4 biasMat = mat4(
+    0.5, 0.0, 0.0, 0.0,
+    0.0, 0.5, 0.0, 0.0,
+    0.0, 0.0, 1.0, 0.0,
+    0.5, 0.5, 0.0, 1.0
+);
+
+int selectCascade(float viewDepth) {
+    // viewDepth в диапазоне [near, far]
+    if (viewDepth < ubo.directional_light.cascade_splits.x) return 0;
+    if (viewDepth < ubo.directional_light.cascade_splits.y) return 1;
+    if (viewDepth < ubo.directional_light.cascade_splits.z) return 2;
+    return 3;
+}
+
+float calculateShadowForCascade(int cascadeIndex, vec3 normal) {
+    // Вычисляем позицию в light space для выбранного каскада
+    float ndotl = max(dot(normal, normalize(-ubo.directional_light.direction)), 0.0);
+    float normalBias = max(0.005 * (1.0 - ndotl), 0.002);
+    vec3 newFragPos = fragPos + fragNormal * normalBias;
+    vec4 fragPosLightSpace =
+        ubo.directional_light.light_space_matrices[cascadeIndex] * vec4(newFragPos, 1.0);
+
     // Проецируем координаты в диапазон [-1, 1]
     vec3 projCoords = fragPosLightSpace.xyz / fragPosLightSpace.w;
-
-    //projCoords = projCoords * 0.5 + 0.5;
 
     // Преобразуем в диапазон [0, 1] только xy
     projCoords.xy = projCoords.xy * 0.5 + 0.5;
 
     // Проверяем, что координаты в пределах [0, 1]
-    if (projCoords.x < 0.0 || projCoords.x > 1.0 ||
+    if (
+        projCoords.x < 0.0 || projCoords.x > 1.0 ||
         projCoords.y < 0.0 || projCoords.y > 1.0 ||
-        projCoords.z > 1.0)
-    {
+        projCoords.z < 0.0 || projCoords.z > 1.0
+    ) {
         return 1.0;
     }
 
-    ivec2 texDim = textureSize(shadowMap, 0).xy;
-    float scale = 0.75;
+    ivec2 texDim = textureSize(shadowMapArray, 0).xy;
+    float scale = 0.5;
     float dx = scale * 1.0 / float(texDim.x);
     float dy = scale * 1.0 / float(texDim.y);
 
     float shadow = 0;
     int count = 0;
-    int range = 0; // 0 for off, 1 for 3x3, 2 for 5x5
+    int range = 2;  // 0 for off, 1 for 3x3, 2 for 5x5
     for (int x = -range; x <= range; ++x) {
         for (int y = -range; y <= range; ++y) {
             shadow += texture(
-                shadowMap,
-                vec3(
-                    vec2(projCoords.x + x*dx, projCoords.y + y*dy),
-                    projCoords.z
+                shadowMapArray,
+                    vec4(
+                        vec2(projCoords.x + x*dx, projCoords.y + y*dy),
+                        float(cascadeIndex),
+                        projCoords.z
                 )
             );
             count++;
@@ -84,6 +106,36 @@ float calculateShadow(vec4 fragPosLightSpace, vec3 normal) {
     }
 
     return shadow / count;
+}
+
+float calculateShadow(vec3 normal, float viewDepth) {
+    // Выбираем каскад на основе view depth
+    int cascadeIndex = selectCascade(viewDepth);
+
+    // Вычисляем shadow для текущего каскада
+    float shadow = calculateShadowForCascade(cascadeIndex, normal);
+    return shadow; // Возвращаем shadow без blending для упрощения
+
+    // Blending между каскадами (если не последний каскад)
+    if (cascadeIndex < 3) {
+        // Определяем зону смешивания (5% перед границей следующего каскада)
+        float nextSplit = ubo.directional_light.cascade_splits[cascadeIndex];
+        float blendStart = nextSplit * 0.95;
+        float blendEnd = nextSplit;
+
+        // Если фрагмент в зоне смешивания (перед границей следующего каскада)
+        if (viewDepth > blendStart && viewDepth < blendEnd) {
+            // Вычисляем shadow для следующего каскада
+            int nextCascadeIndex = cascadeIndex + 1;
+            float nextShadow = calculateShadowForCascade(nextCascadeIndex, normal);
+
+            // Интерполируем между каскадами (0 = текущий, 1 = следующий)
+            float blendFactor = smoothstep(blendStart, blendEnd, viewDepth);
+            shadow = mix(shadow, nextShadow, blendFactor);
+        }
+    }
+
+    return shadow;
 }
 
 vec3 calculateDirectionalLight(vec3 normal, vec3 viewDir, float shadow) {
@@ -157,7 +209,7 @@ vec3 calculateHemisphereAmbient(vec3 normal) {
     vec3 groundColor = vec3(0.1, 0.1, 0.15);
 
     // Смешиваем цвета в зависимости от направления нормали
-    float upFactor = normal.y * 0.5 + 0.5; // Преобразуем [-1, 1] в [0, 1]
+    float upFactor = normal.y * 0.5 + 0.5;// Преобразуем [-1, 1] в [0, 1]
     return mix(groundColor, skyColor, upFactor);
 }
 
@@ -166,24 +218,14 @@ layout(location = 0) out vec4 outColor;
 
 void main() {
     vec3 normal = normalize(fragNormal);
-    vec3 viewDir = normalize(viewPos - fragPos);
+    vec3 viewDir = normalize(ubo.viewPos - fragPos);
 
-    // Смещение позиции фрагмента вдоль нормали для уменьшения артефактов shadow acne
-    float ndotl = max(dot(normal, normalize(-ubo.directional_light.direction)), 0.0);
-    float normalBias = max(0.05 * (1.0 - ndotl), 0.01);
-    //float normalBias = max(0.005 * (1.0 - ndotl), 0.002);
-    vec3 newFragPos = fragPos + fragNormal * normalBias;
-    vec4 newFragPosLightSpace = ubo.directional_light.light_space_matrix * vec4(newFragPos, 1.0);
-
-    // Вычисляем shadow
-    float shadow = calculateShadow(
-        newFragPosLightSpace, normal
-    );
+    // Вычисляем shadow (normal bias применяется внутри функции)
+    float shadow = calculateShadow(normal, viewDepth);
 
     // Ambient lighting
     float ambientStrength = 0.15;
-    vec3 baseAmbient =
-        ambientStrength * ubo.directional_light.color * ubo.directional_light.intensity;
+    vec3 baseAmbient = ambientStrength * ubo.directional_light.color * ubo.directional_light.intensity;
 
     // Hemisphere ambient для более выразительного объёма
     vec3 hemisphereAmbient = calculateHemisphereAmbient(normal) * 0.3;

@@ -17,11 +17,15 @@ namespace vw::gfx {
 inline shadow_map::shadow_map(
     vulkan_context& context
 )
-    : context_(&context), light_space_matrix_(math::identity_matrix()) {
+    : context_(&context) {
+    // Инициализируем матрицы единичными
+    for (auto& matrix : light_space_matrices_) {
+        matrix = math::identity_matrix();
+    }
     create_shadow_map_image();
     create_sampler();
     create_render_pass();
-    create_framebuffer();
+    create_framebuffers();
 }
 
 inline shadow_map::~shadow_map() {
@@ -29,7 +33,24 @@ inline shadow_map::~shadow_map() {
 }
 
 inline void shadow_map::create_shadow_map_image() {
-    VkFormat depth_format = VK_FORMAT_D32_SFLOAT;
+    constexpr std::array candidates = {
+        VK_FORMAT_D32_SFLOAT,
+        VK_FORMAT_D32_SFLOAT_S8_UINT,
+        VK_FORMAT_D24_UNORM_S8_UINT,
+    };
+
+    VkFormat depth_format = VK_FORMAT_UNDEFINED;
+    for (VkFormat fmt : candidates) {
+        VkFormatProperties props{};
+        vkGetPhysicalDeviceFormatProperties(context_->get_physical_device(), fmt, &props);
+        if ((props.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT) != 0) {
+            depth_format = fmt;
+            break;
+        }
+    }
+    if (depth_format == VK_FORMAT_UNDEFINED) {
+        throw std::runtime_error("Failed to find supported depth format for shadow map!");
+    }
 
     VkImageCreateInfo image_info{};
     image_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -38,7 +59,7 @@ inline void shadow_map::create_shadow_map_image() {
     image_info.extent.height = shadow_map_size;
     image_info.extent.depth  = 1;
     image_info.mipLevels     = 1;
-    image_info.arrayLayers   = 1;
+    image_info.arrayLayers   = cascade_count;
     image_info.format        = depth_format;
     image_info.tiling        = VK_IMAGE_TILING_OPTIMAL;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -83,29 +104,51 @@ inline void shadow_map::create_shadow_map_image() {
 
     vkBindImageMemory(context_->get_device(), shadow_image_, shadow_image_memory_, 0);
 
-    VkImageViewCreateInfo view_info{};
-    view_info.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    view_info.image                           = shadow_image_;
-    view_info.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
-    view_info.format                          = depth_format;
-    view_info.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT;
-    view_info.subresourceRange.baseMipLevel   = 0;
-    view_info.subresourceRange.levelCount     = 1;
-    view_info.subresourceRange.baseArrayLayer = 0;
-    view_info.subresourceRange.layerCount     = 1;
+    // Создаем array view для использования в шейдерах
+    VkImageViewCreateInfo array_view_info{};
+    array_view_info.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    array_view_info.image                           = shadow_image_;
+    array_view_info.viewType                        = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+    array_view_info.format                          = depth_format;
+    array_view_info.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT;
+    array_view_info.subresourceRange.baseMipLevel   = 0;
+    array_view_info.subresourceRange.levelCount     = 1;
+    array_view_info.subresourceRange.baseArrayLayer = 0;
+    array_view_info.subresourceRange.layerCount     = cascade_count;
 
-    if (vkCreateImageView(context_->get_device(), &view_info, nullptr, &shadow_image_view_) !=
-        VK_SUCCESS) {
-        throw std::runtime_error("Failed to create shadow map image view!");
+    if (vkCreateImageView(
+            context_->get_device(), &array_view_info, nullptr, &shadow_array_image_view_
+        ) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create shadow map array image view!");
+    }
+
+    // Создаем отдельные 2D views для каждого каскада (для debug отображения и framebuffers)
+    for (uint32 i = 0; i < cascade_count; ++i) {
+        VkImageViewCreateInfo view_info{};
+        view_info.sType                           = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        view_info.image                           = shadow_image_;
+        view_info.viewType                        = VK_IMAGE_VIEW_TYPE_2D;
+        view_info.format                          = depth_format;
+        view_info.subresourceRange.aspectMask     = VK_IMAGE_ASPECT_DEPTH_BIT;
+        view_info.subresourceRange.baseMipLevel   = 0;
+        view_info.subresourceRange.levelCount     = 1;
+        view_info.subresourceRange.baseArrayLayer = i;
+        view_info.subresourceRange.layerCount     = 1;
+
+        if (vkCreateImageView(
+                context_->get_device(), &view_info, nullptr, &shadow_cascade_image_views_[i]
+            ) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create shadow map cascade image view!");
+        }
     }
 }
 
 inline void shadow_map::create_sampler() {
     VkSamplerCreateInfo sampler_info{};
     sampler_info.sType                   = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    sampler_info.magFilter               = VK_FILTER_LINEAR;
-    sampler_info.minFilter               = VK_FILTER_LINEAR;
-    sampler_info.mipmapMode              = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    sampler_info.magFilter               = VK_FILTER_NEAREST;
+    sampler_info.minFilter               = VK_FILTER_NEAREST;
+    sampler_info.mipmapMode              = VK_SAMPLER_MIPMAP_MODE_NEAREST;
     sampler_info.addressModeU            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
     sampler_info.addressModeV            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
     sampler_info.addressModeW            = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
@@ -120,6 +163,14 @@ inline void shadow_map::create_sampler() {
     sampler_info.unnormalizedCoordinates = VK_FALSE;
 
     if (vkCreateSampler(context_->get_device(), &sampler_info, nullptr, &shadow_sampler_) !=
+        VK_SUCCESS) {
+        throw std::runtime_error("Failed to create shadow map sampler!");
+    }
+
+    sampler_info.compareEnable = VK_FALSE;
+    sampler_info.compareOp     = VK_COMPARE_OP_NEVER;
+
+    if (vkCreateSampler(context_->get_device(), &sampler_info, nullptr, &debug_sampler_) !=
         VK_SUCCESS) {
         throw std::runtime_error("Failed to create shadow map sampler!");
     }
@@ -169,108 +220,152 @@ inline void shadow_map::create_render_pass() {
     }
 }
 
-inline void shadow_map::create_framebuffer() {
-    VkFramebufferCreateInfo framebuffer_info{};
-    framebuffer_info.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
-    framebuffer_info.renderPass      = shadow_render_pass_;
-    framebuffer_info.attachmentCount = 1;
-    framebuffer_info.pAttachments    = &shadow_image_view_;
-    framebuffer_info.width           = shadow_map_size;
-    framebuffer_info.height          = shadow_map_size;
-    framebuffer_info.layers          = 1;
+inline void shadow_map::create_framebuffers() {
+    for (uint32 i = 0; i < cascade_count; ++i) {
+        VkFramebufferCreateInfo framebuffer_info{};
+        framebuffer_info.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+        framebuffer_info.renderPass      = shadow_render_pass_;
+        framebuffer_info.attachmentCount = 1;
+        framebuffer_info.pAttachments    = &shadow_cascade_image_views_[i];
+        framebuffer_info.width           = shadow_map_size;
+        framebuffer_info.height          = shadow_map_size;
+        framebuffer_info.layers          = 1;
 
-    if (vkCreateFramebuffer(
-            context_->get_device(), &framebuffer_info, nullptr, &shadow_framebuffer_
-        ) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create shadow map framebuffer!");
+        if (vkCreateFramebuffer(
+                context_->get_device(), &framebuffer_info, nullptr, &shadow_framebuffers_[i]
+            ) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create shadow map framebuffer!");
+        }
     }
 }
 
-inline void shadow_map::update_light_matrix(
+inline void shadow_map::update_cascade_matrices(
     const camera& camera, const vec3f& light_direction
 ) {
     const vec3f light_dir = math::normalize(light_direction);
 
-    // 1. Получаем параметры камеры
-    const vec3f cam_pos     = camera.get_position();
-    const vec3f cam_forward = camera.get_forward();
+    // Вычисляем split distances используя Practical Split Scheme
+    std::array<float, cascade_split_count> local_cascade_splits{};
     const float cam_near    = camera.get_near();
     const float cam_far     = camera.get_far();
+    const vec3f cam_pos     = camera.get_position();
+    const vec3f cam_forward = camera.get_forward();
     const float fov_rad     = math::radians(camera.get_fov());
     const float aspect      = camera.get_aspect_ratio();
 
-    // 2. Вычисляем центр frustum
-    const float center_distance =
-        std::min((cam_near + cam_far) * 0.5f, max_shadow_distance_ * 0.5f);
-    const vec3f frustum_center = cam_pos + cam_forward * center_distance;
-
-    // 3. Вычисляем размер frustum на расстоянии центра
-    const float tan_half_fov  = std::tan(fov_rad * 0.5f);
-    const float center_height = center_distance * tan_half_fov;
-    const float center_width  = center_height * aspect;
-    const float max_size      = std::max(center_width, center_height);
-    float half_size           = max_size * 1.5f;  // Небольшой запас для надёжности
-
-    // 4. Позиция источника света
-    vec3f target         = frustum_center;
-    const float light_distance = cam_far * 0.75f;
-    vec3f eye            = target - light_dir * light_distance;
-
-    // 5. Вычисляем up вектор
-    vec3f up = vec3f{0.0f, 1.0f, 0.0f};
-    if (std::abs(math::dot(up, light_dir)) > 0.99f) {
-        up = vec3f{1.0f, 0.0f, 0.0f};
+    for (uint32 i = 0; i < cascade_count; ++i) {
+        float p            = static_cast<float>(i + 1) / static_cast<float>(cascade_count);
+        float log          = cam_near * std::pow(cam_far / cam_near, p);
+        float uniform      = cam_near + (cam_far - cam_near) * p;
+        float d            = split_lambda_ * (log - uniform) + uniform;
+        cascade_splits_[i] = d - cam_near;
     }
 
-    // 6. Создаем light_view матрицу
-    const mat4f light_view = math::look_at_matrix(eye, target, up);
+    // Для каждого каскада вычисляем light space matrix
+    for (uint32 cascade_index = 0; cascade_index < cascade_count; ++cascade_index) {
+        const float cascade_split = cascade_splits_[0];
 
-    // 7. Light Space Snap: стабилизация теней путём привязки к сетке текселей
-    // Вычисляем размер одного текселя в пространстве света (в единицах ортографической проекции)
-    const float texel_size = (2.0f * half_size) / static_cast<float>(shadow_map_size);
+        const float center_distance = std::min((cam_near + cam_far) * 0.5f, cascade_split * 0.5f);
+        const vec3f frustum_center  = cam_pos + cam_forward * center_distance;
 
-    // Используем более крупную сетку для snap (4x размер текселя) - уменьшает частоту дергания
-    constexpr float snap_multiplier = 1.0f;
-    const float snap_size = texel_size * snap_multiplier;
+        const float tan_half_fov  = std::tan(fov_rad * 0.5f);
+        const float center_height = center_distance * tan_half_fov;
+        const float center_width  = center_height * aspect;
+        const float max_size      = std::max(center_width, center_height);
+        float half_size           = max_size * 1.5f;  // Небольшой запас для надёжности
 
-    // Преобразуем frustum_center в пространство света
-    const vec4f frustum_center_light_space = light_view * vec4f{frustum_center.x, frustum_center.y, frustum_center.z, 1.0f};
+        vec3f target               = frustum_center;
+        const float light_distance = cam_far * 0.75f;
+        vec3f eye                  = target - light_dir * light_distance;
 
-    // Округляем координаты X и Y в пространстве света до кратных размеру snap сетки
-    const float snapped_x = std::floor(frustum_center_light_space.x / snap_size) * snap_size;
-    const float snapped_y = std::floor(frustum_center_light_space.y / snap_size) * snap_size;
+        vec3f up = vec3f{0.0f, 1.0f, 0.0f};
+        if (std::abs(math::dot(up, light_dir)) > 0.99f) {
+            up = vec3f{1.0f, 0.0f, 0.0f};
+        }
 
-    // Вычисляем смещение для ортографической проекции
-    const float offset_x = snapped_x - frustum_center_light_space.x;
-    const float offset_y = snapped_y - frustum_center_light_space.y;
+        const mat4f light_view = math::look_at_matrix(eye, target, up);
 
-    // Округляем half_size до кратных размеру текселя для дополнительной стабильности
-    half_size = std::ceil(half_size / texel_size) * texel_size;
+        // 7. Light Space Snap: стабилизация теней путём привязки к сетке текселей
+        // Вычисляем размер одного текселя в пространстве света (в единицах ортографической
+        // проекции)
+        const float texel_size = (2.0f * half_size) / static_cast<float>(shadow_map_size);
 
-    // 8. Ортографическая проекция с учетом смещения для стабилизации
-    // Смещаем границы проекции на offset_x и offset_y, чтобы центр был выровнен по сетке
-    auto light_proj = math::orthographic_matrix(
-        -half_size + offset_x, half_size + offset_x, -half_size + offset_y, half_size + offset_y,
-        cam_near, cam_far
-    );
+        // Используем более крупную сетку для snap (4x размер текселя) - уменьшает частоту дергания
+        constexpr float snap_multiplier = 1.0f;
+        const float snap_size           = texel_size * snap_multiplier;
 
-    light_space_matrix_ = light_proj * light_view;
+        // Преобразуем frustum_center в пространство света
+        const vec4f frustum_center_light_space =
+            light_view * vec4f{frustum_center.x, frustum_center.y, frustum_center.z, 1.0f};
+
+        // Округляем координаты X и Y в пространстве света до кратных размеру snap сетки
+        const float snapped_x = std::floor(frustum_center_light_space.x / snap_size) * snap_size;
+        const float snapped_y = std::floor(frustum_center_light_space.y / snap_size) * snap_size;
+
+        // Вычисляем смещение для ортографической проекции
+        const float offset_x = snapped_x - frustum_center_light_space.x;
+        const float offset_y = snapped_y - frustum_center_light_space.y;
+
+        // Округляем half_size до кратных размеру текселя для дополнительной стабильности
+        //half_size = std::ceil(half_size / texel_size) * texel_size;
+
+        // 8. Ортографическая проекция с учетом смещения для стабилизации
+        // Смещаем границы проекции на offset_x и offset_y, чтобы центр был выровнен по сетке
+        auto light_proj = math::orthographic_matrix(
+            -half_size + offset_x,
+            half_size + offset_x,
+            -half_size + offset_y,
+            half_size + offset_y,
+            cam_near,
+            cam_far
+        );
+
+        light_space_matrices_[cascade_index] = light_proj * light_view;
+    }
 }
 
-inline mat4f shadow_map::get_light_space_matrix() const {
-    return light_space_matrix_;
+inline mat4f shadow_map::get_light_space_matrix(
+    uint32 cascade_index
+) const {
+    return light_space_matrices_[cascade_index];
 }
 
-inline VkImageView shadow_map::get_image_view() const {
-    return shadow_image_view_;
+inline const std::array<mat4f, shadow_map::cascade_count>& shadow_map::
+    get_light_space_matrices() const {
+    return light_space_matrices_;
+}
+
+inline const std::array<float, shadow_map::cascade_count + 1>& shadow_map::
+    get_cascade_splits() const {
+    return cascade_splits_;
+}
+
+inline VkImage shadow_map::get_image() const {
+    return shadow_image_;
+}
+
+inline VkImageView shadow_map::get_image_view(
+    uint32 cascade_index
+) const {
+    return shadow_cascade_image_views_[cascade_index];
+}
+
+inline VkImageView shadow_map::get_array_image_view() const {
+    return shadow_array_image_view_;
 }
 
 inline VkSampler shadow_map::get_sampler() const {
     return shadow_sampler_;
 }
 
-inline VkFramebuffer shadow_map::get_framebuffer() const {
-    return shadow_framebuffer_;
+inline VkSampler shadow_map::get_debug_sampler() const {
+    return debug_sampler_;
+}
+
+inline VkFramebuffer shadow_map::get_framebuffer(
+    uint32 cascade_index
+) const {
+    return shadow_framebuffers_[cascade_index];
 }
 
 inline VkRenderPass shadow_map::get_render_pass() const {
@@ -278,9 +373,19 @@ inline VkRenderPass shadow_map::get_render_pass() const {
 }
 
 inline void shadow_map::cleanup() {
-    if (shadow_framebuffer_ != VK_NULL_HANDLE) {
-        vkDestroyFramebuffer(context_->get_device(), shadow_framebuffer_, nullptr);
-        shadow_framebuffer_ = VK_NULL_HANDLE;
+    for (uint32 i = 0; i < cascade_count; ++i) {
+        if (shadow_framebuffers_[i] != VK_NULL_HANDLE) {
+            vkDestroyFramebuffer(context_->get_device(), shadow_framebuffers_[i], nullptr);
+            shadow_framebuffers_[i] = VK_NULL_HANDLE;
+        }
+        if (shadow_cascade_image_views_[i] != VK_NULL_HANDLE) {
+            vkDestroyImageView(context_->get_device(), shadow_cascade_image_views_[i], nullptr);
+            shadow_cascade_image_views_[i] = VK_NULL_HANDLE;
+        }
+    }
+    if (shadow_array_image_view_ != VK_NULL_HANDLE) {
+        vkDestroyImageView(context_->get_device(), shadow_array_image_view_, nullptr);
+        shadow_array_image_view_ = VK_NULL_HANDLE;
     }
     if (shadow_render_pass_ != VK_NULL_HANDLE) {
         vkDestroyRenderPass(context_->get_device(), shadow_render_pass_, nullptr);
@@ -290,9 +395,9 @@ inline void shadow_map::cleanup() {
         vkDestroySampler(context_->get_device(), shadow_sampler_, nullptr);
         shadow_sampler_ = VK_NULL_HANDLE;
     }
-    if (shadow_image_view_ != VK_NULL_HANDLE) {
-        vkDestroyImageView(context_->get_device(), shadow_image_view_, nullptr);
-        shadow_image_view_ = VK_NULL_HANDLE;
+    if (debug_sampler_ != VK_NULL_HANDLE) {
+        vkDestroySampler(context_->get_device(), debug_sampler_, nullptr);
+        debug_sampler_ = VK_NULL_HANDLE;
     }
     if (shadow_image_ != VK_NULL_HANDLE) {
         vkDestroyImage(context_->get_device(), shadow_image_, nullptr);

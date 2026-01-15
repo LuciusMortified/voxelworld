@@ -36,7 +36,8 @@ struct directional_light_settings {
 
 // Для directional light (в UBO)
 struct directional_light_data {
-    alignas(16) mat4f light_space_matrix;
+    alignas(16) mat4f light_space_matrices[shadow_map::cascade_count];
+    alignas(16) vec4f cascade_splits;
     alignas(16) vec3f direction;
     alignas(16) vec3f color;
     alignas(4) float32 intensity;
@@ -52,10 +53,10 @@ struct uniform_buffer_object {
     alignas(16) directional_light_data directional_light;
 
     // Point lights count (для расширяемости)
-    alignas(4) uint32 point_lights_count;
+    alignas(4) uint32 point_lights_count{0};
 };
 
-// Uniform buffer для shadow pass (только light_space_matrix)
+// Uniform buffer для shadow pass (light_space_matrix и cascade_index)
 struct shadow_uniform_buffer_object {
     alignas(16) mat4f light_space_matrix;
 };
@@ -129,7 +130,7 @@ public:
 
     // Получить ImTextureID для shadow map (для отображения в ImGui::Image)
     // В Vulkan это VkDescriptorSet, приведенный к void*
-    [[nodiscard]] void* get_shadow_map_texture_id() const;
+    [[nodiscard]] void* get_shadow_map_texture_id(uint32 cascade_index = 0) const;
 
 private:
     void create_swapchain();

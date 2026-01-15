@@ -1,13 +1,11 @@
 #version 460 core
 #extension GL_ARB_shader_draw_parameters : require
 
-// Входные данные от вертексов (нужна только позиция для shadow mapping)
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
 layout(location = 2) in uint inColor;
 
 // Uniform buffer object для shadow pass (set 0, binding 0)
-// Для shadow pass нужна только light_space_matrix
 layout(set = 0, binding = 0) uniform ShadowUniformBufferObject {
     mat4 light_space_matrix;
 } shadowUbo;
