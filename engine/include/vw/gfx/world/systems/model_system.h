@@ -41,7 +41,6 @@ public:
         void set_voxel(vec3i pos, const voxel& v);
         void set_voxel(vec3i pos, color c);
         void fill(const voxel& v);
-        void clear();
         
     private:
         model_system* system_;

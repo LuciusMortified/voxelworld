@@ -5,6 +5,7 @@
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
 layout(location = 2) in uint inColor;
+layout(location = 3) in uint inInstanceIndex;
 
 // Структура directional light данных (соответствует directional_light_data в C++)
 struct DirectionalLightData {
@@ -45,7 +46,7 @@ vec3 unpackColor(uint packedColor) {
 }
 
 void main() {
-    mat4 model = modelMatrices.models[gl_DrawID];
+    mat4 model = modelMatrices.models[inInstanceIndex];
     
     // Трансформация позиции
     vec4 worldPos = model * vec4(inPosition, 1.0);

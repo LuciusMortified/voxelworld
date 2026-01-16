@@ -175,7 +175,7 @@ bool entity_properties_panel<WC>::render_vec3f_field(
 
     ImGui::AlignTextToFramePadding();
     std::string text = std::format("{}:", label);
-    ImGui::Text(text.c_str());
+    ImGui::Text("%s", text.c_str());
 
     ImGui::AlignTextToFramePadding();
     ImGui::Text("X");

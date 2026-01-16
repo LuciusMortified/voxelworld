@@ -241,7 +241,7 @@ void renderer<C>::render(
     if (vkBeginCommandBuffer(command_buffers_[current_image_index_], &begin_info) != VK_SUCCESS) {
         throw std::runtime_error("Failed to begin recording command buffer!");
     }
-    
+
     update_uniform_buffer(camera);
 
     const frustum& view_frustum = camera.get_frustum();
@@ -1434,8 +1434,9 @@ void renderer<WC>::render_world(
             continue;
         }
 
-        VkBuffer vertex_buffer = buffer->get_vertex_buffer();
-        VkBuffer index_buffer  = buffer->get_index_buffer();
+        VkBuffer vertex_buffer         = buffer->get_vertex_buffer();
+        VkBuffer instance_index_buffer = buffer->get_instance_index_buffer();
+        VkBuffer index_buffer          = buffer->get_index_buffer();
 
         // Биндим storage buffer descriptor set из буфера (set 1)
         VkDescriptorSet buffer_descriptor_set = buffer->get_descriptor_set();
@@ -1451,9 +1452,18 @@ void renderer<WC>::render_world(
         );
 
         // Биндим vertex и index буферы
-        constexpr VkDeviceSize vertex_offset = 0;
+        constexpr VkDeviceSize vertex_offset   = 0;
+        constexpr VkDeviceSize instance_offset = 0;
+
+        std::array vertex_buffers = {vertex_buffer, instance_index_buffer};
+        std::array vertex_offsets = {vertex_offset, instance_offset};
+
         vkCmdBindVertexBuffers(
-            command_buffers_[current_image_index_], 0, 1, &vertex_buffer, &vertex_offset
+            command_buffers_[current_image_index_],
+            0,
+            vertex_buffers.size(),
+            vertex_buffers.data(),
+            vertex_offsets.data()
         );
         vkCmdBindIndexBuffer(
             command_buffers_[current_image_index_], index_buffer, 0, VK_INDEX_TYPE_UINT32
@@ -1497,13 +1507,12 @@ void renderer<C>::update_uniform_buffer(
 
     // Directional light data
     const auto& light_space_matrices = shadow_map_->get_light_space_matrices();
-    const auto& cascade_splits = shadow_map_->get_cascade_splits();
+    const auto& cascade_splits       = shadow_map_->get_cascade_splits();
     for (uint32 i = 0; i < shadow_map::cascade_count; ++i) {
         ubo.directional_light.light_space_matrices[i] = light_space_matrices[i];
     }
-    ubo.directional_light.cascade_splits = vec4f{
-        cascade_splits[0], cascade_splits[1], cascade_splits[2], cascade_splits[3]
-    };
+    ubo.directional_light.cascade_splits =
+        vec4f{cascade_splits[0], cascade_splits[1], cascade_splits[2], cascade_splits[3]};
     ubo.directional_light.direction = directional_light_settings_.direction;
     ubo.directional_light.color     = directional_light_settings_.color;
     ubo.directional_light.intensity = directional_light_settings_.intensity;
@@ -1569,18 +1578,20 @@ void renderer<C>::render_imgui() const {
 }
 
 template <typename C>
-void* renderer<C>::get_shadow_map_texture_id(uint32 cascade_index) const {
+void* renderer<C>::get_shadow_map_texture_id(
+    uint32 cascade_index
+) const {
     struct Cache {
         std::array<VkDescriptorSet, shadow_map::cascade_count> sets{};
         std::array<VkImageView, shadow_map::cascade_count> views{};
         VkSampler sampler = VK_NULL_HANDLE;
-        bool valid = false;
+        bool valid        = false;
     };
 
     static Cache cache;
 
     VkSampler current_sampler = shadow_map_->get_debug_sampler();
-    bool need_rebuild = !cache.valid || cache.sampler != current_sampler;
+    bool need_rebuild         = !cache.valid || cache.sampler != current_sampler;
 
     for (uint32 i = 0; i < shadow_map::cascade_count; ++i) {
         VkImageView v = shadow_map_->get_image_view(i);
@@ -1593,10 +1604,8 @@ void* renderer<C>::get_shadow_map_texture_id(uint32 cascade_index) const {
         cache.sampler = current_sampler;
         for (uint32 i = 0; i < shadow_map::cascade_count; ++i) {
             cache.views[i] = shadow_map_->get_image_view(i);
-            cache.sets[i] = ImGui_ImplVulkan_AddTexture(
-                cache.sampler,
-                cache.views[i],
-                VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
+            cache.sets[i]  = ImGui_ImplVulkan_AddTexture(
+                cache.sampler, cache.views[i], VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL
             );
         }
         cache.valid = true;

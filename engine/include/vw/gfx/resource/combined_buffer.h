@@ -106,6 +106,7 @@ public:
 
     [[nodiscard]] VkBuffer get_vertex_buffer() const;
     [[nodiscard]] VkBuffer get_index_buffer() const;
+    [[nodiscard]] VkBuffer get_instance_index_buffer() const;
     [[nodiscard]] VkBuffer get_indirect_draw_buffer() const;
     [[nodiscard]] VkBuffer get_model_matrix_buffer() const;
     [[nodiscard]] uint32 get_draw_command_count() const;
@@ -128,6 +129,7 @@ private:
     uint32 mesh_capacity_;
     std::unique_ptr<vertex_buffer> vertex_buffer_;
     std::unique_ptr<index_buffer> index_buffer_;
+    std::unique_ptr<storage_buffer> instance_index_buffer_;
 
     uint32 instance_capacity_;
     std::unique_ptr<storage_buffer> model_matrix_buffer_;

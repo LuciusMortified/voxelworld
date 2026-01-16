@@ -4,7 +4,6 @@
 #define VW_CORE_TYPES_H
 
 #include <cstdint>
-#include <stdfloat>
 
 namespace vw {
 using uint8  = std::uint8_t;

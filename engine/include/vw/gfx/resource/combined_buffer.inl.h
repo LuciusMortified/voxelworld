@@ -32,6 +32,13 @@ inline combined_buffer::combined_buffer(
     index_buffer_ = std::make_unique<index_buffer>(
         *context_, mesh_capacity_ * chunk_size_.index_count * sizeof(uint32)
     );
+    instance_index_buffer_ = std::make_unique<storage_buffer>(
+        *context_,
+        instance_capacity_ * sizeof(uint32),
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |     //
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT |  //
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT
+    );
     model_matrix_buffer_ = std::make_unique<storage_buffer>(
         *context_,
         instance_capacity_ * sizeof(mat4f),
@@ -168,8 +175,10 @@ inline void combined_buffer::allocate(
         .instance_count = 1,
         .first_index    = mesh_alloc.index_offset,
         .vertex_offset  = static_cast<int32>(mesh_alloc.vertex_offset),
-        .first_instance = 0,
+        .first_instance = instance_index,
     };
+
+    instance_index_buffer_->copy_from_struct(instance_index, instance_index * sizeof(uint32));
 
     indirect_draw_buffer_->copy_from_struct(cmd, instance_index * sizeof(draw_command));
     model_matrix_buffer_->copy_from_struct(transform_matrix, instance_index * sizeof(mat4f));
@@ -356,6 +365,10 @@ inline uint32 combined_buffer::get_draw_command_count() const {
 
 inline VkBuffer combined_buffer::get_index_buffer() const {
     return index_buffer_->get_buffer();
+}
+
+inline VkBuffer combined_buffer::get_instance_index_buffer() const {
+    return instance_index_buffer_->get_buffer();
 }
 
 inline VkBuffer combined_buffer::get_indirect_draw_buffer() const {

@@ -59,7 +59,7 @@ inline void tool_panel::render_tool_button(
     ImGui::PopStyleColor(2);
 
     ImGui::SameLine();
-    ImGui::TextDisabled(shortcut.data());
+    ImGui::TextDisabled("%s", shortcut.data());
     ImGui::Spacing();
 }
 

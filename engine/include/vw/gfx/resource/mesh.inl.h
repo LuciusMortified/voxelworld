@@ -12,6 +12,11 @@ inline auto vertex::get_binding_descriptions() -> std::vector<VkVertexInputBindi
             .stride    = sizeof(vertex),
             .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
         },
+        VkVertexInputBindingDescription{
+            .binding   = 1,
+            .stride    = sizeof(uint32),
+            .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE,
+        },
     };
     return binding_descriptions;
 }
@@ -35,6 +40,12 @@ inline auto vertex::get_attribute_descriptions() -> std::vector<VkVertexInputAtt
             .binding  = 0,
             .format   = VK_FORMAT_R32_UINT,
             .offset   = offsetof(vertex, color),
+        },
+        VkVertexInputAttributeDescription{
+            .location = 3,
+            .binding  = 1,
+            .format   = VK_FORMAT_R32_UINT,
+            .offset   = 0,
         },
     };
     return attribute_descriptions;

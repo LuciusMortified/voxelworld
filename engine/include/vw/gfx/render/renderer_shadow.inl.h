@@ -291,8 +291,9 @@ void renderer<WC>::render_shadow_pass(
                 continue;
             }
 
-            VkBuffer vertex_buffer = buffer->get_vertex_buffer();
-            VkBuffer index_buffer  = buffer->get_index_buffer();
+            VkBuffer vertex_buffer         = buffer->get_vertex_buffer();
+            VkBuffer instance_index_buffer = buffer->get_instance_index_buffer();
+            VkBuffer index_buffer          = buffer->get_index_buffer();
 
             // Биндим storage buffer descriptor set из буфера (set 1)
             VkDescriptorSet buffer_descriptor_set = buffer->get_descriptor_set();
@@ -308,9 +309,18 @@ void renderer<WC>::render_shadow_pass(
             );
 
             // Биндим vertex и index буферы
-            constexpr VkDeviceSize vertex_offset = 0;
+            constexpr VkDeviceSize vertex_offset   = 0;
+            constexpr VkDeviceSize instance_offset = 0;
+
+            std::array vertex_buffers = {vertex_buffer, instance_index_buffer};
+            std::array vertex_offsets = {vertex_offset, instance_offset};
+
             vkCmdBindVertexBuffers(
-                command_buffers_[current_image_index_], 0, 1, &vertex_buffer, &vertex_offset
+                command_buffers_[current_image_index_],
+                0,
+                vertex_buffers.size(),
+                vertex_buffers.data(),
+                vertex_offsets.data()
             );
             vkCmdBindIndexBuffer(
                 command_buffers_[current_image_index_], index_buffer, 0, VK_INDEX_TYPE_UINT32

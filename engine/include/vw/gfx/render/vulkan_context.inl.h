@@ -11,7 +11,7 @@
 #include "vw/gfx/window/window.h"
 
 #ifndef NDEBUG
-inline VKAPI_ATTR VkBool32 VKAPI_CALL ::debug_callback(
+inline VkBool32 vw::gfx::debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
     VkDebugUtilsMessageTypeFlagsEXT message_type,
     const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
@@ -20,12 +20,12 @@ inline VKAPI_ATTR VkBool32 VKAPI_CALL ::debug_callback(
     switch (message_severity) {
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT:
             vw::log::error(
-                vw::gfx::vulkan_context::lc_, "Validation layer: {}", p_callback_data->pMessage
+                vulkan_context::lc_, "Validation layer: {}", p_callback_data->pMessage
             );
             break;
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT:
             vw::log::warn(
-                vw::gfx::vulkan_context::lc_, "Validation layer: {}", p_callback_data->pMessage
+                vulkan_context::lc_, "Validation layer: {}", p_callback_data->pMessage
             );
             break;
         case VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT:
@@ -161,8 +161,7 @@ inline void vulkan_context::create_instance_() {
     create_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 #endif
 
-    auto extensions = window_->get_required_extensions();
-    extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
+    auto extensions = window::get_required_extensions();
 
 #ifndef NDEBUG
     extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -176,8 +175,8 @@ inline void vulkan_context::create_instance_() {
     create_info.enabledExtensionCount   = static_cast<uint32>(extensions.size());
     create_info.ppEnabledExtensionNames = extensions.data();
 
-#ifndef NDEBUG
-    const std::vector<const char*> validation_layers = {"VK_LAYER_KHRONOS_validation"};
+#ifdef NDEBUG
+    const std::vector validation_layers = {"VK_LAYER_KHRONOS_validation"};
 
     // Проверяем доступность слоев валидации
     uint32 layer_count;
@@ -263,7 +262,8 @@ inline void vulkan_context::pick_physical_device_() {
             physical_device_ = device;
             VkPhysicalDeviceProperties props;
             vkGetPhysicalDeviceProperties(device, &props);
-            vw::log::info(lc_, "Selected device: {}", props.deviceName);
+            std::string name = props.deviceName;
+            vw::log::info(lc_, "Selected device: {}", name);
             return;
         }
     }
@@ -309,14 +309,7 @@ inline void vulkan_context::create_logical_device_() {
     create_info.pEnabledFeatures        = &device_features;
     create_info.enabledExtensionCount   = static_cast<uint32>(device_extensions_.size());
     create_info.ppEnabledExtensionNames = device_extensions_.data();
-
-#ifndef NDEBUG
-    const std::vector<const char*> validation_layers = {"VK_LAYER_KHRONOS_validation"};
-    create_info.enabledLayerCount   = static_cast<uint32>(validation_layers.size());
-    create_info.ppEnabledLayerNames = validation_layers.data();
-#else
-    create_info.enabledLayerCount = 0;
-#endif
+    create_info.enabledLayerCount     = 0;
 
     if (vkCreateDevice(physical_device_, &create_info, nullptr, &device_) != VK_SUCCESS) {
         throw std::runtime_error("failed to create logical device");

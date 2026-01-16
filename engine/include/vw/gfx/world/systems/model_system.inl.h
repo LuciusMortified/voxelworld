@@ -178,21 +178,6 @@ void model_system<Cs...>::model_modifier::fill(
     }
 }
 
-template <typename... Cs>
-void model_system<Cs...>::model_modifier::clear() {
-    if (component_->model_) {
-        component_->model_->clear();
-        system_->mark_dirty(entity_);
-        system_->mark_render_dirty(entity_);
-
-        // Пометить spatial_component как dirty
-        if (system_->spatial_system_ &&
-            system_->registry_->template has<spatial_component>(entity_)) {
-            system_->spatial_system_->mark_dirty(entity_);
-        }
-    }
-}
-
 }  // namespace vw::gfx
 
 #endif  // VW_GFX_WORLD_SYSTEMS_MODEL_SYSTEM_INL_H

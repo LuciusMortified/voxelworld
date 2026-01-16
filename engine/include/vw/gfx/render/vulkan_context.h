@@ -11,8 +11,10 @@
 #include "vw/core.h"
 #include "vw/log.h"
 
+namespace vw::gfx {
+
 #ifndef NDEBUG
-VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
+VkBool32 debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
     VkDebugUtilsMessageTypeFlagsEXT message_type,
     const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
@@ -20,7 +22,6 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
 );
 #endif
 
-namespace vw::gfx {
 class window;
 
 struct queue_family_indices {
@@ -61,7 +62,7 @@ private:
     static constexpr log::log_category lc_{"vulkan_context"};
 
 #ifndef NDEBUG
-    friend VKAPI_ATTR VkBool32 VKAPI_CALL ::debug_callback(
+    friend VkBool32 debug_callback(
         VkDebugUtilsMessageSeverityFlagBitsEXT message_severity,
         VkDebugUtilsMessageTypeFlagsEXT message_type,
         const VkDebugUtilsMessengerCallbackDataEXT* p_callback_data,
