@@ -245,7 +245,6 @@ inline void shadow_map::update_cascade_matrices(
     const vec3f light_dir = math::normalize(light_direction);
 
     // Вычисляем split distances используя Practical Split Scheme
-    std::array<float, cascade_split_count> local_cascade_splits{};
     const float cam_near    = camera.get_near();
     const float cam_far     = camera.get_far();
     const vec3f cam_pos     = camera.get_position();
@@ -272,7 +271,7 @@ inline void shadow_map::update_cascade_matrices(
         const float center_height = center_distance * tan_half_fov;
         const float center_width  = center_height * aspect;
         const float max_size      = std::max(center_width, center_height);
-        float half_size           = max_size * 1.5f;  // Небольшой запас для надёжности
+        float half_size           = max_size * 1.25f;  // Небольшой запас для надёжности
 
         vec3f target               = frustum_center;
         const float light_distance = cam_far * 0.75f;
@@ -290,8 +289,8 @@ inline void shadow_map::update_cascade_matrices(
         // проекции)
         const float texel_size = (2.0f * half_size) / static_cast<float>(shadow_map_size);
 
-        // Используем более крупную сетку для snap (4x размер текселя) - уменьшает частоту дергания
-        constexpr float snap_multiplier = 1.0f;
+        // Используем более крупную сетку для snap - уменьшает частоту дергания
+        constexpr float snap_multiplier = 16.0f;
         const float snap_size           = texel_size * snap_multiplier;
 
         // Преобразуем frustum_center в пространство света
@@ -307,7 +306,7 @@ inline void shadow_map::update_cascade_matrices(
         const float offset_y = snapped_y - frustum_center_light_space.y;
 
         // Округляем half_size до кратных размеру текселя для дополнительной стабильности
-        //half_size = std::ceil(half_size / texel_size) * texel_size;
+        half_size = std::ceil(half_size / texel_size) * texel_size;
 
         // 8. Ортографическая проекция с учетом смещения для стабилизации
         // Смещаем границы проекции на offset_x и offset_y, чтобы центр был выровнен по сетке

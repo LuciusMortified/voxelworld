@@ -45,13 +45,6 @@ layout(set = 3, binding = 0, std430) readonly buffer PointLights {
     PointLightData lights[];
 } pointLights;
 
-const mat4 biasMat = mat4(
-    0.5, 0.0, 0.0, 0.0,
-    0.0, 0.5, 0.0, 0.0,
-    0.0, 0.0, 1.0, 0.0,
-    0.5, 0.5, 0.0, 1.0
-);
-
 int selectCascade(float viewDepth) {
     // viewDepth в диапазоне [near, far]
     if (viewDepth < ubo.directional_light.cascade_splits.x) return 0;
@@ -61,10 +54,16 @@ int selectCascade(float viewDepth) {
 }
 
 float calculateShadowForCascade(int cascadeIndex, vec3 normal) {
+    // Если свет почти перпендикулярен поверхности, не отбрасываем тени
+    float ndot = dot(normal, normalize(-ubo.directional_light.direction));
+    if (ndot < 0.01) {
+        return 1.0;
+    }
+
     // Вычисляем позицию в light space для выбранного каскада
-    float ndotl = max(dot(normal, normalize(-ubo.directional_light.direction)), 0.0);
+    float ndotl = max(ndot, 0.0);
     float normalBias = max(0.005 * (1.0 - ndotl), 0.002);
-    vec3 newFragPos = fragPos + fragNormal * normalBias;
+    vec3 newFragPos = fragPos + fragNormal * 0;
     vec4 fragPosLightSpace =
         ubo.directional_light.light_space_matrices[cascadeIndex] * vec4(newFragPos, 1.0);
 
@@ -90,7 +89,7 @@ float calculateShadowForCascade(int cascadeIndex, vec3 normal) {
 
     float shadow = 0;
     int count = 0;
-    int range = 2;  // 0 for off, 1 for 3x3, 2 for 5x5
+    int range = 1;  // 0 for off, 1 for 3x3, 2 for 5x5
     for (int x = -range; x <= range; ++x) {
         for (int y = -range; y <= range; ++y) {
             shadow += texture(

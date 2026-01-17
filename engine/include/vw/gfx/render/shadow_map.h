@@ -65,7 +65,7 @@ private:
     std::array<float, cascade_split_count> cascade_splits_ = {};
 
     float max_shadow_distance_ = 100.0f;
-    float split_lambda_        = 0.75f;  // Коэффициент для Practical Split Scheme
+    float split_lambda_        = 0.9f;  // Коэффициент для Practical Split Scheme
 };
 
 }  // namespace vw::gfx
