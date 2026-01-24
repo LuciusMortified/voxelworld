@@ -5,14 +5,12 @@
 
 namespace vw::sculptor {
 
-template <typename WC>
-entity_properties_panel<WC>::entity_properties_panel(
+inline entity_properties_panel::entity_properties_panel(
     engine_type& eng, app_state& st, operation_manager& op_manager
 )
     : engine_(&eng), state_(&st), op_manager_(&op_manager) {}
 
-template <typename WC>
-void entity_properties_panel<WC>::render(
+inline void entity_properties_panel::render(
     float delta_time
 ) {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -67,13 +65,11 @@ void entity_properties_panel<WC>::render(
     ImGui::End();
 }
 
-template <typename WC>
-void entity_properties_panel<WC>::render_position() {
+inline void entity_properties_panel::render_position() {
     auto ent = state_->name_to_entity[state_->selected_name];
 
     auto& world            = engine_->get_world();
-    auto& transform_system = world.get_transform_system();
-    auto& transform_comp   = world.template get_component<gfx::transform_component>(ent);
+    auto& transform_comp   = world.get_component<gfx::transform_component>(ent);
     vec3f position         = transform_comp.get_position();
     if (render_vec3f_field("Position", position)) {
         transform new_transform = transform_comp.get_transform();
@@ -83,18 +79,16 @@ void entity_properties_panel<WC>::render_position() {
             .name = state_->selected_name,
             .transform = new_transform,
         };
-        auto op = std::make_unique<operation_type>(*engine_, *state_, params);
+        auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
         op_manager_->execute(std::move(op));
     }
 }
 
-template <typename WC>
-void entity_properties_panel<WC>::render_rotation() {
+inline void entity_properties_panel::render_rotation() {
     auto ent = state_->name_to_entity[state_->selected_name];
 
     auto& world            = engine_->get_world();
-    auto& transform_system = world.get_transform_system();
-    auto& transform_comp   = world.template get_component<gfx::transform_component>(ent);
+    auto& transform_comp   = world.get_component<gfx::transform_component>(ent);
     vec3f rotation         = transform_comp.get_rotation();
     vec3f rotation_deg     = {
         math::degrees(rotation.x),
@@ -115,18 +109,16 @@ void entity_properties_panel<WC>::render_rotation() {
             .name = state_->selected_name,
             .transform = new_transform,
         };
-        auto op = std::make_unique<operation_type>(*engine_, *state_, params);
+        auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
         op_manager_->execute(std::move(op));
     }
 }
 
-template <typename WC>
-void entity_properties_panel<WC>::render_scale() {
+inline void entity_properties_panel::render_scale() {
     auto ent = state_->name_to_entity[state_->selected_name];
 
     auto& world            = engine_->get_world();
-    auto& transform_system = world.get_transform_system();
-    auto& transform_comp   = world.template get_component<gfx::transform_component>(ent);
+    auto& transform_comp   = world.get_component<gfx::transform_component>(ent);
     vec3f scale            = transform_comp.get_scale();
     if (render_vec3f_field("Scale", scale)) {
         transform new_transform = transform_comp.get_transform();
@@ -136,18 +128,16 @@ void entity_properties_panel<WC>::render_scale() {
             .name = state_->selected_name,
             .transform = new_transform,
         };
-        auto op = std::make_unique<operation_type>(*engine_, *state_, params);
+        auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
         op_manager_->execute(std::move(op));
     }
 }
 
-template <typename WC>
-void entity_properties_panel<WC>::render_origin() {
+inline void entity_properties_panel::render_origin() {
     auto ent = state_->name_to_entity[state_->selected_name];
 
     auto& world            = engine_->get_world();
-    auto& transform_system = world.get_transform_system();
-    auto& transform_comp   = world.template get_component<gfx::transform_component>(ent);
+    auto& transform_comp   = world.get_component<gfx::transform_component>(ent);
     vec3f origin           = transform_comp.get_origin();
     if (render_vec3f_field("Origin", origin)) {
         transform new_transform = transform_comp.get_transform();
@@ -157,16 +147,14 @@ void entity_properties_panel<WC>::render_origin() {
             .name = state_->selected_name,
             .transform = new_transform,
         };
-        auto op = std::make_unique<operation_type>(*engine_, *state_, params);
+        auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
         op_manager_->execute(std::move(op));
     }
 }
 
-template <typename WC>
-void entity_properties_panel<WC>::render_actions() {}
+inline void entity_properties_panel::render_actions() {}
 
-template <typename WC>
-bool entity_properties_panel<WC>::render_vec3f_field(
+inline bool entity_properties_panel::render_vec3f_field(
     const char* label, vec3f& vec
 ) {
     bool vec_changed = false;

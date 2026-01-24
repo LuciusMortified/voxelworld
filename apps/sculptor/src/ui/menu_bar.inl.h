@@ -5,14 +5,12 @@
 
 namespace vw::sculptor {
 
-template <typename WC>
-menu_bar<WC>::menu_bar(
+inline menu_bar::menu_bar(
     engine_type& eng, app_state& state, operation_manager& op_manager
 )
     : engine_(&eng), state_(&state), op_manager_(&op_manager) {}
 
-template <typename WC>
-void menu_bar<WC>::render(
+inline void menu_bar::render(
     float delta_time
 ) {
     ImGuiWindowFlags menu_window_flags =          //

@@ -5,14 +5,12 @@
 
 namespace vw::sculptor {
 
-template <typename WC>
-set_transform_operation<WC>::set_transform_operation(
+inline set_transform_operation::set_transform_operation(
     engine_type& engine, app_state& st, const set_transform_params& params
 )
     : engine_(&engine), state_(&st), params_(params) {}
 
-template <typename WC>
-void set_transform_operation<WC>::execute() {
+inline void set_transform_operation::execute() {
     auto& world            = engine_->get_world();
     auto& transform_system = world.get_transform_system();
 
@@ -23,8 +21,7 @@ void set_transform_operation<WC>::execute() {
     transform_system.modify(ent).set_transform(params_.transform);
 }
 
-template <typename WC>
-void set_transform_operation<WC>::undo() {
+inline void set_transform_operation::undo() {
     auto& world            = engine_->get_world();
     auto& transform_system = world.get_transform_system();
 

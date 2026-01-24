@@ -13,7 +13,7 @@
 namespace vw::sculptor {
 
 inline app::app(
-    gfx::engine<>& eng
+    engine_type& eng
 )
     : gfx::app<>(eng)
     , camera_controller_(0.1f, 5.0f)
@@ -27,9 +27,9 @@ inline app::app(
     auto& camera = eng.get_camera();
     auto& renderer = eng.get_renderer();
 
-    tools_[tools::select_entity] = std::make_unique<select_entity_tool<>>(eng, state_);
-    tools_[tools::add_voxel]     = std::make_unique<add_voxel_tool<>>(eng, state_, op_manager_);
-    tools_[tools::remove_voxel]  = std::make_unique<remove_voxel_tool<>>(eng, state_, op_manager_);
+    tools_[tools::select_entity] = std::make_unique<select_entity_tool>(eng, state_);
+    tools_[tools::add_voxel]     = std::make_unique<add_voxel_tool>(eng, state_, op_manager_);
+    tools_[tools::remove_voxel]  = std::make_unique<remove_voxel_tool>(eng, state_, op_manager_);
     tools_[tools::paint_voxel]   = std::make_unique<dummy_tool>();
 
     camera_controller_.setup(window, camera);
@@ -90,6 +90,7 @@ inline void app::render(
 
     tools_[state_.selected_tool]->render(delta_time);
 
+#if 0
     ImGui::Begin("Shadow Map Debug");
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
     // Сетка 2x2 для всех каскадов
@@ -109,6 +110,7 @@ inline void app::render(
     }
     ImGui::PopStyleVar();
     ImGui::End();
+#endif
 }
 
 inline void app::handle_key_press(

@@ -4,17 +4,15 @@
 #define VW_SCULPTOR_MENU_BAR_H
 
 #include <vw/gfx/engine/engine.h>
-#include <vw/gfx/world/world_components.h>
 
 #include "app/app_state.h"
 #include "operations/operation_manager.h"
 
 namespace vw::sculptor {
 
-template <typename WC = gfx::base_world_components>
 class menu_bar final {
 public:
-    using engine_type = gfx::engine<WC>;
+    using engine_type = gfx::engine<>;
 
     menu_bar(engine_type& eng, app_state& state, operation_manager& op_manager);
 

@@ -6,14 +6,12 @@
 
 namespace vw::sculptor {
 
-template <typename WC>
-remove_voxel_tool<WC>::remove_voxel_tool(
+inline remove_voxel_tool::remove_voxel_tool(
     engine_type& eng, app_state& st, operation_manager& op_manager
 )
     : engine_(&eng), state_(&st), op_manager_(&op_manager) {}
 
-template <typename WC>
-void remove_voxel_tool<WC>::render(
+inline void remove_voxel_tool::render(
     float delta_time
 ) {
     if (hovered_voxel_ == vec3i{-1, -1, -1}) {
@@ -28,8 +26,8 @@ void remove_voxel_tool<WC>::render(
 
     auto& world        = engine_->get_world();
     bool is_renderable =  //
-        world.template has_component<gfx::transform_component>(ent) &&
-        world.template has_component<gfx::model_component>(ent);
+        world.has_component<gfx::transform_component>(ent) &&
+        world.has_component<gfx::model_component>(ent);
     if (!is_renderable) {
         return;
     }
@@ -42,20 +40,18 @@ void remove_voxel_tool<WC>::render(
     };
 
     auto voxel_world_pos =  //
-        world.template get_component<gfx::transform_component>(ent).get_world_matrix() *
+        world.get_component<gfx::transform_component>(ent).get_world_matrix() *
         math::translation_matrix(voxel_local_pos) *         //
         math::scale_matrix(vec3f{1.1f, 1.1f, 1.1f}) *  //
         math::translation_matrix(vec3f{-0.05f, -0.05f, -0.05f});
     renderer.draw_box(voxel_world_pos, vec3f{1.f, 1.f, 1.f}, colors::black);
 }
 
-template <typename WC>
-void remove_voxel_tool<WC>::on_key_press(
+inline void remove_voxel_tool::on_key_press(
     const gfx::key_press_event& ev
 ) {}
 
-template <typename WC>
-void remove_voxel_tool<WC>::on_mouse_move(
+inline void remove_voxel_tool::on_mouse_move(
     const gfx::mouse_move_event& ev
 ) {
     const auto& world  = engine_->get_world();
@@ -66,14 +62,13 @@ void remove_voxel_tool<WC>::on_mouse_move(
 
     auto voxel_hit = world.voxel_ray_cast(ray, ray_cast_entities_);
     if (voxel_hit.has_value()) {
-        hovered_voxel_ = voxel_hit->position;
+        hovered_voxel_ = voxel_hit->voxel_pos;
     } else {
         hovered_voxel_ = vec3i{-1, -1, -1};
     }
 }
 
-template <typename WC>
-void remove_voxel_tool<WC>::on_mouse_press(
+inline void remove_voxel_tool::on_mouse_press(
     const gfx::mouse_press_event& ev
 ) {
     if (ev.button == gfx::mouse::buttons::LEFT) {
@@ -90,15 +85,14 @@ void remove_voxel_tool<WC>::on_mouse_press(
             .position = hovered_voxel_,
         };
 
-        auto op = std::make_unique<remove_voxel_operation<WC>>(
+        auto op = std::make_unique<remove_voxel_operation>(
             *engine_, *state_, params
         );
         op_manager_->execute(std::move(op));
     }
 }
 
-template <typename WC>
-void remove_voxel_tool<WC>::on_mouse_release(
+inline void remove_voxel_tool::on_mouse_release(
     const gfx::mouse_release_event& ev
 ) {}
 

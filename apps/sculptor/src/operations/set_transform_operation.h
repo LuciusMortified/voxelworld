@@ -16,10 +16,9 @@ struct set_transform_params {
     transform transform;
 };
 
-template <typename WC = gfx::base_world_components>
 class set_transform_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<WC>;
+    using engine_type = gfx::engine<>;
 
     set_transform_operation(engine_type& engine, app_state& st, const set_transform_params& params);
 

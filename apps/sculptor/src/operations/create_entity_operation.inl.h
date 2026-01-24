@@ -5,28 +5,26 @@
 
 namespace vw::sculptor {
 
-template <typename WC>
-create_entity_operation<WC>::create_entity_operation(
+inline create_entity_operation::create_entity_operation(
     engine_type& engine, app_state& state, const create_entity_params& params
 )
     : base_operation(), engine_(&engine), state_(&state), params_(params) {}
 
-template <typename WC>
-void create_entity_operation<WC>::execute() {
+inline void create_entity_operation::execute() {
     auto& world            = engine_->get_world();
     auto& hierarchy_system = world.get_hierarchy_system();
     auto& transform_system = world.get_transform_system();
     auto& model_registry   = world.get_model_registry();
     auto& model_system     = world.get_model_system();
 
-    auto ent_builder = gfx::entity_builder<WC>{world};
-    ent_builder.template with<gfx::hierarchy_component>();
-    ent_builder.template with<gfx::transform_component>();
-    ent_builder.template with<gfx::spatial_component>();
+    auto ent_builder = gfx::entity_builder{world};
+    ent_builder.with<gfx::hierarchy_component>();
+    ent_builder.with<gfx::transform_component>();
+    ent_builder.with<gfx::spatial_component>();
 
     std::shared_ptr<gfx::model> model = nullptr;
     if (params_.with_model) {
-        ent_builder.template with<gfx::model_component>();
+        ent_builder.with<gfx::model_component>();
 
         model = model_registry.create(params_.name, params_.size);
         model->fill(voxel{state_->selected_color});
@@ -58,8 +56,7 @@ void create_entity_operation<WC>::execute() {
     state_->entities.push_back(std::move(ent_guard));
 }
 
-template <typename WC>
-void create_entity_operation<WC>::undo() {
+inline void create_entity_operation::undo() {
     auto ent    = state_->name_to_entity[params_.name];
     auto& world = engine_->get_world();
     world.destroy_entity(ent);

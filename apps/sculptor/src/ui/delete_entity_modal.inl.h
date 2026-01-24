@@ -5,22 +5,19 @@
 
 namespace vw::sculptor {
 
-template <typename WC>
-delete_entity_modal<WC>::delete_entity_modal(
+inline delete_entity_modal::delete_entity_modal(
     engine_type& eng, app_state& state, operation_manager& op_manager
 )
     : engine_(&eng), state_(&state), op_manager_(&op_manager) {}
 
-template <typename WC>
-void delete_entity_modal<WC>::open(
+inline void delete_entity_modal::open(
     const std::string& delete_name
 ) {
     need_open_   = true;
     delete_name_ = delete_name;
 }
 
-template <typename WC>
-void delete_entity_modal<WC>::render(
+inline void delete_entity_modal::render(
     float delta_time
 ) {
     if (need_open_) {
@@ -39,7 +36,7 @@ void delete_entity_modal<WC>::render(
                 .name = delete_name_
             };
 
-            auto op = std::make_unique<operation_type>(*engine_, *state_, params);
+            auto op = std::make_unique<delete_entity_operation>(*engine_, *state_, params);
             op_manager_->execute(std::move(op));
 
             ImGui::CloseCurrentPopup();

@@ -9,12 +9,9 @@
 
 namespace vw::sculptor {
 
-template <typename WC = gfx::base_world_components>
 class entity_tree_panel {
 public:
-    using engine_type = gfx::engine<WC>;
-    using create_entity_modal_type = create_entity_modal<WC>;
-    using delete_entity_modal_type = delete_entity_modal<WC>;
+    using engine_type = gfx::engine<>;
 
     entity_tree_panel(engine_type& eng, app_state& st, operation_manager& op_manager);
 
@@ -25,8 +22,8 @@ private:
     app_state* state_;
     operation_manager* op_manager_;
 
-    create_entity_modal_type creation_modal_;
-    delete_entity_modal_type deletion_modal_;
+    create_entity_modal creation_modal_;
+    delete_entity_modal deletion_modal_;
 
     void render_entity_node(const std::string& name);
 };

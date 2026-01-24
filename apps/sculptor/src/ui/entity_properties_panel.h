@@ -9,11 +9,9 @@
 
 namespace vw::sculptor {
 
-template <typename WC = gfx::base_world_components>
 class entity_properties_panel {
 public:
-    using engine_type    = gfx::engine<WC>;
-    using operation_type = set_transform_operation<WC>;
+    using engine_type    = gfx::engine<>;
 
     entity_properties_panel(engine_type& eng, app_state& st, operation_manager& op_manager);
 

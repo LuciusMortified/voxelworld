@@ -15,10 +15,9 @@ struct delete_entity_params {
     std::string name;
 };
 
-template <typename WC = gfx::base_world_components>
 class delete_entity_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<WC>;
+    using engine_type = gfx::engine<>;
 
     delete_entity_operation(
         engine_type& engine, app_state& state, const delete_entity_params& params

@@ -7,14 +7,12 @@
 
 namespace vw::sculptor {
 
-template <typename WC>
-remove_voxel_operation<WC>::remove_voxel_operation(
+inline remove_voxel_operation::remove_voxel_operation(
     engine_type& eng, app_state& st, const remove_voxel_params& params
 )
     : engine_(&eng), state_(&st), params_(params) {}
 
-template <typename WC>
-void remove_voxel_operation<WC>::execute() {
+inline void remove_voxel_operation::execute() {
     auto ent = state_->name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
@@ -26,8 +24,7 @@ void remove_voxel_operation<WC>::execute() {
     model_system.modify(ent).set_voxel(params_.position, empty_voxel);
 }
 
-template <typename WC>
-void remove_voxel_operation<WC>::undo() {
+inline void remove_voxel_operation::undo() {
     auto ent = state_->name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();

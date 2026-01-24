@@ -259,13 +259,11 @@ template <typename... Cs>
 auto spatial_system<Cs...>::voxel_ray_cast(
     const ray& r, std::unordered_set<entity>& candidates
 ) const -> std::optional<voxel_ray_hit> {
-    // Получить кандидатов через spatial tree
     query_all(r, candidates);
 
     std::optional<voxel_ray_hit> closest_hit;
     float closest_distance_sq = std::numeric_limits<float>::max();
 
-    // Обработать каждого кандидата
     for (entity ent : candidates) {
         const bool can_be_processed =  //
             registry_->template has<model_component>(ent) &&
@@ -281,7 +279,6 @@ auto spatial_system<Cs...>::voxel_ray_cast(
             continue;
         }
 
-        // Получить размеры модели
         const vec3i model_size = model_comp.size();
 
         if (model_size.x <= 0 || model_size.y <= 0 || model_size.z <= 0) {
@@ -292,7 +289,6 @@ auto spatial_system<Cs...>::voxel_ray_cast(
         const int height = model_size.y;
         const int depth  = model_size.z;
 
-        // Преобразовать луч в локальное пространство модели
         const mat4f world_matrix    = transform_comp.get_world_matrix();
         const mat4f inverse_world   = math::inverse_matrix(world_matrix);
         const vec3f local_start     = inverse_world * r.start;
@@ -301,8 +297,12 @@ auto spatial_system<Cs...>::voxel_ray_cast(
 
         // AABB модели в локальных координатах (от (0,0,0) до (width, height, depth))
         const aabb model_aabb{
-            vec3f{0.0f, 0.0f, 0.0f},
-            vec3f{static_cast<float>(width), static_cast<float>(height), static_cast<float>(depth)}
+            vec3f{-1.f, -1.f, -1.f},
+            vec3f{
+                static_cast<float>(width) + 1.f,
+                static_cast<float>(height) + 1.f,
+                static_cast<float>(depth) + 1.f
+            }
         };
 
         // Проверить пересечение луча с AABB модели
@@ -316,19 +316,23 @@ auto spatial_system<Cs...>::voxel_ray_cast(
         vec3f entry_point = local_ray.point_at(t_entry);
 
         // Ограничить начальную точку границами модели
-        entry_point.x = math::clamp(entry_point.x, 0.0f, static_cast<float>(width));
-        entry_point.y = math::clamp(entry_point.y, 0.0f, static_cast<float>(height));
-        entry_point.z = math::clamp(entry_point.z, 0.0f, static_cast<float>(depth));
+        entry_point.x = math::clamp(entry_point.x, -1.f, static_cast<float>(width) + 1.f);
+        entry_point.y = math::clamp(entry_point.y, -1.f, static_cast<float>(height) + 1.f);
+        entry_point.z = math::clamp(entry_point.z, -1.f, static_cast<float>(depth) + 1.f);
 
-        // Начальная позиция вокселя
+        // Начальная позиция вокселя (до ограничения границами)
         int x = static_cast<int>(std::floor(entry_point.x));
         int y = static_cast<int>(std::floor(entry_point.y));
         int z = static_cast<int>(std::floor(entry_point.z));
 
         // Ограничить начальную позицию границами
-        x = std::max(0, std::min(width - 1, x));
-        y = std::max(0, std::min(height - 1, y));
-        z = std::max(0, std::min(depth - 1, z));
+        x = std::max(-1, std::min(width, x));
+        y = std::max(-1, std::min(height, y));
+        z = std::max(-1, std::min(depth, z));
+
+        int prev_x = x;
+        int prev_y = y;
+        int prev_z = z;
 
         // Шаги по осям
         const int step_x = local_direction.x > 0.0f ? 1 : -1;
@@ -385,12 +389,15 @@ auto spatial_system<Cs...>::voxel_ray_cast(
 
         while (iterations < max_iterations) {
             // Проверить, что воксель в пределах границ
-            if (x < 0 || x >= width || y < 0 || y >= height || z < 0 || z >= depth) {
+            if (x < -1 || x > width || y < -1 || y > height || z < -1 || z > depth) {
                 break;
             }
 
+            bool is_out_of_bounds =  //
+                x == -1 || x == width || y == -1 || y == height || z == -1 || z == depth;
+
             // Проверить воксель
-            if (!model_comp.is_empty(x, y, z)) {
+            if (!is_out_of_bounds && !model_comp.is_empty(x, y, z)) {
                 // Найдено попадание!
                 vec3f hit_point_local{
                     static_cast<float>(x) + 0.5f,
@@ -402,10 +409,19 @@ auto spatial_system<Cs...>::voxel_ray_cast(
 
                 if (distance_sq < closest_distance_sq) {
                     closest_distance_sq = distance_sq;
-                    closest_hit         = voxel_ray_hit{ent, vec3i{x, y, z}};
+
+                    closest_hit = voxel_ray_hit{
+                        .ent       = ent,
+                        .voxel_pos = vec3i{x, y, z},
+                        .empty_pos = vec3i{prev_x, prev_y, prev_z}
+                    };
                 }
                 break;  // Найдено первое попадание в этой модели, переходим к следующему кандидату
             }
+
+            prev_x = x;
+            prev_y = y;
+            prev_z = z;
 
             // Переместиться к следующему вокселю
             if (t_max_x < t_max_y && t_max_x < t_max_z) {

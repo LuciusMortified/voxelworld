@@ -18,7 +18,9 @@ namespace vw::sculptor {
 
 class app final : public gfx::app<> {
 public:
-    explicit app(gfx::engine<>& eng);
+    using engine_type = gfx::engine<>;
+
+    explicit app(engine_type& eng);
 
     void render(float delta_time) override;
 
@@ -36,11 +38,11 @@ private:
 
     std::unordered_map<tools, std::unique_ptr<base_tool>> tools_;
 
-    menu_bar<> menu_bar_;
+    menu_bar menu_bar_;
     tool_panel tool_panel_;
     color_palette_panel color_palette_panel_;
-    entity_properties_panel<> entity_properties_panel_;
-    entity_tree_panel<> entity_tree_panel_;
+    entity_properties_panel entity_properties_panel_;
+    entity_tree_panel entity_tree_panel_;
 };
 
 }  // namespace vw::sculptor

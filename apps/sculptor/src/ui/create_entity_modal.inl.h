@@ -5,20 +5,17 @@
 
 namespace vw::sculptor {
 
-template <typename WC>
-create_entity_modal<WC>::create_entity_modal(
+inline create_entity_modal::create_entity_modal(
     engine_type& eng, app_state& state, operation_manager& op_manager
 )
     : engine_(&eng), state_(&state), op_manager_(&op_manager) {}
 
-template <typename WC>
-void create_entity_modal<WC>::open() {
+inline void create_entity_modal::open() {
     need_open_ = true;
     name_      = std::format("new entity {}", state_->name_to_entity.size());
 }
 
-template <typename WC>
-void create_entity_modal<WC>::render(
+inline void create_entity_modal::render(
     float /*delta_time*/
 ) {
     if (need_open_) {
@@ -54,8 +51,7 @@ void create_entity_modal<WC>::render(
     }
 }
 
-template <typename WC>
-bool create_entity_modal<WC>::create_entity() {
+inline bool create_entity_modal::create_entity() {
     error_.clear();
 
     if (name_.empty()) {
@@ -78,7 +74,7 @@ bool create_entity_modal<WC>::create_entity() {
         .size        = size_,
     };
 
-    auto op = std::make_unique<operation_type>(*engine_, *state_, params);
+    auto op = std::make_unique<create_entity_operation>(*engine_, *state_, params);
     op_manager_->execute(std::move(op));
 
     return true;

@@ -16,10 +16,9 @@ struct remove_voxel_params {
     vec3i position;
 };
 
-template <typename WC = gfx::base_world_components>
 class remove_voxel_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<WC>;
+    using engine_type = gfx::engine<>;
 
     remove_voxel_operation(engine_type& eng, app_state& st, const remove_voxel_params& params);
 

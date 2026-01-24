@@ -5,8 +5,7 @@
 
 namespace vw::sculptor {
 
-template <typename WC>
-entity_tree_panel<WC>::entity_tree_panel(
+inline entity_tree_panel::entity_tree_panel(
     engine_type& eng, app_state& st, operation_manager& op_manager
 )
     : engine_(&eng)
@@ -15,8 +14,7 @@ entity_tree_panel<WC>::entity_tree_panel(
     , creation_modal_(eng, st, op_manager)
     , deletion_modal_(eng, st, op_manager) {}
 
-template <typename WC>
-void entity_tree_panel<WC>::render(
+inline void entity_tree_panel::render(
     float delta_time
 ) {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -52,8 +50,7 @@ void entity_tree_panel<WC>::render(
     ImGui::End();
 }
 
-template <typename WC>
-void entity_tree_panel<WC>::render_entity_node(
+inline void entity_tree_panel::render_entity_node(
     const std::string& name
 ) {
     if (name.empty()) {
@@ -63,13 +60,11 @@ void entity_tree_panel<WC>::render_entity_node(
     auto ent    = state_->name_to_entity[name];
     auto& world = engine_->get_world();
 
-    auto& hierarchy_system = world.get_hierarchy_system();
-
-    bool has_hierarchy = world.template has_component<gfx::hierarchy_component>(ent);
+    bool has_hierarchy = world.has_component<gfx::hierarchy_component>(ent);
     bool has_children  = false;
 
     if (has_hierarchy) {
-        const auto& hierarchy_comp = world.template get_component<gfx::hierarchy_component>(ent);
+        const auto& hierarchy_comp = world.get_component<gfx::hierarchy_component>(ent);
         has_children               = !hierarchy_comp.get_children().empty();
     }
 
@@ -113,7 +108,7 @@ void entity_tree_panel<WC>::render_entity_node(
     }
 
     if (is_open && has_children) {
-        const auto& hierarchy_comp = world.template get_component<gfx::hierarchy_component>(ent);
+        const auto& hierarchy_comp = world.get_component<gfx::hierarchy_component>(ent);
         const auto& children       = hierarchy_comp.get_children();
 
         for (auto child : children) {

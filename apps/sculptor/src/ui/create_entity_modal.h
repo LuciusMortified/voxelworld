@@ -11,11 +11,9 @@
 
 namespace vw::sculptor {
 
-template <typename WC = gfx::base_world_components>
 class create_entity_modal final {
 public:
-    using engine_type = gfx::engine<WC>;
-    using operation_type = create_entity_operation<WC>;
+    using engine_type = gfx::engine<>;
 
     create_entity_modal(engine_type& eng, app_state& state, operation_manager& op_manager);
 

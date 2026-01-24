@@ -5,19 +5,17 @@
 
 namespace vw::sculptor {
 
-template <typename WC>
-delete_entity_operation<WC>::delete_entity_operation(
+inline delete_entity_operation::delete_entity_operation(
     engine_type& engine, app_state& state, const delete_entity_params& params
 )
     : engine_(&engine), state_(&state), params_(params) {}
 
-template <typename WC>
-void delete_entity_operation<WC>::execute() {
+inline void delete_entity_operation::execute() {
     auto ent = state_->name_to_entity[params_.name];
 
     auto& world          = engine_->get_world();
-    auto& hierarchy_comp = world.template get_component<gfx::hierarchy_component>(ent);
-    auto& transform_comp = world.template get_component<gfx::transform_component>(ent);
+    auto& hierarchy_comp = world.get_component<gfx::hierarchy_component>(ent);
+    auto& transform_comp = world.get_component<gfx::transform_component>(ent);
 
     bool has_parent = hierarchy_comp.has_parent();
     if (has_parent) {
@@ -26,8 +24,8 @@ void delete_entity_operation<WC>::execute() {
 
     transform_ = transform_comp.get_transform();
 
-    if (world.template has_component<gfx::model_component>(ent)) {
-        auto& model_comp = world.template get_component<gfx::model_component>(ent);
+    if (world.has_component<gfx::model_component>(ent)) {
+        auto& model_comp = world.get_component<gfx::model_component>(ent);
 
         if (model_comp.has_model()) {
             with_model_ = true;
@@ -60,8 +58,7 @@ void delete_entity_operation<WC>::execute() {
     );
 }
 
-template <typename WC>
-void delete_entity_operation<WC>::undo() {
+inline void delete_entity_operation::undo() {
     auto& world            = engine_->get_world();
     auto& hierarchy_system = world.get_hierarchy_system();
     auto& transform_system = world.get_transform_system();

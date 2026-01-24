@@ -19,10 +19,9 @@ struct create_entity_params {
     vec3i size      = vec3i{6, 6, 6};
 };
 
-template <typename WC = gfx::base_world_components>
 class create_entity_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<WC>;
+    using engine_type = gfx::engine<>;
 
     create_entity_operation(
         engine_type& engine, app_state& state, const create_entity_params& params = {}

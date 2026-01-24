@@ -4,17 +4,15 @@
 #define VW_SCULPTOR_SELECT_ENTITY_TOOL_H
 
 #include <vw/gfx/engine/engine.h>
-#include <vw/gfx/world/world_components.h>
 
 #include "app/app_state.h"
 #include "base_tool.h"
 
 namespace vw::sculptor {
 
-template <typename WC = gfx::base_world_components>
 class select_entity_tool final : public base_tool {
 public:
-    using engine_type = gfx::engine<WC>;
+    using engine_type = gfx::engine<>;
 
     select_entity_tool(engine_type& eng, app_state& st);
 

@@ -210,19 +210,24 @@ private:
 
             auto voxel_hit = world.voxel_ray_cast(ray, selected_entities_);
             if (voxel_hit.has_value()) {
-                selected_entity_ = voxel_hit->ent;
-                selected_voxel_  = voxel_hit->position;
+                selected_entity_     = voxel_hit->ent;
+                selected_voxel_      = voxel_hit->voxel_pos;
+                selected_empty_pos_  = voxel_hit->empty_pos;
                 log::info(
-                    "Selected entity: {}.{}, voxel: ({}, {}, {})",
+                    "Selected entity: {}.{}, voxel: ({}, {}, {}), empty: ({}, {}, {})",
                     selected_entity_.index,
                     selected_entity_.generation,
                     selected_voxel_.x,
                     selected_voxel_.y,
-                    selected_voxel_.z
+                    selected_voxel_.z,
+                    selected_empty_pos_.x,
+                    selected_empty_pos_.y,
+                    selected_empty_pos_.z
                 );
             } else {
-                selected_entity_ = gfx::invalid_entity;
-                selected_voxel_  = vec3i{-1, -1, -1};
+                selected_entity_    = gfx::invalid_entity;
+                selected_voxel_     = vec3i{-1, -1, -1};
+                selected_empty_pos_ = vec3i{-1, -1, -1};
                 log::info("No voxel hit");
             }
         }
@@ -237,18 +242,34 @@ private:
             return;
         }
 
-        auto& renderer       = get_engine().get_renderer();
+        auto& renderer = get_engine().get_renderer();
+        const auto& transform_matrix =
+            world.get_component<gfx::transform_component>(selected_entity_).get_world_matrix();
+
         auto voxel_local_pos = vec3f{
             static_cast<float>(selected_voxel_.x),
             static_cast<float>(selected_voxel_.y),
             static_cast<float>(selected_voxel_.z)
         };
         auto voxel_world_pos =  //
-            world.get_component<gfx::transform_component>(selected_entity_).get_world_matrix() *
-            math::translation_matrix(voxel_local_pos) *    //
-            math::scale_matrix(vec3f{1.1f, 1.1f, 1.1f}) *  //
+            transform_matrix * math::translation_matrix(voxel_local_pos) *
+            math::scale_matrix(vec3f{1.1f, 1.1f, 1.1f}) *
             math::translation_matrix(vec3f{-0.05f, -0.05f, -0.05f});
         renderer.draw_box(voxel_world_pos, vec3f{1.0f, 1.0f, 1.0f}, colors::black);
+
+        if (selected_empty_pos_.x >= -1 && selected_empty_pos_.y >= -1 &&
+            selected_empty_pos_.z >= -1) {
+            auto empty_local_pos = vec3f{
+                static_cast<float>(selected_empty_pos_.x),
+                static_cast<float>(selected_empty_pos_.y),
+                static_cast<float>(selected_empty_pos_.z)
+            };
+            auto empty_world_pos =  //
+                transform_matrix * math::translation_matrix(empty_local_pos) *
+                math::scale_matrix(vec3f{1.1f, 1.1f, 1.1f}) *
+                math::translation_matrix(vec3f{-0.05f, -0.05f, -0.05f});
+            renderer.draw_box(empty_world_pos, vec3f{1.0f, 1.0f, 1.0f}, colors::yellow);
+        }
     }
 
     std::unique_ptr<gfx::fps_camera_controller> camera_controller_;
@@ -262,6 +283,7 @@ private:
     std::unordered_set<gfx::entity> selected_entities_;
     gfx::entity selected_entity_ = gfx::invalid_entity;
     vec3i selected_voxel_{-1, -1, -1};
+    vec3i selected_empty_pos_{-1, -1, -1};
     gfx::ray select_ray_{vec3f{}, vec3f{}};
 };
 

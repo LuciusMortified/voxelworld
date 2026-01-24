@@ -28,8 +28,7 @@ public:
     );
     
     void update();
-    
-    // Методы запросов - возвращают все попавшие сущности
+
     void query_all(
         const frustum& f,
         std::unordered_set<entity>& result_out

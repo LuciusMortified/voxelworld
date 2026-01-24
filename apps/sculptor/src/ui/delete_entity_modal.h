@@ -12,11 +12,9 @@
 
 namespace vw::sculptor {
 
-template <typename WC = gfx::base_world_components>
 class delete_entity_modal final {
 public:
-    using engine_type = gfx::engine<WC>;
-    using operation_type = delete_entity_operation<WC>;
+    using engine_type = gfx::engine<>;
 
     delete_entity_modal(engine_type& eng, app_state& state, operation_manager& op_manager);
 
