@@ -239,7 +239,7 @@ inline void shadow_map::create_framebuffers() {
     }
 }
 
-inline void shadow_map::update_cascade_matrices(
+inline void shadow_map::update(
     const camera& camera, const vec3f& light_direction
 ) {
     const vec3f light_dir = math::normalize(light_direction);
@@ -262,7 +262,7 @@ inline void shadow_map::update_cascade_matrices(
 
     // Для каждого каскада вычисляем light space matrix
     for (uint32 cascade_index = 0; cascade_index < cascade_count; ++cascade_index) {
-        const float cascade_split = cascade_splits_[0];
+        const float cascade_split = cascade_splits_[cascade_index];
 
         const float center_distance = std::min((cam_near + cam_far) * 0.5f, cascade_split * 0.5f);
         const vec3f frustum_center  = cam_pos + cam_forward * center_distance;

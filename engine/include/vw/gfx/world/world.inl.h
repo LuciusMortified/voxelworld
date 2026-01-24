@@ -72,7 +72,7 @@ template <typename Cs>
 template <typename T>
 void world<Cs>::remove_component(
     entity ent
-) {
+) noexcept {
     if constexpr (std::same_as<T, hierarchy_component>) {
         hierarchy_system_.cleanup(ent);
     }
@@ -91,41 +91,10 @@ void world<Cs>::remove_component(
     registry_.template remove<T>(ent);
 }
 
-template <typename Cs>
-void world<Cs>::remove_all_components(
-    entity ent
-) {
-    if (registry_.template has<hierarchy_component>(ent)) {
-        hierarchy_system_.cleanup(ent);
-    }
-    if (registry_.template has<transform_component>(ent)) {
-        transform_system_.mark_render_dirty(ent);
-    }
-    if (registry_.template has<model_component>(ent)) {
-        model_system_.mark_render_dirty(ent);
-    }
-    if (registry_.template has<spatial_component>(ent)) {
-        spatial_system_.cleanup(ent);
-    }
-    registry_.remove_all(ent);
-}
-
 template <typename C>
 void world<C>::destroy_entity(
     entity ent
-) {
-    if (registry_.template has<hierarchy_component>(ent)) {
-        hierarchy_system_.cleanup(ent);
-    }
-    if (registry_.template has<transform_component>(ent)) {
-        transform_system_.mark_render_dirty(ent);
-    }
-    if (registry_.template has<model_component>(ent)) {
-        model_system_.mark_render_dirty(ent);
-    }
-    if (registry_.template has<spatial_component>(ent)) {
-        spatial_system_.cleanup(ent);
-    }
+) noexcept {
     registry_.destroy(ent);
 }
 

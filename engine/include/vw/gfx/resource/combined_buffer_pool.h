@@ -63,7 +63,7 @@ public:
     combined_buffer_pool(combined_buffer_pool&&)                 = delete;
     combined_buffer_pool& operator=(combined_buffer_pool&&)      = delete;
 
-    void update(world_type& world, const frustum& view_frustum);
+    void update(world_type& world, const camera& camera);
 
     [[nodiscard]] auto get_buffers() const -> const std::vector<std::unique_ptr<combined_buffer>>&;
 

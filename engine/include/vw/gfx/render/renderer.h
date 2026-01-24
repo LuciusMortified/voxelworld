@@ -56,9 +56,13 @@ struct uniform_buffer_object {
     alignas(4) uint32 point_lights_count{0};
 };
 
+struct shadow_push_constant_data {
+    alignas(4) uint32 cascade_index = 0;
+};
+
 // Uniform buffer для shadow pass (light_space_matrix и cascade_index)
 struct shadow_uniform_buffer_object {
-    alignas(16) mat4f light_space_matrix;
+    alignas(16) mat4f light_space_matrices[shadow_map::cascade_count];
 };
 
 struct push_constant_data {
@@ -170,9 +174,12 @@ private:
     void create_point_lights_descriptor_set_layout();
     void cleanup_point_lights_resources();
 
-    void render_world(world_type& world, const camera& camera);
-    void update_uniform_buffer(const camera& camera) const;
+    void update_shadow_uniform_buffer() const;
     void render_shadow_pass(world_type& world, const camera& camera);
+
+    void update_uniform_buffer(const camera& camera) const;
+    void render_world_pass(world_type& world, const camera& camera);
+    void render_world(world_type& world, const camera& camera);
 
     void render_debug_primitives();
     void update_debug_vertex_buffer();

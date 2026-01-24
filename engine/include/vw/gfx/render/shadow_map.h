@@ -30,7 +30,7 @@ public:
     shadow_map(shadow_map&&)                 = delete;
     shadow_map& operator=(shadow_map&&)      = delete;
 
-    void update_cascade_matrices(const camera& camera, const vec3f& light_direction);
+    void update(const camera& camera, const vec3f& light_direction);
 
     [[nodiscard]] mat4f get_light_space_matrix(uint32 cascade_index) const;
     [[nodiscard]] const std::array<mat4f, cascade_count>& get_light_space_matrices() const;
@@ -65,7 +65,7 @@ private:
     std::array<float, cascade_split_count> cascade_splits_ = {};
 
     float max_shadow_distance_ = 100.0f;
-    float split_lambda_        = 0.9f;  // Коэффициент для Practical Split Scheme
+    float split_lambda_        = 0.95f;  // Коэффициент для Practical Split Scheme
 };
 
 }  // namespace vw::gfx

@@ -16,24 +16,29 @@ void create_entity_operation<WC>::execute() {
     auto& world            = engine_->get_world();
     auto& hierarchy_system = world.get_hierarchy_system();
     auto& transform_system = world.get_transform_system();
+    auto& model_registry   = world.get_model_registry();
+    auto& model_system     = world.get_model_system();
 
-    auto ent = world.create_entity();
-    world.template add_component<gfx::hierarchy_component>(ent);
-    world.template add_component<gfx::transform_component>(ent);
-    world.template add_component<gfx::spatial_component>(ent);
+    auto ent_builder = gfx::entity_builder<WC>{world};
+    ent_builder.template with<gfx::hierarchy_component>();
+    ent_builder.template with<gfx::transform_component>();
+    ent_builder.template with<gfx::spatial_component>();
 
-    transform_system.modify(ent).set_origin(
-        vec3f{-params_.size.x / 2.f, -params_.size.y / 2.f, -params_.size.z / 2.f}
-    );
-
+    std::shared_ptr<gfx::model> model = nullptr;
     if (params_.with_model) {
-        world.template add_component<gfx::model_component>(ent);
+        ent_builder.template with<gfx::model_component>();
 
-        auto& model_registry = world.get_model_registry();
-        auto& model_system   = world.get_model_system();
-
-        auto model = model_registry.create(params_.name, params_.size);
+        model = model_registry.create(params_.name, params_.size);
         model->fill(voxel{state_->selected_color});
+    }
+
+    auto ent_guard = ent_builder.release_guard();
+    auto ent       = ent_guard->get_entity();
+
+    transform_system.modify(ent)
+        .set_origin(vec3f{-params_.size.x / 2.f, -params_.size.y / 2.f, -params_.size.z / 2.f});
+
+    if (model) {
         model_system.modify(ent).set_model(model);
     }
 
@@ -49,6 +54,8 @@ void create_entity_operation<WC>::execute() {
         state_->root_name = params_.name;
     }
     state_->selected_name = params_.name;
+
+    state_->entities.push_back(std::move(ent_guard));
 }
 
 template <typename WC>

@@ -93,7 +93,7 @@ inline void color_palette_panel::render(
     ImGui::End();
 }
 
-inline ImVec4 color_palette_panel::to_imvec4(
+ImVec4 color_palette_panel::to_imvec4(
     const color& clr
 ) const {
     return ImVec4(

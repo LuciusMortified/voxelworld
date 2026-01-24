@@ -36,7 +36,6 @@ void delete_entity_operation<WC>::execute() {
         }
     }
 
-    world.destroy_entity(ent);
     state_->entity_to_name.erase(ent);
     state_->name_to_entity.erase(params_.name);
 
@@ -48,6 +47,17 @@ void delete_entity_operation<WC>::execute() {
     } else {
         state_->selected_name = "";
     }
+
+    state_->entities.erase(
+        std::remove_if(
+            state_->entities.begin(),
+            state_->entities.end(),
+            [ent](const auto& guard) {
+                return guard->get_entity() == ent;
+            }
+        ),
+        state_->entities.end()
+    );
 }
 
 template <typename WC>

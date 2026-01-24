@@ -89,7 +89,7 @@ float calculateShadowForCascade(int cascadeIndex, vec3 normal) {
 
     float shadow = 0;
     int count = 0;
-    int range = 1;  // 0 for off, 1 for 3x3, 2 for 5x5
+    int range = 0;  // 0 for off, 1 for 3x3, 2 for 5x5
     for (int x = -range; x <= range; ++x) {
         for (int y = -range; y <= range; ++y) {
             shadow += texture(
@@ -113,11 +113,10 @@ float calculateShadow(vec3 normal, float viewDepth) {
 
     // Вычисляем shadow для текущего каскада
     float shadow = calculateShadowForCascade(cascadeIndex, normal);
-    return shadow; // Возвращаем shadow без blending для упрощения
 
     // Blending между каскадами (если не последний каскад)
     if (cascadeIndex < 3) {
-        // Определяем зону смешивания (5% перед границей следующего каскада)
+        // Определяем зону смешивания
         float nextSplit = ubo.directional_light.cascade_splits[cascadeIndex];
         float blendStart = nextSplit * 0.95;
         float blendEnd = nextSplit;
@@ -174,7 +173,7 @@ vec3 calculatePointLight(uint lightIndex, vec3 normal, vec3 fragPos, vec3 viewDi
     float attenuation = light.attenuation_constant +
     light.attenuation_linear * distance +
     light.attenuation_quadratic * distance * distance;
-    attenuation = 1.0 / max(attenuation, 0.0001);// Защита от деления на ноль
+    attenuation = 1.0 / max(attenuation, 0.001);// Защита от деления на ноль
 
     // Diffuse
     float diff = max(dot(normal, lightDir), 0.0);
@@ -227,7 +226,8 @@ void main() {
     vec3 baseAmbient = ambientStrength * ubo.directional_light.color * ubo.directional_light.intensity;
 
     // Hemisphere ambient для более выразительного объёма
-    vec3 hemisphereAmbient = calculateHemisphereAmbient(normal) * 0.3;
+    float hemisphereStrength = 0.15;
+    vec3 hemisphereAmbient = calculateHemisphereAmbient(normal) * hemisphereStrength;
 
     // Комбинируем ambient освещение
     vec3 ambient = baseAmbient + hemisphereAmbient;
@@ -248,7 +248,7 @@ void main() {
 
     // Усиление контраста на гранях вокселей (edge enhancement)
     // Используем dot product нормали и направления взгляда для определения "краёв"
-    float edgeIntensity = 0.02;
+    float edgeIntensity = 0.01;
     float edgeFactor = abs(dot(normal, viewDir));
     // Грани, перпендикулярные взгляду (края вокселей), получают дополнительное освещение
     float edgeEnhancement = (1.0 - edgeFactor) * edgeIntensity * (1.0 - shadow);

@@ -174,6 +174,11 @@ void renderer<C>::create_shadow_pipeline() {
     depth_stencil.depthBoundsTestEnable = VK_FALSE;
     depth_stencil.stencilTestEnable     = VK_FALSE;
 
+    VkPushConstantRange push_constant_range{};
+    push_constant_range.offset     = 0;
+    push_constant_range.size       = sizeof(shadow_push_constant_data);
+    push_constant_range.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
     // Pipeline layout для shadow pass (uniform и storage descriptor set layouts)
     std::array shadow_descriptor_set_layouts = {
         uniform_descriptor_set_layout_, storage_descriptor_set_layout_
@@ -184,8 +189,8 @@ void renderer<C>::create_shadow_pipeline() {
     pipeline_layout_info.setLayoutCount =
         static_cast<uint32_t>(shadow_descriptor_set_layouts.size());
     pipeline_layout_info.pSetLayouts            = shadow_descriptor_set_layouts.data();
-    pipeline_layout_info.pushConstantRangeCount = 0;
-    pipeline_layout_info.pPushConstantRanges    = nullptr;
+    pipeline_layout_info.pushConstantRangeCount = 1;
+    pipeline_layout_info.pPushConstantRanges    = &push_constant_range;
 
     if (vkCreatePipelineLayout(
             context_->get_device(), &pipeline_layout_info, nullptr, &shadow_pipeline_layout_
@@ -220,16 +225,24 @@ void renderer<C>::create_shadow_pipeline() {
 }
 
 template <typename WC>
+void renderer<WC>::update_shadow_uniform_buffer() const {
+    shadow_uniform_buffer_object ubo{};
+    // Directional light data
+    const auto& light_space_matrices = shadow_map_->get_light_space_matrices();
+    for (uint32 i = 0; i < shadow_map::cascade_count; ++i) {
+        ubo.light_space_matrices[i] = light_space_matrices[i];
+    }
+    shadow_uniform_buffers_[current_frame_]->copy_from_struct(ubo);
+}
+
+template <typename WC>
 void renderer<WC>::render_shadow_pass(
     world_type& world, const camera& camera
 ) {
+    update_shadow_uniform_buffer();
+
     // Рендерим каждый каскад отдельно
     for (uint32 cascade_index = 0; cascade_index < shadow_map::cascade_count; ++cascade_index) {
-        // Обновить shadow uniform buffer с light_space_matrix для текущего каскада
-        shadow_uniform_buffer_object shadow_ubo{};
-        shadow_ubo.light_space_matrix = shadow_map_->get_light_space_matrix(cascade_index);
-        shadow_uniform_buffers_[current_frame_]->copy_from_struct(shadow_ubo);
-
         // Начинаем shadow render pass для текущего каскада
         VkRenderPassBeginInfo render_pass_info{};
         render_pass_info.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -282,6 +295,19 @@ void renderer<WC>::render_shadow_pass(
             &shadow_descriptor_sets_[current_frame_],
             0,
             nullptr
+        );
+
+        // Устанавливаем push constant с индексом каскада
+        shadow_push_constant_data push_constants{
+            .cascade_index = cascade_index,
+        };
+        vkCmdPushConstants(
+            command_buffers_[current_image_index_],
+            shadow_pipeline_layout_,
+            VK_SHADER_STAGE_VERTEX_BIT,
+            0,
+            sizeof(shadow_push_constant_data),
+            &push_constants
         );
 
         // Рендерим все объекты из combined_buffer_pool

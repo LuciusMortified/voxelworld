@@ -274,6 +274,7 @@ inline void combined_buffer::free(
         indirect_draw_buffer_->copy_to_struct(
             new_cmd, last_ent_alloc.instance_index * sizeof(draw_command)
         );
+        new_cmd.first_instance = ent_alloc.instance_index;
         indirect_draw_buffer_->copy_from_struct(
             new_cmd, ent_alloc.instance_index * sizeof(draw_command)
         );

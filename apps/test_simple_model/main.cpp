@@ -1,6 +1,9 @@
 #include <vw/core.h>
 #include <vw/gfx.h>
 
+#include "vw/gfx/world/entity_builder.h"
+#include "vw/gfx/world/entity_guard.h"
+
 using namespace vw;
 
 class simple_model_app final : public gfx::app<> {
@@ -38,10 +41,7 @@ public:
         create_flower_model();
     }
 
-    ~simple_model_app() override {
-        auto& world = get_engine().get_world();
-        world.destroy_entity(some_entity_);
-    }
+    ~simple_model_app() override = default;
 
     void render(
         float delta_time
@@ -112,20 +112,22 @@ private:
         model_->set_voxel(2, 4, 1, colors::white);
 
         // Создаем сущность с моделью
-        some_entity_ = world.create_entity();
-        world.add_component<gfx::transform_component>(some_entity_);
-        world.add_component<gfx::model_component>(some_entity_);
-        world.add_component<gfx::hierarchy_component>(some_entity_);
-        world.add_component<gfx::spatial_component>(some_entity_);
+        flower_ =
+            gfx::entity_builder<>{world}
+                .with<gfx::transform_component>()
+                .with<gfx::model_component>()
+                .with<gfx::hierarchy_component>()
+                .with<gfx::spatial_component>()
+                .release_guard();
 
         // Настраиваем transform
-        transform_system.modify(some_entity_)
-            .set_origin({1.5f, 0.f, 1.5f})
-            .set_position({-1.5f, 0.0f, -1.5f})
+        transform_system.modify(flower_->get_entity())
+            .set_origin({-1.5f, 0.f, -1.5f})
+            .set_position({0.f, 0.0f, 0.f})
             .set_scale({0.5f, 0.5f, 0.5f});
 
         // Настраиваем модель через model_system
-        model_system.modify(some_entity_).set_model(model_);
+        model_system.modify(flower_->get_entity()).set_model(model_);
 
         object_rotation_       = 0.0f;
         object_rotation_speed_ = math::radians(5.0f);
@@ -162,11 +164,12 @@ private:
 
         auto& world            = get_engine().get_world();
         auto& transform_system = world.get_transform_system();
-        transform_system.modify(some_entity_).set_rotation({0.0f, object_rotation_, 0.0f});
+        transform_system.modify(flower_->get_entity()).set_rotation({0.0f, object_rotation_, 0.0f});
 
-        if (world.has_component<gfx::transform_component>(some_entity_)) {
+        if (world.has_component<gfx::transform_component>(flower_->get_entity())) {
             const auto matrix =
-                world.get_component<gfx::transform_component>(some_entity_).get_world_matrix();
+                world.get_component<gfx::transform_component>(flower_->get_entity())
+                    .get_world_matrix();
             get_engine().get_renderer().draw_grid(matrix, 1.f, 3, 3, colors::white);
         }
 
@@ -187,6 +190,7 @@ private:
                 break;
             case gfx::keyboard::keys::F1:
                 camera_controller_->toggle_mouse_captured();
+                camera_controller_->toggle_keyboard_control_enabled();
                 break;
             default:
                 break;
@@ -253,7 +257,7 @@ private:
     float object_rotation_{};
     float object_rotation_speed_{};
 
-    gfx::entity some_entity_;
+    std::unique_ptr<gfx::entity_guard<>> flower_;
 
     std::unordered_set<gfx::entity> selected_entities_;
     gfx::entity selected_entity_ = gfx::invalid_entity;

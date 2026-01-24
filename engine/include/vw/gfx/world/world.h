@@ -15,6 +15,7 @@
 #include "vw/gfx/world/systems/spatial_system.h"
 #include "vw/gfx/world/systems/transform_system.h"
 #include "vw/gfx/world/world_components.h"
+#include "vw/gfx/world/entity_builder.h"
 
 namespace vw::gfx {
 
@@ -51,11 +52,9 @@ public:
     [[nodiscard]] auto get_component(entity ent) -> T&;
 
     template <typename T>
-    void remove_component(entity ent);
+    void remove_component(entity ent) noexcept;
 
-    void remove_all_components(entity ent);
-
-    void destroy_entity(entity ent);
+    void destroy_entity(entity ent) noexcept;
 
     [[nodiscard]] auto get_mesh_pool() const -> const mesh_pool&;
 

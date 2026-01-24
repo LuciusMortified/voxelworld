@@ -86,7 +86,6 @@ public:
     }
 
     void destroy(entity e) {
-        remove_all(e);
         entity_pool_.destroy(e);
     }
 

@@ -21,8 +21,9 @@ combined_buffer_pool<C>::combined_buffer_pool(
 
 template <typename C>
 void combined_buffer_pool<C>::update(
-    world_type& world, const frustum& view_frustum
+    world_type& world, const camera& camera
 ) {
+    const frustum& view_frustum = camera.get_frustum();
     update_visibility_cache_(world, view_frustum);
     update_meshes_(world, view_frustum);
     update_transforms_(world, view_frustum);

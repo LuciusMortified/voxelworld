@@ -139,7 +139,7 @@ auto transform_system<Cs...>::transform_modifier::set_origin(
 }
 
 template <typename... Cs>
-inline auto transform_system<Cs...>::transform_modifier::translate(
+auto transform_system<Cs...>::transform_modifier::translate(
     const vec3f& offset
 ) -> transform_modifier& {
     if (!system_->registry_->template has<transform_component>(entity_)) {
@@ -163,7 +163,7 @@ inline auto transform_system<Cs...>::transform_modifier::translate(
 }
 
 template <typename... Cs>
-inline auto transform_system<Cs...>::transform_modifier::rotate(
+auto transform_system<Cs...>::transform_modifier::rotate(
     const vec3f& angles
 ) -> transform_modifier& {
     if (!system_->registry_->template has<transform_component>(entity_)) {
@@ -187,7 +187,7 @@ inline auto transform_system<Cs...>::transform_modifier::rotate(
 }
 
 template <typename... Cs>
-inline auto transform_system<Cs...>::transform_modifier::scale(
+auto transform_system<Cs...>::transform_modifier::scale(
     const vec3f& factor
 ) -> transform_modifier& {
     if (!system_->registry_->template has<transform_component>(entity_)) {
@@ -211,7 +211,7 @@ inline auto transform_system<Cs...>::transform_modifier::scale(
 }
 
 template <typename... Cs>
-inline void transform_system<Cs...>::mark_world_dirty(
+void transform_system<Cs...>::mark_world_dirty(
     entity ent
 ) {
     if (!registry_->template has<transform_component>(ent)) {

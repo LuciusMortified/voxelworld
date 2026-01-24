@@ -1,5 +1,4 @@
 #version 460 core
-#extension GL_ARB_shader_draw_parameters : require
 
 // Входные данные от вертексов
 layout(location = 0) in vec3 inPosition;

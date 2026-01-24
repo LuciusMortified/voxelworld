@@ -91,6 +91,7 @@ inline void app::render(
     tools_[state_.selected_tool]->render(delta_time);
 
     ImGui::Begin("Shadow Map Debug");
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
     // Сетка 2x2 для всех каскадов
     for (uint32 i = 0; i < 4; ++i) {
         void* shadow_map_texture_id = renderer.get_shadow_map_texture_id(i);
@@ -102,7 +103,11 @@ inline void app::render(
             ImVec4(1, 1, 1, 1), // tint цвет
             ImVec4(0, 0, 0, 0)  // border цвет
         );
+        if (i % 2 == 0) {
+            ImGui::SameLine();
+        }
     }
+    ImGui::PopStyleVar();
     ImGui::End();
 }
 

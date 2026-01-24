@@ -242,63 +242,12 @@ void renderer<C>::render(
         throw std::runtime_error("Failed to begin recording command buffer!");
     }
 
-    update_uniform_buffer(camera);
+    shadow_map_->update(camera, directional_light_settings_.direction);
+    combined_buffer_pool_->update(world, camera);
 
-    const frustum& view_frustum = camera.get_frustum();
-    combined_buffer_pool_->update(world, view_frustum);
-
-    // Рендерим shadow pass ДО основного прохода
     render_shadow_pass(world, camera);
 
-    // Начинаем рендер пасс
-    VkRenderPassBeginInfo render_pass_info{};
-    render_pass_info.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    render_pass_info.renderPass        = render_pass_;
-    render_pass_info.framebuffer       = framebuffers_[current_image_index_];
-    render_pass_info.renderArea.offset = {0, 0};
-    render_pass_info.renderArea.extent = swapchain_extent_;
-
-    VkClearValue clear_values[2];
-    memcpy(&clear_values[0].color, &clear_color_, sizeof(vec4f));
-    clear_values[1].depthStencil = {1.0f, 0};
-
-    render_pass_info.clearValueCount = 2;
-    render_pass_info.pClearValues    = clear_values;
-
-    // Первый проход для 3д объектов
-    vkCmdBeginRenderPass(
-        command_buffers_[current_image_index_], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE
-    );
-
-    VkViewport viewport{};
-    viewport.x        = 0.0f;
-    viewport.y        = 0.0f;
-    viewport.width    = static_cast<float>(swapchain_extent_.width);
-    viewport.height   = static_cast<float>(swapchain_extent_.height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
-    vkCmdSetViewport(command_buffers_[current_image_index_], 0, 1, &viewport);
-
-    VkRect2D scissor{};
-    scissor.offset = {0, 0};
-    scissor.extent = swapchain_extent_;
-
-    vkCmdSetScissor(command_buffers_[current_image_index_], 0, 1, &scissor);
-
-    render_world(world, camera);
-
-    // Переходим к проходу для примитивов
-    vkCmdNextSubpass(command_buffers_[current_image_index_], VK_SUBPASS_CONTENTS_INLINE);
-
-    render_debug_primitives();
-
-    // Переходим к проходу для ImGui
-    vkCmdNextSubpass(command_buffers_[current_image_index_], VK_SUBPASS_CONTENTS_INLINE);
-
-    render_imgui();
-
-    vkCmdEndRenderPass(command_buffers_[current_image_index_]);
+    render_world_pass(world, camera);
 
     if (vkEndCommandBuffer(command_buffers_[current_image_index_]) != VK_SUCCESS) {
         throw std::runtime_error("Failed to record command buffer!");
@@ -1379,6 +1328,63 @@ void renderer<C>::recreate_swapchain() {
 }
 
 template <typename WC>
+void renderer<WC>::render_world_pass(
+    world_type& world, const camera& camera
+) {
+    update_uniform_buffer(camera);
+
+    // Начинаем рендер пасс
+    VkRenderPassBeginInfo render_pass_info{};
+    render_pass_info.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
+    render_pass_info.renderPass        = render_pass_;
+    render_pass_info.framebuffer       = framebuffers_[current_image_index_];
+    render_pass_info.renderArea.offset = {0, 0};
+    render_pass_info.renderArea.extent = swapchain_extent_;
+
+    VkClearValue clear_values[2];
+    memcpy(&clear_values[0].color, &clear_color_, sizeof(vec4f));
+    clear_values[1].depthStencil = {1.0f, 0};
+
+    render_pass_info.clearValueCount = 2;
+    render_pass_info.pClearValues    = clear_values;
+
+    // Первый проход для 3д объектов
+    vkCmdBeginRenderPass(
+        command_buffers_[current_image_index_], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE
+    );
+
+    VkViewport viewport{};
+    viewport.x        = 0.0f;
+    viewport.y        = 0.0f;
+    viewport.width    = static_cast<float>(swapchain_extent_.width);
+    viewport.height   = static_cast<float>(swapchain_extent_.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+
+    vkCmdSetViewport(command_buffers_[current_image_index_], 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = {0, 0};
+    scissor.extent = swapchain_extent_;
+
+    vkCmdSetScissor(command_buffers_[current_image_index_], 0, 1, &scissor);
+
+    render_world(world, camera);
+
+    // Переходим к проходу для примитивов
+    vkCmdNextSubpass(command_buffers_[current_image_index_], VK_SUBPASS_CONTENTS_INLINE);
+
+    render_debug_primitives();
+
+    // Переходим к проходу для ImGui
+    vkCmdNextSubpass(command_buffers_[current_image_index_], VK_SUBPASS_CONTENTS_INLINE);
+
+    render_imgui();
+
+    vkCmdEndRenderPass(command_buffers_[current_image_index_]);
+}
+
+template <typename WC>
 void renderer<WC>::render_world(
     world_type& world, const camera& camera
 ) {
@@ -1501,9 +1507,6 @@ void renderer<C>::update_uniform_buffer(
 
     // View position
     ubo.view_pos = camera.get_position();
-
-    // Обновить cascade matrices в shadow map
-    shadow_map_->update_cascade_matrices(camera, directional_light_settings_.direction);
 
     // Directional light data
     const auto& light_space_matrices = shadow_map_->get_light_space_matrices();

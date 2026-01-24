@@ -2,6 +2,7 @@
 
 #ifndef VW_SCULPTOR_STATE_H
 #define VW_SCULPTOR_STATE_H
+#include "vw/gfx/world/entity_guard.h"
 
 namespace vw::sculptor {
 
@@ -19,6 +20,8 @@ struct ui_state {
 };
 
 struct app_state {
+    using entity_guard_type = gfx::entity_guard<>;
+
     ui_state ui;
 
     tools selected_tool  = tools::select_entity;
@@ -28,6 +31,8 @@ struct app_state {
     std::string root_name;
     std::unordered_map<std::string, gfx::entity> name_to_entity;
     std::unordered_map<gfx::entity, std::string> entity_to_name;
+
+    std::vector<std::unique_ptr<entity_guard_type>> entities;
 };
 
 }  // namespace vw::sculptor
