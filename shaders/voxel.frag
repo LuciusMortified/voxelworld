@@ -118,7 +118,7 @@ float calculateShadow(vec3 normal, float viewDepth) {
     if (cascadeIndex < 3) {
         // Определяем зону смешивания
         float nextSplit = ubo.directional_light.cascade_splits[cascadeIndex];
-        float blendStart = nextSplit * 0.95;
+        float blendStart = nextSplit * 0.75;
         float blendEnd = nextSplit;
 
         // Если фрагмент в зоне смешивания (перед границей следующего каскада)

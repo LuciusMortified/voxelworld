@@ -64,7 +64,7 @@ private:
     std::array<mat4f, cascade_count> light_space_matrices_ = {};
     std::array<float, cascade_split_count> cascade_splits_ = {};
 
-    float max_shadow_distance_ = 100.0f;
+    float cascade_radius_coef_ = 0.5f;
     float split_lambda_        = 0.95f;  // Коэффициент для Practical Split Scheme
 };
 

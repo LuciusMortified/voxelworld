@@ -251,75 +251,85 @@ inline void shadow_map::update(
     const vec3f cam_forward = camera.get_forward();
     const float fov_rad     = math::radians(camera.get_fov());
     const float aspect      = camera.get_aspect_ratio();
+    const float cam_dist    = cam_far - cam_near;
 
     for (uint32 i = 0; i < cascade_count; ++i) {
         float p            = static_cast<float>(i + 1) / static_cast<float>(cascade_count);
         float log          = cam_near * std::pow(cam_far / cam_near, p);
-        float uniform      = cam_near + (cam_far - cam_near) * p;
+        float uniform      = cam_near + cam_dist * p;
         float d            = split_lambda_ * (log - uniform) + uniform;
         cascade_splits_[i] = d - cam_near;
     }
 
     // Для каждого каскада вычисляем light space matrix
+    float last_cascade_split = 0.0f;
     for (uint32 cascade_index = 0; cascade_index < cascade_count; ++cascade_index) {
         const float cascade_split = cascade_splits_[cascade_index];
 
-        const float center_distance = std::min((cam_near + cam_far) * 0.5f, cascade_split * 0.5f);
-        const vec3f frustum_center  = cam_pos + cam_forward * center_distance;
+        std::array frustum_corners = {
+            vec3f{-1.0f, 1.0f, 0.0f},
+            vec3f{1.0f, 1.0f, 0.0f},
+            vec3f{1.0f, -1.0f, 0.0f},
+            vec3f{-1.0f, -1.0f, 0.0f},
+            vec3f{-1.0f, 1.0f, 1.0f},
+            vec3f{1.0f, 1.0f, 1.0f},
+            vec3f{1.0f, -1.0f, 1.0f},
+            vec3f{-1.0f, -1.0f, 1.0f},
+        };
 
-        const float tan_half_fov  = std::tan(fov_rad * 0.5f);
-        const float center_height = center_distance * tan_half_fov;
-        const float center_width  = center_height * aspect;
-        const float max_size      = std::max(center_width, center_height);
-        float half_size           = max_size * 1.25f;  // Небольшой запас для надёжности
+        auto inv_cam = math::inverse_matrix(camera.get_view_projection_matrix());
+        for (auto& corner : frustum_corners) {
+            vec4f corner_homogeneous = vec4f{corner.x, corner.y, corner.z, 1.0f};
+            vec4f corner_world       = inv_cam * corner_homogeneous;
+            corner_world             = corner_world * (1.f / corner_world.w);
+            corner                   = vec3f{corner_world.x, corner_world.y, corner_world.z};
+        }
 
-        vec3f target               = frustum_center;
-        const float light_distance = cam_far * 0.75f;
-        vec3f eye                  = target - light_dir * light_distance;
+        for (int i = 0; i < 4; ++i) {
+            vec3 dist              = frustum_corners[i + 4] - frustum_corners[i];
+            frustum_corners[i + 4] = frustum_corners[i] + dist * (cascade_split / cam_dist);
+            frustum_corners[i]     = frustum_corners[i] + dist * (last_cascade_split / cam_dist);
+        }
 
-        vec3f up = vec3f{0.0f, 1.0f, 0.0f};
+        vec3 frustum_center = vec3f{0.0f, 0.0f, 0.0f};
+        for (const auto& corner : frustum_corners) {
+            frustum_center += corner;
+        }
+        frustum_center = frustum_center * (1.0f / static_cast<float>(frustum_corners.size()));
+
+        float radius = 0.0f;
+        for (const auto& corner : frustum_corners) {
+            float distance = math::length(corner - frustum_center);
+            radius         = std::max(radius, distance);
+        }
+        radius *= cascade_radius_coef_;
+        radius = std::ceil(radius * 16.0f) / 16.0f;
+
+        const vec3f max_extents = vec3f{radius, radius, radius};
+        const vec3f min_extents = -max_extents;
+
+        vec3f target = frustum_center;
+        vec3f eye    = target - light_dir * cam_dist;
+
+        auto up = vec3f{0.0f, 1.0f, 0.0f};
         if (std::abs(math::dot(up, light_dir)) > 0.99f) {
             up = vec3f{1.0f, 0.0f, 0.0f};
         }
 
         const mat4f light_view = math::look_at_matrix(eye, target, up);
 
-        // 7. Light Space Snap: стабилизация теней путём привязки к сетке текселей
-        // Вычисляем размер одного текселя в пространстве света (в единицах ортографической
-        // проекции)
-        const float texel_size = (2.0f * half_size) / static_cast<float>(shadow_map_size);
-
-        // Используем более крупную сетку для snap - уменьшает частоту дергания
-        constexpr float snap_multiplier = 16.0f;
-        const float snap_size           = texel_size * snap_multiplier;
-
-        // Преобразуем frustum_center в пространство света
-        const vec4f frustum_center_light_space =
-            light_view * vec4f{frustum_center.x, frustum_center.y, frustum_center.z, 1.0f};
-
-        // Округляем координаты X и Y в пространстве света до кратных размеру snap сетки
-        const float snapped_x = std::floor(frustum_center_light_space.x / snap_size) * snap_size;
-        const float snapped_y = std::floor(frustum_center_light_space.y / snap_size) * snap_size;
-
-        // Вычисляем смещение для ортографической проекции
-        const float offset_x = snapped_x - frustum_center_light_space.x;
-        const float offset_y = snapped_y - frustum_center_light_space.y;
-
-        // Округляем half_size до кратных размеру текселя для дополнительной стабильности
-        half_size = std::ceil(half_size / texel_size) * texel_size;
-
-        // 8. Ортографическая проекция с учетом смещения для стабилизации
-        // Смещаем границы проекции на offset_x и offset_y, чтобы центр был выровнен по сетке
         auto light_proj = math::orthographic_matrix(
-            -half_size + offset_x,
-            half_size + offset_x,
-            -half_size + offset_y,
-            half_size + offset_y,
+            min_extents.x,
+            max_extents.x,
+            min_extents.y,
+            max_extents.y,
             cam_near,
             cam_far
         );
 
         light_space_matrices_[cascade_index] = light_proj * light_view;
+
+        last_cascade_split = cascade_split;
     }
 }
 
