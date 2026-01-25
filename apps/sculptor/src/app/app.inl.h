@@ -33,6 +33,7 @@ inline app::app(
     tools_[tools::paint_voxel]   = std::make_unique<dummy_tool>();
 
     camera_controller_.setup(window, camera);
+    camera_controller_.set_camera_speed(15.f);
 
     window.sub<gfx::key_press_event>([this](const gfx::key_press_event& ev) {
         handle_key_press(ev);
@@ -63,6 +64,9 @@ inline app::app(
     camera.set_rotation(0.0f, 0.0f);
 
     renderer.set_clear_color(vec4f{0.15f, 0.27f, 0.45f, 1.0f});
+
+    auto& dir_light_settings = renderer.get_directional_light_settings();
+    dir_light_settings.direction = math::normalize(vec3f{+0.3f, -1.0f, +0.3f});
 }
 
 inline void app::render(
@@ -90,11 +94,11 @@ inline void app::render(
 
     tools_[state_.selected_tool]->render(delta_time);
 
-#if 0
+#if 1
     ImGui::Begin("Shadow Map Debug");
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
     // Сетка 2x2 для всех каскадов
-    for (uint32 i = 0; i < 4; ++i) {
+    for (uint32 i = 0; i < gfx::shadow_map::cascade_count; ++i) {
         void* shadow_map_texture_id = renderer.get_shadow_map_texture_id(i);
         ImGui::Image(
             reinterpret_cast<ImTextureID>(shadow_map_texture_id),

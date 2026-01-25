@@ -63,7 +63,7 @@ float calculateShadowForCascade(int cascadeIndex, vec3 normal) {
     // Вычисляем позицию в light space для выбранного каскада
     float ndotl = max(ndot, 0.0);
     float normalBias = max(0.005 * (1.0 - ndotl), 0.002);
-    vec3 newFragPos = fragPos + fragNormal * 0;
+    vec3 newFragPos = fragPos + fragNormal * normalBias;
     vec4 fragPosLightSpace =
         ubo.directional_light.light_space_matrices[cascadeIndex] * vec4(newFragPos, 1.0);
 
@@ -83,7 +83,7 @@ float calculateShadowForCascade(int cascadeIndex, vec3 normal) {
     }
 
     ivec2 texDim = textureSize(shadowMapArray, 0).xy;
-    float scale = 0.5;
+    float scale = 1.0;
     float dx = scale * 1.0 / float(texDim.x);
     float dy = scale * 1.0 / float(texDim.y);
 

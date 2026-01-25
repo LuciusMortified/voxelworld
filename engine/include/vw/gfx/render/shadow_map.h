@@ -18,9 +18,8 @@ class camera;
 
 class shadow_map {
 public:
-    static constexpr uint32 cascade_count       = 4;
-    static constexpr uint32 cascade_split_count = cascade_count + 1;
-    static constexpr uint32 shadow_map_size     = 2048;
+    static constexpr uint32 cascade_count   = 4;
+    static constexpr uint32 shadow_map_size = 4192;
 
     explicit shadow_map(vulkan_context& context);
     ~shadow_map();
@@ -34,7 +33,7 @@ public:
 
     [[nodiscard]] mat4f get_light_space_matrix(uint32 cascade_index) const;
     [[nodiscard]] const std::array<mat4f, cascade_count>& get_light_space_matrices() const;
-    [[nodiscard]] const std::array<float, cascade_split_count>& get_cascade_splits() const;
+    [[nodiscard]] const std::array<float, cascade_count>& get_cascade_splits() const;
     [[nodiscard]] VkImage get_image() const;
     [[nodiscard]] VkImageView get_image_view(uint32 cascade_index) const;
     [[nodiscard]] VkImageView get_array_image_view() const;
@@ -62,10 +61,10 @@ private:
     VkRenderPass shadow_render_pass_                                   = VK_NULL_HANDLE;
 
     std::array<mat4f, cascade_count> light_space_matrices_ = {};
-    std::array<float, cascade_split_count> cascade_splits_ = {};
+    std::array<float, cascade_count> cascade_splits_       = {};
 
-    float cascade_radius_coef_ = 0.5f;
-    float split_lambda_        = 0.95f;  // Коэффициент для Practical Split Scheme
+    float split_lambda_        = 0.75f;
+    float shadow_far_          = 500.f;
 };
 
 }  // namespace vw::gfx

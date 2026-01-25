@@ -247,19 +247,23 @@ inline void shadow_map::update(
     // Вычисляем split distances используя Practical Split Scheme
     const float cam_near    = camera.get_near();
     const float cam_far     = camera.get_far();
-    const vec3f cam_pos     = camera.get_position();
-    const vec3f cam_forward = camera.get_forward();
-    const float fov_rad     = math::radians(camera.get_fov());
-    const float aspect      = camera.get_aspect_ratio();
-    const float cam_dist    = cam_far - cam_near;
+    const float shadow_far  = std::min(shadow_far_, cam_far);
+    const float shadow_dist = shadow_far - cam_near;
 
     for (uint32 i = 0; i < cascade_count; ++i) {
         float p            = static_cast<float>(i + 1) / static_cast<float>(cascade_count);
-        float log          = cam_near * std::pow(cam_far / cam_near, p);
-        float uniform      = cam_near + cam_dist * p;
+        float log          = cam_near * std::pow(shadow_far / cam_near, p);
+        float uniform      = cam_near + shadow_dist * p;
         float d            = split_lambda_ * (log - uniform) + uniform;
         cascade_splits_[i] = d - cam_near;
     }
+
+    // Вычисляем inverse view-projection матрицу камеры
+    auto cam_proj = math::perspective_matrix(
+        camera.get_fov(), camera.get_aspect_ratio(), cam_near, shadow_far
+    );
+    auto cam_view = camera.get_view_matrix();
+    auto inv_cam = math::inverse_matrix(cam_proj * cam_view);
 
     // Для каждого каскада вычисляем light space matrix
     float last_cascade_split = 0.0f;
@@ -277,7 +281,6 @@ inline void shadow_map::update(
             vec3f{-1.0f, -1.0f, 1.0f},
         };
 
-        auto inv_cam = math::inverse_matrix(camera.get_view_projection_matrix());
         for (auto& corner : frustum_corners) {
             vec4f corner_homogeneous = vec4f{corner.x, corner.y, corner.z, 1.0f};
             vec4f corner_world       = inv_cam * corner_homogeneous;
@@ -287,8 +290,8 @@ inline void shadow_map::update(
 
         for (int i = 0; i < 4; ++i) {
             vec3 dist              = frustum_corners[i + 4] - frustum_corners[i];
-            frustum_corners[i + 4] = frustum_corners[i] + dist * (cascade_split / cam_dist);
-            frustum_corners[i]     = frustum_corners[i] + dist * (last_cascade_split / cam_dist);
+            frustum_corners[i + 4] = frustum_corners[i] + dist * (cascade_split / shadow_dist);
+            frustum_corners[i]     = frustum_corners[i] + dist * (last_cascade_split / shadow_dist);
         }
 
         vec3 frustum_center = vec3f{0.0f, 0.0f, 0.0f};
@@ -302,14 +305,12 @@ inline void shadow_map::update(
             float distance = math::length(corner - frustum_center);
             radius         = std::max(radius, distance);
         }
-        radius *= cascade_radius_coef_;
-        radius = std::ceil(radius * 16.0f) / 16.0f;
 
         const vec3f max_extents = vec3f{radius, radius, radius};
         const vec3f min_extents = -max_extents;
 
         vec3f target = frustum_center;
-        vec3f eye    = target - light_dir * cam_dist;
+        vec3f eye    = target - light_dir * shadow_dist;
 
         auto up = vec3f{0.0f, 1.0f, 0.0f};
         if (std::abs(math::dot(up, light_dir)) > 0.99f) {
@@ -319,12 +320,7 @@ inline void shadow_map::update(
         const mat4f light_view = math::look_at_matrix(eye, target, up);
 
         auto light_proj = math::orthographic_matrix(
-            min_extents.x,
-            max_extents.x,
-            min_extents.y,
-            max_extents.y,
-            cam_near,
-            cam_far
+            min_extents.x, max_extents.x, min_extents.y, max_extents.y, cam_near, shadow_far
         );
 
         light_space_matrices_[cascade_index] = light_proj * light_view;
@@ -344,8 +340,7 @@ inline const std::array<mat4f, shadow_map::cascade_count>& shadow_map::
     return light_space_matrices_;
 }
 
-inline const std::array<float, shadow_map::cascade_count + 1>& shadow_map::
-    get_cascade_splits() const {
+inline const std::array<float, shadow_map::cascade_count>& shadow_map::get_cascade_splits() const {
     return cascade_splits_;
 }
 

@@ -235,6 +235,7 @@ private:
 
     void render_selected_voxel() {
         auto& world                = get_engine().get_world();
+        
         const bool can_be_rendered =  //
             selected_entity_.is_valid() &&
             world.has_component<gfx::transform_component>(selected_entity_);
