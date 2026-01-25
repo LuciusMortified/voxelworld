@@ -44,12 +44,20 @@ inline void remove_voxel_tool::render(
         math::translation_matrix(voxel_local_pos) *         //
         math::scale_matrix(vec3f{1.1f, 1.1f, 1.1f}) *  //
         math::translation_matrix(vec3f{-0.05f, -0.05f, -0.05f});
+
     renderer.draw_box(voxel_world_pos, vec3f{1.f, 1.f, 1.f}, colors::black);
 }
 
 inline void remove_voxel_tool::on_key_press(
     const gfx::key_press_event& ev
-) {}
+) {
+    using keys = gfx::keyboard::keys;
+
+    if (ev.key == keys::KEY_3) {
+        state_->selected_tool = tools::remove_voxel;
+        hovered_voxel_ = vec3i{-1, -1, -1};
+    }
+}
 
 inline void remove_voxel_tool::on_mouse_move(
     const gfx::mouse_move_event& ev
@@ -95,6 +103,10 @@ inline void remove_voxel_tool::on_mouse_press(
 inline void remove_voxel_tool::on_mouse_release(
     const gfx::mouse_release_event& ev
 ) {}
+
+inline void remove_voxel_tool::on_activate() {
+    hovered_voxel_ = vec3i{-1, -1, -1};
+}
 
 }  // namespace vw::sculptor
 

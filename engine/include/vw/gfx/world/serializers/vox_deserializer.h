@@ -1,0 +1,48 @@
+#pragma once
+
+#ifndef VW_GFX_VOX_DESERIALIZER_H
+#define VW_GFX_VOX_DESERIALIZER_H
+#include <filesystem>
+
+#include "vw/gfx/world/world.h"
+
+namespace vw::gfx {
+template <typename WC = base_world_components>
+class vox_deserializer final {
+public:
+    using world_type        = world<WC>;
+    using entity_guard_type = entity_guard<WC>;
+
+    struct result {
+        std::string root_name;
+        std::unordered_map<std::string, entity> name_to_entity;
+        std::unordered_map<entity, std::string> entity_to_name;
+        std::vector<std::unique_ptr<entity_guard_type>> entities;
+    };
+
+    vox_deserializer(world_type& world);
+
+    auto deserialize(const std::filesystem::path& filepath) -> std::optional<result>;
+
+private:
+    void process_root_(std::istringstream& iss);
+    void process_entity_(std::istringstream& iss);
+    void process_parent_(std::istringstream& iss);
+    void process_transform_(std::istringstream& iss);
+    void process_model_(std::istringstream& iss);
+    void process_voxel_(std::istringstream& iss);
+
+    world_type* world_;
+
+    result result_;
+
+    entity current_entity_ = invalid_entity;
+    std::unique_ptr<entity_guard_type> current_entity_guard_;
+    std::shared_ptr<model> current_model_;
+};
+
+}  // namespace vw::gfx
+
+#include "vox_deserializer.inl.h"
+
+#endif  // VW_GFX_VOX_DESERIALIZER_H

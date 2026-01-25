@@ -1,17 +1,17 @@
 #pragma once
 
-#ifndef VW_SCULPTOR_ADD_VOXEL_TOOL_INL_H
-#define VW_SCULPTOR_ADD_VOXEL_TOOL_INL_H
-#include "operations/add_voxel_operation.h"
+#ifndef VW_SCULPTOR_PAINT_TOOL_INL_H
+#define VW_SCULPTOR_PAINT_TOOL_INL_H
+#include "operations/paint_voxel_operation.h"
 
 namespace vw::sculptor {
 
-inline add_voxel_tool::add_voxel_tool(
+inline paint_tool::paint_tool(
     engine_type& eng, app_state& st, operation_manager& op_manager
 )
     : engine_(&eng), state_(&st), op_manager_(&op_manager) {}
 
-inline void add_voxel_tool::render(
+inline void paint_tool::render(
     float delta_time
 ) {
     if (hovered_voxel_ == vec3i{-1, -1, -1}) {
@@ -32,13 +32,7 @@ inline void add_voxel_tool::render(
         return;
     }
 
-    auto& model_comp = world.get_component<gfx::model_component>(ent);
-    bool is_outside = //
-        hovered_voxel_.x < 0 || hovered_voxel_.x >= model_comp.width() ||
-        hovered_voxel_.y < 0 || hovered_voxel_.y >= model_comp.height() ||
-        hovered_voxel_.z < 0 || hovered_voxel_.z >= model_comp.depth();
-
-    auto& renderer = engine_->get_renderer();
+    auto& renderer       = engine_->get_renderer();
     auto voxel_local_pos = vec3f{
         static_cast<float>(hovered_voxel_.x),
         static_cast<float>(hovered_voxel_.y),
@@ -47,39 +41,35 @@ inline void add_voxel_tool::render(
 
     auto voxel_world_pos =  //
         world.get_component<gfx::transform_component>(ent).get_world_matrix() *
-        math::translation_matrix(voxel_local_pos) *         //
-        math::scale_matrix(vec3f{1.01f, 1.01f, 1.01f}) *  //
-        math::translation_matrix(vec3f{-0.005f, -0.005f, -0.005f});
+        math::translation_matrix(voxel_local_pos) *    //
+        math::scale_matrix(vec3f{1.1f, 1.1f, 1.1f}) *  //
+        math::translation_matrix(vec3f{-0.05f, -0.05f, -0.05f});
 
-    const auto draw_color = is_outside ? colors::red : colors::black;
-
-    renderer.draw_box(voxel_world_pos, vec3f{1.f, 1.f, 1.f}, draw_color);
+    renderer.draw_box(voxel_world_pos, vec3f{1.f, 1.f, 1.f}, colors::black);
 }
 
-inline void add_voxel_tool::on_key_press(
+inline void paint_tool::on_key_press(
     const gfx::key_press_event& ev
-) {
+) {}
 
-}
-
-inline void add_voxel_tool::on_mouse_move(
+inline void paint_tool::on_mouse_move(
     const gfx::mouse_move_event& ev
 ) {
-    auto& world  = engine_->get_world();
-    auto& window = engine_->get_window();
-    auto& camera = engine_->get_camera();
+    const auto& world  = engine_->get_world();
+    const auto& window = engine_->get_window();
+    const auto& camera = engine_->get_camera();
 
     auto ray = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
 
     auto voxel_hit = world.voxel_ray_cast(ray, ray_cast_entities_);
     if (voxel_hit.has_value()) {
-        hovered_voxel_ = voxel_hit->empty_pos;
+        hovered_voxel_ = voxel_hit->voxel_pos;
     } else {
         hovered_voxel_ = vec3i{-1, -1, -1};
     }
 }
 
-inline void add_voxel_tool::on_mouse_press(
+inline void paint_tool::on_mouse_press(
     const gfx::mouse_press_event& ev
 ) {
     using buttons = gfx::mouse::buttons;
@@ -103,36 +93,26 @@ inline void add_voxel_tool::on_mouse_press(
             return;
         }
 
-        auto& model_comp = world.get_component<gfx::model_component>(ent);
-
-        bool is_outside = //
-            hovered_voxel_.x < 0 || hovered_voxel_.x >= model_comp.width() ||
-            hovered_voxel_.y < 0 || hovered_voxel_.y >= model_comp.height() ||
-            hovered_voxel_.z < 0 || hovered_voxel_.z >= model_comp.depth();
-        if (is_outside) {
-            return;
-        }
-
-        add_voxel_params params;
+        paint_voxel_params params;
         params.name     = state_->selected_name;
         params.position = hovered_voxel_;
         params.color    = state_->selected_color;
 
-        auto op = std::make_unique<add_voxel_operation>(
+        auto op = std::make_unique<paint_voxel_operation>(
             *engine_, *state_, params
         );
         op_manager_->execute(std::move(op));
     }
 }
 
-inline void add_voxel_tool::on_mouse_release(
+inline void paint_tool::on_mouse_release(
     const gfx::mouse_release_event& ev
 ) {}
 
-inline void add_voxel_tool::on_activate() {
+inline void paint_tool::on_activate() {
     hovered_voxel_ = vec3i{-1, -1, -1};
 }
 
 }  // namespace vw::sculptor
 
-#endif  // VW_SCULPTOR_ADD_VOXEL_TOOL_INL_H
+#endif  // VW_SCULPTOR_PAINT_TOOL_INL_H

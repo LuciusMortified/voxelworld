@@ -28,6 +28,8 @@ public:
 
     [[nodiscard]] auto get_archetype() const -> entity_archetype_type;
 
+    void update_archetype();
+
 private:
     world_type* world_;
     entity ent_;

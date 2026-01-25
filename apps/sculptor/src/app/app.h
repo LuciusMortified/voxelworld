@@ -12,6 +12,9 @@
 #include "ui/entity_properties_panel.h"
 #include "ui/entity_tree_panel.h"
 #include "ui/menu_bar.h"
+#include "ui/new_file_modal.h"
+#include "ui/open_file_modal.h"
+#include "ui/startup_modal.h"
 #include "ui/tool_panel.h"
 
 namespace vw::sculptor {
@@ -30,12 +33,15 @@ private:
     void handle_mouse_press(const gfx::mouse_press_event& ev);
     void handle_mouse_release(const gfx::mouse_release_event& ev);
 
+    void init_asset_dir_();
+
     gfx::fps_camera_controller camera_controller_;
     bool camera_movement_enabled_ = false;
 
     app_state state_;
     operation_manager op_manager_;
 
+    tools active_tool_ = tools::select_entity;
     std::unordered_map<tools, std::unique_ptr<base_tool>> tools_;
 
     menu_bar menu_bar_;
@@ -43,6 +49,10 @@ private:
     color_palette_panel color_palette_panel_;
     entity_properties_panel entity_properties_panel_;
     entity_tree_panel entity_tree_panel_;
+
+    startup_modal startup_modal_;
+    new_file_modal new_file_modal_;
+    open_file_modal open_file_modal_;
 };
 
 }  // namespace vw::sculptor

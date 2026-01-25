@@ -1,18 +1,16 @@
 #pragma once
 
-#ifndef VW_SCULPTOR_REMOVE_VOXEL_OPERATION_INL_H
-#define VW_SCULPTOR_REMOVE_VOXEL_OPERATION_INL_H
-
-#include "vw/core/voxel.h"
+#ifndef VW_SCULPTOR_PAINT_VOXEL_OPERATION_INL_H
+#define VW_SCULPTOR_PAINT_VOXEL_OPERATION_INL_H
 
 namespace vw::sculptor {
 
-inline remove_voxel_operation::remove_voxel_operation(
-    engine_type& eng, app_state& st, const remove_voxel_params& params
+inline paint_voxel_operation::paint_voxel_operation(
+    engine_type& eng, app_state& st, const paint_voxel_params& params
 )
     : engine_(&eng), state_(&st), params_(params) {}
 
-inline void remove_voxel_operation::execute() {
+inline void paint_voxel_operation::execute() {
     auto ent = state_->name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
@@ -21,10 +19,10 @@ inline void remove_voxel_operation::execute() {
     auto& model_comp = world.get_component<gfx::model_component>(ent);
     previous_color_  = model_comp.get_voxel(params_.position).value;
 
-    model_system.modify(ent).set_voxel(params_.position, empty_voxel);
+    model_system.modify(ent).set_voxel(params_.position, params_.color);
 }
 
-inline void remove_voxel_operation::undo() {
+inline void paint_voxel_operation::undo() {
     auto ent = state_->name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
@@ -35,4 +33,4 @@ inline void remove_voxel_operation::undo() {
 
 }  // namespace vw::sculptor
 
-#endif  // VW_SCULPTOR_REMOVE_VOXEL_OPERATION_INL_H
+#endif  // VW_SCULPTOR_PAINT_VOXEL_OPERATION_INL_H

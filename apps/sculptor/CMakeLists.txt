@@ -39,6 +39,18 @@ add_executable(${PROJECT_NAME}
         src/operations/remove_voxel_operation.inl.h
         src/tools/add_voxel_tool.h
         src/tools/add_voxel_tool.inl.h
+        src/tools/paint_tool.h
+        src/tools/paint_tool.inl.h
+        src/operations/add_voxel_operation.h
+        src/operations/add_voxel_operation.inl.h
+        src/operations/paint_voxel_operation.h
+        src/operations/paint_voxel_operation.inl.h
+        src/ui/startup_modal.h
+        src/ui/startup_modal.inl.h
+        src/ui/new_file_modal.h
+        src/ui/new_file_modal.inl.h
+        src/ui/open_file_modal.h
+        src/ui/open_file_modal.inl.h
 )
 
 target_link_libraries(${PROJECT_NAME} vwengine)

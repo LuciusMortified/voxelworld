@@ -46,6 +46,17 @@ auto entity_guard<WC>::get_archetype() const -> entity_archetype_type {
     return archetype_;
 }
 
+template <typename WC>
+void entity_guard<WC>::update_archetype() {
+    entity_archetype_type new_archetype;
+    detail::for_each_tuple_type<WC>([&]<typename C, std::size_t I>() noexcept {
+        if (world_->template has_component<C>(ent_)) {
+            new_archetype.template add<C>();
+        }
+    });
+    archetype_ = new_archetype;
+}
+
 }  // namespace vw::gfx
 
 #endif  // VW_GFX_ENTITY_GUARD_INL_H

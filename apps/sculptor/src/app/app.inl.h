@@ -3,10 +3,10 @@
 #ifndef VW_SCULPTOR_APP_INL_H
 #define VW_SCULPTOR_APP_INL_H
 
-#include <cstdio>
+#include <filesystem>
 
 #include "tools/add_voxel_tool.h"
-#include "tools/dummy_tool.h"
+#include "tools/paint_tool.h"
 #include "tools/remove_voxel_tool.h"
 #include "tools/select_entity_tool.h"
 
@@ -22,15 +22,21 @@ inline app::app(
     , tool_panel_(state_)
     , color_palette_panel_(state_)
     , entity_properties_panel_(eng, state_, op_manager_)
-    , entity_tree_panel_(eng, state_, op_manager_) {
-    auto& window = eng.get_window();
-    auto& camera = eng.get_camera();
+    , entity_tree_panel_(eng, state_, op_manager_)
+    , startup_modal_(eng, state_)
+    , new_file_modal_(eng, state_)
+    , open_file_modal_(eng, state_) {
+
+    init_asset_dir_();
+
+    auto& window   = eng.get_window();
+    auto& camera   = eng.get_camera();
     auto& renderer = eng.get_renderer();
 
     tools_[tools::select_entity] = std::make_unique<select_entity_tool>(eng, state_);
     tools_[tools::add_voxel]     = std::make_unique<add_voxel_tool>(eng, state_, op_manager_);
     tools_[tools::remove_voxel]  = std::make_unique<remove_voxel_tool>(eng, state_, op_manager_);
-    tools_[tools::paint_voxel]   = std::make_unique<dummy_tool>();
+    tools_[tools::paint_voxel]   = std::make_unique<paint_tool>(eng, state_, op_manager_);
 
     camera_controller_.setup(window, camera);
     camera_controller_.set_camera_speed(15.f);
@@ -65,13 +71,18 @@ inline app::app(
 
     renderer.set_clear_color(vec4f{0.15f, 0.27f, 0.45f, 1.0f});
 
-    auto& dir_light_settings = renderer.get_directional_light_settings();
+    auto& dir_light_settings     = renderer.get_directional_light_settings();
     dir_light_settings.direction = math::normalize(vec3f{+0.3f, -1.0f, +0.3f});
 }
 
 inline void app::render(
     float delta_time
 ) {
+    if (state_.selected_tool != active_tool_) {
+        active_tool_ = state_.selected_tool;
+        tools_[active_tool_]->on_activate();
+    }
+
     camera_controller_.update(delta_time);
 
     auto& renderer = get_engine().get_renderer();
@@ -92,9 +103,13 @@ inline void app::render(
     entity_properties_panel_.render(delta_time);
     entity_tree_panel_.render(delta_time);
 
-    tools_[state_.selected_tool]->render(delta_time);
+    startup_modal_.render(delta_time);
+    new_file_modal_.render(delta_time);
+    open_file_modal_.render(delta_time);
 
-#if 1
+    tools_[active_tool_]->render(delta_time);
+
+#if 0
     ImGui::Begin("Shadow Map Debug");
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
     // Сетка 2x2 для всех каскадов
@@ -139,27 +154,28 @@ inline void app::handle_key_press(
     if (ev.key == keys::Z && ev.with(mods::CTRL) && ev.with(mods::SHIFT)) {
         op_manager_.redo();
     }
-    if (ev.key == keys::S) {
+
+    if (ev.key == keys::KEY_1) {
         state_.selected_tool = tools::select_entity;
     }
-    if (ev.key == keys::A) {
+    if (ev.key == keys::KEY_2) {
         state_.selected_tool = tools::add_voxel;
     }
-    if (ev.key == keys::R) {
+    if (ev.key == keys::KEY_3) {
         state_.selected_tool = tools::remove_voxel;
     }
-    if (ev.key == keys::P) {
+    if (ev.key == keys::KEY_4) {
         state_.selected_tool = tools::paint_voxel;
     }
 
-    tools_[state_.selected_tool]->on_key_press(ev);
+    tools_[active_tool_]->on_key_press(ev);
 }
 
 inline void app::handle_mouse_move(
     const gfx::mouse_move_event& ev
 ) {
     if (!camera_movement_enabled_) {
-        tools_[state_.selected_tool]->on_mouse_move(ev);
+        tools_[active_tool_]->on_mouse_move(ev);
     }
 }
 
@@ -185,7 +201,7 @@ inline void app::handle_mouse_press(
     }
 
     if (!camera_movement_enabled_) {
-        tools_[state_.selected_tool]->on_mouse_press(ev);
+        tools_[active_tool_]->on_mouse_press(ev);
     }
 }
 
@@ -206,7 +222,21 @@ inline void app::handle_mouse_release(
     }
 
     if (!camera_movement_enabled_) {
-        tools_[state_.selected_tool]->on_mouse_release(ev);
+        tools_[active_tool_]->on_mouse_release(ev);
+    }
+}
+
+inline void app::init_asset_dir_() {
+    if (!std::filesystem::exists(app_state::asset_dir_name)) {
+        std::error_code ec;
+        std::filesystem::create_directories(app_state::asset_dir_name, ec);
+        if (ec) {
+            log::critical(
+                "Failed to create asset directory '{}': {}",  //
+                app_state::asset_dir_name,
+                ec.message()
+            );
+        }
     }
 }
 

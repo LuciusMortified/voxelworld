@@ -33,6 +33,8 @@ public:
 
     void set_voxel(int x, int y, int z, const voxel& voxel);
     void set_voxel(int x, int y, int z, color color);
+    void set_voxel(vec3i pos, const voxel& voxel);
+    void set_voxel(vec3i pos, color color);
 
     [[nodiscard]] auto get_voxel(int x, int y, int z) const -> voxel;
     [[nodiscard]] auto get_voxel(vec3i pos) const -> voxel;

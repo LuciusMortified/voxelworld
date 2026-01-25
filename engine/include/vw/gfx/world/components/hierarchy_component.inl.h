@@ -22,7 +22,7 @@ inline auto hierarchy_component::has_child(entity child) const -> bool {
     return std::ranges::contains(children_, child);
 }
 
-inline auto hierarchy_component::get_children() const -> const std::unordered_set<entity>& {
+inline auto hierarchy_component::get_children() const -> const std::vector<entity>& {
     return children_;
 }
 

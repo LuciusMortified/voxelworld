@@ -6,11 +6,14 @@
 namespace vw::sculptor {
 
 inline void imgui_input_text_string(
-    std::string_view label, std::string& value, size_t max_length = 64
+    std::string_view label, std::string& value
 ) {
-    value.resize(max_length);
-    if (ImGui::InputText(label.data(), value.data(), value.size())) {
-        value.resize(strlen(value.data()));
+    constexpr size_t max_length = 64;
+    char buffer[max_length]{};
+    strcpy_s(buffer, value.data());
+
+    if (ImGui::InputText(label.data(), buffer, max_length)) {
+        value = std::string{buffer};
     }
 }
 

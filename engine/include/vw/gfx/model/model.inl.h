@@ -61,6 +61,20 @@ inline void model::set_voxel(
     increment_generation_();
 }
 
+inline void model::set_voxel(
+    vec3i pos, const voxel& voxel
+) {
+    voxels_[index_at(pos)] = voxel;
+    increment_generation_();
+}
+
+inline void model::set_voxel(
+    vec3i pos, color color
+) {
+    voxels_[index_at(pos)] = voxel{color};
+    increment_generation_();
+}
+
 inline auto model::get_voxel(
     int x, int y, int z
 ) const -> voxel {

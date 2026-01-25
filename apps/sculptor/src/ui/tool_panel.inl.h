@@ -27,10 +27,10 @@ inline void tool_panel::render(
 
     ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.0f, 0.5f));
 
-    render_tool_button(tools::select_entity, "Select entity", "(S)");
-    render_tool_button(tools::add_voxel, "Add voxel", "(A)");
-    render_tool_button(tools::remove_voxel, "Remove voxel", "(R)");
-    render_tool_button(tools::paint_voxel, "Paint voxel", "(P)");
+    render_tool_button(tools::select_entity, "Select entity", "(1)");
+    render_tool_button(tools::add_voxel, "Add voxel", "(2)");
+    render_tool_button(tools::remove_voxel, "Remove voxel", "(3)");
+    render_tool_button(tools::paint_voxel, "Paint voxel", "(4)");
 
     ImGui::PopStyleVar(1);
 

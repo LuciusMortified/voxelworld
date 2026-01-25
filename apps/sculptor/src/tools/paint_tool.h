@@ -1,21 +1,20 @@
 #pragma once
 
-#ifndef VW_SCULPTOR_ADD_VOXEL_TOOL_H
-#define VW_SCULPTOR_ADD_VOXEL_TOOL_H
-
-#include <vw/gfx/engine/engine.h>
+#ifndef VW_SCULPTOR_PAINT_TOOL_H
+#define VW_SCULPTOR_PAINT_TOOL_H
 
 #include "app/app_state.h"
 #include "base_tool.h"
 #include "operations/operation_manager.h"
+#include "vw/gfx/engine/engine.h"
 
 namespace vw::sculptor {
 
-class add_voxel_tool final : public base_tool {
+class paint_tool final : public base_tool {
 public:
     using engine_type = gfx::engine<>;
 
-    add_voxel_tool(engine_type& eng, app_state& st, operation_manager& op_manager);
+    paint_tool(engine_type& eng, app_state& st, operation_manager& op_manager);
 
     void render(float delta_time) override;
     void on_key_press(const gfx::key_press_event& ev) override;
@@ -35,6 +34,6 @@ private:
 
 }  // namespace vw::sculptor
 
-#include "add_voxel_tool.inl.h"
+#include "paint_tool.inl.h"
 
-#endif  // VW_SCULPTOR_ADD_VOXEL_TOOL_H
+#endif  // VW_SCULPTOR_PAINT_TOOL_H

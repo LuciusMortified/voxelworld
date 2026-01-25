@@ -2,6 +2,7 @@
 
 #ifndef VW_SCULPTOR_MENU_BAR_INL_H
 #define VW_SCULPTOR_MENU_BAR_INL_H
+#include "vw/gfx/world/serializers/vox_serializer.h"
 
 namespace vw::sculptor {
 
@@ -37,20 +38,29 @@ inline void menu_bar::render(
     ImGui::BeginMenuBar();
 
     if (ImGui::BeginMenu("File")) {
-        if (ImGui::MenuItem("New", "Ctrl+N")) {
+        if (ImGui::MenuItem("New File", "Ctrl+N")) {
             // TODO: new project
         }
-        if (ImGui::MenuItem("Open", "Ctrl+O")) {
+        if (ImGui::MenuItem("Open File", "Ctrl+O")) {
             // TODO: open project
         }
-        if (ImGui::MenuItem("Save", "Ctrl+S")) {
-            // TODO: save project
+        if (ImGui::MenuItem("Save File", "Ctrl+S")) {
+            gfx::vox_serializer serializer{
+                engine_->get_world(),
+                state_->name_to_entity.at(state_->root_name),
+                state_->entity_to_name
+            };
+
+            namespace fs = std::filesystem;
+            fs::path assets_dir_path{app_state::asset_dir_name};
+            fs::path filepath{assets_dir_path / state_->filename};
+            serializer.serialize(filepath);
         }
 
         ImGui::Separator();
 
         if (ImGui::MenuItem("Exit", "Alt+F4")) {
-            // TODO: exit
+            engine_->shutdown();
         }
 
         ImGui::EndMenu();

@@ -37,7 +37,7 @@ void hierarchy_system<Cs...>::cleanup(
         parent = hierarchy_comp.get_parent();
         if (registry_->template has<hierarchy_component>(parent)) {
             auto& parent_comp = registry_->template get<hierarchy_component>(parent);
-            parent_comp.children_.erase(ent);
+            std::erase(parent_comp.children_, ent);
         }
     }
 
@@ -103,7 +103,7 @@ auto hierarchy_system<Cs...>::hierarchy_modifier::set_parent(entity parent)
 
     if (system_->registry_->template has<hierarchy_component>(parent)) {
         auto& parent_component = system_->registry_->template get<hierarchy_component>(parent);
-        parent_component.children_.insert(entity_);
+        parent_component.children_.push_back(entity_);
     }
 
     if (system_->registry_->template has<hierarchy_component>(entity_)) {

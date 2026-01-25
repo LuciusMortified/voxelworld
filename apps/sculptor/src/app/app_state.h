@@ -17,12 +17,20 @@ enum class tools : int {
 struct ui_state {
     float left_size_voffset  = 0.f;
     float right_side_voffset = 0.f;
+
+    bool need_startup_modal  = true;
+    bool need_new_file_modal = false;
+    bool need_open_file_modal = false;
 };
 
 struct app_state {
+    inline static const std::string asset_dir_name = "models";
+
     using entity_guard_type = gfx::entity_guard<>;
 
     ui_state ui;
+
+    std::string filename;
 
     tools selected_tool  = tools::select_entity;
     color selected_color = colors::white;

@@ -28,6 +28,8 @@ public:
     void on_mouse_release(
         const gfx::mouse_release_event& ev
     ) override {}
+
+    void on_activate() override {}
 };
 
 }  // namespace vw::sculptor

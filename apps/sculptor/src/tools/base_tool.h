@@ -17,6 +17,8 @@ public:
     virtual void on_mouse_move(const gfx::mouse_move_event& ev)       = 0;
     virtual void on_mouse_press(const gfx::mouse_press_event& ev)     = 0;
     virtual void on_mouse_release(const gfx::mouse_release_event& ev) = 0;
+
+    virtual void on_activate() = 0;
 };
 
 }  // namespace vw::sculptor
