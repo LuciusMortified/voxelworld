@@ -1,4 +1,4 @@
-project(sculptor VERSION 0.0.1 LANGUAGES CXX)
+project(sculptor VERSION 0.1.0 LANGUAGES CXX)
 
 add_executable(${PROJECT_NAME}
         src/main.cpp

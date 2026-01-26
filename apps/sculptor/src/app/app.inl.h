@@ -103,6 +103,7 @@ inline void app::render(
     entity_properties_panel_.render(delta_time);
     entity_tree_panel_.render(delta_time);
 
+    // modals
     startup_modal_.render(delta_time);
     new_file_modal_.render(delta_time);
     open_file_modal_.render(delta_time);
@@ -169,6 +170,25 @@ inline void app::handle_key_press(
     }
 
     tools_[active_tool_]->on_key_press(ev);
+
+    if (ev.key == keys::N && ev.with(mods::CTRL)) {
+        state_.ui.need_new_file_modal = true;
+    }
+    if (ev.key == keys::O && ev.with(mods::CTRL)) {
+        state_.ui.need_open_file_modal = true;
+    }
+    if (ev.key == keys::S && ev.with(mods::CTRL)) {
+        gfx::vox_serializer serializer{
+            get_engine().get_world(),
+            state_.name_to_entity[state_.root_name],
+            state_.entity_to_name
+        };
+
+        namespace fs = std::filesystem;
+        fs::path assets_dir_path{app_state::asset_dir_name};
+        fs::path filepath{assets_dir_path / state_.filename};
+        serializer.serialize(filepath);
+    }
 }
 
 inline void app::handle_mouse_move(

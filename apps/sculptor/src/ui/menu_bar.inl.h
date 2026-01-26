@@ -39,10 +39,10 @@ inline void menu_bar::render(
 
     if (ImGui::BeginMenu("File")) {
         if (ImGui::MenuItem("New File", "Ctrl+N")) {
-            // TODO: new project
+            state_->ui.need_new_file_modal = true;
         }
         if (ImGui::MenuItem("Open File", "Ctrl+O")) {
-            // TODO: open project
+            state_->ui.need_open_file_modal = true;
         }
         if (ImGui::MenuItem("Save File", "Ctrl+S")) {
             gfx::vox_serializer serializer{
