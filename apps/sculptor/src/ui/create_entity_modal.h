@@ -4,10 +4,8 @@
 #define VW_SCULPTOR_CREATE_ENTITY_MODAL_H
 
 #include <vw/gfx/engine/engine.h>
-#include <vw/gfx/world/world_components.h>
 
 #include "app/app_state.h"
-#include "operations/create_entity_operation.h"
 
 namespace vw::sculptor {
 
@@ -22,6 +20,8 @@ public:
     void render(float delta_time);
 
 private:
+    bool create_entity();
+
     engine_type* engine_;
     app_state* state_;
     operation_manager* op_manager_;
@@ -29,11 +29,10 @@ private:
     bool need_open_ = false;
 
     std::string name_;
-    vec3i size_{6, 6, 6};
+    bool with_model_ = false;
+    vec3i size_{12, 12, 12};
 
     std::string error_;
-
-    bool create_entity();
 };
 
 }  // namespace vw::sculptor

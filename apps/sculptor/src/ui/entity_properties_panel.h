@@ -22,11 +22,12 @@ private:
     app_state* state_;
     operation_manager* op_manager_;
 
+    void render_model_info();
+
     void render_position();
     void render_rotation();
     void render_scale();
     void render_origin();
-    void render_actions();
 
     bool render_vec3f_field(const char* label, vec3f& vec);
 };

@@ -2,6 +2,7 @@
 
 #ifndef VW_SCULPTOR_CREATE_ENTITY_MODAL_INL_H
 #define VW_SCULPTOR_CREATE_ENTITY_MODAL_INL_H
+#include "operations/create_entity_operation.h"
 
 namespace vw::sculptor {
 
@@ -13,6 +14,7 @@ inline create_entity_modal::create_entity_modal(
 inline void create_entity_modal::open() {
     need_open_ = true;
     name_      = std::format("new entity {}", state_->name_to_entity.size());
+    with_model_ = false;
 }
 
 inline void create_entity_modal::render(
@@ -33,9 +35,12 @@ inline void create_entity_modal::render(
 
         imgui_input_text_string("Name", name_);
 
-        ImGui::InputInt("Size X", &size_.x);
-        ImGui::InputInt("Size Y", &size_.y);
-        ImGui::InputInt("Size Z", &size_.z);
+        ImGui::Checkbox("With Model?", &with_model_);
+        if (with_model_) {
+            ImGui::InputInt("Size X", &size_.x);
+            ImGui::InputInt("Size Y", &size_.y);
+            ImGui::InputInt("Size Z", &size_.z);
+        }
 
         if (ImGui::Button("Create")) {
             if (create_entity()) {
@@ -70,7 +75,7 @@ inline bool create_entity_modal::create_entity() {
     create_entity_params params = {
         .name        = name_,
         .parent_name = state_->selected_name,
-        .with_model  = true,
+        .with_model  = with_model_,
         .size        = size_,
     };
 

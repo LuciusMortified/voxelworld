@@ -11,7 +11,7 @@ inline tool_panel::tool_panel(
     : state_(&st) {}
 
 inline void tool_panel::render(
-    float delta_time
+    float /*delta_time*/
 ) {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImVec2 window_pos =

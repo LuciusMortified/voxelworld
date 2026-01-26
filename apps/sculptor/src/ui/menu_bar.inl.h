@@ -77,6 +77,7 @@ inline void menu_bar::render(
         ImGui::EndMenu();
     }
 
+#if 0
     if (ImGui::BeginMenu("Help")) {
         if (ImGui::MenuItem("About")) {
             ImGui::ShowAboutWindow();
@@ -84,6 +85,7 @@ inline void menu_bar::render(
 
         ImGui::EndMenu();
     }
+#endif
 
     state_->ui.left_size_voffset += 20.0f;
     state_->ui.right_side_voffset += 20.0f;

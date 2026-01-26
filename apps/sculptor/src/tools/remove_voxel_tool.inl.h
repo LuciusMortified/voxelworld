@@ -51,12 +51,6 @@ inline void remove_voxel_tool::render(
 inline void remove_voxel_tool::on_key_press(
     const gfx::key_press_event& ev
 ) {
-    using keys = gfx::keyboard::keys;
-
-    if (ev.key == keys::KEY_3) {
-        state_->selected_tool = tools::remove_voxel;
-        hovered_voxel_ = vec3i{-1, -1, -1};
-    }
 }
 
 inline void remove_voxel_tool::on_mouse_move(
