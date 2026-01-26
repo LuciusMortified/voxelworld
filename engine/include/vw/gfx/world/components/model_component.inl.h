@@ -53,6 +53,10 @@ inline auto model_component::has_model() const -> bool {
     return model_ != nullptr;
 }
 
+inline auto model_component::get_model() const -> std::shared_ptr<model> {
+    return model_;
+}
+
 inline auto model_component::get_identity() const -> model_identity {
     return model_->get_identity();
 }

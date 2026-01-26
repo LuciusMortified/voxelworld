@@ -3,6 +3,7 @@
 #ifndef VW_SCULPTOR_ADD_VOXEL_TOOL_INL_H
 #define VW_SCULPTOR_ADD_VOXEL_TOOL_INL_H
 #include "operations/add_voxel_operation.h"
+#include "operations/expand_model_operation.h"
 
 namespace vw::sculptor {
 
@@ -12,7 +13,7 @@ inline add_voxel_tool::add_voxel_tool(
     : engine_(&eng), state_(&st), op_manager_(&op_manager) {}
 
 inline void add_voxel_tool::render(
-    float delta_time
+    float /*delta_time*/
 ) {
     if (hovered_voxel_ == vec3i{-1, -1, -1}) {
         return;
@@ -57,13 +58,13 @@ inline void add_voxel_tool::render(
 }
 
 inline void add_voxel_tool::on_key_press(
-    const gfx::key_press_event& ev
+    const gfx::key_press_event& /*ev*/
 ) {
 
 }
 
 inline void add_voxel_tool::on_mouse_move(
-    const gfx::mouse_move_event& ev
+    const gfx::mouse_move_event& /*ev*/
 ) {
     update_hovered_voxel_();
 }
@@ -99,6 +100,22 @@ inline void add_voxel_tool::on_mouse_press(
             hovered_voxel_.y < 0 || hovered_voxel_.y >= model_comp.height() ||
             hovered_voxel_.z < 0 || hovered_voxel_.z >= model_comp.depth();
         if (is_outside) {
+            vec3i expand_dir = vec3i{
+                hovered_voxel_.x < 0 ? -1 : hovered_voxel_.x >= model_comp.width() ? 1 : 0,
+                hovered_voxel_.y < 0 ? -1 : hovered_voxel_.y >= model_comp.height() ? 1 : 0,
+                hovered_voxel_.z < 0 ? -1 : hovered_voxel_.z >= model_comp.depth() ? 1 : 0
+            };
+
+            expand_model_params expand_params = {
+                .name = state_->selected_name,
+                .dir = expand_dir,
+            };
+            auto expand_op = std::make_unique<expand_model_operation>(
+                *engine_, *state_, expand_params
+            );
+            op_manager_->execute(std::move(expand_op));
+
+            update_hovered_voxel_();
             return;
         }
 
@@ -117,7 +134,7 @@ inline void add_voxel_tool::on_mouse_press(
 }
 
 inline void add_voxel_tool::on_mouse_release(
-    const gfx::mouse_release_event& ev
+    const gfx::mouse_release_event& /*ev*/
 ) {}
 
 inline void add_voxel_tool::on_activate() {
@@ -125,16 +142,15 @@ inline void add_voxel_tool::on_activate() {
 }
 
 inline void add_voxel_tool::update_hovered_voxel_() {
-    auto& world  = engine_->get_world();
-    auto& window = engine_->get_window();
-    auto& camera = engine_->get_camera();
+    const auto& world  = engine_->get_world();
+    const auto& window = engine_->get_window();
+    const auto& camera = engine_->get_camera();
 
-    auto ray = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
+    const auto ray = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
 
-    auto voxel_hit = world.voxel_ray_cast(ray, ray_cast_entities_);
-    if (voxel_hit.has_value()) {
-        hovered_voxel_ = voxel_hit->empty_pos;
-        state_->selected_name = state_->entity_to_name[voxel_hit->ent];
+    if (const auto hit = world.voxel_ray_cast(ray, ray_cast_entities_); hit) {
+        hovered_voxel_ = hit->empty_pos;
+        state_->selected_name = state_->entity_to_name[hit->ent];
     } else {
         hovered_voxel_ = vec3i{-1, -1, -1};
     }

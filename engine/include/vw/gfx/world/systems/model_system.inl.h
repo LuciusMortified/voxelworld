@@ -91,6 +91,11 @@ model_system<Cs...>::model_modifier::model_modifier(
     : system_(&system), component_(component), entity_(entity_id) {}
 
 template <typename... Cs>
+std::shared_ptr<model> model_system<Cs...>::model_modifier::get_model() const {
+    return component_->model_;
+}
+
+template <typename... Cs>
 void model_system<Cs...>::model_modifier::set_model(
     std::shared_ptr<model> model_ptr
 ) {

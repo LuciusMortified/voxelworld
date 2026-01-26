@@ -49,6 +49,8 @@ add_executable(${PROJECT_NAME}
         src/ui/new_file_modal.inl.h
         src/ui/open_file_modal.h
         src/ui/open_file_modal.inl.h
+        src/operations/expand_model_operation.h
+        src/operations/expand_model_operation.inl.h
 )
 
 target_link_libraries(${PROJECT_NAME} vwengine)

@@ -23,6 +23,7 @@ private:
 
 public:
     [[nodiscard]] auto has_model() const -> bool;
+    [[nodiscard]] auto get_model() const -> std::shared_ptr<model>;
 
     [[nodiscard]] auto get_voxel(int x, int y, int z) const -> voxel;
     [[nodiscard]] auto get_voxel(vec3i pos) const -> voxel;

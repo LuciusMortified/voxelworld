@@ -35,6 +35,8 @@ public:
     public:
         explicit model_modifier(model_system& system, model_component* component, entity e);
 
+        [[nodiscard]] std::shared_ptr<model> get_model() const;
+
         void set_model(std::shared_ptr<model> model_ptr);
         void set_voxel(int x, int y, int z, const voxel& v);
         void set_voxel(int x, int y, int z, color c);
