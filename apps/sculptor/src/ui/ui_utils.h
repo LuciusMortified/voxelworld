@@ -10,7 +10,7 @@ inline void imgui_input_text_string(
 ) {
     constexpr size_t max_length = 64;
     char buffer[max_length]{};
-    strcpy_s(buffer, value.data());
+    strlcpy(buffer, value.data(), sizeof(buffer));
 
     if (ImGui::InputText(label.data(), buffer, max_length)) {
         value = std::string{buffer};

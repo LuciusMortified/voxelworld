@@ -336,7 +336,8 @@ inline bool vulkan_context::is_device_suitable_(
     VkPhysicalDeviceProperties device_properties;
     vkGetPhysicalDeviceProperties(device, &device_properties);
 
-    vw::log::debug(lc_, "Checking device: {}", device_properties.deviceName);
+    std::string device_name{device_properties.deviceName};
+    vw::log::debug(lc_, "Checking device: {}", device_name);
     const char* device_type_str = "UNKNOWN";
     switch (device_properties.deviceType) {
         case VK_PHYSICAL_DEVICE_TYPE_OTHER:
