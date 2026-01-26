@@ -3,8 +3,6 @@
 #ifndef VW_GFX_TRANSFORM_COMPONENT_INL_H
 #define VW_GFX_TRANSFORM_COMPONENT_INL_H
 
-#include "vw/gfx/world/components/transform_component.h"
-
 namespace vw::gfx {
 
 inline auto transform_component::get_local_matrix() const -> mat4f {

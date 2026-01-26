@@ -33,7 +33,7 @@ private:
     void handle_mouse_press(const gfx::mouse_press_event& ev);
     void handle_mouse_release(const gfx::mouse_release_event& ev);
 
-    void init_asset_dir_();
+    static void init_asset_dir_();
 
     gfx::fps_camera_controller camera_controller_;
     bool camera_movement_enabled_ = false;
@@ -41,7 +41,7 @@ private:
     app_state state_;
     operation_manager op_manager_;
 
-    tools active_tool_ = tools::select_entity;
+    tools active_tool_ = tools::add_voxel;
     std::unordered_map<tools, std::unique_ptr<base_tool>> tools_;
 
     menu_bar menu_bar_;

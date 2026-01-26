@@ -1,12 +1,10 @@
 #version 460 core
 
-// Входные данные от vertex shader
 layout(location = 0) in vec3 fragPos;
 layout(location = 1) in vec3 fragNormal;
 layout(location = 2) in vec3 fragColor;
 layout(location = 4) in float viewDepth;
 
-// Структура directional light данных (соответствует directional_light_data в C++)
 struct DirectionalLightData {
     mat4 light_space_matrices[4];
     vec4 cascade_splits;// x = split0, y = split1, z = split2, w = split3
@@ -15,21 +13,16 @@ struct DirectionalLightData {
     float intensity;
 };
 
-// Uniform buffer object (set 0, binding = 0)
 layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
     vec3 viewPos;
-// Directional light
     DirectionalLightData directional_light;
-// Point lights count
     uint point_lights_count;
 } ubo;
 
-// Shadow map array (set 2, binding 0)
 layout(set = 2, binding = 0) uniform sampler2DArrayShadow shadowMapArray;
 
-// Структура point light данных (соответствует point_light_data в C++)
 struct PointLightData {
     vec4 position;
     vec4 color;
@@ -40,13 +33,11 @@ struct PointLightData {
     float attenuation_quadratic;
 };
 
-// Point lights SSBO (set 3, binding 0)
 layout(set = 3, binding = 0, std430) readonly buffer PointLights {
     PointLightData lights[];
 } pointLights;
 
 int selectCascade(float viewDepth) {
-    // viewDepth в диапазоне [near, far]
     if (viewDepth < ubo.directional_light.cascade_splits.x) return 0;
     if (viewDepth < ubo.directional_light.cascade_splits.y) return 1;
     if (viewDepth < ubo.directional_light.cascade_splits.z) return 2;
@@ -108,26 +99,19 @@ float calculateShadowForCascade(int cascadeIndex, vec3 normal) {
 }
 
 float calculateShadow(vec3 normal, float viewDepth) {
-    // Выбираем каскад на основе view depth
     int cascadeIndex = selectCascade(viewDepth);
 
-    // Вычисляем shadow для текущего каскада
     float shadow = calculateShadowForCascade(cascadeIndex, normal);
 
-    // Blending между каскадами (если не последний каскад)
     if (cascadeIndex < 3) {
-        // Определяем зону смешивания
         float nextSplit = ubo.directional_light.cascade_splits[cascadeIndex];
         float blendStart = nextSplit * 0.75;
         float blendEnd = nextSplit;
 
-        // Если фрагмент в зоне смешивания (перед границей следующего каскада)
         if (viewDepth > blendStart && viewDepth < blendEnd) {
-            // Вычисляем shadow для следующего каскада
             int nextCascadeIndex = cascadeIndex + 1;
             float nextShadow = calculateShadowForCascade(nextCascadeIndex, normal);
 
-            // Интерполируем между каскадами (0 = текущий, 1 = следующий)
             float blendFactor = smoothstep(blendStart, blendEnd, viewDepth);
             shadow = mix(shadow, nextShadow, blendFactor);
         }
@@ -137,20 +121,15 @@ float calculateShadow(vec3 normal, float viewDepth) {
 }
 
 vec3 calculateDirectionalLight(vec3 normal, vec3 viewDir, float shadow) {
-    // Вычисляем sun_factor: если direction.y > 0, свет идет вверх (ночь)
     float sunFactor = step(0.0, -ubo.directional_light.direction.y);
 
-    // Направление света (нормализованное)
     vec3 lightDir = normalize(-ubo.directional_light.direction);
 
-    // Diffuse
     float diff = max(dot(lightDir, normal), 0.0);
 
-    // Specular
     vec3 reflectDir = reflect(-lightDir, normal);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 64.0);
 
-    // Комбинируем освещение с учетом shadow и sun_factor
     vec3 diffuse = diff * ubo.directional_light.color * ubo.directional_light.intensity * sunFactor * shadow;
     vec3 specular = spec * ubo.directional_light.color * ubo.directional_light.intensity * sunFactor * shadow * 0.5;
 

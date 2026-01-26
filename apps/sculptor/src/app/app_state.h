@@ -7,11 +7,10 @@
 namespace vw::sculptor {
 
 enum class tools : int {
-    invalid       = 0,
-    select_entity = 1,
-    add_voxel     = 2,
-    remove_voxel  = 3,
-    paint_voxel   = 4,
+    invalid,
+    add_voxel,
+    remove_voxel,
+    paint_voxel,
 };
 
 struct ui_state {
@@ -32,7 +31,7 @@ struct app_state {
 
     std::string filename;
 
-    tools selected_tool  = tools::select_entity;
+    tools selected_tool  = tools::add_voxel;
     color selected_color = colors::white;
 
     std::string selected_name;

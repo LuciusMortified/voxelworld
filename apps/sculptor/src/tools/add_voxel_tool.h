@@ -25,6 +25,8 @@ public:
     void on_activate() override;
 
 private:
+    void update_hovered_voxel_();
+
     engine_type* engine_;
     app_state* state_;
     operation_manager* op_manager_;

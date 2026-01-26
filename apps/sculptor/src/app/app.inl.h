@@ -8,7 +8,6 @@
 #include "tools/add_voxel_tool.h"
 #include "tools/paint_tool.h"
 #include "tools/remove_voxel_tool.h"
-#include "tools/select_entity_tool.h"
 
 namespace vw::sculptor {
 
@@ -33,7 +32,6 @@ inline app::app(
     auto& camera   = eng.get_camera();
     auto& renderer = eng.get_renderer();
 
-    tools_[tools::select_entity] = std::make_unique<select_entity_tool>(eng, state_);
     tools_[tools::add_voxel]     = std::make_unique<add_voxel_tool>(eng, state_, op_manager_);
     tools_[tools::remove_voxel]  = std::make_unique<remove_voxel_tool>(eng, state_, op_manager_);
     tools_[tools::paint_voxel]   = std::make_unique<paint_tool>(eng, state_, op_manager_);
@@ -157,15 +155,12 @@ inline void app::handle_key_press(
     }
 
     if (ev.key == keys::KEY_1) {
-        state_.selected_tool = tools::select_entity;
-    }
-    if (ev.key == keys::KEY_2) {
         state_.selected_tool = tools::add_voxel;
     }
-    if (ev.key == keys::KEY_3) {
+    if (ev.key == keys::KEY_2) {
         state_.selected_tool = tools::remove_voxel;
     }
-    if (ev.key == keys::KEY_4) {
+    if (ev.key == keys::KEY_3) {
         state_.selected_tool = tools::paint_voxel;
     }
 

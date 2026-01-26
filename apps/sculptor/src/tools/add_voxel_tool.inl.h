@@ -65,19 +65,7 @@ inline void add_voxel_tool::on_key_press(
 inline void add_voxel_tool::on_mouse_move(
     const gfx::mouse_move_event& ev
 ) {
-    auto& world  = engine_->get_world();
-    auto& window = engine_->get_window();
-    auto& camera = engine_->get_camera();
-
-    auto ray = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
-
-    auto voxel_hit = world.voxel_ray_cast(ray, ray_cast_entities_);
-    auto selected_ent = state_->name_to_entity[state_->selected_name];
-    if (voxel_hit.has_value() && voxel_hit->ent == selected_ent) {
-        hovered_voxel_ = voxel_hit->empty_pos;
-    } else {
-        hovered_voxel_ = vec3i{-1, -1, -1};
-    }
+    update_hovered_voxel_();
 }
 
 inline void add_voxel_tool::on_mouse_press(
@@ -123,6 +111,8 @@ inline void add_voxel_tool::on_mouse_press(
             *engine_, *state_, params
         );
         op_manager_->execute(std::move(op));
+
+        update_hovered_voxel_();
     }
 }
 
@@ -131,7 +121,23 @@ inline void add_voxel_tool::on_mouse_release(
 ) {}
 
 inline void add_voxel_tool::on_activate() {
-    hovered_voxel_ = vec3i{-1, -1, -1};
+    update_hovered_voxel_();
+}
+
+inline void add_voxel_tool::update_hovered_voxel_() {
+    auto& world  = engine_->get_world();
+    auto& window = engine_->get_window();
+    auto& camera = engine_->get_camera();
+
+    auto ray = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
+
+    auto voxel_hit = world.voxel_ray_cast(ray, ray_cast_entities_);
+    if (voxel_hit.has_value()) {
+        hovered_voxel_ = voxel_hit->empty_pos;
+        state_->selected_name = state_->entity_to_name[voxel_hit->ent];
+    } else {
+        hovered_voxel_ = vec3i{-1, -1, -1};
+    }
 }
 
 }  // namespace vw::sculptor

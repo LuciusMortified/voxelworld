@@ -31,8 +31,6 @@ add_executable(${PROJECT_NAME}
         src/operations/set_transform_operation.inl.h
         src/tools/base_tool.h
         src/tools/dummy_tool.h
-        src/tools/select_entity_tool.h
-        src/tools/select_entity_tool.inl.h
         src/tools/remove_voxel_tool.h
         src/tools/remove_voxel_tool.inl.h
         src/operations/remove_voxel_operation.h
