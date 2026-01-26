@@ -42,8 +42,8 @@ inline void paint_tool::render(
     auto voxel_world_pos =  //
         world.get_component<gfx::transform_component>(ent).get_world_matrix() *
         math::translation_matrix(voxel_local_pos) *    //
-        math::scale_matrix(vec3f{1.1f, 1.1f, 1.1f}) *  //
-        math::translation_matrix(vec3f{-0.05f, -0.05f, -0.05f});
+        math::scale_matrix(vec3f{1.01f, 1.01f, 1.01f}) *  //
+        math::translation_matrix(vec3f{-0.005f, -0.005f, -0.005f});
 
     renderer.draw_box(voxel_world_pos, vec3f{1.f, 1.f, 1.f}, colors::black);
 }
@@ -62,7 +62,8 @@ inline void paint_tool::on_mouse_move(
     auto ray = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
 
     auto voxel_hit = world.voxel_ray_cast(ray, ray_cast_entities_);
-    if (voxel_hit.has_value()) {
+    auto selected_ent = state_->name_to_entity[state_->selected_name];
+    if (voxel_hit.has_value() && voxel_hit->ent == selected_ent) {
         hovered_voxel_ = voxel_hit->voxel_pos;
     } else {
         hovered_voxel_ = vec3i{-1, -1, -1};

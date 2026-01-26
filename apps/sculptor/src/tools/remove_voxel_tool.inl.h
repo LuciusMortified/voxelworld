@@ -69,7 +69,8 @@ inline void remove_voxel_tool::on_mouse_move(
     auto ray = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
 
     auto voxel_hit = world.voxel_ray_cast(ray, ray_cast_entities_);
-    if (voxel_hit.has_value()) {
+    auto selected_ent = state_->name_to_entity[state_->selected_name];
+    if (voxel_hit.has_value() && voxel_hit->ent == selected_ent) {
         hovered_voxel_ = voxel_hit->voxel_pos;
     } else {
         hovered_voxel_ = vec3i{-1, -1, -1};
