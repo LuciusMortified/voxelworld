@@ -1,93 +1,93 @@
-# CLAUDE.md - Voxel World AI Assistant Guide
+# CLAUDE.md - Руководство для ИИ-ассистентов
 
-This document provides essential information for AI assistants working on the Voxel World codebase.
+Этот документ содержит информацию для ИИ-ассистентов, работающих с кодовой базой Voxel World.
 
-## Project Overview
+## Обзор проекта
 
-Voxel World is a C++/Vulkan-based voxel sandbox game engine featuring:
-- Modern C++23 codebase with header-only engine design
-- Entity Component System (ECS) architecture
-- Vulkan rendering with cascade shadow mapping
-- Sculptor application for voxel model editing
-- VOX file format for serialization
+Voxel World — воксельный движок на C++/Vulkan со следующими особенностями:
+- Современный C++23 с header-only архитектурой движка
+- Entity Component System (ECS) архитектура
+- Рендеринг на Vulkan с каскадными тенями
+- Приложение Sculptor для редактирования воксельных моделей
+- Формат VOX для сериализации
 
-**Current version**: 0.0.1 (early development)
+**Текущая версия**: 0.0.1 (ранняя разработка)
 
-## Quick Reference
+## Быстрый старт
 
 ```bash
-# Build commands
+# Сборка проекта
 mkdir build && cd build
 cmake ..
 cmake --build . --config Release
 
-# Compile shaders (from shaders/ directory)
+# Компиляция шейдеров (из директории shaders/)
 ./compile.sh    # Linux/macOS
 compile.bat     # Windows
 
-# Run Sculptor application
+# Запуск Sculptor
 ./build/apps/sculptor/sculptor
 ```
 
-## Directory Structure
+## Структура директорий
 
 ```
 voxelworld/
-├── engine/                    # Header-only engine library
+├── engine/                    # Header-only библиотека движка
 │   └── include/vw/
-│       ├── core/              # Fundamental types (types.h, vec3.h, mat4.h, color.h)
+│       ├── core/              # Базовые типы (types.h, vec3.h, mat4.h, color.h)
 │       ├── gfx/
-│       │   ├── camera/        # Camera systems (camera.h, fps_camera_controller.h)
-│       │   ├── debug/         # Debug visualization (debug_window.h, debug_primitive.h)
-│       │   ├── engine/        # Engine coordination (engine.h, app.h)
-│       │   ├── model/         # Voxel models (model.h, model_registry.h)
-│       │   ├── render/        # Vulkan rendering (renderer.h, vulkan_context.h)
-│       │   ├── resource/      # GPU resources (buffer.h, mesh.h, shader.h)
-│       │   ├── spatial/       # Spatial math (ray.h, aabb.h, frustum.h)
+│       │   ├── camera/        # Камера (camera.h, fps_camera_controller.h)
+│       │   ├── debug/         # Отладка (debug_window.h, debug_primitive.h)
+│       │   ├── engine/        # Координация движка (engine.h, app.h)
+│       │   ├── model/         # Воксельные модели (model.h, model_registry.h)
+│       │   ├── render/        # Vulkan рендеринг (renderer.h, vulkan_context.h)
+│       │   ├── resource/      # GPU ресурсы (buffer.h, mesh.h, shader.h)
+│       │   ├── spatial/       # Пространственная математика (ray.h, aabb.h)
 │       │   └── world/         # ECS (entity.h, registry.h, components/, systems/)
-│       └── log/               # Logging (logger.h)
+│       └── log/               # Логирование (logger.h)
 ├── apps/
-│   ├── sculptor/              # Main voxel editor application
+│   ├── sculptor/              # Основное приложение — редактор вокселей
 │   │   └── src/
-│   │       ├── app/           # Application state and main class
-│   │       ├── operations/    # Undo/redo operations
-│   │       ├── tools/         # Sculpting tools (add, remove, paint)
-│   │       └── ui/            # ImGui panels and modals
-│   ├── test_window/           # Window/input testing
-│   ├── test_simple_model/     # Model rendering test
-│   └── test_math_matrix/      # Math validation test
-├── shaders/                   # GLSL shaders (voxel, shadow, debug)
-├── docs/                      # Documentation (ENGINE.md, TASKS.md, PRD.md)
-└── vcpkg.json                 # Package dependencies
+│   │       ├── app/           # Состояние приложения
+│   │       ├── operations/    # Операции отмены/повтора
+│   │       ├── tools/         # Инструменты (добавление, удаление, покраска)
+│   │       └── ui/            # ImGui панели и модальные окна
+│   ├── test_window/           # Тест окна и ввода
+│   ├── test_simple_model/     # Тест рендеринга модели
+│   └── test_math_matrix/      # Тест математики
+├── shaders/                   # GLSL шейдеры (voxel, shadow, debug)
+├── docs/                      # Документация (ENGINE.md, TASKS.md, PRD.md)
+└── vcpkg.json                 # Зависимости
 ```
 
-## Architecture Concepts
+## Архитектурные концепции
 
-### Header-Only Engine Pattern
-- Engine is an INTERFACE library (no compiled .cpp files)
-- Headers declare interfaces (`.h`), implementations in inline headers (`.inl.h`)
-- Apps are compiled executables linking against the header library
+### Header-Only паттерн
+- Движок — INTERFACE библиотека (без компилируемых .cpp файлов)
+- Заголовки объявляют интерфейсы (`.h`), реализации в inline-заголовках (`.inl.h`)
+- Приложения — компилируемые исполняемые файлы, линкующиеся с header-библиотекой
 
 ### Entity Component System (ECS)
 ```cpp
-// Registry is templated on component types
+// Registry шаблонизирован типами компонентов
 template <typename... Cs>
 class registry { /* ... */ };
 
-// View for iterating entities with specific components
+// View для итерации по сущностям с определёнными компонентами
 auto view = registry.view<TransformComponent, ModelComponent>();
 for (auto [ent, transform, model] : view) { /* ... */ }
 ```
 
-### Entity Handle Pattern
+### Паттерн Entity Handle
 ```cpp
 struct entity {
-    uint32 index;       // Dense array index
-    uint32 generation;  // Version for use-after-free safety
+    uint32 index;       // Индекс в плотном массиве
+    uint32 generation;  // Версия для защиты от use-after-free
 };
 ```
 
-### Command Pattern for Undo/Redo
+### Command паттерн для Undo/Redo
 ```cpp
 class base_operation {
     virtual void execute() = 0;
@@ -95,176 +95,168 @@ class base_operation {
 };
 ```
 
-## Code Conventions
+## Соглашения по коду
 
-### C++ Standards
-- **Standard**: C++23
-- **Compiler flags**: `-Wall -Wextra -Wpedantic`
-- **No exceptions** in hot paths; use return values for error handling
+### Стандарт C++
+- **Стандарт**: C++23
+- **Флаги компилятора**: `-Wall -Wextra -Wpedantic`
+- **Исключения**: не используются в горячих путях; ошибки через возвращаемые значения
 
-### Naming Conventions
-- **Namespaces**: `vw::` (core), `vw::gfx::` (graphics), `vw::sculptor::` (editor)
-- **Types**: `snake_case` for classes/structs (e.g., `entity`, `model_registry`)
-- **Functions/methods**: `snake_case` (e.g., `get_voxel`, `is_valid`)
-- **Member variables**: `snake_case`, no prefix (e.g., `index`, `generation`)
-- **Constants**: `snake_case` (e.g., `invalid_index`)
-- **Template parameters**: `PascalCase` single letters or short (e.g., `Cs`, `T`)
+### Именование
+- **Пространства имён**: `vw::` (ядро), `vw::gfx::` (графика), `vw::sculptor::` (редактор)
+- **Типы**: `snake_case` для классов/структур (например, `entity`, `model_registry`)
+- **Функции/методы**: `snake_case` (например, `get_voxel`, `is_valid`)
+- **Члены класса**: `snake_case`, без префиксов (например, `index`, `generation`)
+- **Константы**: `snake_case` (например, `invalid_index`)
+- **Шаблонные параметры**: `PascalCase` (например, `Cs`, `T`)
 
-### Header Guards
+### Защита заголовков
 ```cpp
 #pragma once
 
 #ifndef VW_PATH_TO_FILE_H
 #define VW_PATH_TO_FILE_H
-// ... content ...
+// ... содержимое ...
 #endif  // VW_PATH_TO_FILE_H
 ```
 
-### Return Type Syntax
-Use trailing return type for all methods:
+### Синтаксис возвращаемого типа
+Используйте trailing return type для всех методов:
 ```cpp
 [[nodiscard]] auto get_value() const -> int;
 auto operator=(const foo&) -> foo& = delete;
 ```
 
-### Formatting (.clang-format)
-- **Base style**: Google
-- **Indentation**: 4 spaces (no tabs)
-- **Column limit**: 100 characters
-- **Braces**: Attached (K&R style)
-- **Pointers**: Left-aligned (`int* ptr`)
-- **Constructor initializers**: Break before comma, one per line
+### Форматирование (.clang-format)
+- **Базовый стиль**: Google
+- **Отступы**: 4 пробела (без табуляции)
+- **Лимит строки**: 100 символов
+- **Фигурные скобки**: присоединённые (K&R стиль)
+- **Указатели**: выравнивание влево (`int* ptr`)
+- **Инициализаторы конструктора**: перенос перед запятой, по одному на строку
 
-### Include Order
-1. Standard library headers
-2. Third-party headers
-3. Project headers (vw/...)
-4. Local headers
+### Порядок include
+1. Заголовки стандартной библиотеки
+2. Сторонние заголовки
+3. Заголовки проекта (vw/...)
+4. Локальные заголовки
 
-Includes are sorted case-insensitively with regrouping enabled.
+## Псевдонимы типов
 
-## Type Aliases
-
-Use project-specific types from `vw/core/types.h`:
+Используйте типы проекта из `vw/core/types.h`:
 ```cpp
 vw::uint8, vw::uint16, vw::uint32, vw::uint64
 vw::int8, vw::int16, vw::int32, vw::int64
 vw::float32, vw::float64
 ```
 
-## Dependencies
+## Зависимости
 
-Managed via vcpkg:
-- **Vulkan SDK** (system requirement)
-- **glfw3** - Window management
-- **imgui** (with glfw-binding, vulkan-binding) - UI
-- **spdlog** (>=1.15.3) - Logging
+Управляются через vcpkg:
+- **Vulkan SDK** (системное требование)
+- **glfw3** — управление окнами
+- **imgui** (с glfw-binding, vulkan-binding) — UI
+- **spdlog** (>=1.15.3) — логирование
 
-## Build System
+## Система сборки
 
-### CMake Structure
-- Root `CMakeLists.txt` - minimal, delegates to subdirectories
-- `engine/CMakeLists.txt` - INTERFACE library definition
-- `apps/CMakeLists.txt` - aggregator for applications
-- Individual app `CMakeLists.txt` - per-application configuration
+### Структура CMake
+- Корневой `CMakeLists.txt` — минимальный, делегирует поддиректориям
+- `engine/CMakeLists.txt` — определение INTERFACE библиотеки
+- `apps/CMakeLists.txt` — агрегатор приложений
+- Индивидуальные `CMakeLists.txt` приложений
 
-### Key CMake Settings
+### Ключевые настройки CMake
 ```cmake
 cmake_minimum_required(VERSION 3.16)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_23)
 ```
 
-### Shader Compilation
-Shaders are GLSL compiled to SPIR-V via `glslc`:
-- Source: `shaders/*.vert`, `shaders/*.frag`
-- Output: `shaders/*.spv`
-- Compiled automatically during Sculptor build
+### Компиляция шейдеров
+Шейдеры GLSL компилируются в SPIR-V через `glslc`:
+- Исходники: `shaders/*.vert`, `shaders/*.frag`
+- Результат: `shaders/*.spv`
+- Компилируются автоматически при сборке Sculptor
 
-## Testing
+## Тестирование
 
-No formal test framework. Testing is done via dedicated test applications:
-- `test_window` - Window creation and input polling
-- `test_simple_model` - Model rendering validation
-- `test_math_matrix` - Math library verification
+Формальный фреймворк тестирования отсутствует. Тестирование через специальные приложения:
+- `test_window` — создание окна и обработка ввода
+- `test_simple_model` — валидация рендеринга модели
+- `test_math_matrix` — проверка математической библиотеки
 
-Run test apps manually to verify functionality.
+## Типичные задачи разработки
 
-## Common Development Tasks
+### Добавление нового компонента
+1. Создать заголовок в `engine/include/vw/gfx/world/components/`
+2. Именование: `*_component.h` и `*_component.inl.h`
+3. Добавить в tuple `world_components.h` при необходимости
 
-### Adding a New Component
-1. Create header in `engine/include/vw/gfx/world/components/`
-2. Follow naming: `*_component.h` and `*_component.inl.h`
-3. Add to `world_components.h` tuple if needed
+### Добавление новой системы
+1. Создать заголовок в `engine/include/vw/gfx/world/systems/`
+2. Именование: `*_system.h` и `*_system.inl.h`
+3. Реализовать метод `update()`, работающий с view registry
 
-### Adding a New System
-1. Create header in `engine/include/vw/gfx/world/systems/`
-2. Follow naming: `*_system.h` and `*_system.inl.h`
-3. Implement `update()` method operating on registry views
+### Добавление инструмента Sculptor
+1. Создать класс, наследующий `base_tool` в `apps/sculptor/src/tools/`
+2. Реализовать виртуальные методы (render, обработчики событий)
+3. Зарегистрировать в UI панели инструментов
 
-### Adding a Sculptor Tool
-1. Create class inheriting from `base_tool` in `apps/sculptor/src/tools/`
-2. Implement required virtual methods (render, event handlers)
-3. Register in tool panel UI
+### Добавление операции Sculptor (Undo/Redo)
+1. Создать класс, наследующий `base_operation` в `apps/sculptor/src/operations/`
+2. Реализовать методы `execute()` и `undo()`
+3. Использовать через `operation_manager::execute()`
 
-### Adding a Sculptor Operation (Undo/Redo)
-1. Create class inheriting from `base_operation` in `apps/sculptor/src/operations/`
-2. Implement `execute()` and `undo()` methods
-3. Use via `operation_manager::execute()`
+## Структуры данных
 
-## Data Structures
+### Воксель
+- Одно значение цвета, хранится как `uint32` (упакованный RGBA)
+- Пустой воксель представлен значением цвета 0
 
-### Voxel
-- Single color value stored as `uint32` (RGBA packed)
-- Empty voxel represented by color value 0
+### Модель
+- 3D массив вокселей (ширина x высота x глубина)
+- Линейное хранение: `x + y*width + z*width*height`
 
-### Model
-- 3D array of voxels (width x height x depth)
-- Linear storage: `x + y*width + z*width*height`
-
-### Vertex (for GPU)
+### Вершина (для GPU)
 ```cpp
 struct vertex {
-    vec3f position;  // 12 bytes
-    vec3f normal;    // 12 bytes
-    uint32 color;    // 4 bytes (RGBA packed)
-};  // Total: 28 bytes
+    vec3f position;  // 12 байт
+    vec3f normal;    // 12 байт
+    uint32 color;    // 4 байта (упакованный RGBA)
+};  // Всего: 28 байт
 ```
 
-## Documentation Language
+## Справочник важных файлов
 
-Primary documentation is in Russian. Code comments may be in Russian or English.
-
-## Important Files Reference
-
-| Purpose | File |
-|---------|------|
-| Type definitions | `engine/include/vw/core/types.h` |
-| Entity definition | `engine/include/vw/gfx/world/entity.h` |
+| Назначение | Файл |
+|------------|------|
+| Определения типов | `engine/include/vw/core/types.h` |
+| Определение entity | `engine/include/vw/gfx/world/entity.h` |
 | ECS Registry | `engine/include/vw/gfx/world/registry.h` |
-| Vulkan context | `engine/include/vw/gfx/render/vulkan_context.h` |
-| Main renderer | `engine/include/vw/gfx/render/renderer.h` |
-| Voxel model | `engine/include/vw/gfx/model/model.h` |
-| Color palette | `engine/include/vw/core/color.h` |
-| Sculptor app | `apps/sculptor/src/app/app.h` |
-| Base tool | `apps/sculptor/src/tools/base_tool.h` |
-| Base operation | `apps/sculptor/src/operations/base_operation.h` |
+| Vulkan контекст | `engine/include/vw/gfx/render/vulkan_context.h` |
+| Основной рендерер | `engine/include/vw/gfx/render/renderer.h` |
+| Воксельная модель | `engine/include/vw/gfx/model/model.h` |
+| Цветовая палитра | `engine/include/vw/core/color.h` |
+| Приложение Sculptor | `apps/sculptor/src/app/app.h` |
+| Базовый инструмент | `apps/sculptor/src/tools/base_tool.h` |
+| Базовая операция | `apps/sculptor/src/operations/base_operation.h` |
 
-## Clangd Integration
+## Интеграция с Clangd
 
-The project is configured for clangd with:
-- C++23 standard
-- ClangTidy checks (readability, performance, modernize, bugprone)
-- Inlay hints enabled
-- Compile commands exported (`compile_commands.json`)
+Проект настроен для clangd:
+- Стандарт C++23
+- Проверки ClangTidy (readability, performance, modernize, bugprone)
+- Inlay hints включены
+- Экспорт compile commands (`compile_commands.json`)
 
-Disabled checks: `readability-magic-numbers`, `readability-identifier-length`, `bugprone-easily-swappable-parameters`
+Отключённые проверки: `readability-magic-numbers`, `readability-identifier-length`, `bugprone-easily-swappable-parameters`
 
 ## Git Workflow
 
-Recent development focuses on:
-- Sculptor tool improvements (model operations, file format)
-- Shadow mapping (cascade shadows)
-- Platform support (macOS via MoltenVK)
+Текущий фокус разработки:
+- Улучшения инструмента Sculptor (операции с моделями, формат файлов)
+- Каскадные тени
+- Поддержка платформ (macOS через MoltenVK)
 
-Commits follow concise format: `area: description` (e.g., `sculptor: expand model operation`)
+Формат коммитов: `область: описание` (например, `sculptor: expand model operation`)
