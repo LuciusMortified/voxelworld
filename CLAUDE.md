@@ -259,4 +259,7 @@ struct vertex {
 - Каскадные тени
 - Поддержка платформ (macOS через MoltenVK)
 
-Формат коммитов: `область: описание` (например, `sculptor: expand model operation`)
+### Коммиты
+- **Язык**: английский (обязательно)
+- **Формат**: `область: описание` (например, `sculptor: expand model operation`)
+- **Области**: `engine`, `sculptor`, `docs`, `shaders`, `build`
