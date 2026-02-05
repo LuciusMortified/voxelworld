@@ -14,6 +14,7 @@
 #include "ui/menu_bar.h"
 #include "ui/new_file_modal.h"
 #include "ui/open_file_modal.h"
+#include "ui/save_as_modal.h"
 #include "ui/startup_modal.h"
 #include "ui/tool_panel.h"
 
@@ -53,6 +54,7 @@ private:
     startup_modal startup_modal_;
     new_file_modal new_file_modal_;
     open_file_modal open_file_modal_;
+    save_as_modal save_as_modal_;
 };
 
 }  // namespace vw::sculptor

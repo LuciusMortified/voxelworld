@@ -17,9 +17,10 @@ struct ui_state {
     float left_size_voffset  = 0.f;
     float right_side_voffset = 0.f;
 
-    bool need_startup_modal  = true;
-    bool need_new_file_modal = false;
+    bool need_startup_modal   = true;
+    bool need_new_file_modal  = false;
     bool need_open_file_modal = false;
+    bool need_save_as_modal   = false;
 };
 
 struct app_state {

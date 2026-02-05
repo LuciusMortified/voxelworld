@@ -56,6 +56,9 @@ inline void menu_bar::render(
             fs::path filepath{assets_dir_path / state_->filename};
             serializer.serialize(filepath);
         }
+        if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S")) {
+            state_->ui.need_save_as_modal = true;
+        }
 
         ImGui::Separator();
 
