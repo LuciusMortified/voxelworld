@@ -259,6 +259,10 @@ struct vertex {
 - Каскадные тени
 - Поддержка платформ (macOS через MoltenVK)
 
+### Ветки
+- **Формат**: `snake_case`, краткое описание задачи
+- **Примеры**: `fix_shadow_artifacts`, `add_rotate_tool`, `refactor_ecs_registry`
+
 ### Коммиты
 - **Язык**: английский (обязательно)
 - **Формат**: `область: описание` (например, `sculptor: expand model operation`)
