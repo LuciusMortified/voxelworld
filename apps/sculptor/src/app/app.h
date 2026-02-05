@@ -34,10 +34,12 @@ private:
     void handle_mouse_press(const gfx::mouse_press_event& ev);
     void handle_mouse_release(const gfx::mouse_release_event& ev);
 
+    void update_title_();
     static void init_asset_dir_();
 
     gfx::fps_camera_controller camera_controller_;
     bool camera_movement_enabled_ = false;
+    bool prev_unsaved_state_      = false;
 
     app_state state_;
     operation_manager op_manager_;

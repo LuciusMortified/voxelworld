@@ -114,7 +114,8 @@ inline auto save_as_modal::save_file_() -> bool {
     }
 
     // Update state with new filename
-    state_->filename = filepath.filename().string();
+    state_->filename            = filepath.filename().string();
+    state_->has_unsaved_changes = false;
 
     auto title = std::format("Sculptor {} | {}", version_string, state_->filename);
     engine_->get_window().set_title(title);

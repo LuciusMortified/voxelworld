@@ -55,6 +55,7 @@ inline void menu_bar::render(
             fs::path assets_dir_path{app_state::asset_dir_name};
             fs::path filepath{assets_dir_path / state_->filename};
             serializer.serialize(filepath);
+            state_->has_unsaved_changes = false;
         }
         if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S")) {
             state_->ui.need_save_as_modal = true;

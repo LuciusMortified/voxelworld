@@ -30,6 +30,8 @@ struct app_state {
 
     ui_state ui;
 
+    bool has_unsaved_changes = false;
+
     std::string filename;
 
     tools selected_tool  = tools::add_voxel;

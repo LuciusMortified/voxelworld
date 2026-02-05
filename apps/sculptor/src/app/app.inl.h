@@ -29,6 +29,8 @@ inline app::app(
 
     init_asset_dir_();
 
+    op_manager_.set_dirty_flag(&state_.has_unsaved_changes);
+
     auto& window   = eng.get_window();
     auto& camera   = eng.get_camera();
     auto& renderer = eng.get_renderer();
@@ -110,6 +112,11 @@ inline void app::render(
 
     tools_[active_tool_]->render(delta_time);
 
+    if (state_.has_unsaved_changes != prev_unsaved_state_) {
+        prev_unsaved_state_ = state_.has_unsaved_changes;
+        update_title_();
+    }
+
 #if 0
     ImGui::Begin("Shadow Map Debug");
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
@@ -185,6 +192,7 @@ inline void app::handle_key_press(
         fs::path assets_dir_path{app_state::asset_dir_name};
         fs::path filepath{assets_dir_path / state_.filename};
         serializer.serialize(filepath);
+        state_.has_unsaved_changes = false;
     }
     if (ev.key == keys::S && ev.with(mods::CTRL) && ev.with(mods::SHIFT)) {
         state_.ui.need_save_as_modal = true;
@@ -244,6 +252,18 @@ inline void app::handle_mouse_release(
     if (!camera_movement_enabled_) {
         tools_[active_tool_]->on_mouse_release(ev);
     }
+}
+
+inline void app::update_title_() {
+    std::string title;
+    if (state_.filename.empty()) {
+        title = std::format("Sculptor {}", version_string);
+    } else if (state_.has_unsaved_changes) {
+        title = std::format("Sculptor {} | {} | UNSAVED CHANGES", version_string, state_.filename);
+    } else {
+        title = std::format("Sculptor {} | {}", version_string, state_.filename);
+    }
+    get_engine().get_window().set_title(title);
 }
 
 inline void app::init_asset_dir_() {
