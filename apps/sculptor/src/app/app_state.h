@@ -24,7 +24,7 @@ struct ui_state {
 };
 
 struct app_state {
-    static constexpr std::string asset_dir_name = "models";
+    static constexpr std::string_view asset_dir_name = "models";
 
     using entity_guard_type = gfx::entity_guard<>;
 

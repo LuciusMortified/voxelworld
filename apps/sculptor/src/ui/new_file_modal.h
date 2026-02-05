@@ -2,6 +2,7 @@
 
 #ifndef VW_SCULPTOR_NEW_FILE_MODAL_H
 #define VW_SCULPTOR_NEW_FILE_MODAL_H
+
 #include "app/app_state.h"
 #include "vw/gfx/engine/engine.h"
 
