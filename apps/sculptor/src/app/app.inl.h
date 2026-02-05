@@ -24,7 +24,8 @@ inline app::app(
     , entity_tree_panel_(eng, state_, op_manager_)
     , startup_modal_(eng, state_)
     , new_file_modal_(eng, state_)
-    , open_file_modal_(eng, state_) {
+    , open_file_modal_(eng, state_)
+    , save_as_modal_(eng, state_) {
 
     init_asset_dir_();
 
@@ -105,6 +106,7 @@ inline void app::render(
     startup_modal_.render(delta_time);
     new_file_modal_.render(delta_time);
     open_file_modal_.render(delta_time);
+    save_as_modal_.render(delta_time);
 
     tools_[active_tool_]->render(delta_time);
 
@@ -172,7 +174,7 @@ inline void app::handle_key_press(
     if (ev.key == keys::O && ev.with(mods::CTRL)) {
         state_.ui.need_open_file_modal = true;
     }
-    if (ev.key == keys::S && ev.with(mods::CTRL)) {
+    if (ev.key == keys::S && ev.with(mods::CTRL) && !ev.with(mods::SHIFT)) {
         gfx::vox_serializer serializer{
             get_engine().get_world(),
             state_.name_to_entity[state_.root_name],
@@ -183,6 +185,9 @@ inline void app::handle_key_press(
         fs::path assets_dir_path{app_state::asset_dir_name};
         fs::path filepath{assets_dir_path / state_.filename};
         serializer.serialize(filepath);
+    }
+    if (ev.key == keys::S && ev.with(mods::CTRL) && ev.with(mods::SHIFT)) {
+        state_.ui.need_save_as_modal = true;
     }
 }
 
