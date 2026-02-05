@@ -56,6 +56,7 @@ inline void delete_entity_operation::execute() {
         ),
         state_->entities.end()
     );
+    state_->has_unsaved_changes = true;
 }
 
 inline void delete_entity_operation::undo() {
@@ -92,7 +93,8 @@ inline void delete_entity_operation::undo() {
     if (state_->root_name.empty()) {
         state_->root_name = params_.name;
     }
-    state_->selected_name = params_.name;
+    state_->selected_name       = params_.name;
+    state_->has_unsaved_changes = true;
 }
 
 }  // namespace vw::sculptor

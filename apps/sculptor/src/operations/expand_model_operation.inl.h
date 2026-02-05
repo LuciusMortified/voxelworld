@@ -57,6 +57,7 @@ inline void expand_model_operation::execute() {
         static_cast<float>(zeroed_dir.z)
     };
     transform_system.modify(ent).set_origin(new_origin);
+    state_->has_unsaved_changes = true;
 }
 
 inline void expand_model_operation::undo() {
@@ -117,6 +118,7 @@ inline void expand_model_operation::undo() {
         static_cast<float>(zeroed_dir.z)
     };
     transform_system.modify(ent).set_origin(new_origin);
+    state_->has_unsaved_changes = true;
 }
 
 }  // namespace vw::sculptor
