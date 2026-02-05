@@ -19,6 +19,7 @@ inline void set_transform_operation::execute() {
     auto& transform_comp = world.template get_component<gfx::transform_component>(ent);
     previous_transform_  = transform_comp.get_transform();
     transform_system.modify(ent).set_transform(params_.transform);
+    state_->has_unsaved_changes = true;
 }
 
 inline void set_transform_operation::undo() {
@@ -27,6 +28,7 @@ inline void set_transform_operation::undo() {
 
     auto ent = state_->name_to_entity[params_.name];
     transform_system.modify(ent).set_transform(previous_transform_);
+    state_->has_unsaved_changes = true;
 }
 
 }  // namespace vw::sculptor

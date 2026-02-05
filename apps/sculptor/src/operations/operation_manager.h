@@ -17,8 +17,6 @@ public:
     operation_manager(const operation_manager&)                    = delete;
     auto operator=(const operation_manager&) -> operation_manager& = delete;
 
-    void set_dirty_flag(bool* flag);
-
     void execute(std::unique_ptr<base_operation> op);
 
     [[nodiscard]] bool is_undo_empty() const;
@@ -28,9 +26,6 @@ public:
     void redo();
 
 private:
-    void mark_dirty_();
-
-    bool* dirty_flag_ = nullptr;
     std::deque<std::unique_ptr<base_operation>> undo_;
     std::deque<std::unique_ptr<base_operation>> redo_;
 };

@@ -29,8 +29,6 @@ inline app::app(
 
     init_asset_dir_();
 
-    op_manager_.set_dirty_flag(&state_.has_unsaved_changes);
-
     auto& window   = eng.get_window();
     auto& camera   = eng.get_camera();
     auto& renderer = eng.get_renderer();

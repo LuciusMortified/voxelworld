@@ -54,6 +54,7 @@ inline void create_entity_operation::execute() {
     state_->selected_name = params_.name;
 
     state_->entities.push_back(std::move(ent_guard));
+    state_->has_unsaved_changes = true;
 }
 
 inline void create_entity_operation::undo() {
@@ -63,7 +64,8 @@ inline void create_entity_operation::undo() {
     if (state_->root_name == params_.name) {
         state_->root_name = "";
     }
-    state_->selected_name = "";
+    state_->selected_name       = "";
+    state_->has_unsaved_changes = true;
 }
 
 }  // namespace vw::sculptor
