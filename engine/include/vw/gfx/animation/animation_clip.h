@@ -27,10 +27,6 @@ public:
     void remove_track(const std::string& target_name);
     void add_channel_to_track(const std::string& target_name, const animation_channel& channel);
     [[nodiscard]] auto get_duration() const -> float32;
-    void compile(const animation_track::compile_settings& settings);
-    void compile();
-    void clear_compiled();
-    [[nodiscard]] auto is_compiled() const -> bool { return is_compiled_; }
     [[nodiscard]] auto get_name() const -> const std::string&;
     void set_name(std::string name);
     void add_channel(const animation_channel& channel);
@@ -39,7 +35,6 @@ public:
 private:
     std::string name_;
     std::vector<animation_track> tracks_;
-    bool is_compiled_ = false;
 };
 
 }  // namespace vw::gfx

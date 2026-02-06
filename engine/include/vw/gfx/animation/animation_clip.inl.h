@@ -79,25 +79,6 @@ inline auto animation_clip::get_duration() const -> float32 {
     return max_duration;
 }
 
-inline void animation_clip::compile(const animation_track::compile_settings& settings) {
-    for (auto& track : tracks_) {
-        track.compile(settings);
-    }
-    is_compiled_ = true;
-}
-
-inline void animation_clip::clear_compiled() {
-    for (auto& track : tracks_) {
-        track.clear_compiled();
-    }
-    is_compiled_ = false;
-}
-
-inline void animation_clip::compile() {
-    animation_track::compile_settings default_settings;
-    compile(default_settings);
-}
-
 inline auto animation_clip::get_name() const -> const std::string& {
     return name_;
 }

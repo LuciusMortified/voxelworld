@@ -2,47 +2,36 @@
 
 namespace vw::gfx {
 
-inline void animation_clip_registry::register_clip(
-    const std::string& name,
-    std::shared_ptr<animation_clip> clip
-) {
-    if (!clip) {
-        return;
-    }
-
-    clips_[name] = std::move(clip);
+inline auto animation_clip_registry::create(std::string_view name)
+    -> std::shared_ptr<animation_clip> {
+    auto clip = std::make_shared<animation_clip>(std::string(name));
+    clips_[std::string(name)] = clip;
+    return clip;
 }
 
-inline auto animation_clip_registry::get_clip(const std::string& name) const
+inline auto animation_clip_registry::get(std::string_view name) const
     -> std::shared_ptr<animation_clip> {
-    auto it = clips_.find(name);
+    auto it = clips_.find(std::string(name));
     if (it != clips_.end()) {
         return it->second;
     }
     return nullptr;
 }
 
-inline auto animation_clip_registry::has_clip(const std::string& name) const -> bool {
-    return clips_.find(name) != clips_.end();
+inline auto animation_clip_registry::has(std::string_view name) const -> bool {
+    return clips_.find(std::string(name)) != clips_.end();
 }
 
-inline void animation_clip_registry::unregister_clip(const std::string& name) {
-    clips_.erase(name);
+inline void animation_clip_registry::remove(std::string_view name) {
+    clips_.erase(std::string(name));
 }
 
-inline auto animation_clip_registry::create_clip(const std::string& name)
-    -> std::shared_ptr<animation_clip> {
-    auto clip = std::make_shared<animation_clip>(name);
-    register_clip(name, clip);
-    return clip;
-}
-
-inline auto animation_clip_registry::get_all_clips() const
+inline auto animation_clip_registry::all() const
     -> const std::unordered_map<std::string, std::shared_ptr<animation_clip>>& {
     return clips_;
 }
 
-inline auto animation_clip_registry::clip_count() const -> size_t {
+inline auto animation_clip_registry::count() const -> size_t {
     return clips_.size();
 }
 

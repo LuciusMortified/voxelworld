@@ -5,6 +5,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 
 #include "vw/gfx/animation/animation_clip.h"
@@ -18,15 +19,13 @@ class animation_clip_registry final {
 public:
     animation_clip_registry() = default;
 
-    void register_clip(const std::string& name, std::shared_ptr<animation_clip> clip);
-    [[nodiscard]] auto get_clip(const std::string& name) const
-        -> std::shared_ptr<animation_clip>;
-    [[nodiscard]] auto has_clip(const std::string& name) const -> bool;
-    void unregister_clip(const std::string& name);
-    [[nodiscard]] auto create_clip(const std::string& name) -> std::shared_ptr<animation_clip>;
-    [[nodiscard]] auto get_all_clips() const
+    [[nodiscard]] auto create(std::string_view name) -> std::shared_ptr<animation_clip>;
+    [[nodiscard]] auto get(std::string_view name) const -> std::shared_ptr<animation_clip>;
+    [[nodiscard]] auto has(std::string_view name) const -> bool;
+    void remove(std::string_view name);
+    [[nodiscard]] auto all() const
         -> const std::unordered_map<std::string, std::shared_ptr<animation_clip>>&;
-    [[nodiscard]] auto clip_count() const -> size_t;
+    [[nodiscard]] auto count() const -> size_t;
     void clear();
 
 private:

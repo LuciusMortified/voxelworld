@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <vector>
 
+#include "vw/core/interpolation.h"
 #include "vw/core/math.h"
 #include "vw/core/types.h"
 #include "vw/gfx/animation/animation_types.h"

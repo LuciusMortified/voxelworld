@@ -17,30 +17,21 @@ struct animation_track {
     std::string target_name;
     std::vector<animation_channel> channels;
 
-    struct compile_settings {
-        uint32 fps = 60;
-        bool compile_matrices = true;
-    };
-
-    void compile(const compile_settings& settings);
-    void compile();
-    void clear_compiled();
-    [[nodiscard]] auto is_compiled() const -> bool { return is_compiled_; }
-    [[nodiscard]] auto get_compiled_fps() const -> uint32 { return compiled_fps_; }
     [[nodiscard]] auto evaluate(float32 time) const -> transform;
-    [[nodiscard]] auto get_compiled_transform(float32 time) const -> const transform&;
-    [[nodiscard]] auto get_compiled_matrix(float32 time) const -> const mat4f&;
+    [[nodiscard]] auto get_matrix(float32 time) const -> const mat4f&;
     [[nodiscard]] auto get_duration() const -> float32;
     void add_channel(const animation_channel& channel);
     [[nodiscard]] auto get_channel(animation_property prop) const -> const animation_channel*;
     [[nodiscard]] auto has_channel(animation_property prop) const -> bool;
 
 private:
-    bool is_compiled_ = false;
-    uint32 compiled_fps_ = 0;
-    float32 frame_time_ = 0.0f;
-    std::vector<transform> compiled_transforms_;
-    std::vector<mat4f> compiled_local_matrices_;
+    void recompile_if_needed() const;
+
+    mutable bool is_dirty_ = true;
+    mutable uint32 compiled_fps_ = 60;
+    mutable float32 frame_time_ = 0.0f;
+    mutable std::vector<transform> compiled_transforms_;
+    mutable std::vector<mat4f> compiled_matrices_;
 };
 
 }  // namespace vw::gfx

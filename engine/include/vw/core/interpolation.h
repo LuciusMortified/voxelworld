@@ -1,14 +1,13 @@
 #pragma once
 
-#ifndef VW_GFX_ANIMATION_INTERPOLATION_H
-#define VW_GFX_ANIMATION_INTERPOLATION_H
+#ifndef VW_CORE_INTERPOLATION_H
+#define VW_CORE_INTERPOLATION_H
 
-#include "vw/core/math.h"
 #include "vw/core/types.h"
 #include "vw/core/vec2.h"
-#include "vw/gfx/animation/animation_types.h"
+#include "vw/core/vec3.h"
 
-namespace vw::gfx {
+namespace vw {
 
 [[nodiscard]] auto lerp(const vec3f& a, const vec3f& b, float32 t) -> vec3f;
 
@@ -44,8 +43,8 @@ namespace vw::gfx {
     const vec2f& control2 = vec2f{1.0f, 1.0f}
 ) -> vec3f;
 
-}  // namespace vw::gfx
+}  // namespace vw
 
-#include "vw/gfx/animation/interpolation.inl.h"
+#include "vw/core/interpolation.inl.h"
 
-#endif  // VW_GFX_ANIMATION_INTERPOLATION_H
+#endif  // VW_CORE_INTERPOLATION_H

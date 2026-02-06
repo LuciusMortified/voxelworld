@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-#include "vw/gfx/animation/interpolation.h"
+#include "vw/core/interpolation.h"
 
 namespace vw::gfx {
 
@@ -50,7 +50,7 @@ inline auto animation_channel::evaluate(float32 time) const -> vec3f {
 
     float32 t = (time - kf0.time) / duration;
 
-    return interpolate(kf0.value, kf1.value, t, kf0.interp, kf0.tangent_in, kf0.tangent_out);
+    return vw::interpolate(kf0.value, kf1.value, t, kf0.interp, kf0.tangent_in, kf0.tangent_out);
 }
 
 inline auto animation_channel::get_duration() const -> float32 {

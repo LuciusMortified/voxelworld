@@ -120,10 +120,8 @@ void animation_system<Cs...>::process_animation(
         }
     } else if (anim_comp.loop_mode_ == animation_loop_mode::loop) {
         if (duration > 0.0f) {
-            while (anim_comp.current_time_ >= duration) {
-                anim_comp.current_time_ -= duration;
-            }
-            while (anim_comp.current_time_ < 0.0f) {
+            anim_comp.current_time_ = std::fmod(anim_comp.current_time_, duration);
+            if (anim_comp.current_time_ < 0.0f) {
                 anim_comp.current_time_ += duration;
             }
         }
@@ -178,18 +176,7 @@ void animation_system<Cs...>::apply_animation_to_transform(
         return current;
     };
 
-    auto* root_track = anim_comp.clip_->get_track("");
-    if (root_track && registry_->template has<transform_component>(root_ent)) {
-        transform t = get_blended_transform(*root_track, anim_comp.current_time_);
-        auto modifier = transform_system_->modify(root_ent);
-        modifier.set_transform(t);
-    }
-
     for (const auto& track : anim_comp.clip_->get_tracks()) {
-        if (track.target_name.empty()) {
-            continue;
-        }
-
         auto it = target_map->find(track.target_name);
         if (it == target_map->end()) {
             continue;
@@ -303,7 +290,7 @@ void animation_system<Cs...>::animation_modifier::set_clip(std::shared_ptr<anima
 
 template <typename... Cs>
 void animation_system<Cs...>::animation_modifier::set_clip_by_name(const std::string& name) {
-    auto clip = system_->clip_registry_->get_clip(name);
+    auto clip = system_->clip_registry_->get(name);
     if (clip) {
         set_clip(clip);
     }
@@ -342,7 +329,7 @@ void animation_system<Cs...>::animation_modifier::blend_to_by_name(
     const std::string& name,
     float32 blend_duration
 ) {
-    auto clip = system_->clip_registry_->get_clip(name);
+    auto clip = system_->clip_registry_->get(name);
     if (clip) {
         blend_to(clip, blend_duration);
     }

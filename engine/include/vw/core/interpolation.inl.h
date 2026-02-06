@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace vw::gfx {
+namespace vw {
 
 inline auto lerp(const vec3f& a, const vec3f& b, float32 t) -> vec3f {
     return vec3f{
@@ -133,4 +133,4 @@ inline auto interpolate(
     }
 }
 
-}  // namespace vw::gfx
+}  // namespace vw
