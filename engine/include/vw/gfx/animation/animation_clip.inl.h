@@ -54,17 +54,14 @@ inline void animation_clip::add_channel_to_track(
     const std::string& target_name,
     const animation_channel& channel
 ) {
-    // Найти или создать трек
     animation_track* track = get_track_mut(target_name);
 
     if (track == nullptr) {
-        // Создать новый трек
         animation_track new_track;
         new_track.target_name = target_name;
         new_track.add_channel(channel);
         add_track(std::move(new_track));
     } else {
-        // Добавить канал к существующему треку
         track->add_channel(channel);
     }
 }
@@ -108,8 +105,6 @@ inline auto animation_clip::get_name() const -> const std::string& {
 inline void animation_clip::set_name(std::string name) {
     name_ = std::move(name);
 }
-
-// ========== Обратная совместимость ==========
 
 inline void animation_clip::add_channel(const animation_channel& channel) {
     add_channel_to_track("", channel);

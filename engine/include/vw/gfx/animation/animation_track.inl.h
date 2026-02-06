@@ -14,10 +14,8 @@ inline void animation_track::compile(const compile_settings& settings) {
     compiled_fps_ = settings.fps;
     frame_time_ = 1.0f / static_cast<float32>(compiled_fps_);
 
-    // Вычислить количество кадров
     uint32 frame_count = static_cast<uint32>(std::ceil(duration / frame_time_)) + 1;
 
-    // Резервировать память
     compiled_transforms_.clear();
     compiled_transforms_.reserve(frame_count);
 
@@ -26,11 +24,9 @@ inline void animation_track::compile(const compile_settings& settings) {
         compiled_local_matrices_.reserve(frame_count);
     }
 
-    // Прекомпилировать все кадры
     for (uint32 i = 0; i < frame_count; ++i) {
         float32 time = static_cast<float32>(i) * frame_time_;
 
-        // Вычислить transform из каналов
         transform t;
 
         for (const auto& channel : channels) {
@@ -54,7 +50,6 @@ inline void animation_track::compile(const compile_settings& settings) {
 
         compiled_transforms_.push_back(t);
 
-        // Опционально: вычислить матрицу
         if (settings.compile_matrices) {
             compiled_local_matrices_.push_back(t.calc_matrix());
         }
@@ -83,10 +78,8 @@ inline auto animation_track::get_compiled_transform(float32 time) const -> const
         return default_transform;
     }
 
-    // Вычислить индекс кадра
     uint32 frame_index = static_cast<uint32>(time / frame_time_);
 
-    // Clamp к диапазону
     if (frame_index >= compiled_transforms_.size()) {
         frame_index = static_cast<uint32>(compiled_transforms_.size()) - 1;
     }
@@ -101,10 +94,8 @@ inline auto animation_track::get_compiled_matrix(float32 time) const -> const ma
         return identity;
     }
 
-    // Вычислить индекс кадра
     uint32 frame_index = static_cast<uint32>(time / frame_time_);
 
-    // Clamp к диапазону
     if (frame_index >= compiled_local_matrices_.size()) {
         frame_index = static_cast<uint32>(compiled_local_matrices_.size()) - 1;
     }
@@ -113,12 +104,10 @@ inline auto animation_track::get_compiled_matrix(float32 time) const -> const ma
 }
 
 inline auto animation_track::evaluate(float32 time) const -> transform {
-    // Если скомпилировано - используем быстрый путь
     if (is_compiled_) {
         return get_compiled_transform(time);
     }
 
-    // Иначе вычисляем в runtime
     transform t;
 
     for (const auto& channel : channels) {

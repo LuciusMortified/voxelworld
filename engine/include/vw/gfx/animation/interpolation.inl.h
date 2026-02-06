@@ -14,26 +14,25 @@ inline auto lerp(const vec3f& a, const vec3f& b, float32 t) -> vec3f {
 }
 
 inline auto ease_in(const vec3f& a, const vec3f& b, float32 t) -> vec3f {
-    float32 eased_t = t * t;  // Quadratic ease-in
+    float32 eased_t = t * t;
     return lerp(a, b, eased_t);
 }
 
 inline auto ease_out(const vec3f& a, const vec3f& b, float32 t) -> vec3f {
-    float32 eased_t = t * (2.0f - t);  // Quadratic ease-out
+    float32 eased_t = t * (2.0f - t);
     return lerp(a, b, eased_t);
 }
 
 inline auto ease_in_out(const vec3f& a, const vec3f& b, float32 t) -> vec3f {
     float32 eased_t;
     if (t < 0.5f) {
-        eased_t = 2.0f * t * t;  // Ease-in for first half
+        eased_t = 2.0f * t * t;
     } else {
-        eased_t = -1.0f + (4.0f - 2.0f * t) * t;  // Ease-out for second half
+        eased_t = -1.0f + (4.0f - 2.0f * t) * t;
     }
     return lerp(a, b, eased_t);
 }
 
-// Вычислить значение кубической кривой Безье для параметра t
 inline auto cubic_bezier_scalar(float32 t, float32 p0, float32 p1, float32 p2, float32 p3)
     -> float32 {
     float32 one_minus_t = 1.0f - t;
@@ -53,14 +52,11 @@ inline auto cubic_bezier(
     const vec2f& control1,
     const vec2f& control2
 ) -> vec3f {
-    // Для упрощения используем Bezier только для времени (easing curve)
-    // а затем применяем линейную интерполяцию к значениям
     float32 bezier_t = cubic_bezier_scalar(t, 0.0f, control1.y, control2.y, 1.0f);
     return lerp(a, b, bezier_t);
 }
 
 inline auto apply_easing(float32 t, interpolation_type type) -> float32 {
-    // Clamp t to [0, 1]
     t = std::clamp(t, 0.0f, 1.0f);
 
     switch (type) {
@@ -84,7 +80,6 @@ inline auto apply_easing(float32 t, interpolation_type type) -> float32 {
             }
 
         case interpolation_type::cubic_bezier:
-            // Для cubic_bezier нужны контрольные точки - используем линейную как fallback
             return t;
 
         default:
@@ -99,7 +94,6 @@ inline auto apply_easing_bezier(
     const vec2f& control2
 ) -> float32 {
     if (type == interpolation_type::cubic_bezier) {
-        // Clamp t to [0, 1]
         t = std::clamp(t, 0.0f, 1.0f);
         return cubic_bezier_scalar(t, 0.0f, control1.y, control2.y, 1.0f);
     } else {

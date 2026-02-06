@@ -5,8 +5,6 @@
 
 namespace vw::gfx {
 
-// ========== Конструктор ==========
-
 template <typename... Cs>
 animation_system<Cs...>::animation_system(
     world_type& world,
@@ -19,15 +17,11 @@ animation_system<Cs...>::animation_system(
       transform_system_(&transform_sys),
       clip_registry_(&clip_registry) {}
 
-// ========== Главный метод обновления ==========
-
 template <typename... Cs>
 void animation_system<Cs...>::update(float32 delta_time) {
-    // Проходим ТОЛЬКО по активным entity (оптимизация!)
     std::vector<entity> to_remove;
 
     for (entity ent : active_entities_) {
-        // Проверка валидности
         if (!registry_->template has<animation_component>(ent)) {
             to_remove.push_back(ent);
             continue;
@@ -35,38 +29,29 @@ void animation_system<Cs...>::update(float32 delta_time) {
 
         auto& anim_comp = registry_->template get<animation_component>(ent);
 
-        // Обработать анимацию
         process_animation(ent, anim_comp, delta_time);
 
-        // Если анимация завершилась - пометить на удаление
         if (anim_comp.state_ == animation_state::stopped) {
             to_remove.push_back(ent);
         }
     }
 
-    // Удалить завершившиеся анимации из активных
     for (entity ent : to_remove) {
         remove_active_entity(ent);
     }
 }
 
-// ========== Управление активными entity ==========
-
 template <typename... Cs>
 void animation_system<Cs...>::add_active_entity(entity root_ent) {
-    // Добавить в активные
     active_entities_.insert(root_ent);
 
-    // Построить и закэшировать target_map
     build_and_cache_target_map(root_ent);
 }
 
 template <typename... Cs>
 void animation_system<Cs...>::remove_active_entity(entity root_ent) {
-    // Удалить из активных
     active_entities_.erase(root_ent);
 
-    // Удалить кэш маппинга
     target_maps_.erase(root_ent);
 }
 
@@ -74,7 +59,6 @@ template <typename... Cs>
 void animation_system<Cs...>::build_and_cache_target_map(entity root_ent) {
     std::unordered_map<std::string, entity> target_map;
 
-    // Обход иерархии в ширину
     std::queue<entity> to_visit;
     to_visit.push(root_ent);
 
@@ -82,13 +66,11 @@ void animation_system<Cs...>::build_and_cache_target_map(entity root_ent) {
         entity current = to_visit.front();
         to_visit.pop();
 
-        // Проверить, является ли этот entity целью анимации
         if (registry_->template has<animation_target_component>(current)) {
             const auto& target_comp = registry_->template get<animation_target_component>(current);
             target_map[target_comp.get_name()] = current;
         }
 
-        // Добавить детей в очередь
         if (registry_->template has<hierarchy_component>(current)) {
             const auto& hierarchy = registry_->template get<hierarchy_component>(current);
             for (entity child : hierarchy.get_children()) {
@@ -97,7 +79,6 @@ void animation_system<Cs...>::build_and_cache_target_map(entity root_ent) {
         }
     }
 
-    // Закэшировать
     target_maps_[root_ent] = std::move(target_map);
 }
 
@@ -111,8 +92,6 @@ auto animation_system<Cs...>::get_cached_target_map(entity root_ent) const
     return nullptr;
 }
 
-// ========== Обработка анимации ==========
-
 template <typename... Cs>
 void animation_system<Cs...>::process_animation(
     entity ent,
@@ -123,15 +102,12 @@ void animation_system<Cs...>::process_animation(
         return;
     }
 
-    // Пропустить неактивные анимации
     if (anim_comp.state_ != animation_state::playing) {
         return;
     }
 
-    // 1. Обновить время
     anim_comp.current_time_ += delta_time * anim_comp.playback_speed_ * anim_comp.direction_;
 
-    // 2. Обработать зацикливание
     float32 duration = anim_comp.clip_->get_duration();
 
     if (anim_comp.loop_mode_ == animation_loop_mode::once) {
@@ -161,22 +137,17 @@ void animation_system<Cs...>::process_animation(
         }
     }
 
-    // 3. Обработать блендинг
     if (anim_comp.blend_duration_ > 0.0f) {
         anim_comp.blend_time_ += delta_time;
         if (anim_comp.blend_time_ >= anim_comp.blend_duration_) {
-            // Завершить блендинг
             anim_comp.previous_clip_ = nullptr;
             anim_comp.blend_time_ = 0.0f;
             anim_comp.blend_duration_ = 0.0f;
         }
     }
 
-    // 4. Применить анимацию к transform
     apply_animation_to_transform(ent, anim_comp);
 }
-
-// ========== Применение анимации к transform ==========
 
 template <typename... Cs>
 void animation_system<Cs...>::apply_animation_to_transform(
@@ -187,13 +158,11 @@ void animation_system<Cs...>::apply_animation_to_transform(
         return;
     }
 
-    // Получить ЗАКЭШИРОВАННЫЙ target_map
     const auto* target_map = get_cached_target_map(root_ent);
     if (!target_map) {
-        return;  // Нет кэша - пропускаем
+        return;
     }
 
-    // Лямбда для получения blended transform
     auto get_blended_transform = [&](const animation_track& track, float32 time) -> transform {
         transform current = track.evaluate(time);
 
@@ -209,7 +178,6 @@ void animation_system<Cs...>::apply_animation_to_transform(
         return current;
     };
 
-    // Обработать трек с пустым именем (корневой entity)
     auto* root_track = anim_comp.clip_->get_track("");
     if (root_track && registry_->template has<transform_component>(root_ent)) {
         transform t = get_blended_transform(*root_track, anim_comp.current_time_);
@@ -217,16 +185,14 @@ void animation_system<Cs...>::apply_animation_to_transform(
         modifier.set_transform(t);
     }
 
-    // Применить каждый трек к соответствующей цели (используя КЭШ!)
     for (const auto& track : anim_comp.clip_->get_tracks()) {
         if (track.target_name.empty()) {
-            continue;  // Пропускаем пустое имя (уже обработали)
+            continue;
         }
 
-        // Найти entity в КЭШЕ (O(1) вместо обхода иерархии!)
         auto it = target_map->find(track.target_name);
         if (it == target_map->end()) {
-            continue;  // Цель не найдена
+            continue;
         }
 
         entity target_ent = it->second;
@@ -235,14 +201,11 @@ void animation_system<Cs...>::apply_animation_to_transform(
             continue;
         }
 
-        // Вычислить и применить transform
         transform t = get_blended_transform(track, anim_comp.current_time_);
         auto modifier = transform_system_->modify(target_ent);
         modifier.set_transform(t);
     }
 }
-
-// ========== Блендинг трансформаций ==========
 
 template <typename... Cs>
 auto animation_system<Cs...>::blend_transforms(
@@ -250,12 +213,10 @@ auto animation_system<Cs...>::blend_transforms(
     const transform& t2,
     float32 factor
 ) const -> transform {
-    // Clamp factor to [0, 1]
     factor = std::clamp(factor, 0.0f, 1.0f);
 
     transform result;
 
-    // Интерполировать позицию
     vec3f pos = vec3f{
         t1.get_position().x + (t2.get_position().x - t1.get_position().x) * factor,
         t1.get_position().y + (t2.get_position().y - t1.get_position().y) * factor,
@@ -263,7 +224,6 @@ auto animation_system<Cs...>::blend_transforms(
     };
     result.set_position(pos);
 
-    // Интерполировать вращение
     vec3f rot = vec3f{
         t1.get_rotation().x + (t2.get_rotation().x - t1.get_rotation().x) * factor,
         t1.get_rotation().y + (t2.get_rotation().y - t1.get_rotation().y) * factor,
@@ -271,7 +231,6 @@ auto animation_system<Cs...>::blend_transforms(
     };
     result.set_rotation(rot);
 
-    // Интерполировать масштаб
     vec3f scale = vec3f{
         t1.get_scale().x + (t2.get_scale().x - t1.get_scale().x) * factor,
         t1.get_scale().y + (t2.get_scale().y - t1.get_scale().y) * factor,
@@ -279,7 +238,6 @@ auto animation_system<Cs...>::blend_transforms(
     };
     result.set_scale(scale);
 
-    // Интерполировать origin
     vec3f origin = vec3f{
         t1.get_origin().x + (t2.get_origin().x - t1.get_origin().x) * factor,
         t1.get_origin().y + (t2.get_origin().y - t1.get_origin().y) * factor,
@@ -289,8 +247,6 @@ auto animation_system<Cs...>::blend_transforms(
 
     return result;
 }
-
-// ========== Animation Modifier ==========
 
 template <typename... Cs>
 animation_system<Cs...>::animation_modifier::animation_modifier(
@@ -313,7 +269,6 @@ void animation_system<Cs...>::animation_modifier::play() {
         component_->current_time_ = 0.0f;
         component_->direction_ = 1.0f;
 
-        // ДОБАВИТЬ в активные entity
         system_->add_active_entity(entity_);
     }
 }
@@ -322,7 +277,6 @@ template <typename... Cs>
 void animation_system<Cs...>::animation_modifier::pause() {
     if (component_->state_ == animation_state::playing) {
         component_->state_ = animation_state::paused;
-        // НЕ удаляем из активных - может быть resume
     }
 }
 
@@ -331,7 +285,6 @@ void animation_system<Cs...>::animation_modifier::stop() {
     component_->state_ = animation_state::stopped;
     component_->current_time_ = 0.0f;
 
-    // УДАЛИТЬ из активных entity
     system_->remove_active_entity(entity_);
 }
 
