@@ -6,9 +6,11 @@
 #include <optional>
 #include <unordered_set>
 
+#include "vw/gfx/animation/animation_clip_registry.h"
 #include "vw/gfx/model/model_registry.h"
 #include "vw/gfx/spatial/ray.h"
 #include "vw/gfx/world/registry.h"
+#include "vw/gfx/world/systems/animation_system.h"
 #include "vw/gfx/world/systems/hierarchy_system.h"
 #include "vw/gfx/world/systems/light_system.h"
 #include "vw/gfx/world/systems/model_system.h"
@@ -30,6 +32,7 @@ public:
     using model_system_type     = model_system_from_tuple<WC>::type;
     using spatial_system_type   = spatial_system_from_tuple<WC>::type;
     using light_system_type     = light_system_from_tuple<WC>::type;
+    using animation_system_type = animation_system_from_tuple<WC>::type;
 
     explicit world(vulkan_context& context);
     ~world()                               = default;
@@ -73,6 +76,10 @@ public:
 
     [[nodiscard]] auto get_light_system() -> light_system_type&;
 
+    [[nodiscard]] auto get_animation_system() -> animation_system_type&;
+
+    [[nodiscard]] auto get_animation_clip_registry() -> animation_clip_registry&;
+
     [[nodiscard]] auto voxel_ray_cast(
         const ray& r,
         std::unordered_set<entity>& candidates
@@ -87,6 +94,8 @@ private:
     model_registry model_registry_;
     model_system_type model_system_;
     light_system_type light_system_;
+    animation_clip_registry animation_clip_registry_;
+    animation_system_type animation_system_;
 };
 
 }  // namespace vw::gfx
