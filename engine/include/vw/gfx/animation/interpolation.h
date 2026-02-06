@@ -10,19 +10,14 @@
 
 namespace vw::gfx {
 
-// Линейная интерполяция между двумя значениями
 [[nodiscard]] auto lerp(const vec3f& a, const vec3f& b, float32 t) -> vec3f;
 
-// Ease-in интерполяция (квадратичная)
 [[nodiscard]] auto ease_in(const vec3f& a, const vec3f& b, float32 t) -> vec3f;
 
-// Ease-out интерполяция (квадратичная)
 [[nodiscard]] auto ease_out(const vec3f& a, const vec3f& b, float32 t) -> vec3f;
 
-// Ease-in-out интерполяция (квадратичная)
 [[nodiscard]] auto ease_in_out(const vec3f& a, const vec3f& b, float32 t) -> vec3f;
 
-// Cubic Bezier интерполяция с контрольными точками
 [[nodiscard]] auto cubic_bezier(
     const vec3f& a,
     const vec3f& b,
@@ -31,10 +26,8 @@ namespace vw::gfx {
     const vec2f& control2
 ) -> vec3f;
 
-// Применить easing функцию к параметру t [0..1]
 [[nodiscard]] auto apply_easing(float32 t, interpolation_type type) -> float32;
 
-// Применить easing функцию к параметру t с контрольными точками для bezier
 [[nodiscard]] auto apply_easing_bezier(
     float32 t,
     interpolation_type type,
@@ -42,7 +35,6 @@ namespace vw::gfx {
     const vec2f& control2
 ) -> float32;
 
-// Интерполировать между двумя значениями с заданным типом интерполяции
 [[nodiscard]] auto interpolate(
     const vec3f& a,
     const vec3f& b,

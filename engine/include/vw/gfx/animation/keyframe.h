@@ -10,21 +10,13 @@
 
 namespace vw::gfx {
 
-// Ключевой кадр для vec3f свойства (position, rotation, scale, origin)
 struct keyframe_vec3 {
-    float32 time;  // Время ключевого кадра в секундах
+    float32 time;
+    vec3f value;
+    interpolation_type interp = interpolation_type::linear;
+    vec2f tangent_in{0.0f, 0.0f};
+    vec2f tangent_out{1.0f, 1.0f};
 
-    vec3f value;  // Значение в этом ключевом кадре
-
-    interpolation_type interp = interpolation_type::linear;  // Тип интерполяции к следующему
-                                                             // кадру
-
-    // Контрольные точки для cubic_bezier интерполяции
-    // Для других типов интерполяции игнорируются
-    vec2f tangent_in{0.0f, 0.0f};   // Входящая касательная (control point 1)
-    vec2f tangent_out{1.0f, 1.0f};  // Исходящая касательная (control point 2)
-
-    // Оператор сравнения для сортировки по времени
     [[nodiscard]] auto operator<(const keyframe_vec3& other) const -> bool {
         return time < other.time;
     }

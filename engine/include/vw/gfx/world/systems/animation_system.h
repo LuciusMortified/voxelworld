@@ -42,45 +42,27 @@ public:
         animation_clip_registry& clip_registry
     );
 
-    // ========== Главный метод обновления ==========
-
-    // Обновить все активные анимации (вызывается каждый кадр)
     void update(float32 delta_time);
 
-    // ========== Animation Modifier ==========
-
-    // Модификатор для безопасного управления animation_component
     class animation_modifier {
     public:
-        // Управление воспроизведением
-        void play();    // Начать воспроизведение (добавляет в active_entities_)
-        void pause();   // Поставить на паузу
-        void stop();    // Остановить (удаляет из active_entities_)
-        void resume();  // Продолжить с паузы
-
-        // Установка клипа
+        void play();
+        void pause();
+        void stop();
+        void resume();
         void set_clip(std::shared_ptr<animation_clip> clip);
         void set_clip_by_name(const std::string& name);
-
-        // Управление временем
         void set_time(float32 time);
         void set_playback_speed(float32 speed);
-
-        // Режим зацикливания
         void set_loop_mode(animation_loop_mode mode);
-
-        // Блендинг между анимациями
         void blend_to(std::shared_ptr<animation_clip> clip, float32 blend_duration);
         void blend_to_by_name(const std::string& name, float32 blend_duration);
-
-        // Getters
         [[nodiscard]] auto get_clip() const -> std::shared_ptr<animation_clip>;
         [[nodiscard]] auto get_state() const -> animation_state;
         [[nodiscard]] auto get_current_time() const -> float32;
 
     private:
         friend class animation_system;
-
         animation_modifier(animation_system* system, entity ent, animation_component* component);
 
         animation_system* system_;
@@ -88,47 +70,24 @@ public:
         animation_component* component_;
     };
 
-    // Получить modifier для entity
     auto modify(entity ent) -> animation_modifier;
 
 private:
-    // ========== ОПТИМИЗАЦИИ ==========
-
-    // Активные корневые entity с анимациями
     std::unordered_set<entity> active_entities_;
-
-    // Кэш маппингов: root_entity -> (target_name -> target_entity)
     std::unordered_map<entity, std::unordered_map<std::string, entity>> target_maps_;
 
-    // ========== Внутренние методы ==========
-
-    // Добавить entity в активные (вызывается из play())
     void add_active_entity(entity root_ent);
-
-    // Удалить entity из активных (вызывается из stop() или при завершении)
     void remove_active_entity(entity root_ent);
-
-    // Построить и закэшировать target_map для entity
     void build_and_cache_target_map(entity root_ent);
-
-    // Получить закэшированный target_map
     [[nodiscard]] auto get_cached_target_map(entity root_ent) const
         -> const std::unordered_map<std::string, entity>*;
-
-    // Обработка одной анимации
     void process_animation(entity ent, animation_component& anim_comp, float32 delta_time);
-
-    // Применение анимации к transform (использует кэш!)
     void apply_animation_to_transform(entity root_ent, const animation_component& anim_comp);
-
-    // Блендинг трансформаций
     [[nodiscard]] auto blend_transforms(
         const transform& t1,
         const transform& t2,
         float32 factor
     ) const -> transform;
-
-    // ========== Зависимости ==========
 
     world_type* world_;
     registry_type* registry_;
