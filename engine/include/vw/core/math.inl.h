@@ -269,6 +269,125 @@ inline vec3f lerp(
     return {lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t)};
 }
 
+inline vec3f ease_in(const vec3f& a, const vec3f& b, float t) {
+    float eased_t = t * t;
+    return lerp(a, b, eased_t);
+}
+
+inline vec3f ease_out(const vec3f& a, const vec3f& b, float t) {
+    float eased_t = t * (2.0f - t);
+    return lerp(a, b, eased_t);
+}
+
+inline vec3f ease_in_out(const vec3f& a, const vec3f& b, float t) {
+    float eased_t;
+    if (t < 0.5f) {
+        eased_t = 2.0f * t * t;
+    } else {
+        eased_t = -1.0f + (4.0f - 2.0f * t) * t;
+    }
+    return lerp(a, b, eased_t);
+}
+
+inline float cubic_bezier(float t, float p0, float p1, float p2, float p3) {
+    float one_minus_t = 1.0f - t;
+    float one_minus_t_sq = one_minus_t * one_minus_t;
+    float one_minus_t_cb = one_minus_t_sq * one_minus_t;
+    float t_sq = t * t;
+    float t_cb = t_sq * t;
+
+    return one_minus_t_cb * p0 + 3.0f * one_minus_t_sq * t * p1 +
+           3.0f * one_minus_t * t_sq * p2 + t_cb * p3;
+}
+
+inline vec3f cubic_bezier(
+    const vec3f& a,
+    const vec3f& b,
+    float t,
+    float control1,
+    float control2
+) {
+    float bezier_t = cubic_bezier(t, 0.0f, control1, control2, 1.0f);
+    return lerp(a, b, bezier_t);
+}
+
+inline float apply_easing(float t, interpolation_type type) {
+    t = clamp(t, 0.0f, 1.0f);
+
+    switch (type) {
+        case interpolation_type::linear:
+            return t;
+
+        case interpolation_type::step:
+            return t < 1.0f ? 0.0f : 1.0f;
+
+        case interpolation_type::ease_in:
+            return t * t;
+
+        case interpolation_type::ease_out:
+            return t * (2.0f - t);
+
+        case interpolation_type::ease_in_out:
+            if (t < 0.5f) {
+                return 2.0f * t * t;
+            } else {
+                return -1.0f + (4.0f - 2.0f * t) * t;
+            }
+
+        case interpolation_type::cubic_bezier:
+            return t;
+
+        default:
+            return t;
+    }
+}
+
+inline float apply_easing_bezier(
+    float t,
+    interpolation_type type,
+    float control1,
+    float control2
+) {
+    if (type == interpolation_type::cubic_bezier) {
+        t = clamp(t, 0.0f, 1.0f);
+        return cubic_bezier(t, 0.0f, control1, control2, 1.0f);
+    } else {
+        return apply_easing(t, type);
+    }
+}
+
+inline vec3f interpolate(
+    const vec3f& a,
+    const vec3f& b,
+    float t,
+    interpolation_type type,
+    float control1,
+    float control2
+) {
+    switch (type) {
+        case interpolation_type::linear:
+            return lerp(a, b, t);
+
+        case interpolation_type::step:
+            return t < 1.0f ? a : b;
+
+        case interpolation_type::ease_in:
+            return ease_in(a, b, t);
+
+        case interpolation_type::ease_out:
+            return ease_out(a, b, t);
+
+        case interpolation_type::ease_in_out:
+            return ease_in_out(a, b, t);
+
+        case interpolation_type::cubic_bezier:
+            return cubic_bezier(a, b, t, control1, control2);
+
+        default:
+            return lerp(a, b, t);
+    }
+}
+
 inline vec3f perpendicular(
     const vec3f& eye, const vec3f& target
 ) {

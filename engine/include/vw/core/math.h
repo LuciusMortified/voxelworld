@@ -26,6 +26,15 @@ float clamp(float value, float min_val, float max_val);
 float lerp(float a, float b, float t);
 vec3f lerp(const vec3f& a, const vec3f& b, float t);
 
+vec3f ease_in(const vec3f& a, const vec3f& b, float t);
+vec3f ease_out(const vec3f& a, const vec3f& b, float t);
+vec3f ease_in_out(const vec3f& a, const vec3f& b, float t);
+float cubic_bezier(float t, float p0, float p1, float p2, float p3);
+vec3f cubic_bezier(const vec3f& a, const vec3f& b, float t, float control1, float control2);
+float apply_easing(float t, interpolation_type type);
+float apply_easing_bezier(float t, interpolation_type type, float control1, float control2);
+vec3f interpolate(const vec3f& a, const vec3f& b, float t, interpolation_type type, float control1 = 0.0f, float control2 = 1.0f);
+
 vec3f perpendicular(const vec3f& eye, const vec3f& target);
 
 bool is_safe_zero(float a, float b, float epsilon = 1e-5f);

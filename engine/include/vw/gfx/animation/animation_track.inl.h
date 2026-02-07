@@ -5,6 +5,9 @@
 
 namespace vw::gfx {
 
+inline animation_track::animation_track(std::string target_name, uint32 fps)
+    : target_name_(std::move(target_name)), compiled_fps_(fps) {}
+
 inline void animation_track::recompile_if_needed() const {
     if (!is_dirty_) {
         return;
@@ -29,10 +32,14 @@ inline void animation_track::recompile_if_needed() const {
 
         transform t;
 
-        for (const auto& channel : channels) {
-            vec3f value = channel.evaluate(time);
+        for (const auto& channel : channels_) {
+            auto value_result = channel.evaluate(time);
+            if (!value_result) {
+                continue;
+            }
+            vec3f value = *value_result;
 
-            switch (channel.property) {
+            switch (channel.get_property()) {
                 case animation_property::position:
                     t.set_position(value);
                     break;
@@ -55,11 +62,11 @@ inline void animation_track::recompile_if_needed() const {
     is_dirty_ = false;
 }
 
-inline auto animation_track::evaluate(float32 time) const -> transform {
+inline auto animation_track::get_transform(float32 time) const -> std::expected<transform, vw::animation_track_error> {
     recompile_if_needed();
 
     if (compiled_transforms_.empty()) {
-        return transform{};
+        return std::unexpected(vw::animation_track_error::empty);
     }
 
     uint32 frame_index = static_cast<uint32>(time / frame_time_);
@@ -71,13 +78,11 @@ inline auto animation_track::evaluate(float32 time) const -> transform {
     return compiled_transforms_[frame_index];
 }
 
-inline auto animation_track::get_matrix(float32 time) const -> const mat4f& {
-    static const mat4f identity = math::identity_matrix();
-
+inline auto animation_track::get_matrix(float32 time) const -> std::expected<mat4f, vw::animation_track_error> {
     recompile_if_needed();
 
     if (compiled_matrices_.empty()) {
-        return identity;
+        return std::unexpected(vw::animation_track_error::empty);
     }
 
     uint32 frame_index = static_cast<uint32>(time / frame_time_);
@@ -92,8 +97,12 @@ inline auto animation_track::get_matrix(float32 time) const -> const mat4f& {
 inline auto animation_track::get_duration() const -> float32 {
     float32 max_duration = 0.0f;
 
-    for (const auto& channel : channels) {
-        float32 channel_duration = channel.get_duration();
+    for (const auto& channel : channels_) {
+        auto duration_result = channel.get_duration();
+        if (!duration_result) {
+            continue;
+        }
+        float32 channel_duration = *duration_result;
         if (channel_duration > max_duration) {
             max_duration = channel_duration;
         }
@@ -102,15 +111,15 @@ inline auto animation_track::get_duration() const -> float32 {
     return max_duration;
 }
 
-inline void animation_track::add_channel(const animation_channel& channel) {
-    channels.push_back(channel);
+inline void animation_track::add(const animation_channel3f& channel) {
+    channels_.push_back(channel);
     is_dirty_ = true;
 }
 
 inline auto animation_track::get_channel(animation_property prop) const
-    -> const animation_channel* {
-    for (const auto& channel : channels) {
-        if (channel.property == prop) {
+    -> const animation_channel3f* {
+    for (const auto& channel : channels_) {
+        if (channel.get_property() == prop) {
             return &channel;
         }
     }

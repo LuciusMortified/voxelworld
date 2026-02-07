@@ -2,46 +2,57 @@
 
 #include <algorithm>
 
-#include "vw/core/interpolation.h"
-
 namespace vw::gfx {
 
-inline auto animation_channel::evaluate(float32 time) const -> vec3f {
-    if (keyframes.empty()) {
-        return vec3f{0.0f, 0.0f, 0.0f};
+template <typename T>
+void animation_channel<T>::add(const keyframe<T>& keyframe) {
+    keyframes_.push_back(keyframe);
+    std::sort(keyframes_.begin(), keyframes_.end());
+}
+
+template <typename T>
+void animation_channel<T>::set_keyframes(std::vector<keyframe<T>> keyframes) {
+    keyframes_ = std::move(keyframes);
+    std::sort(keyframes_.begin(), keyframes_.end());
+}
+
+template <typename T>
+auto animation_channel<T>::evaluate(float32 time) const -> std::expected<T, vw::animation_channel_error> {
+    if (keyframes_.empty()) {
+        return std::unexpected(vw::animation_channel_error::empty);
     }
 
-    if (keyframes.size() == 1) {
-        return keyframes[0].value;
+    if (keyframes_.size() == 1) {
+        return keyframes_[0].value;
     }
 
-    if (time <= keyframes.front().time) {
-        return keyframes.front().value;
+    if (time <= keyframes_.front().time) {
+        return keyframes_.front().value;
     }
 
-    if (time >= keyframes.back().time) {
-        return keyframes.back().value;
+    if (time >= keyframes_.back().time) {
+        return keyframes_.back().value;
     }
 
     auto it = std::lower_bound(
-        keyframes.begin(),
-        keyframes.end(),
+        keyframes_.begin(),
+        keyframes_.end(),
         time,
-        [](const keyframe_vec3& kf, float32 t) { return kf.time < t; }
+        [](const keyframe<T>& kf, float32 t) { return kf.time < t; }
     );
 
-    if (it == keyframes.end()) {
-        return keyframes.back().value;
+    if (it == keyframes_.end()) {
+        return keyframes_.back().value;
     }
 
-    if (it == keyframes.begin()) {
-        return keyframes.front().value;
+    if (it == keyframes_.begin()) {
+        return keyframes_.front().value;
     }
 
     auto prev_it = it - 1;
 
-    const keyframe_vec3& kf0 = *prev_it;
-    const keyframe_vec3& kf1 = *it;
+    const keyframe<T>& kf0 = *prev_it;
+    const keyframe<T>& kf1 = *it;
 
     float32 duration = kf1.time - kf0.time;
     if (duration <= 0.0f) {
@@ -50,19 +61,15 @@ inline auto animation_channel::evaluate(float32 time) const -> vec3f {
 
     float32 t = (time - kf0.time) / duration;
 
-    return vw::interpolate(kf0.value, kf1.value, t, kf0.interp, kf0.tangent_in, kf0.tangent_out);
+    return math::interpolate(kf0.value, kf1.value, t, kf0.interp, kf0.tangent_in, kf0.tangent_out);
 }
 
-inline auto animation_channel::get_duration() const -> float32 {
-    if (keyframes.empty()) {
-        return 0.0f;
+template <typename T>
+auto animation_channel<T>::get_duration() const -> std::expected<float32, vw::animation_channel_error> {
+    if (keyframes_.empty()) {
+        return std::unexpected(vw::animation_channel_error::empty);
     }
-    return keyframes.back().time;
-}
-
-inline void animation_channel::add_keyframe(const keyframe_vec3& keyframe) {
-    keyframes.push_back(keyframe);
-    std::sort(keyframes.begin(), keyframes.end());
+    return keyframes_.back().time;
 }
 
 }  // namespace vw::gfx

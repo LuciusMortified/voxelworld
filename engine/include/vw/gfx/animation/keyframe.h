@@ -27,7 +27,7 @@ struct keyframe {
     }
 };
 
-using keyframe_vec3 = keyframe<vec3f>;
+using keyframe3f = keyframe<vec3f>;
 
 }  // namespace vw::gfx
 

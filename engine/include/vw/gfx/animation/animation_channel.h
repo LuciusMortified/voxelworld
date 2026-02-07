@@ -4,26 +4,43 @@
 #define VW_GFX_ANIMATION_CHANNEL_H
 
 #include <algorithm>
+#include <expected>
 #include <vector>
 
-#include "vw/core/interpolation.h"
 #include "vw/core/math.h"
 #include "vw/core/types.h"
 #include "vw/gfx/animation/animation_types.h"
 #include "vw/gfx/animation/keyframe.h"
 
+namespace vw {
+
+enum class animation_channel_error {
+    empty
+};
+
+}  // namespace vw
+
 namespace vw::gfx {
 
-struct animation_channel {
-    animation_property property;
-    std::vector<keyframe_vec3> keyframes;
+template <typename T>
+class animation_channel final {
+public:
+    explicit animation_channel(animation_property property) : property_(property) {}
 
-    [[nodiscard]] auto evaluate(float32 time) const -> vec3f;
-    [[nodiscard]] auto get_duration() const -> float32;
-    void add_keyframe(const keyframe_vec3& keyframe);
-    [[nodiscard]] auto is_empty() const -> bool { return keyframes.empty(); }
-    [[nodiscard]] auto keyframe_count() const -> size_t { return keyframes.size(); }
+    void add(const keyframe<T>& keyframe);
+    void set_keyframes(std::vector<keyframe<T>> keyframes);
+    [[nodiscard]] auto evaluate(float32 time) const -> std::expected<T, vw::animation_channel_error>;
+    [[nodiscard]] auto get_duration() const -> std::expected<float32, vw::animation_channel_error>;
+    [[nodiscard]] auto get_property() const -> animation_property { return property_; }
+    [[nodiscard]] auto is_empty() const -> bool { return keyframes_.empty(); }
+    [[nodiscard]] auto keyframe_count() const -> size_t { return keyframes_.size(); }
+
+private:
+    animation_property property_;
+    std::vector<keyframe<T>> keyframes_;
 };
+
+using animation_channel3f = animation_channel<vec3f>;
 
 }  // namespace vw::gfx
 
