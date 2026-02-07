@@ -6,7 +6,6 @@
 #include "vw/core/interpolation.h"
 #include "vw/core/math.h"
 #include "vw/core/types.h"
-#include "vw/core/vec2.h"
 #include "vw/gfx/animation/animation_types.h"
 
 namespace vw::gfx {
@@ -16,8 +15,8 @@ struct keyframe {
     float32 time;
     T value;
     vw::interpolation_type interp = vw::interpolation_type::linear;
-    vec2f tangent_in{0.0f, 0.0f};
-    vec2f tangent_out{1.0f, 1.0f};
+    float32 tangent_in = 0.0f;
+    float32 tangent_out = 1.0f;
 
     [[nodiscard]] auto operator<(const keyframe& other) const -> bool {
         return time < other.time;
