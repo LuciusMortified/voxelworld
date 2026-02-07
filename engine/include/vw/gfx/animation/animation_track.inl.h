@@ -62,11 +62,11 @@ inline void animation_track::recompile_if_needed() const {
     is_dirty_ = false;
 }
 
-inline auto animation_track::get_transform(float32 time) const -> std::expected<transform, vw::animation_track_error> {
+inline auto animation_track::get_transform(float32 time) const -> std::expected<transform, animation_track::error> {
     recompile_if_needed();
 
     if (compiled_transforms_.empty()) {
-        return std::unexpected(vw::animation_track_error::empty);
+        return std::unexpected(animation_track::error::empty);
     }
 
     uint32 frame_index = static_cast<uint32>(time / frame_time_);
@@ -78,11 +78,11 @@ inline auto animation_track::get_transform(float32 time) const -> std::expected<
     return compiled_transforms_[frame_index];
 }
 
-inline auto animation_track::get_matrix(float32 time) const -> std::expected<mat4f, vw::animation_track_error> {
+inline auto animation_track::get_matrix(float32 time) const -> std::expected<mat4f, animation_track::error> {
     recompile_if_needed();
 
     if (compiled_matrices_.empty()) {
-        return std::unexpected(vw::animation_track_error::empty);
+        return std::unexpected(animation_track::error::empty);
     }
 
     uint32 frame_index = static_cast<uint32>(time / frame_time_);

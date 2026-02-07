@@ -7,7 +7,6 @@
 
 namespace vw::gfx {
 
-// Состояние воспроизведения анимации
 enum class animation_state : uint8 {
     stopped,
     playing,
@@ -25,15 +24,6 @@ enum class animation_property : uint8 {
     rotation,
     scale,
     origin
-};
-
-enum class interpolation_type : uint8 {
-    linear,
-    step,
-    ease_in,
-    ease_out,
-    ease_in_out,
-    cubic_bezier
 };
 
 }  // namespace vw::gfx

@@ -13,7 +13,7 @@ template <typename T>
 struct keyframe {
     float32 time;
     T value;
-    vw::interpolation_type interp = vw::interpolation_type::linear;
+    math::interpolation_type interp = math::interpolation_type::linear;
     float32 tangent_in = 0.0f;
     float32 tangent_out = 1.0f;
 

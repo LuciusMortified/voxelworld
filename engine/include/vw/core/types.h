@@ -19,15 +19,6 @@ using int64 = std::int64_t;
 using float32 = float;
 using float64 = double;
 
-enum class interpolation_type : uint8 {
-    linear,
-    step,
-    ease_in,
-    ease_out,
-    ease_in_out,
-    cubic_bezier
-};
-
 }  // namespace vw
 
 #endif  // VW_CORE_TYPES_H

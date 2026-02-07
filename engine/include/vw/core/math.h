@@ -10,6 +10,15 @@
 
 namespace vw::math {
 
+enum class interpolation_type : uint8 {
+    linear,
+    step,
+    ease_in,
+    ease_out,
+    ease_in_out,
+    cubic_bezier
+};
+
 constexpr float pi         = 3.14159265359f;
 constexpr float deg_to_rad = pi / 180.0f;
 constexpr float rad_to_deg = 180.0f / pi;
