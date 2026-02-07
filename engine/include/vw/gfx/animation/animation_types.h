@@ -4,6 +4,7 @@
 #define VW_GFX_ANIMATION_TYPES_H
 
 #include "vw/core/types.h"
+#include "vw/core/vec3.h"
 
 namespace vw::gfx {
 
@@ -23,7 +24,36 @@ enum class animation_property : uint8 {
     position,
     rotation,
     scale,
-    origin
+    origin,
+    color
+};
+
+template <animation_property Prop>
+struct animation_property_traits;
+
+template <>
+struct animation_property_traits<animation_property::position> {
+    using type = vec3f;
+};
+
+template <>
+struct animation_property_traits<animation_property::rotation> {
+    using type = vec3f;
+};
+
+template <>
+struct animation_property_traits<animation_property::scale> {
+    using type = vec3f;
+};
+
+template <>
+struct animation_property_traits<animation_property::origin> {
+    using type = vec3f;
+};
+
+template <>
+struct animation_property_traits<animation_property::color> {
+    using type = uint32;
 };
 
 }  // namespace vw::gfx

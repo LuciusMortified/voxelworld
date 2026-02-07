@@ -43,6 +43,7 @@ vec3f cubic_bezier(const vec3f& a, const vec3f& b, float t, float control1, floa
 float apply_easing(float t, interpolation_type type);
 float apply_easing_bezier(float t, interpolation_type type, float control1, float control2);
 vec3f interpolate(const vec3f& a, const vec3f& b, float t, interpolation_type type, float control1 = 0.0f, float control2 = 1.0f);
+uint32 interpolate(uint32 a, uint32 b, float t, interpolation_type type, float control1 = 0.0f, float control2 = 1.0f);
 
 vec3f perpendicular(const vec3f& eye, const vec3f& target);
 

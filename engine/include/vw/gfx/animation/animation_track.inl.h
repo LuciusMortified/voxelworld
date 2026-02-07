@@ -32,27 +32,35 @@ inline void animation_track::recompile_if_needed() const {
 
         transform t;
 
-        for (const auto& channel : channels_) {
-            auto value_result = channel.evaluate(time);
-            if (!value_result) {
-                continue;
-            }
-            vec3f value = *value_result;
+        for (const auto& channel_var : channels_) {
+            std::visit([&](const auto& channel) {
+                auto value_result = channel.evaluate(time);
+                if (!value_result) {
+                    return;
+                }
 
-            switch (channel.get_property()) {
-                case animation_property::position:
-                    t.set_position(value);
-                    break;
-                case animation_property::rotation:
-                    t.set_rotation(value);
-                    break;
-                case animation_property::scale:
-                    t.set_scale(value);
-                    break;
-                case animation_property::origin:
-                    t.set_origin(value);
-                    break;
-            }
+                auto property = channel.get_property();
+
+                if constexpr (std::is_same_v<decltype(*value_result), vec3f>) {
+                    vec3f value = *value_result;
+                    switch (property) {
+                        case animation_property::position:
+                            t.set_position(value);
+                            break;
+                        case animation_property::rotation:
+                            t.set_rotation(value);
+                            break;
+                        case animation_property::scale:
+                            t.set_scale(value);
+                            break;
+                        case animation_property::origin:
+                            t.set_origin(value);
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }, channel_var);
         }
 
         compiled_transforms_.push_back(t);
@@ -97,30 +105,38 @@ inline auto animation_track::get_matrix(float32 time) const -> std::expected<mat
 inline auto animation_track::get_duration() const -> float32 {
     float32 max_duration = 0.0f;
 
-    for (const auto& channel : channels_) {
-        auto duration_result = channel.get_duration();
-        if (!duration_result) {
-            continue;
-        }
-        float32 channel_duration = *duration_result;
-        if (channel_duration > max_duration) {
-            max_duration = channel_duration;
-        }
+    for (const auto& channel_var : channels_) {
+        std::visit([&](const auto& channel) {
+            auto duration_result = channel.get_duration();
+            if (duration_result) {
+                float32 channel_duration = *duration_result;
+                if (channel_duration > max_duration) {
+                    max_duration = channel_duration;
+                }
+            }
+        }, channel_var);
     }
 
     return max_duration;
 }
 
-inline void animation_track::add(const animation_channel_vec3f& channel) {
-    channels_.push_back(channel);
+inline void animation_track::add(animation_channel_variant channel) {
+    channels_.push_back(std::move(channel));
     is_dirty_ = true;
 }
 
 inline auto animation_track::get_channel(animation_property prop) const
-    -> const animation_channel_vec3f* {
-    for (const auto& channel : channels_) {
-        if (channel.get_property() == prop) {
-            return &channel;
+    -> const animation_channel_variant* {
+    for (const auto& channel_var : channels_) {
+        bool found = false;
+        std::visit([&](const auto& channel) {
+            if (channel.get_property() == prop) {
+                found = true;
+            }
+        }, channel_var);
+
+        if (found) {
+            return &channel_var;
         }
     }
     return nullptr;

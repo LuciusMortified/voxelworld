@@ -52,16 +52,16 @@ inline void animation_clip::remove_track(std::string_view target_name) {
 
 inline void animation_clip::add_channel_to_track(
     std::string_view target_name,
-    const animation_channel_vec3f& channel
+    animation_channel_variant channel
 ) {
     animation_track* track = get_track_mut(target_name);
 
     if (track == nullptr) {
         animation_track new_track(std::string(target_name));
-        new_track.add(channel);
+        new_track.add(std::move(channel));
         add_track(std::move(new_track));
     } else {
-        track->add(channel);
+        track->add(std::move(channel));
     }
 }
 

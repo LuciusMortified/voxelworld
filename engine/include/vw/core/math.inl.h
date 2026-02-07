@@ -388,6 +388,41 @@ inline vec3f interpolate(
     }
 }
 
+inline uint32 interpolate(
+    uint32 a,
+    uint32 b,
+    float t,
+    interpolation_type type,
+    float control1,
+    float control2
+) {
+    if (type == interpolation_type::step) {
+        return t < 1.0f ? a : b;
+    }
+
+    float eased_t = apply_easing_bezier(t, type, control1, control2);
+
+    uint8 r_a = (a >> 0) & 0xFF;
+    uint8 g_a = (a >> 8) & 0xFF;
+    uint8 b_a = (a >> 16) & 0xFF;
+    uint8 a_a = (a >> 24) & 0xFF;
+
+    uint8 r_b = (b >> 0) & 0xFF;
+    uint8 g_b = (b >> 8) & 0xFF;
+    uint8 b_b = (b >> 16) & 0xFF;
+    uint8 a_b = (b >> 24) & 0xFF;
+
+    uint8 r = static_cast<uint8>(lerp(static_cast<float>(r_a), static_cast<float>(r_b), eased_t));
+    uint8 g = static_cast<uint8>(lerp(static_cast<float>(g_a), static_cast<float>(g_b), eased_t));
+    uint8 b_c = static_cast<uint8>(lerp(static_cast<float>(b_a), static_cast<float>(b_b), eased_t));
+    uint8 a_c = static_cast<uint8>(lerp(static_cast<float>(a_a), static_cast<float>(a_b), eased_t));
+
+    return (static_cast<uint32>(a_c) << 24) |
+           (static_cast<uint32>(b_c) << 16) |
+           (static_cast<uint32>(g) << 8) |
+           static_cast<uint32>(r);
+}
+
 inline vec3f perpendicular(
     const vec3f& eye, const vec3f& target
 ) {
