@@ -17,7 +17,7 @@ namespace vw::gfx {
 template <typename T>
 class animation_channel final {
 public:
-    enum class error {
+    enum class error_type {
         empty
     };
 
@@ -25,8 +25,8 @@ public:
 
     void add(const keyframe<T>& keyframe);
     void set_keyframes(std::vector<keyframe<T>> keyframes);
-    [[nodiscard]] auto evaluate(float32 time) const -> std::expected<T, error>;
-    [[nodiscard]] auto get_duration() const -> std::expected<float32, error>;
+    [[nodiscard]] auto evaluate(float32 time) const -> std::expected<T, error_type>;
+    [[nodiscard]] auto get_duration() const -> std::expected<float32, error_type>;
     [[nodiscard]] auto get_property() const -> animation_property { return property_; }
     [[nodiscard]] auto is_empty() const -> bool { return keyframes_.empty(); }
     [[nodiscard]] auto keyframe_count() const -> size_t { return keyframes_.size(); }
@@ -36,7 +36,7 @@ private:
     std::vector<keyframe<T>> keyframes_;
 };
 
-using animation_channel3f = animation_channel<vec3f>;
+using animation_channel_vec3f = animation_channel<vec3f>;
 
 }  // namespace vw::gfx
 

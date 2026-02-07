@@ -24,7 +24,7 @@ public:
     [[nodiscard]] auto has_track(std::string_view target_name) const -> bool;
     [[nodiscard]] auto get_tracks() const -> const std::vector<animation_track>&;
     void remove_track(std::string_view target_name);
-    void add_channel_to_track(std::string_view target_name, const animation_channel3f& channel);
+    void add_channel_to_track(std::string_view target_name, const animation_channel_vec3f& channel);
     [[nodiscard]] auto get_duration() const -> float32;
     [[nodiscard]] auto get_name() const -> const std::string&;
 

@@ -62,11 +62,11 @@ inline void animation_track::recompile_if_needed() const {
     is_dirty_ = false;
 }
 
-inline auto animation_track::get_transform(float32 time) const -> std::expected<transform, animation_track::error> {
+inline auto animation_track::get_transform(float32 time) const -> std::expected<transform, animation_track::error_type> {
     recompile_if_needed();
 
     if (compiled_transforms_.empty()) {
-        return std::unexpected(animation_track::error::empty);
+        return std::unexpected(animation_track::error_type::empty);
     }
 
     uint32 frame_index = static_cast<uint32>(time / frame_time_);
@@ -78,11 +78,11 @@ inline auto animation_track::get_transform(float32 time) const -> std::expected<
     return compiled_transforms_[frame_index];
 }
 
-inline auto animation_track::get_matrix(float32 time) const -> std::expected<mat4f, animation_track::error> {
+inline auto animation_track::get_matrix(float32 time) const -> std::expected<mat4f, animation_track::error_type> {
     recompile_if_needed();
 
     if (compiled_matrices_.empty()) {
-        return std::unexpected(animation_track::error::empty);
+        return std::unexpected(animation_track::error_type::empty);
     }
 
     uint32 frame_index = static_cast<uint32>(time / frame_time_);
@@ -111,13 +111,13 @@ inline auto animation_track::get_duration() const -> float32 {
     return max_duration;
 }
 
-inline void animation_track::add(const animation_channel3f& channel) {
+inline void animation_track::add(const animation_channel_vec3f& channel) {
     channels_.push_back(channel);
     is_dirty_ = true;
 }
 
 inline auto animation_track::get_channel(animation_property prop) const
-    -> const animation_channel3f* {
+    -> const animation_channel_vec3f* {
     for (const auto& channel : channels_) {
         if (channel.get_property() == prop) {
             return &channel;

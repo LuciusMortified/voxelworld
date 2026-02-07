@@ -16,25 +16,25 @@ namespace vw::gfx {
 
 class animation_track final {
 public:
-    enum class error {
+    enum class error_type {
         empty
     };
 
     explicit animation_track(std::string target_name, uint32 fps = 60);
 
-    void add(const animation_channel3f& channel);
-    [[nodiscard]] auto get_transform(float32 time) const -> std::expected<transform, error>;
-    [[nodiscard]] auto get_matrix(float32 time) const -> std::expected<mat4f, error>;
+    void add(const animation_channel_vec3f& channel);
+    [[nodiscard]] auto get_transform(float32 time) const -> std::expected<transform, error_type>;
+    [[nodiscard]] auto get_matrix(float32 time) const -> std::expected<mat4f, error_type>;
     [[nodiscard]] auto get_duration() const -> float32;
     [[nodiscard]] auto get_target_name() const -> const std::string& { return target_name_; }
-    [[nodiscard]] auto get_channel(animation_property prop) const -> const animation_channel3f*;
+    [[nodiscard]] auto get_channel(animation_property prop) const -> const animation_channel_vec3f*;
     [[nodiscard]] auto has_channel(animation_property prop) const -> bool;
 
 private:
     void recompile_if_needed() const;
 
     std::string target_name_;
-    std::vector<animation_channel3f> channels_;
+    std::vector<animation_channel_vec3f> channels_;
 
     mutable bool is_dirty_ = true;
     mutable uint32 compiled_fps_;
