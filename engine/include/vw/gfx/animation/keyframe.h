@@ -3,7 +3,6 @@
 #ifndef VW_GFX_ANIMATION_KEYFRAME_H
 #define VW_GFX_ANIMATION_KEYFRAME_H
 
-#include "vw/core/interpolation.h"
 #include "vw/core/math.h"
 #include "vw/core/types.h"
 #include "vw/gfx/animation/animation_types.h"

@@ -10,14 +10,14 @@ namespace vw::gfx {
 template <typename... Cs>
 class animation_system;
 
-// Компонент цели анимации - помечает entity как цель для анимационного трека
-// Прикрепляется к каждой анимируемой части в иерархии (head, arms, legs, etc.)
 struct animation_target_component final {
+public:
+    explicit animation_target_component(std::string name) : target_name_(std::move(name)) {}
+
+    [[nodiscard]] auto get_name() const -> const std::string&;
+
 private:
     std::string target_name_;
-
-public:
-    [[nodiscard]] auto get_name() const -> const std::string&;
 
     template <typename... Cs>
     friend class animation_system;

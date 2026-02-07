@@ -10,26 +10,26 @@ inline void animation_clip::add_track(animation_track track) {
     tracks_.push_back(std::move(track));
 }
 
-inline auto animation_clip::get_track(const std::string& target_name) const
+inline auto animation_clip::get_track(std::string_view target_name) const
     -> const animation_track* {
     for (const auto& track : tracks_) {
-        if (track.target_name == target_name) {
+        if (track.get_target_name() == target_name) {
             return &track;
         }
     }
     return nullptr;
 }
 
-inline auto animation_clip::get_track_mut(const std::string& target_name) -> animation_track* {
+inline auto animation_clip::get_track_mut(std::string_view target_name) -> animation_track* {
     for (auto& track : tracks_) {
-        if (track.target_name == target_name) {
+        if (track.get_target_name() == target_name) {
             return &track;
         }
     }
     return nullptr;
 }
 
-inline auto animation_clip::has_track(const std::string& target_name) const -> bool {
+inline auto animation_clip::has_track(std::string_view target_name) const -> bool {
     return get_track(target_name) != nullptr;
 }
 
@@ -37,13 +37,13 @@ inline auto animation_clip::get_tracks() const -> const std::vector<animation_tr
     return tracks_;
 }
 
-inline void animation_clip::remove_track(const std::string& target_name) {
+inline void animation_clip::remove_track(std::string_view target_name) {
     tracks_.erase(
         std::remove_if(
             tracks_.begin(),
             tracks_.end(),
-            [&target_name](const animation_track& track) {
-                return track.target_name == target_name;
+            [target_name](const animation_track& track) {
+                return track.get_target_name() == target_name;
             }
         ),
         tracks_.end()
@@ -51,18 +51,17 @@ inline void animation_clip::remove_track(const std::string& target_name) {
 }
 
 inline void animation_clip::add_channel_to_track(
-    const std::string& target_name,
-    const animation_channel& channel
+    std::string_view target_name,
+    const animation_channel3f& channel
 ) {
     animation_track* track = get_track_mut(target_name);
 
     if (track == nullptr) {
-        animation_track new_track;
-        new_track.target_name = target_name;
-        new_track.add_channel(channel);
+        animation_track new_track(std::string(target_name));
+        new_track.add(channel);
         add_track(std::move(new_track));
     } else {
-        track->add_channel(channel);
+        track->add(channel);
     }
 }
 
@@ -81,24 +80,6 @@ inline auto animation_clip::get_duration() const -> float32 {
 
 inline auto animation_clip::get_name() const -> const std::string& {
     return name_;
-}
-
-inline void animation_clip::set_name(std::string name) {
-    name_ = std::move(name);
-}
-
-inline void animation_clip::add_channel(const animation_channel& channel) {
-    add_channel_to_track("", channel);
-}
-
-inline auto animation_clip::evaluate_single(float32 time) const -> transform {
-    const animation_track* root_track = get_track("");
-
-    if (root_track == nullptr) {
-        return transform{};
-    }
-
-    return root_track->evaluate(time);
 }
 
 }  // namespace vw::gfx

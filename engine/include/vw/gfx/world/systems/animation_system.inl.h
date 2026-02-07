@@ -162,14 +162,21 @@ void animation_system<Cs...>::apply_animation_to_transform(
     }
 
     auto get_blended_transform = [&](const animation_track& track, float32 time) -> transform {
-        transform current = track.evaluate(time);
+        auto current_result = track.get_transform(time);
+        if (!current_result) {
+            return transform{};
+        }
+        transform current = *current_result;
 
         if (anim_comp.previous_clip_ && anim_comp.blend_duration_ > 0.0f) {
-            auto* prev_track = anim_comp.previous_clip_->get_track(track.target_name);
+            auto* prev_track = anim_comp.previous_clip_->get_track(track.get_target_name());
             if (prev_track) {
-                transform previous = prev_track->evaluate(anim_comp.previous_time_);
-                float32 blend_factor = anim_comp.blend_time_ / anim_comp.blend_duration_;
-                current = blend_transforms(previous, current, blend_factor);
+                auto previous_result = prev_track->get_transform(anim_comp.previous_time_);
+                if (previous_result) {
+                    transform previous = *previous_result;
+                    float32 blend_factor = anim_comp.blend_time_ / anim_comp.blend_duration_;
+                    current = blend_transforms(previous, current, blend_factor);
+                }
             }
         }
 
@@ -177,7 +184,7 @@ void animation_system<Cs...>::apply_animation_to_transform(
     };
 
     for (const auto& track : anim_comp.clip_->get_tracks()) {
-        auto it = target_map->find(track.target_name);
+        auto it = target_map->find(track.get_target_name());
         if (it == target_map->end()) {
             continue;
         }
