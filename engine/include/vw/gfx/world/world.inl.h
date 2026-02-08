@@ -19,11 +19,11 @@ world<Cs>::world(
       animation_system_(*this, registry_, transform_system_, animation_clip_registry_) {}
 
 template <typename Cs>
-void world<Cs>::update() {
+void world<Cs>::update(float32 delta_time) {
     transform_system_.update();
     model_system_.update();
     spatial_system_.update();
-    animation_system_.update(0.016f);  // TODO: pass actual delta_time
+    animation_system_.update(delta_time);
 }
 
 template <typename Cs>

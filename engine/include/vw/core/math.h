@@ -5,6 +5,7 @@
 
 #include <cmath>
 
+#include "vw/core/color.h"
 #include "vw/core/mat4.h"
 #include "vw/core/vec3.h"
 
@@ -38,12 +39,13 @@ vec3f lerp(const vec3f& a, const vec3f& b, float t);
 vec3f ease_in(const vec3f& a, const vec3f& b, float t);
 vec3f ease_out(const vec3f& a, const vec3f& b, float t);
 vec3f ease_in_out(const vec3f& a, const vec3f& b, float t);
-float cubic_bezier(float t, float p0, float p1, float p2, float p3);
+float evaluate_cubic_bezier(float t, float p0, float p1, float p2, float p3);
 vec3f cubic_bezier(const vec3f& a, const vec3f& b, float t, float control1, float control2);
 float apply_easing(float t, interpolation_type type);
 float apply_easing_bezier(float t, interpolation_type type, float control1, float control2);
+uint8 lerp(uint8 a, uint8 b, float t);
 vec3f interpolate(const vec3f& a, const vec3f& b, float t, interpolation_type type, float control1 = 0.0f, float control2 = 1.0f);
-uint32 interpolate(uint32 a, uint32 b, float t, interpolation_type type, float control1 = 0.0f, float control2 = 1.0f);
+color interpolate(color a, color b, float t, interpolation_type type, float control1 = 0.0f, float control2 = 1.0f);
 
 vec3f perpendicular(const vec3f& eye, const vec3f& target);
 

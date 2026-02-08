@@ -7,6 +7,15 @@ namespace vw::gfx {
 inline animation_clip::animation_clip(std::string name) : name_(std::move(name)) {}
 
 inline void animation_clip::add_track(animation_track track) {
+    std::string_view target_name = track.get_target_name();
+
+    for (auto& existing_track : tracks_) {
+        if (existing_track.get_target_name() == target_name) {
+            existing_track = std::move(track);
+            return;
+        }
+    }
+
     tracks_.push_back(std::move(track));
 }
 

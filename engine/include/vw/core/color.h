@@ -16,6 +16,13 @@ struct color {
         uint32 value_
     )
         : value(value_) {}
+    constexpr color(
+        uint8 r, uint8 g, uint8 b, uint8 a = 255
+    )
+        : value((static_cast<uint32>(r) << 24) |
+                (static_cast<uint32>(g) << 16) |
+                (static_cast<uint32>(b) << 8) |
+                static_cast<uint32>(a)) {}
 
     constexpr color(const color&)                    = default;
     constexpr auto operator=(const color&) -> color& = default;
@@ -30,6 +37,7 @@ struct color {
     [[nodiscard]] constexpr auto r() const -> uint8;
     [[nodiscard]] constexpr auto g() const -> uint8;
     [[nodiscard]] constexpr auto b() const -> uint8;
+    [[nodiscard]] constexpr auto a() const -> uint8;
 };
 
 // 255-цветная палитра - основные цвета

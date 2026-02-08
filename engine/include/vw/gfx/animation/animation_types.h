@@ -24,8 +24,7 @@ enum class animation_property : uint8 {
     position,
     rotation,
     scale,
-    origin,
-    color
+    origin
 };
 
 template <animation_property Prop>
@@ -49,11 +48,6 @@ struct animation_property_traits<animation_property::scale> {
 template <>
 struct animation_property_traits<animation_property::origin> {
     using type = vec3f;
-};
-
-template <>
-struct animation_property_traits<animation_property::color> {
-    using type = uint32;
 };
 
 }  // namespace vw::gfx

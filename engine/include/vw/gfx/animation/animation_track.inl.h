@@ -13,11 +13,25 @@ inline void animation_track::recompile_if_needed() const {
         return;
     }
 
-    float32 duration = get_duration();
-    if (duration <= 0.0f) {
+    cached_duration_ = 0.0f;
+    for (const auto& channel_var : channels_) {
+        std::visit([&](const auto& channel) {
+            auto duration_result = channel.get_duration();
+            if (duration_result) {
+                float32 channel_duration = *duration_result;
+                if (channel_duration > cached_duration_) {
+                    cached_duration_ = channel_duration;
+                }
+            }
+        }, channel_var);
+    }
+
+    if (cached_duration_ <= 0.0f) {
         is_dirty_ = false;
         return;
     }
+
+    float32 duration = cached_duration_;
 
     frame_time_ = 1.0f / static_cast<float32>(compiled_fps_);
     uint32 frame_count = static_cast<uint32>(std::ceil(duration / frame_time_)) + 1;
@@ -103,26 +117,50 @@ inline auto animation_track::get_matrix(float32 time) const -> std::expected<mat
 }
 
 inline auto animation_track::get_duration() const -> float32 {
-    float32 max_duration = 0.0f;
-
-    for (const auto& channel_var : channels_) {
-        std::visit([&](const auto& channel) {
-            auto duration_result = channel.get_duration();
-            if (duration_result) {
-                float32 channel_duration = *duration_result;
-                if (channel_duration > max_duration) {
-                    max_duration = channel_duration;
-                }
-            }
-        }, channel_var);
-    }
-
-    return max_duration;
+    recompile_if_needed();
+    return cached_duration_;
 }
 
 inline void animation_track::add(animation_channel_variant channel) {
+    animation_property prop;
+    std::visit([&](const auto& ch) {
+        prop = ch.get_property();
+    }, channel);
+
+    for (auto& existing_channel : channels_) {
+        bool should_replace = false;
+        std::visit([&](const auto& ch) {
+            if (ch.get_property() == prop) {
+                should_replace = true;
+            }
+        }, existing_channel);
+
+        if (should_replace) {
+            existing_channel = std::move(channel);
+            is_dirty_ = true;
+            return;
+        }
+    }
+
     channels_.push_back(std::move(channel));
     is_dirty_ = true;
+}
+
+inline void animation_track::remove_channel(animation_property prop) {
+    auto it = std::remove_if(channels_.begin(), channels_.end(), [prop](const auto& channel_var) {
+        bool matches = false;
+        std::visit([&](const auto& ch) {
+            if (ch.get_property() == prop) {
+                matches = true;
+            }
+        }, channel_var);
+        return matches;
+    });
+
+    if (it != channels_.end()) {
+        channels_.erase(it, channels_.end());
+        is_dirty_ = true;
+    }
 }
 
 inline auto animation_track::get_channel(animation_property prop) const

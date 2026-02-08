@@ -38,13 +38,9 @@ private:
 };
 
 using animation_channel_vec3f = animation_channel<vec3f>;
-using animation_channel_uint32 = animation_channel<uint32>;
-using animation_channel_float32 = animation_channel<float32>;
 
 using animation_channel_variant = std::variant<
-    animation_channel<vec3f>,
-    animation_channel<uint32>,
-    animation_channel<float32>
+    animation_channel<vec3f>
 >;
 
 }  // namespace vw::gfx

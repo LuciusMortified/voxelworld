@@ -41,7 +41,7 @@ public:
     world(world&&)                         = delete;
     auto operator=(world&&) -> world&      = delete;
 
-    void update();
+    void update(float32 delta_time);
 
     [[nodiscard]] auto create_entity() -> entity;
 

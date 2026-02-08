@@ -23,6 +23,10 @@ constexpr auto color::b() const -> uint8 {
     return static_cast<uint8>((value >> 8) & 0xFF);
 }
 
+constexpr auto color::a() const -> uint8 {
+    return static_cast<uint8>(value & 0xFF);
+}
+
 }  // namespace vw
 
 #endif  // VW_CORE_COLOR_INL_H

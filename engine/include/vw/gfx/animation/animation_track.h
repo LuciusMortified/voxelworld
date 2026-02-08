@@ -25,9 +25,11 @@ public:
     void add(animation_channel_variant channel);
 
     template <animation_property Prop>
-    void add_typed(animation_channel<typename animation_property_traits<Prop>::type> channel) {
-        add(std::move(channel));
+    void add(animation_channel<typename animation_property_traits<Prop>::type> channel) {
+        add(animation_channel_variant(std::move(channel)));
     }
+
+    void remove_channel(animation_property prop);
 
     [[nodiscard]] auto get_transform(float32 time) const -> std::expected<transform, error_type>;
     [[nodiscard]] auto get_matrix(float32 time) const -> std::expected<mat4f, error_type>;
@@ -45,6 +47,7 @@ private:
     mutable bool is_dirty_ = true;
     mutable uint32 compiled_fps_;
     mutable float32 frame_time_ = 0.0f;
+    mutable float32 cached_duration_ = 0.0f;
     mutable std::vector<transform> compiled_transforms_;
     mutable std::vector<mat4f> compiled_matrices_;
 };

@@ -289,7 +289,7 @@ inline vec3f ease_in_out(const vec3f& a, const vec3f& b, float t) {
     return lerp(a, b, eased_t);
 }
 
-inline float cubic_bezier(float t, float p0, float p1, float p2, float p3) {
+inline float evaluate_cubic_bezier(float t, float p0, float p1, float p2, float p3) {
     float one_minus_t = 1.0f - t;
     float one_minus_t_sq = one_minus_t * one_minus_t;
     float one_minus_t_cb = one_minus_t_sq * one_minus_t;
@@ -300,6 +300,10 @@ inline float cubic_bezier(float t, float p0, float p1, float p2, float p3) {
            3.0f * one_minus_t * t_sq * p2 + t_cb * p3;
 }
 
+inline uint8 lerp(uint8 a, uint8 b, float t) {
+    return static_cast<uint8>(lerp(static_cast<float>(a), static_cast<float>(b), t));
+}
+
 inline vec3f cubic_bezier(
     const vec3f& a,
     const vec3f& b,
@@ -307,7 +311,7 @@ inline vec3f cubic_bezier(
     float control1,
     float control2
 ) {
-    float bezier_t = cubic_bezier(t, 0.0f, control1, control2, 1.0f);
+    float bezier_t = evaluate_cubic_bezier(t, 0.0f, control1, control2, 1.0f);
     return lerp(a, b, bezier_t);
 }
 
@@ -350,7 +354,7 @@ inline float apply_easing_bezier(
 ) {
     if (type == interpolation_type::cubic_bezier) {
         t = clamp(t, 0.0f, 1.0f);
-        return cubic_bezier(t, 0.0f, control1, control2, 1.0f);
+        return evaluate_cubic_bezier(t, 0.0f, control1, control2, 1.0f);
     } else {
         return apply_easing(t, type);
     }
@@ -388,9 +392,9 @@ inline vec3f interpolate(
     }
 }
 
-inline uint32 interpolate(
-    uint32 a,
-    uint32 b,
+inline color interpolate(
+    color a,
+    color b,
     float t,
     interpolation_type type,
     float control1,
@@ -402,25 +406,12 @@ inline uint32 interpolate(
 
     float eased_t = apply_easing_bezier(t, type, control1, control2);
 
-    uint8 r_a = (a >> 0) & 0xFF;
-    uint8 g_a = (a >> 8) & 0xFF;
-    uint8 b_a = (a >> 16) & 0xFF;
-    uint8 a_a = (a >> 24) & 0xFF;
+    uint8 r = lerp(a.r(), b.r(), eased_t);
+    uint8 g = lerp(a.g(), b.g(), eased_t);
+    uint8 b_c = lerp(a.b(), b.b(), eased_t);
+    uint8 a_c = lerp(a.a(), b.a(), eased_t);
 
-    uint8 r_b = (b >> 0) & 0xFF;
-    uint8 g_b = (b >> 8) & 0xFF;
-    uint8 b_b = (b >> 16) & 0xFF;
-    uint8 a_b = (b >> 24) & 0xFF;
-
-    uint8 r = static_cast<uint8>(lerp(static_cast<float>(r_a), static_cast<float>(r_b), eased_t));
-    uint8 g = static_cast<uint8>(lerp(static_cast<float>(g_a), static_cast<float>(g_b), eased_t));
-    uint8 b_c = static_cast<uint8>(lerp(static_cast<float>(b_a), static_cast<float>(b_b), eased_t));
-    uint8 a_c = static_cast<uint8>(lerp(static_cast<float>(a_a), static_cast<float>(a_b), eased_t));
-
-    return (static_cast<uint32>(a_c) << 24) |
-           (static_cast<uint32>(b_c) << 16) |
-           (static_cast<uint32>(g) << 8) |
-           static_cast<uint32>(r);
+    return color(r, g, b_c, a_c);
 }
 
 inline vec3f perpendicular(

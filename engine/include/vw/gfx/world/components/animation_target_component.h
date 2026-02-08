@@ -12,7 +12,7 @@ class animation_system;
 
 struct animation_target_component final {
 public:
-    explicit animation_target_component(std::string name) : target_name_(std::move(name)) {}
+    animation_target_component() = default;
 
     [[nodiscard]] auto get_name() const -> const std::string&;
 

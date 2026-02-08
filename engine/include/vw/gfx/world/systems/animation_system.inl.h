@@ -19,11 +19,11 @@ animation_system<Cs...>::animation_system(
 
 template <typename... Cs>
 void animation_system<Cs...>::update(float32 delta_time) {
-    std::vector<entity> to_remove;
+    to_remove_.clear();
 
     for (entity ent : active_entities_) {
         if (!registry_->template has<animation_component>(ent)) {
-            to_remove.push_back(ent);
+            to_remove_.push_back(ent);
             continue;
         }
 
@@ -32,11 +32,11 @@ void animation_system<Cs...>::update(float32 delta_time) {
         process_animation(ent, anim_comp, delta_time);
 
         if (anim_comp.state_ == animation_state::stopped) {
-            to_remove.push_back(ent);
+            to_remove_.push_back(ent);
         }
     }
 
-    for (entity ent : to_remove) {
+    for (entity ent : to_remove_) {
         remove_active_entity(ent);
     }
 }
@@ -120,9 +120,10 @@ void animation_system<Cs...>::process_animation(
         }
     } else if (anim_comp.loop_mode_ == animation_loop_mode::loop) {
         if (duration > 0.0f) {
-            anim_comp.current_time_ = std::fmod(anim_comp.current_time_, duration);
-            if (anim_comp.current_time_ < 0.0f) {
-                anim_comp.current_time_ += duration;
+            if (anim_comp.direction_ > 0.0f && anim_comp.current_time_ >= duration) {
+                anim_comp.current_time_ = 0.0f;
+            } else if (anim_comp.direction_ < 0.0f && anim_comp.current_time_ < 0.0f) {
+                anim_comp.current_time_ = duration;
             }
         }
     } else if (anim_comp.loop_mode_ == animation_loop_mode::ping_pong) {
@@ -207,37 +208,13 @@ auto animation_system<Cs...>::blend_transforms(
     const transform& t2,
     float32 factor
 ) const -> transform {
-    factor = std::clamp(factor, 0.0f, 1.0f);
+    factor = math::clamp(factor, 0.0f, 1.0f);
 
     transform result;
-
-    vec3f pos = vec3f{
-        t1.get_position().x + (t2.get_position().x - t1.get_position().x) * factor,
-        t1.get_position().y + (t2.get_position().y - t1.get_position().y) * factor,
-        t1.get_position().z + (t2.get_position().z - t1.get_position().z) * factor
-    };
-    result.set_position(pos);
-
-    vec3f rot = vec3f{
-        t1.get_rotation().x + (t2.get_rotation().x - t1.get_rotation().x) * factor,
-        t1.get_rotation().y + (t2.get_rotation().y - t1.get_rotation().y) * factor,
-        t1.get_rotation().z + (t2.get_rotation().z - t1.get_rotation().z) * factor
-    };
-    result.set_rotation(rot);
-
-    vec3f scale = vec3f{
-        t1.get_scale().x + (t2.get_scale().x - t1.get_scale().x) * factor,
-        t1.get_scale().y + (t2.get_scale().y - t1.get_scale().y) * factor,
-        t1.get_scale().z + (t2.get_scale().z - t1.get_scale().z) * factor
-    };
-    result.set_scale(scale);
-
-    vec3f origin = vec3f{
-        t1.get_origin().x + (t2.get_origin().x - t1.get_origin().x) * factor,
-        t1.get_origin().y + (t2.get_origin().y - t1.get_origin().y) * factor,
-        t1.get_origin().z + (t2.get_origin().z - t1.get_origin().z) * factor
-    };
-    result.set_origin(origin);
+    result.set_position(math::lerp(t1.get_position(), t2.get_position(), factor));
+    result.set_rotation(math::lerp(t1.get_rotation(), t2.get_rotation(), factor));
+    result.set_scale(math::lerp(t1.get_scale(), t2.get_scale(), factor));
+    result.set_origin(math::lerp(t1.get_origin(), t2.get_origin(), factor));
 
     return result;
 }
@@ -296,8 +273,8 @@ void animation_system<Cs...>::animation_modifier::set_clip(std::shared_ptr<anima
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::animation_modifier::set_clip_by_name(const std::string& name) {
-    auto clip = system_->clip_registry_->get(name);
+void animation_system<Cs...>::animation_modifier::set_clip_by_name(std::string_view name) {
+    auto clip = system_->clip_registry_->get(std::string(name));
     if (clip) {
         set_clip(clip);
     }
@@ -333,10 +310,10 @@ void animation_system<Cs...>::animation_modifier::blend_to(
 
 template <typename... Cs>
 void animation_system<Cs...>::animation_modifier::blend_to_by_name(
-    const std::string& name,
+    std::string_view name,
     float32 blend_duration
 ) {
-    auto clip = system_->clip_registry_->get(name);
+    auto clip = system_->clip_registry_->get(std::string(name));
     if (clip) {
         blend_to(clip, blend_duration);
     }
