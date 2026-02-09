@@ -301,7 +301,7 @@ inline float evaluate_cubic_bezier(float t, float p0, float p1, float p2, float 
 }
 
 inline uint8 lerp(uint8 a, uint8 b, float t) {
-    return static_cast<uint8>(lerp(static_cast<float>(a), static_cast<float>(b), t));
+    return static_cast<uint8>(a + t * (b - a));
 }
 
 inline vec3f cubic_bezier(
