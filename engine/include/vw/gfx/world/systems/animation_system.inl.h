@@ -18,11 +18,20 @@ animation_system<Cs...>::animation_system(
       clip_registry_(&clip_registry) {}
 
 template <typename... Cs>
+auto animation_system<Cs...>::get_target_frame_time() const -> float32 {
+    return target_frame_time_;
+}
+
+template <typename... Cs>
+void animation_system<Cs...>::set_target_frame_time(float32 frame_time) {
+    target_frame_time_ = frame_time;
+}
+
+template <typename... Cs>
 void animation_system<Cs...>::update(float32 delta_time) {
     accumulated_delta_time_ += delta_time;
 
-    constexpr float32 target_frame_time = 1.0f / 30.0f;
-    if (accumulated_delta_time_ < target_frame_time) {
+    if (accumulated_delta_time_ < target_frame_time_) {
         return;
     }
 
@@ -53,9 +62,11 @@ void animation_system<Cs...>::update(float32 delta_time) {
 
 template <typename... Cs>
 void animation_system<Cs...>::add_active_entity(entity root_ent) {
-    active_entities_.insert(root_ent);
+    auto [it, inserted] = active_entities_.insert(root_ent);
 
-    build_and_cache_target_map(root_ent);
+    if (inserted) {
+        build_and_cache_target_map(root_ent);
+    }
 }
 
 template <typename... Cs>
@@ -103,15 +114,10 @@ auto animation_system<Cs...>::get_cached_target_map(entity root_ent) const
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::process_animation(
-    entity ent,
+void animation_system<Cs...>::update_anim_time(
     animation_player_component& anim_comp,
     float32 delta_time
 ) {
-    if (!anim_comp.clip_ || anim_comp.state_ != animation_state::playing) {
-        return;
-    }
-
     anim_comp.current_time_ += delta_time * anim_comp.playback_speed_ * anim_comp.direction_;
 
     float32 duration = anim_comp.clip_->get_duration();
@@ -141,6 +147,19 @@ void animation_system<Cs...>::process_animation(
             anim_comp.current_time_ = 0.0f;
         }
     }
+}
+
+template <typename... Cs>
+void animation_system<Cs...>::process_animation(
+    entity ent,
+    animation_player_component& anim_comp,
+    float32 delta_time
+) {
+    if (!anim_comp.clip_ || anim_comp.state_ != animation_state::playing) {
+        return;
+    }
+
+    update_anim_time(anim_comp, delta_time);
 
     if (anim_comp.blend_duration_ > 0.0f) {
         anim_comp.blend_time_ += delta_time;
@@ -151,11 +170,11 @@ void animation_system<Cs...>::process_animation(
         }
     }
 
-    apply_animation_to_transform(ent, anim_comp);
+    apply_animation(ent, anim_comp);
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::apply_animation_to_transform(
+void animation_system<Cs...>::apply_animation(
     entity root_ent,
     const animation_player_component& anim_comp
 ) {

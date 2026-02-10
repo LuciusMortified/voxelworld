@@ -44,6 +44,9 @@ public:
 
     void update(float32 delta_time);
 
+    [[nodiscard]] auto get_target_frame_time() const -> float32;
+    void set_target_frame_time(float32 frame_time);
+
     class player_modifier {
     public:
         void play();
@@ -88,6 +91,7 @@ private:
     std::vector<entity> to_remove_;
     std::deque<entity> to_visit_;
     float32 accumulated_delta_time_ = 0.0f;
+    float32 target_frame_time_ = 1.0f / 30.0f;
 
     void add_active_entity(entity root_ent);
     void remove_active_entity(entity root_ent);
@@ -95,7 +99,8 @@ private:
     [[nodiscard]] auto get_cached_target_map(entity root_ent) const
         -> const std::unordered_map<std::string, entity>*;
     void process_animation(entity ent, animation_player_component& anim_comp, float32 delta_time);
-    void apply_animation_to_transform(entity root_ent, const animation_player_component& anim_comp);
+    void update_anim_time(animation_player_component& anim_comp, float32 delta_time);
+    void apply_animation(entity root_ent, const animation_player_component& anim_comp);
 
     world_type* world_;
     registry_type* registry_;
