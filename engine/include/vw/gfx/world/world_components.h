@@ -5,7 +5,7 @@
 
 #include <tuple>
 
-#include "vw/gfx/world/components/animation_component.h"
+#include "vw/gfx/world/components/animation_player_component.h"
 #include "vw/gfx/world/components/animation_target_component.h"
 #include "vw/gfx/world/components/hierarchy_component.h"
 #include "vw/gfx/world/components/light_component.h"
@@ -21,7 +21,7 @@ using base_world_components = std::tuple<
     model_component,
     spatial_component,
     light_component,
-    animation_component,
+    animation_player_component,
     animation_target_component>;
 
 }

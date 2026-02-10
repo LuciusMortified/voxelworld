@@ -3,8 +3,8 @@
 #ifndef VW_GFX_ANIMATION_SYSTEM_H
 #define VW_GFX_ANIMATION_SYSTEM_H
 
+#include <deque>
 #include <memory>
-#include <queue>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -12,7 +12,7 @@
 #include "vw/core/transform.h"
 #include "vw/gfx/animation/animation_clip.h"
 #include "vw/gfx/animation/animation_clip_registry.h"
-#include "vw/gfx/world/components/animation_component.h"
+#include "vw/gfx/world/components/animation_player_component.h"
 #include "vw/gfx/world/components/animation_target_component.h"
 #include "vw/gfx/world/components/hierarchy_component.h"
 #include "vw/gfx/world/components/transform_component.h"
@@ -44,7 +44,7 @@ public:
 
     void update(float32 delta_time);
 
-    class animation_modifier {
+    class player_modifier {
     public:
         void play();
         void pause();
@@ -60,11 +60,11 @@ public:
 
     private:
         friend class animation_system;
-        animation_modifier(animation_system* system, entity ent, animation_component* component);
+        player_modifier(animation_system* system, entity ent, animation_player_component* component);
 
         animation_system* system_;
         entity entity_;
-        animation_component* component_;
+        animation_player_component* component_;
     };
 
     class target_modifier {
@@ -79,28 +79,23 @@ public:
         animation_target_component* component_;
     };
 
-    auto modify(entity ent) -> animation_modifier;
+    auto modify_player(entity ent) -> player_modifier;
     auto modify_target(entity ent) -> target_modifier;
 
 private:
     std::unordered_set<entity> active_entities_;
     std::unordered_map<entity, std::unordered_map<std::string, entity>> target_maps_;
-    std::unordered_map<entity, uint32> last_applied_frame_;
     std::vector<entity> to_remove_;
-    std::queue<entity> to_visit_;
+    std::deque<entity> to_visit_;
+    float32 accumulated_delta_time_ = 0.0f;
 
     void add_active_entity(entity root_ent);
     void remove_active_entity(entity root_ent);
     void build_and_cache_target_map(entity root_ent);
     [[nodiscard]] auto get_cached_target_map(entity root_ent) const
         -> const std::unordered_map<std::string, entity>*;
-    void process_animation(entity ent, animation_component& anim_comp, float32 delta_time);
-    void apply_animation_to_transform(entity root_ent, const animation_component& anim_comp);
-    [[nodiscard]] auto blend_transforms(
-        const transform& t1,
-        const transform& t2,
-        float32 factor
-    ) const -> transform;
+    void process_animation(entity ent, animation_player_component& anim_comp, float32 delta_time);
+    void apply_animation_to_transform(entity root_ent, const animation_player_component& anim_comp);
 
     world_type* world_;
     registry_type* registry_;

@@ -7,6 +7,7 @@
 
 #include "vw/core/color.h"
 #include "vw/core/mat4.h"
+#include "vw/core/transform.h"
 #include "vw/core/vec3.h"
 
 namespace vw::math {
@@ -35,6 +36,7 @@ float dot(const vec3f& a, const vec3f& b);
 float clamp(float value, float min_val, float max_val);
 float lerp(float a, float b, float t);
 vec3f lerp(const vec3f& a, const vec3f& b, float t);
+transform lerp(const transform& a, const transform& b, float t);
 
 vec3f ease_in(const vec3f& a, const vec3f& b, float t);
 vec3f ease_out(const vec3f& a, const vec3f& b, float t);

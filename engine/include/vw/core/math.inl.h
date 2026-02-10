@@ -269,6 +269,17 @@ inline vec3f lerp(
     return {lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t)};
 }
 
+inline transform lerp(
+    const transform& a, const transform& b, float t
+) {
+    transform result;
+    result.set_position(lerp(a.get_position(), b.get_position(), t));
+    result.set_rotation(lerp(a.get_rotation(), b.get_rotation(), t));
+    result.set_scale(lerp(a.get_scale(), b.get_scale(), t));
+    result.set_origin(lerp(a.get_origin(), b.get_origin(), t));
+    return result;
+}
+
 inline vec3f ease_in(const vec3f& a, const vec3f& b, float t) {
     float eased_t = t * t;
     return lerp(a, b, eased_t);
