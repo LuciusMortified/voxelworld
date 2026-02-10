@@ -59,12 +59,14 @@ template <typename... Cs>
 void animation_system<Cs...>::build_and_cache_target_map(entity root_ent) {
     std::unordered_map<std::string, entity> target_map;
 
-    std::queue<entity> to_visit;
-    to_visit.push(root_ent);
+    while (!to_visit_.empty()) {
+        to_visit_.pop();
+    }
+    to_visit_.push(root_ent);
 
-    while (!to_visit.empty()) {
-        entity current = to_visit.front();
-        to_visit.pop();
+    while (!to_visit_.empty()) {
+        entity current = to_visit_.front();
+        to_visit_.pop();
 
         if (registry_->template has<animation_target_component>(current)) {
             const auto& target_comp = registry_->template get<animation_target_component>(current);
@@ -74,7 +76,7 @@ void animation_system<Cs...>::build_and_cache_target_map(entity root_ent) {
         if (registry_->template has<hierarchy_component>(current)) {
             const auto& hierarchy = registry_->template get<hierarchy_component>(current);
             for (entity child : hierarchy.get_children()) {
-                to_visit.push(child);
+                to_visit_.push(child);
             }
         }
     }
@@ -98,11 +100,7 @@ void animation_system<Cs...>::process_animation(
     animation_component& anim_comp,
     float32 delta_time
 ) {
-    if (!anim_comp.clip_) {
-        return;
-    }
-
-    if (anim_comp.state_ != animation_state::playing) {
+    if (!anim_comp.clip_ || anim_comp.state_ != animation_state::playing) {
         return;
     }
 
@@ -196,9 +194,41 @@ void animation_system<Cs...>::apply_animation_to_transform(
             continue;
         }
 
-        transform t = get_blended_transform(track, anim_comp.current_time_);
+        float32 frame_time = track.get_frame_time();
+        uint32 current_frame = static_cast<uint32>(anim_comp.current_time_ / frame_time);
+
+        auto last_frame_it = last_applied_frame_.find(target_ent);
+        if (last_frame_it != last_applied_frame_.end() && last_frame_it->second == current_frame) {
+            continue;
+        }
+
+        last_applied_frame_[target_ent] = current_frame;
+
+        auto transform_result = track.get_transform(anim_comp.current_time_);
+        auto matrix_result = track.get_matrix(anim_comp.current_time_);
+
+        if (!transform_result || !matrix_result) {
+            continue;
+        }
+
+        transform t = *transform_result;
+        mat4f m = *matrix_result;
+
+        if (anim_comp.previous_clip_ && anim_comp.blend_duration_ > 0.0f) {
+            auto* prev_track = anim_comp.previous_clip_->get_track(track.get_target_name());
+            if (prev_track) {
+                auto previous_result = prev_track->get_transform(anim_comp.previous_time_);
+                if (previous_result) {
+                    transform previous = *previous_result;
+                    float32 blend_factor = anim_comp.blend_time_ / anim_comp.blend_duration_;
+                    t = blend_transforms(previous, t, blend_factor);
+                    m = t.calc_matrix();
+                }
+            }
+        }
+
         auto modifier = transform_system_->modify(target_ent);
-        modifier.set_transform(t);
+        modifier.set_transform_with_matrix(t, m);
     }
 }
 
@@ -320,19 +350,21 @@ void animation_system<Cs...>::animation_modifier::blend_to_by_name(
 }
 
 template <typename... Cs>
-auto animation_system<Cs...>::animation_modifier::get_clip() const
-    -> std::shared_ptr<animation_clip> {
-    return component_->get_clip();
+animation_system<Cs...>::target_modifier::target_modifier(
+    entity ent,
+    animation_target_component* component
+)
+    : entity_(ent), component_(component) {}
+
+template <typename... Cs>
+auto animation_system<Cs...>::modify_target(entity ent) -> target_modifier {
+    auto& comp = registry_->template get<animation_target_component>(ent);
+    return target_modifier(ent, &comp);
 }
 
 template <typename... Cs>
-auto animation_system<Cs...>::animation_modifier::get_state() const -> animation_state {
-    return component_->get_state();
-}
-
-template <typename... Cs>
-auto animation_system<Cs...>::animation_modifier::get_current_time() const -> float32 {
-    return component_->get_current_time();
+void animation_system<Cs...>::target_modifier::set_target_name(std::string name) {
+    component_->target_name_ = std::move(name);
 }
 
 }  // namespace vw::gfx

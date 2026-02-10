@@ -30,6 +30,7 @@ public:
     [[nodiscard]] auto get_transform(float32 time) const -> std::expected<transform, error_type>;
     [[nodiscard]] auto get_matrix(float32 time) const -> std::expected<mat4f, error_type>;
     [[nodiscard]] auto get_duration() const -> float32;
+    [[nodiscard]] auto get_frame_time() const -> float32;
     [[nodiscard]] auto get_target_name() const -> const std::string& { return target_name_; }
     [[nodiscard]] auto get_channel(animation_property prop) const -> const animation_channel_variant*;
     [[nodiscard]] auto has_channel(animation_property prop) const -> bool;

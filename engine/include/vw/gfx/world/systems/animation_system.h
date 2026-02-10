@@ -57,9 +57,6 @@ public:
         void set_loop_mode(animation_loop_mode mode);
         void blend_to(std::shared_ptr<animation_clip> clip, float32 blend_duration);
         void blend_to_by_name(std::string_view name, float32 blend_duration);
-        [[nodiscard]] auto get_clip() const -> std::shared_ptr<animation_clip>;
-        [[nodiscard]] auto get_state() const -> animation_state;
-        [[nodiscard]] auto get_current_time() const -> float32;
 
     private:
         friend class animation_system;
@@ -70,12 +67,27 @@ public:
         animation_component* component_;
     };
 
+    class target_modifier {
+    public:
+        void set_target_name(std::string name);
+
+    private:
+        friend class animation_system;
+        target_modifier(entity ent, animation_target_component* component);
+
+        entity entity_;
+        animation_target_component* component_;
+    };
+
     auto modify(entity ent) -> animation_modifier;
+    auto modify_target(entity ent) -> target_modifier;
 
 private:
     std::unordered_set<entity> active_entities_;
     std::unordered_map<entity, std::unordered_map<std::string, entity>> target_maps_;
+    std::unordered_map<entity, uint32> last_applied_frame_;
     std::vector<entity> to_remove_;
+    std::queue<entity> to_visit_;
 
     void add_active_entity(entity root_ent);
     void remove_active_entity(entity root_ent);

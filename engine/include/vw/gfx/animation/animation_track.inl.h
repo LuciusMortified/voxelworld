@@ -126,6 +126,11 @@ inline auto animation_track::get_duration() const -> float32 {
     return cached_duration_;
 }
 
+inline auto animation_track::get_frame_time() const -> float32 {
+    recompile_if_needed();
+    return frame_time_;
+}
+
 inline void animation_track::add_impl(animation_channel_variant channel) {
     animation_property prop;
     std::visit([&](const auto& ch) {
