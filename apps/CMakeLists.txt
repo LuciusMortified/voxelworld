@@ -6,5 +6,6 @@ project(voxelworld_apps)
 add_subdirectory(test_simple_model)
 add_subdirectory(test_window)
 add_subdirectory(test_math_matrix)
+add_subdirectory(test_animation)
 
 add_subdirectory(sculptor)
