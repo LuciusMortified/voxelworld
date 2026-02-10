@@ -44,8 +44,8 @@ public:
 
     void update(float32 delta_time);
 
-    [[nodiscard]] auto get_target_frame_time() const -> float32;
-    void set_target_frame_time(float32 frame_time);
+    [[nodiscard]] auto get_target_fps() const -> float32;
+    void set_target_fps(float32 fps);
 
     class player_modifier {
     public:

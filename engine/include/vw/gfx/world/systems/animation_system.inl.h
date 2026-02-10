@@ -18,13 +18,13 @@ animation_system<Cs...>::animation_system(
       clip_registry_(&clip_registry) {}
 
 template <typename... Cs>
-auto animation_system<Cs...>::get_target_frame_time() const -> float32 {
-    return target_frame_time_;
+auto animation_system<Cs...>::get_target_fps() const -> float32 {
+    return 1.0f / target_frame_time_;
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::set_target_frame_time(float32 frame_time) {
-    target_frame_time_ = frame_time;
+void animation_system<Cs...>::set_target_fps(float32 fps) {
+    target_frame_time_ = 1.0f / fps;
 }
 
 template <typename... Cs>

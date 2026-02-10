@@ -68,10 +68,9 @@ private:
                            .with<gfx::hierarchy_component>()
                            .with<gfx::animation_player_component>()
                            .with<gfx::animation_target_component>()
-                           .release()
-                           .get_entity();
+                           .release_guard();
 
-        animation_system.modify_target(root_entity_).set_target_name("root");
+        animation_system.modify_target(root_entity_->get_entity()).set_target_name("root");
 
         auto red_guard = gfx::entity_builder<>{world}
                              .with<gfx::transform_component>()
@@ -84,7 +83,7 @@ private:
         transform_system.modify(red_ent).set_position({-4.0f, 0.0f, 0.0f});
         model_system.modify(red_ent).set_model(red_cube);
         animation_system.modify_target(red_ent).set_target_name("red");
-        hierarchy_system.modify(red_ent).set_parent(root_entity_);
+        hierarchy_system.modify(red_ent).set_parent(root_entity_->get_entity());
 
         auto green_guard = gfx::entity_builder<>{world}
                                .with<gfx::transform_component>()
@@ -97,7 +96,7 @@ private:
         transform_system.modify(green_ent).set_position({0.0f, 0.0f, 0.0f});
         model_system.modify(green_ent).set_model(green_cube);
         animation_system.modify_target(green_ent).set_target_name("green");
-        hierarchy_system.modify(green_ent).set_parent(root_entity_);
+        hierarchy_system.modify(green_ent).set_parent(root_entity_->get_entity());
 
         auto blue_guard = gfx::entity_builder<>{world}
                               .with<gfx::transform_component>()
@@ -110,7 +109,7 @@ private:
         transform_system.modify(blue_ent).set_position({4.0f, 0.0f, 0.0f});
         model_system.modify(blue_ent).set_model(blue_cube);
         animation_system.modify_target(blue_ent).set_target_name("blue");
-        hierarchy_system.modify(blue_ent).set_parent(root_entity_);
+        hierarchy_system.modify(blue_ent).set_parent(root_entity_->get_entity());
     }
 
     void create_animations() {
@@ -270,7 +269,7 @@ private:
 
         auto& world = get_engine().get_world();
         auto& animation_system = world.get_animation_system();
-        auto modifier = animation_system.modify_player(root_entity_);
+        auto modifier = animation_system.modify_player(root_entity_->get_entity());
 
         if (ImGui::Button("Play Bounce")) {
             modifier.set_clip_by_name("bounce");
@@ -333,9 +332,8 @@ private:
         ImGui::Separator();
 
         float32 speed = 1.0f;
-        auto& registry = world.get_registry();
-        if (registry.has<gfx::animation_player_component>(root_entity_)) {
-            auto& comp = registry.get<gfx::animation_player_component>(root_entity_);
+        if (world.has_component<gfx::animation_player_component>(root_entity_->get_entity())) {
+            auto& comp = world.get_component<gfx::animation_player_component>(root_entity_->get_entity());
             speed = comp.get_playback_speed();
         }
 
@@ -343,20 +341,44 @@ private:
             modifier.set_playback_speed(speed);
         }
 
-        float32 frame_time = animation_system.get_target_frame_time();
-        float32 fps = 1.0f / frame_time;
+        float32 fps = animation_system.get_target_fps();
         if (ImGui::SliderFloat("Target FPS", &fps, 10.0f, 120.0f)) {
-            animation_system.set_target_frame_time(1.0f / fps);
+            animation_system.set_target_fps(fps);
         }
 
         ImGui::Separator();
         ImGui::Text("Current: %s", current_animation_.c_str());
 
+        if (world.has_component<gfx::animation_player_component>(root_entity_->get_entity())) {
+            auto& comp = world.get_component<gfx::animation_player_component>(root_entity_->get_entity());
+
+            ImGui::Separator();
+            ImGui::Text("Animation State:");
+
+            const char* state_str = "Unknown";
+            if (comp.is_playing()) state_str = "Playing";
+            else if (comp.is_paused()) state_str = "Paused";
+            else if (comp.is_stopped()) state_str = "Stopped";
+            ImGui::Text("State: %s", state_str);
+
+            const char* loop_str = "Unknown";
+            auto loop_mode = comp.get_loop_mode();
+            if (loop_mode == gfx::animation_loop_mode::once) loop_str = "Once";
+            else if (loop_mode == gfx::animation_loop_mode::loop) loop_str = "Loop";
+            else if (loop_mode == gfx::animation_loop_mode::ping_pong) loop_str = "Ping Pong";
+            ImGui::Text("Loop Mode: %s", loop_str);
+
+            float32 current_time = comp.get_current_time();
+            float32 duration = comp.get_duration();
+            ImGui::Text("Time: %.2f / %.2f s", current_time, duration);
+            ImGui::ProgressBar(duration > 0.0f ? current_time / duration : 0.0f);
+        }
+
         ImGui::End();
     }
 
     std::unique_ptr<gfx::fps_camera_controller> camera_controller_;
-    gfx::entity root_entity_;
+    std::unique_ptr<gfx::entity_guard> root_entity_;
     std::string current_animation_;
 };
 
