@@ -49,7 +49,9 @@ private:
     void setup_scene() {
         auto& world = get_engine().get_world();
         auto& model_registry = world.get_model_registry();
-        auto& registry = world.get_registry();
+        auto& transform_system = world.get_transform_system();
+        auto& model_system = world.get_model_system();
+        auto& hierarchy_system = world.get_hierarchy_system();
         auto& animation_system = world.get_animation_system();
 
         auto red_cube = model_registry.create("red_cube", 3, 3, 3);
@@ -61,46 +63,66 @@ private:
         auto blue_cube = model_registry.create("blue_cube", 3, 3, 3);
         blue_cube->fill(voxel{colors::blue});
 
-        root_entity_ = registry.create();
-        registry.add<gfx::transform_component>(root_entity_);
-        registry.add<gfx::hierarchy_component>(root_entity_);
-        registry.add<gfx::animation_player_component>(root_entity_);
-        registry.add<gfx::animation_target_component>(root_entity_);
+        root_entity_ = gfx::entity_builder<>{world}
+                           .with<gfx::transform_component>()
+                           .with<gfx::hierarchy_component>()
+                           .with<gfx::animation_player_component>()
+                           .with<gfx::animation_target_component>()
+                           .release()
+                           .get_entity();
+
         animation_system.modify_target(root_entity_).set_target_name("root");
 
-        auto red_ent = registry.create();
-        registry.add<gfx::transform_component>(red_ent).set_position({-4.0f, 0.0f, 0.0f});
-        registry.add<gfx::model_component>(red_ent).set_model_name("red_cube");
-        registry.add<gfx::animation_target_component>(red_ent);
+        auto red_guard = gfx::entity_builder<>{world}
+                             .with<gfx::transform_component>()
+                             .with<gfx::model_component>()
+                             .with<gfx::animation_target_component>()
+                             .with<gfx::hierarchy_component>()
+                             .release_guard();
+
+        auto red_ent = red_guard->get_entity();
+        transform_system.modify(red_ent).set_position({-4.0f, 0.0f, 0.0f});
+        model_system.modify(red_ent).set_model(red_cube);
         animation_system.modify_target(red_ent).set_target_name("red");
-        world.get_hierarchy_system().add_child(root_entity_, red_ent);
+        hierarchy_system.modify(red_ent).set_parent(root_entity_);
 
-        auto green_ent = registry.create();
-        registry.add<gfx::transform_component>(green_ent).set_position({0.0f, 0.0f, 0.0f});
-        registry.add<gfx::model_component>(green_ent).set_model_name("green_cube");
-        registry.add<gfx::animation_target_component>(green_ent);
+        auto green_guard = gfx::entity_builder<>{world}
+                               .with<gfx::transform_component>()
+                               .with<gfx::model_component>()
+                               .with<gfx::animation_target_component>()
+                               .with<gfx::hierarchy_component>()
+                               .release_guard();
+
+        auto green_ent = green_guard->get_entity();
+        transform_system.modify(green_ent).set_position({0.0f, 0.0f, 0.0f});
+        model_system.modify(green_ent).set_model(green_cube);
         animation_system.modify_target(green_ent).set_target_name("green");
-        world.get_hierarchy_system().add_child(root_entity_, green_ent);
+        hierarchy_system.modify(green_ent).set_parent(root_entity_);
 
-        auto blue_ent = registry.create();
-        registry.add<gfx::transform_component>(blue_ent).set_position({4.0f, 0.0f, 0.0f});
-        registry.add<gfx::model_component>(blue_ent).set_model_name("blue_cube");
-        registry.add<gfx::animation_target_component>(blue_ent);
+        auto blue_guard = gfx::entity_builder<>{world}
+                              .with<gfx::transform_component>()
+                              .with<gfx::model_component>()
+                              .with<gfx::animation_target_component>()
+                              .with<gfx::hierarchy_component>()
+                              .release_guard();
+
+        auto blue_ent = blue_guard->get_entity();
+        transform_system.modify(blue_ent).set_position({4.0f, 0.0f, 0.0f});
+        model_system.modify(blue_ent).set_model(blue_cube);
         animation_system.modify_target(blue_ent).set_target_name("blue");
-        world.get_hierarchy_system().add_child(root_entity_, blue_ent);
+        hierarchy_system.modify(blue_ent).set_parent(root_entity_);
     }
 
     void create_animations() {
-        auto& world = get_engine().get_world();
-        auto& clip_registry = world.get_animation_clip_registry();
-
-        create_bounce_animation(clip_registry);
-        create_rotation_animation(clip_registry);
-        create_wave_animation(clip_registry);
-        create_scale_animation(clip_registry);
+        create_bounce_animation();
+        create_rotation_animation();
+        create_wave_animation();
+        create_scale_animation();
     }
 
-    void create_bounce_animation(gfx::animation_clip_registry& registry) {
+    void create_bounce_animation() {
+        auto& world = get_engine().get_world();
+        auto& clip_registry = world.get_animation_clip_registry();
         auto clip = std::make_shared<gfx::animation_clip>("bounce");
 
         auto red_track = gfx::animation_track("red", 30.0f);
@@ -127,10 +149,12 @@ private:
         blue_track.add<gfx::animation_property::position>(blue_pos_channel);
         clip->add_track(blue_track);
 
-        registry.add("bounce", clip);
+        clip_registry.add("bounce", clip);
     }
 
-    void create_rotation_animation(gfx::animation_clip_registry& registry) {
+    void create_rotation_animation() {
+        auto& world = get_engine().get_world();
+        auto& clip_registry = world.get_animation_clip_registry();
         auto clip = std::make_shared<gfx::animation_clip>("rotation");
 
         auto root_track = gfx::animation_track("root", 30.0f);
@@ -140,10 +164,12 @@ private:
         root_track.add<gfx::animation_property::rotation>(rot_channel);
         clip->add_track(root_track);
 
-        registry.add("rotation", clip);
+        clip_registry.add("rotation", clip);
     }
 
-    void create_wave_animation(gfx::animation_clip_registry& registry) {
+    void create_wave_animation() {
+        auto& world = get_engine().get_world();
+        auto& clip_registry = world.get_animation_clip_registry();
         auto clip = std::make_shared<gfx::animation_clip>("wave");
 
         auto red_track = gfx::animation_track("red", 30.0f);
@@ -173,10 +199,12 @@ private:
         blue_track.add<gfx::animation_property::position>(blue_pos_channel);
         clip->add_track(blue_track);
 
-        registry.add("wave", clip);
+        clip_registry.add("wave", clip);
     }
 
-    void create_scale_animation(gfx::animation_clip_registry& registry) {
+    void create_scale_animation() {
+        auto& world = get_engine().get_world();
+        auto& clip_registry = world.get_animation_clip_registry();
         auto clip = std::make_shared<gfx::animation_clip>("scale");
 
         auto red_track = gfx::animation_track("red", 30.0f);
@@ -203,7 +231,7 @@ private:
         blue_track.add<gfx::animation_property::scale>(blue_scale_channel);
         clip->add_track(blue_track);
 
-        registry.add("scale", clip);
+        clip_registry.add("scale", clip);
     }
 
     void handle_key_press(gfx::key key) {
