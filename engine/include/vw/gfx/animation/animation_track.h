@@ -23,9 +23,7 @@ public:
     explicit animation_track(std::string target_name, uint32 fps = 60);
 
     template <animation_property Prop>
-    void add(channel_for<Prop> channel) {
-        add_impl(animation_channel_variant(std::move(channel)));
-    }
+    void add(animation_channel_for<Prop> channel);
 
     void remove_channel(animation_property prop);
 

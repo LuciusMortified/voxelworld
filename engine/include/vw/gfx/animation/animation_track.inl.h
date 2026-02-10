@@ -8,6 +8,11 @@ namespace vw::gfx {
 inline animation_track::animation_track(std::string target_name, uint32 fps)
     : target_name_(std::move(target_name)), compiled_fps_(fps) {}
 
+template <animation_property Prop>
+void animation_track::add(animation_channel_for<Prop> channel) {
+    add_impl(animation_channel_variant(std::move(channel)));
+}
+
 inline void animation_track::recompile_if_needed() const {
     if (!is_dirty_) {
         return;

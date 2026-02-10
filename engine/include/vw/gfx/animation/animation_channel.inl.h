@@ -77,4 +77,9 @@ auto animation_channel<T>::get_duration() const -> std::expected<float32, animat
     return keyframes_.back().time;
 }
 
+template <animation_property Prop>
+auto make_animation_channel() -> animation_channel_for<Prop> {
+    return animation_channel_for<Prop>(Prop);
+}
+
 }  // namespace vw::gfx

@@ -43,12 +43,10 @@ using animation_channel_variant = std::variant<
 >;
 
 template <animation_property Prop>
-using channel_for = animation_channel<typename animation_property_traits<Prop>::type>;
+using animation_channel_for = animation_channel<typename animation_property_traits<Prop>::type>;
 
 template <animation_property Prop>
-auto make_channel() -> channel_for<Prop> {
-    return channel_for<Prop>(Prop);
-}
+auto make_animation_channel() -> animation_channel_for<Prop>;
 
 }  // namespace vw::gfx
 

@@ -17,17 +17,14 @@ struct keyframe {
     float32 tangent_in = 0.0f;
     float32 tangent_out = 1.0f;
 
-    [[nodiscard]] auto operator<(const keyframe& other) const -> bool {
-        return time < other.time;
-    }
-
-    [[nodiscard]] auto operator==(const keyframe& other) const -> bool {
-        return time == other.time;
-    }
+    [[nodiscard]] auto operator<(const keyframe& other) const -> bool;
+    [[nodiscard]] auto operator==(const keyframe& other) const -> bool;
 };
 
 using keyframe_vec3f = keyframe<vec3f>;
 
 }  // namespace vw::gfx
+
+#include "vw/gfx/animation/keyframe.inl.h"
 
 #endif  // VW_GFX_ANIMATION_KEYFRAME_H
