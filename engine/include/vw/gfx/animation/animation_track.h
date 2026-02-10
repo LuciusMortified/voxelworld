@@ -22,11 +22,9 @@ public:
 
     explicit animation_track(std::string target_name, uint32 fps = 60);
 
-    void add(animation_channel_variant channel);
-
     template <animation_property Prop>
-    void add(animation_channel<typename animation_property_traits<Prop>::type> channel) {
-        add(animation_channel_variant(std::move(channel)));
+    void add(channel_for<Prop> channel) {
+        add_impl(animation_channel_variant(std::move(channel)));
     }
 
     void remove_channel(animation_property prop);
@@ -39,6 +37,7 @@ public:
     [[nodiscard]] auto has_channel(animation_property prop) const -> bool;
 
 private:
+    void add_impl(animation_channel_variant channel);
     void recompile_if_needed() const;
 
     std::string target_name_;

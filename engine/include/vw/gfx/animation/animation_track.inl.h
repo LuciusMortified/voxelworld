@@ -121,7 +121,7 @@ inline auto animation_track::get_duration() const -> float32 {
     return cached_duration_;
 }
 
-inline void animation_track::add(animation_channel_variant channel) {
+inline void animation_track::add_impl(animation_channel_variant channel) {
     animation_property prop;
     std::visit([&](const auto& ch) {
         prop = ch.get_property();

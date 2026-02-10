@@ -42,6 +42,14 @@ using animation_channel_variant = std::variant<
     animation_channel<vec3f>
 >;
 
+template <animation_property Prop>
+using channel_for = animation_channel<typename animation_property_traits<Prop>::type>;
+
+template <animation_property Prop>
+auto make_channel() -> channel_for<Prop> {
+    return channel_for<Prop>(Prop);
+}
+
 }  // namespace vw::gfx
 
 #include "vw/gfx/animation/animation_channel.inl.h"
