@@ -26,6 +26,7 @@ public:
 
     void add(const keyframe<T>& keyframe);
     void set_keyframes(std::vector<keyframe<T>> keyframes);
+    void clear();
     [[nodiscard]] auto evaluate(float32 time) const -> std::expected<T, error_type>;
     [[nodiscard]] auto get_duration() const -> std::expected<float32, error_type>;
     [[nodiscard]] auto get_property() const -> animation_property { return property_; }
@@ -36,8 +37,6 @@ private:
     animation_property property_;
     std::vector<keyframe<T>> keyframes_;
 };
-
-using animation_channel_vec3f = animation_channel<vec3f>;
 
 using animation_channel_variant = std::variant<
     animation_channel<vec3f>

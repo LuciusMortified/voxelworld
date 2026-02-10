@@ -59,21 +59,6 @@ inline void animation_clip::remove_track(std::string_view target_name) {
     );
 }
 
-inline void animation_clip::add_channel_to_track(
-    std::string_view target_name,
-    animation_channel_variant channel
-) {
-    animation_track* track = get_track_mut(target_name);
-
-    if (track == nullptr) {
-        animation_track new_track(std::string(target_name));
-        new_track.add(std::move(channel));
-        add_track(std::move(new_track));
-    } else {
-        track->add(std::move(channel));
-    }
-}
-
 inline auto animation_clip::get_duration() const -> float32 {
     float32 max_duration = 0.0f;
 

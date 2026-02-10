@@ -17,6 +17,11 @@ void animation_channel<T>::set_keyframes(std::vector<keyframe<T>> keyframes) {
 }
 
 template <typename T>
+void animation_channel<T>::clear() {
+    keyframes_.clear();
+}
+
+template <typename T>
 auto animation_channel<T>::evaluate(float32 time) const -> std::expected<T, animation_channel<T>::error_type> {
     if (keyframes_.empty()) {
         return std::unexpected(animation_channel<T>::error_type::empty);
