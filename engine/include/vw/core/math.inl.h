@@ -2,7 +2,11 @@
 
 #ifndef VW_CORE_MATH_INL_H
 #define VW_CORE_MATH_INL_H
+
 #include <limits>
+#include <cmath>
+
+#include "vw/core/transform.h"
 
 namespace vw::math {
 

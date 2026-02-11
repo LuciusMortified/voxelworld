@@ -136,7 +136,7 @@ void engine<WC>::render(
     float delta_time
 ) {
     world_update_start_time_ = std::chrono::high_resolution_clock::now();
-    world_->update();
+    world_->update(delta_time);
     const auto world_update_end = std::chrono::high_resolution_clock::now();
     stats_.world_update_ms =
         std::chrono::duration<float32>(world_update_end - world_update_start_time_).count() *

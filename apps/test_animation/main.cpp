@@ -5,7 +5,9 @@ using namespace vw;
 
 class test_animation_app final : public gfx::app<> {
 public:
-    explicit test_animation_app(gfx::engine<>& eng)
+    explicit test_animation_app(
+        gfx::engine<>& eng
+    )
         : app{eng} {
         auto& window = get_engine().get_window();
         auto& camera = get_engine().get_camera();
@@ -14,7 +16,7 @@ public:
         camera_controller_->setup(window, camera);
 
         window.sub<gfx::key_press_event>([this](const gfx::key_press_event& event) {
-            handle_key_press(event.key);
+            handle_key_press(event);
             return true;
         });
 
@@ -33,7 +35,9 @@ public:
 
     ~test_animation_app() override = default;
 
-    void render(float32 delta_time) override {
+    void render(
+        float32 delta_time
+    ) override {
         camera_controller_->update(delta_time);
 
         auto& renderer = get_engine().get_renderer();
@@ -47,69 +51,103 @@ public:
 
 private:
     void setup_scene() {
-        auto& world = get_engine().get_world();
-        auto& model_registry = world.get_model_registry();
+        auto& world            = get_engine().get_world();
+        auto& model_registry   = world.get_model_registry();
         auto& transform_system = world.get_transform_system();
-        auto& model_system = world.get_model_system();
+        auto& model_system     = world.get_model_system();
         auto& hierarchy_system = world.get_hierarchy_system();
         auto& animation_system = world.get_animation_system();
 
-        auto red_cube = model_registry.create("red_cube", 3, 3, 3);
-        red_cube->fill(voxel{colors::red});
+        auto red_cube_model = model_registry.create("red_cube", 3, 3, 3);
+        red_cube_model->fill(voxel{colors::red});
 
-        auto green_cube = model_registry.create("green_cube", 3, 3, 3);
-        green_cube->fill(voxel{colors::green});
+        auto green_cube_model = model_registry.create("green_cube", 3, 3, 3);
+        green_cube_model->fill(voxel{colors::green});
 
-        auto blue_cube = model_registry.create("blue_cube", 3, 3, 3);
-        blue_cube->fill(voxel{colors::blue});
+        auto blue_cube_model = model_registry.create("blue_cube", 3, 3, 3);
+        blue_cube_model->fill(voxel{colors::blue});
 
-        root_entity_ = gfx::entity_builder<>{world}
-                           .with<gfx::transform_component>()
-                           .with<gfx::hierarchy_component>()
-                           .with<gfx::animation_player_component>()
-                           .with<gfx::animation_target_component>()
-                           .release_guard();
+        root_ =
+            gfx::entity_builder<>{world}
+                .with<gfx::transform_component>()
+                .with<gfx::hierarchy_component>()
+                .with<gfx::animation_player_component>()
+                .with<gfx::animation_target_component>()
+                .release_guard();
+        auto root_ent = root_->get_entity();
 
-        animation_system.modify_target(root_entity_->get_entity()).set_target_name("root");
+        animation_system  //
+            .modify_target(root_ent)
+            .set_target_name("root");
 
-        auto red_guard = gfx::entity_builder<>{world}
-                             .with<gfx::transform_component>()
-                             .with<gfx::model_component>()
-                             .with<gfx::animation_target_component>()
-                             .with<gfx::hierarchy_component>()
-                             .release_guard();
+        red_ =
+            gfx::entity_builder<>{world}
+                .with<gfx::transform_component>()
+                .with<gfx::hierarchy_component>()
+                .with<gfx::spatial_component>()
+                .with<gfx::model_component>()
+                .with<gfx::animation_target_component>()
+                .release_guard();
 
-        auto red_ent = red_guard->get_entity();
-        transform_system.modify(red_ent).set_position({-4.0f, 0.0f, 0.0f});
-        model_system.modify(red_ent).set_model(red_cube);
-        animation_system.modify_target(red_ent).set_target_name("red");
-        hierarchy_system.modify(red_ent).set_parent(root_entity_->get_entity());
+        auto red_ent = red_->get_entity();
+        transform_system  //
+            .modify(red_ent)
+            .set_position({-4.0f, 0.0f, 0.0f});
+        model_system  //
+            .modify(red_ent)
+            .set_model(red_cube_model);
+        animation_system  //
+            .modify_target(red_ent)
+            .set_target_name("red");
+        hierarchy_system  //
+            .modify(red_ent)
+            .set_parent(root_ent);
 
-        auto green_guard = gfx::entity_builder<>{world}
-                               .with<gfx::transform_component>()
-                               .with<gfx::model_component>()
-                               .with<gfx::animation_target_component>()
-                               .with<gfx::hierarchy_component>()
-                               .release_guard();
+        green_ =
+            gfx::entity_builder<>{world}
+                .with<gfx::transform_component>()
+                .with<gfx::hierarchy_component>()
+                .with<gfx::spatial_component>()
+                .with<gfx::model_component>()
+                .with<gfx::animation_target_component>()
+                .release_guard();
 
-        auto green_ent = green_guard->get_entity();
-        transform_system.modify(green_ent).set_position({0.0f, 0.0f, 0.0f});
-        model_system.modify(green_ent).set_model(green_cube);
-        animation_system.modify_target(green_ent).set_target_name("green");
-        hierarchy_system.modify(green_ent).set_parent(root_entity_->get_entity());
+        auto green_ent = green_->get_entity();
+        transform_system  //
+            .modify(green_ent)
+            .set_position({0.0f, 0.0f, 0.0f});
+        model_system  //
+            .modify(green_ent)
+            .set_model(green_cube_model);
+        animation_system  //
+            .modify_target(green_ent)
+            .set_target_name("green");
+        hierarchy_system  //
+            .modify(green_ent)
+            .set_parent(root_ent);
 
-        auto blue_guard = gfx::entity_builder<>{world}
-                              .with<gfx::transform_component>()
-                              .with<gfx::model_component>()
-                              .with<gfx::animation_target_component>()
-                              .with<gfx::hierarchy_component>()
-                              .release_guard();
+        blue_ =
+            gfx::entity_builder<>{world}
+                .with<gfx::transform_component>()
+                .with<gfx::hierarchy_component>()
+                .with<gfx::spatial_component>()
+                .with<gfx::model_component>()
+                .with<gfx::animation_target_component>()
+                .release_guard();
 
-        auto blue_ent = blue_guard->get_entity();
-        transform_system.modify(blue_ent).set_position({4.0f, 0.0f, 0.0f});
-        model_system.modify(blue_ent).set_model(blue_cube);
-        animation_system.modify_target(blue_ent).set_target_name("blue");
-        hierarchy_system.modify(blue_ent).set_parent(root_entity_->get_entity());
+        auto blue_ent = blue_->get_entity();
+        transform_system  //
+            .modify(blue_ent)
+            .set_position({4.0f, 0.0f, 0.0f});
+        model_system  //
+            .modify(blue_ent)
+            .set_model(blue_cube_model);
+        animation_system  //
+            .modify_target(blue_ent)
+            .set_target_name("blue");
+        hierarchy_system  //
+            .modify(blue_ent)
+            .set_parent(root_ent);
     }
 
     void create_animations() {
@@ -120,141 +158,275 @@ private:
     }
 
     void create_bounce_animation() {
-        auto& world = get_engine().get_world();
+        auto& world         = get_engine().get_world();
         auto& clip_registry = world.get_animation_clip_registry();
-        auto clip = std::make_shared<gfx::animation_clip>("bounce");
+        auto clip           = clip_registry.create("bounce");
 
-        auto red_track = gfx::animation_track("red", 30.0f);
-        auto red_pos_channel = gfx::make_animation_channel<gfx::animation_property::position>();
-        red_pos_channel.add_keyframe({0.0f, vec3f{-4.0f, 0.0f, 0.0f}});
-        red_pos_channel.add_keyframe({0.5f, vec3f{-4.0f, 3.0f, 0.0f}});
-        red_pos_channel.add_keyframe({1.0f, vec3f{-4.0f, 0.0f, 0.0f}});
-        red_track.add<gfx::animation_property::position>(red_pos_channel);
-        clip->add_track(red_track);
+        {
+            auto track       = gfx::animation_track("red", 120.0f);
 
-        auto green_track = gfx::animation_track("green", 30.0f);
-        auto green_pos_channel = gfx::make_animation_channel<gfx::animation_property::position>();
-        green_pos_channel.add_keyframe({0.0f, vec3f{0.0f, 0.0f, 0.0f}});
-        green_pos_channel.add_keyframe({0.5f, vec3f{0.0f, 3.0f, 0.0f}});
-        green_pos_channel.add_keyframe({1.0f, vec3f{0.0f, 0.0f, 0.0f}});
-        green_track.add<gfx::animation_property::position>(green_pos_channel);
-        clip->add_track(green_track);
+            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            pos_ch.add({0.0f, vec3f{-4.0f, 0.0f, 0.0f}});
+            pos_ch.add({0.5f, vec3f{-4.0f, 3.0f, 0.0f}});
+            pos_ch.add({1.0f, vec3f{-4.0f, 0.0f, 0.0f}});
+            track.add<gfx::animation_property::position>(pos_ch);
 
-        auto blue_track = gfx::animation_track("blue", 30.0f);
-        auto blue_pos_channel = gfx::make_animation_channel<gfx::animation_property::position>();
-        blue_pos_channel.add_keyframe({0.0f, vec3f{4.0f, 0.0f, 0.0f}});
-        blue_pos_channel.add_keyframe({0.5f, vec3f{4.0f, 3.0f, 0.0f}});
-        blue_pos_channel.add_keyframe({1.0f, vec3f{4.0f, 0.0f, 0.0f}});
-        blue_track.add<gfx::animation_property::position>(blue_pos_channel);
-        clip->add_track(blue_track);
+            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
+            track.add<gfx::animation_property::origin>(org_ch);
 
-        clip_registry.add("bounce", clip);
+            clip->add_track(track);
+        }
+
+        {
+            auto track       = gfx::animation_track("green", 120.0f);
+
+            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            pos_ch.add({0.0f, vec3f{0.0f, 3.0f, 0.0f}});
+            pos_ch.add({0.5f, vec3f{0.0f, 0.0f, 0.0f}});
+            pos_ch.add({1.0f, vec3f{0.0f, 3.0f, 0.0f}});
+            track.add<gfx::animation_property::position>(pos_ch);
+
+            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
+            track.add<gfx::animation_property::origin>(org_ch);
+
+            clip->add_track(track);
+        }
+
+        {
+            auto track       = gfx::animation_track("blue", 120.0f);
+
+            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            pos_ch.add({0.0f, vec3f{4.0f, 0.0f, 0.0f}});
+            pos_ch.add({0.5f, vec3f{4.0f, 3.0f, 0.0f}});
+            pos_ch.add({1.0f, vec3f{4.0f, 0.0f, 0.0f}});
+            track.add<gfx::animation_property::position>(pos_ch);
+
+            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
+            track.add<gfx::animation_property::origin>(org_ch);
+
+            clip->add_track(track);
+        }
+
+        auto& animation_system = world.get_animation_system();
+        auto player_modifier   = animation_system.modify_player(root_->get_entity());
+        player_modifier.set_clip_by_name("bounce");
+        player_modifier.set_loop_mode(gfx::animation_loop_mode::loop);
+        player_modifier.play();
     }
 
     void create_rotation_animation() {
-        auto& world = get_engine().get_world();
+        auto& world         = get_engine().get_world();
         auto& clip_registry = world.get_animation_clip_registry();
-        auto clip = std::make_shared<gfx::animation_clip>("rotation");
+        auto clip           = clip_registry.create("rotation");
 
-        auto root_track = gfx::animation_track("root", 30.0f);
-        auto rot_channel = gfx::make_animation_channel<gfx::animation_property::rotation>();
-        rot_channel.add_keyframe({0.0f, vec3f{0.0f, 0.0f, 0.0f}});
-        rot_channel.add_keyframe({1.0f, vec3f{0.0f, math::pi * 2.0f, 0.0f}});
-        root_track.add<gfx::animation_property::rotation>(rot_channel);
-        clip->add_track(root_track);
+        {
+            auto track       = gfx::animation_track("red", 120.0f);
 
-        clip_registry.add("rotation", clip);
+            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            pos_ch.add({0.0f, vec3f{-4.0f, 0.0f, 0.0f}});
+            track.add<gfx::animation_property::position>(pos_ch);
+
+            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
+            track.add<gfx::animation_property::origin>(org_ch);
+
+            auto rot_ch = gfx::make_animation_channel<gfx::animation_property::rotation>();
+            rot_ch.add({0.0f, vec3f{0.0f, 0.0f, 0.0f}});
+            rot_ch.add({1.0f, vec3f{math::radians(180.0f), 0.0f, 0.0f}});
+            track.add<gfx::animation_property::rotation>(rot_ch);
+
+            clip->add_track(track);
+        }
+
+        {
+            auto track       = gfx::animation_track("green", 120.0f);
+
+            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            pos_ch.add({0.0f, vec3f{0.0f, 0.0f, 0.0f}});
+            track.add<gfx::animation_property::position>(pos_ch);
+
+            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
+            track.add<gfx::animation_property::origin>(org_ch);
+
+            auto rot_ch = gfx::make_animation_channel<gfx::animation_property::rotation>();
+            rot_ch.add({0.0f, vec3f{0.0f, 0.0f, 0.0f}});
+            rot_ch.add({1.0f, vec3f{0.0f, math::radians(180.0f), 0.0f}});
+            track.add<gfx::animation_property::rotation>(rot_ch);
+
+            clip->add_track(track);
+        }
+
+        {
+            auto track       = gfx::animation_track("blue", 120.0f);
+
+            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            pos_ch.add({0.0f, vec3f{4.0f, 0.0f, 0.0f}});
+            track.add<gfx::animation_property::position>(pos_ch);
+
+            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
+            track.add<gfx::animation_property::origin>(org_ch);
+
+            auto rot_ch = gfx::make_animation_channel<gfx::animation_property::rotation>();
+            rot_ch.add({0.0f, vec3f{0.0f, 0.0f, 0.0f}});
+            rot_ch.add({1.0f, vec3f{0.0f, 0.0f, math::radians(180.0f)}});
+            track.add<gfx::animation_property::rotation>(rot_ch);
+
+            clip->add_track(track);
+        }
     }
 
     void create_wave_animation() {
-        auto& world = get_engine().get_world();
+        auto& world         = get_engine().get_world();
         auto& clip_registry = world.get_animation_clip_registry();
-        auto clip = std::make_shared<gfx::animation_clip>("wave");
+        auto clip           = clip_registry.create("wave");
 
-        auto red_track = gfx::animation_track("red", 30.0f);
-        auto red_pos_channel = gfx::make_animation_channel<gfx::animation_property::position>();
-        red_pos_channel.add_keyframe({0.0f, vec3f{-4.0f, 0.0f, 0.0f}});
-        red_pos_channel.add_keyframe({0.33f, vec3f{-4.0f, 2.0f, 0.0f}});
-        red_pos_channel.add_keyframe({0.66f, vec3f{-4.0f, 0.0f, 0.0f}});
-        red_pos_channel.add_keyframe({1.0f, vec3f{-4.0f, 0.0f, 0.0f}});
-        red_track.add<gfx::animation_property::position>(red_pos_channel);
-        clip->add_track(red_track);
+        {
+            auto track       = gfx::animation_track("red", 120.0f);
 
-        auto green_track = gfx::animation_track("green", 30.0f);
-        auto green_pos_channel = gfx::make_animation_channel<gfx::animation_property::position>();
-        green_pos_channel.add_keyframe({0.0f, vec3f{0.0f, 0.0f, 0.0f}});
-        green_pos_channel.add_keyframe({0.33f, vec3f{0.0f, 0.0f, 0.0f}});
-        green_pos_channel.add_keyframe({0.66f, vec3f{0.0f, 2.0f, 0.0f}});
-        green_pos_channel.add_keyframe({1.0f, vec3f{0.0f, 0.0f, 0.0f}});
-        green_track.add<gfx::animation_property::position>(green_pos_channel);
-        clip->add_track(green_track);
+            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            pos_ch.add({0.0f, vec3f{-4.0f, 0.0f, 0.0f}});
+            pos_ch.add({0.33f, vec3f{-4.0f, 2.0f, 0.0f}});
+            pos_ch.add({0.66f, vec3f{-4.0f, 0.0f, 0.0f}});
+            pos_ch.add({1.0f, vec3f{-4.0f, 0.0f, 0.0f}});
+            track.add<gfx::animation_property::position>(pos_ch);
 
-        auto blue_track = gfx::animation_track("blue", 30.0f);
-        auto blue_pos_channel = gfx::make_animation_channel<gfx::animation_property::position>();
-        blue_pos_channel.add_keyframe({0.0f, vec3f{4.0f, 0.0f, 0.0f}});
-        blue_pos_channel.add_keyframe({0.33f, vec3f{4.0f, 0.0f, 0.0f}});
-        blue_pos_channel.add_keyframe({0.66f, vec3f{4.0f, 0.0f, 0.0f}});
-        blue_pos_channel.add_keyframe({1.0f, vec3f{4.0f, 2.0f, 0.0f}});
-        blue_track.add<gfx::animation_property::position>(blue_pos_channel);
-        clip->add_track(blue_track);
+            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
+            track.add<gfx::animation_property::origin>(org_ch);
 
-        clip_registry.add("wave", clip);
+            clip->add_track(track);
+        }
+
+        {
+            auto track       = gfx::animation_track("green", 120.0f);
+
+            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            pos_ch.add({0.0f, vec3f{0.0f, 0.0f, 0.0f}});
+            pos_ch.add({0.33f, vec3f{0.0f, 0.0f, 0.0f}});
+            pos_ch.add({0.66f, vec3f{0.0f, 2.0f, 0.0f}});
+            pos_ch.add({1.0f, vec3f{0.0f, 0.0f, 0.0f}});
+            track.add<gfx::animation_property::position>(pos_ch);
+
+            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
+            track.add<gfx::animation_property::origin>(org_ch);
+
+            clip->add_track(track);
+        }
+
+        {
+            auto track       = gfx::animation_track("blue", 120.0f);
+
+            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            pos_ch.add({0.0f, vec3f{4.0f, 0.0f, 0.0f}});
+            pos_ch.add({0.33f, vec3f{4.0f, 0.0f, 0.0f}});
+            pos_ch.add({0.66f, vec3f{4.0f, 0.0f, 0.0f}});
+            pos_ch.add({1.0f, vec3f{4.0f, 2.0f, 0.0f}});
+            pos_ch.add({1.33f, vec3f{4.0f, 0.0f, 0.0f}});
+            track.add<gfx::animation_property::position>(pos_ch);
+
+            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
+            track.add<gfx::animation_property::origin>(org_ch);
+
+            clip->add_track(track);
+        }
     }
 
     void create_scale_animation() {
-        auto& world = get_engine().get_world();
+        auto& world         = get_engine().get_world();
         auto& clip_registry = world.get_animation_clip_registry();
-        auto clip = std::make_shared<gfx::animation_clip>("scale");
+        auto clip           = clip_registry.create("scale");
 
-        auto red_track = gfx::animation_track("red", 30.0f);
-        auto red_scale_channel = gfx::make_animation_channel<gfx::animation_property::scale>();
-        red_scale_channel.add_keyframe({0.0f, vec3f{1.0f, 1.0f, 1.0f}});
-        red_scale_channel.add_keyframe({0.5f, vec3f{1.5f, 1.5f, 1.5f}});
-        red_scale_channel.add_keyframe({1.0f, vec3f{1.0f, 1.0f, 1.0f}});
-        red_track.add<gfx::animation_property::scale>(red_scale_channel);
-        clip->add_track(red_track);
+        {
+            auto track         = gfx::animation_track("red", 120.0f);
 
-        auto green_track = gfx::animation_track("green", 30.0f);
-        auto green_scale_channel = gfx::make_animation_channel<gfx::animation_property::scale>();
-        green_scale_channel.add_keyframe({0.0f, vec3f{1.0f, 1.0f, 1.0f}});
-        green_scale_channel.add_keyframe({0.5f, vec3f{0.5f, 0.5f, 0.5f}});
-        green_scale_channel.add_keyframe({1.0f, vec3f{1.0f, 1.0f, 1.0f}});
-        green_track.add<gfx::animation_property::scale>(green_scale_channel);
-        clip->add_track(green_track);
+            auto scl_ch = gfx::make_animation_channel<gfx::animation_property::scale>();
+            scl_ch.add({0.0f, vec3f{1.0f, 1.0f, 1.0f}});
+            scl_ch.add({0.5f, vec3f{1.5f, 1.5f, 1.5f}});
+            scl_ch.add({1.0f, vec3f{1.0f, 1.0f, 1.0f}});
+            track.add<gfx::animation_property::scale>(scl_ch);
 
-        auto blue_track = gfx::animation_track("blue", 30.0f);
-        auto blue_scale_channel = gfx::make_animation_channel<gfx::animation_property::scale>();
-        blue_scale_channel.add_keyframe({0.0f, vec3f{1.0f, 1.0f, 1.0f}});
-        blue_scale_channel.add_keyframe({0.5f, vec3f{1.2f, 0.8f, 1.2f}});
-        blue_scale_channel.add_keyframe({1.0f, vec3f{1.0f, 1.0f, 1.0f}});
-        blue_track.add<gfx::animation_property::scale>(blue_scale_channel);
-        clip->add_track(blue_track);
+            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            pos_ch.add({0.0f, vec3f{-4.0f, 0.0f, 0.0f}});
+            track.add<gfx::animation_property::position>(pos_ch);
 
-        clip_registry.add("scale", clip);
+            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
+            track.add<gfx::animation_property::origin>(org_ch);
+
+            clip->add_track(track);
+        }
+
+        {
+            auto track         = gfx::animation_track("green", 120.0f);
+
+            auto scl_ch = gfx::make_animation_channel<gfx::animation_property::scale>();
+            scl_ch.add({0.0f, vec3f{1.0f, 1.0f, 1.0f}});
+            scl_ch.add({0.5f, vec3f{0.5f, 0.5f, 0.5f}});
+            scl_ch.add({1.0f, vec3f{1.0f, 1.0f, 1.0f}});
+            track.add<gfx::animation_property::scale>(scl_ch);
+
+            auto pos_ch   = gfx::make_animation_channel<gfx::animation_property::position>();
+            pos_ch.add({0.0f, vec3f{0.0f, 0.0f, 0.0f}});
+            track.add<gfx::animation_property::position>(pos_ch);
+
+            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
+            track.add<gfx::animation_property::origin>(org_ch);
+
+            clip->add_track(track);
+        }
+
+        {
+            auto track         = gfx::animation_track("blue", 120.0f);
+
+            auto scl_ch = gfx::make_animation_channel<gfx::animation_property::scale>();
+            scl_ch.add({0.0f, vec3f{1.0f, 1.0f, 1.0f}});
+            scl_ch.add({0.5f, vec3f{1.2f, 0.8f, 1.2f}});
+            scl_ch.add({1.0f, vec3f{1.0f, 1.0f, 1.0f}});
+            track.add<gfx::animation_property::scale>(scl_ch);
+
+            auto pos_ch   = gfx::make_animation_channel<gfx::animation_property::position>();
+            pos_ch.add({0.0f, vec3f{4.0f, 0.0f, 0.0f}});
+            track.add<gfx::animation_property::position>(pos_ch);
+
+            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
+            track.add<gfx::animation_property::origin>(org_ch);
+
+            clip->add_track(track);
+        }
     }
 
-    void handle_key_press(gfx::key key) {
-        auto& window = get_engine().get_window();
+    void handle_key_press(
+        const gfx::key_press_event& ev
+    ) {
+        using keys = gfx::keyboard::keys;
 
-        if (key == gfx::key::escape) {
+        if (ev.key == keys::ESCAPE) {
             get_engine().shutdown();
-        } else if (key == gfx::key::f1) {
-            if (window.get_cursor_mode() == gfx::cursor_mode::normal) {
-                window.set_cursor_mode(gfx::cursor_mode::disabled);
-            } else {
-                window.set_cursor_mode(gfx::cursor_mode::normal);
-            }
+        } else if (ev.key == keys::F1) {
+            camera_controller_->toggle_mouse_captured();
+            camera_controller_->toggle_keyboard_control_enabled();
         }
     }
 
     void render_ui() {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImVec2 window_pos = ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
-        ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.0f, 0.0f));
+        ImVec2 window_pos       = ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
+        ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
 
-        ImGuiWindowFlags window_flags =
-            ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings;
+        ImGuiWindowFlags window_flags =          //
+            ImGuiWindowFlags_NoCollapse |        //
+            ImGuiWindowFlags_NoResize |          //
+            ImGuiWindowFlags_AlwaysAutoResize |  //
+            ImGuiWindowFlags_NoSavedSettings;
 
         ImGui::Begin("Animation Test", nullptr, window_flags);
 
@@ -265,57 +437,60 @@ private:
         ImGui::Text("ESC - exit");
 
         ImGui::Separator();
-        ImGui::Text("Animations:");
 
-        auto& world = get_engine().get_world();
+        auto& world            = get_engine().get_world();
         auto& animation_system = world.get_animation_system();
-        auto modifier = animation_system.modify_player(root_entity_->get_entity());
+        auto modifier          = animation_system.modify_player(root_->get_entity());
+        auto& animation_comp =
+            world.get_component<gfx::animation_player_component>(root_->get_entity());
 
-        if (ImGui::Button("Play Bounce")) {
-            modifier.set_clip_by_name("bounce");
-            modifier.set_loop_mode(gfx::animation_loop_mode::loop);
-            modifier.play();
+        ImGui::Text("Animation: ");
+
+        if (ImGui::Button("Bounce")) {
+            modifier.blend_to_by_name("bounce", 0.5f);
             current_animation_ = "bounce";
         }
+        ImGui::SameLine();
 
-        if (ImGui::Button("Play Rotation")) {
-            if (current_animation_.empty()) {
-                modifier.set_clip_by_name("rotation");
-                modifier.set_loop_mode(gfx::animation_loop_mode::loop);
-                modifier.play();
-            } else {
-                modifier.blend_to_by_name("rotation", 0.5f);
-                modifier.set_loop_mode(gfx::animation_loop_mode::loop);
-            }
+        if (ImGui::Button("Rotation")) {
+            modifier.blend_to_by_name("rotation", 0.5f);
             current_animation_ = "rotation";
         }
+        ImGui::SameLine();
 
-        if (ImGui::Button("Play Wave")) {
-            if (current_animation_.empty()) {
-                modifier.set_clip_by_name("wave");
-                modifier.set_loop_mode(gfx::animation_loop_mode::loop);
-                modifier.play();
-            } else {
-                modifier.blend_to_by_name("wave", 0.5f);
-                modifier.set_loop_mode(gfx::animation_loop_mode::loop);
-            }
+        if (ImGui::Button("Wave")) {
+            modifier.blend_to_by_name("wave", 0.5f);
             current_animation_ = "wave";
         }
+        ImGui::SameLine();
 
-        if (ImGui::Button("Play Scale")) {
-            if (current_animation_.empty()) {
-                modifier.set_clip_by_name("scale");
-                modifier.set_loop_mode(gfx::animation_loop_mode::loop);
-                modifier.play();
-            } else {
-                modifier.blend_to_by_name("scale", 0.5f);
-                modifier.set_loop_mode(gfx::animation_loop_mode::loop);
-            }
+        if (ImGui::Button("Scale")) {
+            modifier.blend_to_by_name("scale", 0.5f);
             current_animation_ = "scale";
         }
 
         ImGui::Separator();
 
+        ImGui::Text("Loop Mode:");
+        if (ImGui::Button("Once")) {
+            modifier.set_loop_mode(gfx::animation_loop_mode::once);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Loop")) {
+            modifier.set_loop_mode(gfx::animation_loop_mode::loop);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Ping Pong")) {
+            modifier.set_loop_mode(gfx::animation_loop_mode::ping_pong);
+        }
+
+        ImGui::Separator();
+
+        ImGui::Text("Control:");
+        if (ImGui::Button("Play")) {
+            modifier.play();
+        }
+        ImGui::SameLine();
         if (ImGui::Button("Pause")) {
             modifier.pause();
         }
@@ -326,16 +501,11 @@ private:
         ImGui::SameLine();
         if (ImGui::Button("Stop")) {
             modifier.stop();
-            current_animation_.clear();
         }
 
         ImGui::Separator();
 
-        float32 speed = 1.0f;
-        if (world.has_component<gfx::animation_player_component>(root_entity_->get_entity())) {
-            auto& comp = world.get_component<gfx::animation_player_component>(root_entity_->get_entity());
-            speed = comp.get_playback_speed();
-        }
+        float32 speed = animation_comp.get_playback_speed();
 
         if (ImGui::SliderFloat("Speed", &speed, 0.1f, 3.0f)) {
             modifier.set_playback_speed(speed);
@@ -349,27 +519,35 @@ private:
         ImGui::Separator();
         ImGui::Text("Current: %s", current_animation_.c_str());
 
-        if (world.has_component<gfx::animation_player_component>(root_entity_->get_entity())) {
-            auto& comp = world.get_component<gfx::animation_player_component>(root_entity_->get_entity());
+        if (world.has_component<gfx::animation_player_component>(root_->get_entity())) {
+            auto& comp = world.get_component<gfx::animation_player_component>(root_->get_entity());
 
             ImGui::Separator();
             ImGui::Text("Animation State:");
 
             const char* state_str = "Unknown";
-            if (comp.is_playing()) state_str = "Playing";
-            else if (comp.is_paused()) state_str = "Paused";
-            else if (comp.is_stopped()) state_str = "Stopped";
+            if (comp.is_playing()) {
+                state_str = "Playing";
+            } else if (comp.is_paused()) {
+                state_str = "Paused";
+            } else if (comp.is_stopped()) {
+                state_str = "Stopped";
+            }
             ImGui::Text("State: %s", state_str);
 
             const char* loop_str = "Unknown";
-            auto loop_mode = comp.get_loop_mode();
-            if (loop_mode == gfx::animation_loop_mode::once) loop_str = "Once";
-            else if (loop_mode == gfx::animation_loop_mode::loop) loop_str = "Loop";
-            else if (loop_mode == gfx::animation_loop_mode::ping_pong) loop_str = "Ping Pong";
+            auto loop_mode       = comp.get_loop_mode();
+            if (loop_mode == gfx::animation_loop_mode::once) {
+                loop_str = "Once";
+            } else if (loop_mode == gfx::animation_loop_mode::loop) {
+                loop_str = "Loop";
+            } else if (loop_mode == gfx::animation_loop_mode::ping_pong) {
+                loop_str = "Ping Pong";
+            }
             ImGui::Text("Loop Mode: %s", loop_str);
 
             float32 current_time = comp.get_current_time();
-            float32 duration = comp.get_duration();
+            float32 duration     = comp.get_duration();
             ImGui::Text("Time: %.2f / %.2f s", current_time, duration);
             ImGui::ProgressBar(duration > 0.0f ? current_time / duration : 0.0f);
         }
@@ -378,15 +556,17 @@ private:
     }
 
     std::unique_ptr<gfx::fps_camera_controller> camera_controller_;
-    std::unique_ptr<gfx::entity_guard> root_entity_;
-    std::string current_animation_;
+    std::unique_ptr<gfx::entity_guard<>> root_;
+    std::unique_ptr<gfx::entity_guard<>> red_;
+    std::unique_ptr<gfx::entity_guard<>> green_;
+    std::unique_ptr<gfx::entity_guard<>> blue_;
+    std::string current_animation_ = "bounce";
 };
 
 auto main() -> int32 {
     try {
-        gfx::engine engine{"Test Animation", 1280, 720};
-        test_animation_app app{engine};
-        engine.run();
+        gfx::engine<> engine{1280, 720, "Test Animation"};
+        engine.run<test_animation_app>();
     } catch (const std::exception& e) {
         log::error("Fatal error: {}", e.what());
         return 1;

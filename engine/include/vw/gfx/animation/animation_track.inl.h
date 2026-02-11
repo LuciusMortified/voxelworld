@@ -59,9 +59,9 @@ inline void animation_track::recompile_if_needed() const {
                 }
 
                 auto property = channel.get_property();
+                auto value = value_result.value();
 
-                if constexpr (std::is_same_v<decltype(*value_result), vec3f>) {
-                    vec3f value = *value_result;
+                if constexpr (std::is_same_v<decltype(value), vec3f>) {
                     switch (property) {
                         case animation_property::position:
                             t.set_position(value);

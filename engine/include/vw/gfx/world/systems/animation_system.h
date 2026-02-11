@@ -91,7 +91,7 @@ private:
     std::vector<entity> to_remove_;
     std::deque<entity> to_visit_;
     float32 accumulated_delta_time_ = 0.0f;
-    float32 target_frame_time_ = 1.0f / 30.0f;
+    float32 target_frame_time_ = 1.0f / 120.0f;
 
     void add_active_entity(entity root_ent);
     void remove_active_entity(entity root_ent);

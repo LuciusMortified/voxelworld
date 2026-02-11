@@ -62,16 +62,14 @@ public:
         ImVec2 window_pos       = ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
         ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.0f, 0.0f));
 
-        // clang-format off
-        ImGuiWindowFlags window_flags =
-            ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoScrollbar |
-            ImGuiWindowFlags_AlwaysAutoResize |
-            ImGuiWindowFlags_NoSavedSettings |
-            ImGuiWindowFlags_NoNav |
+        ImGuiWindowFlags window_flags =          //
+            ImGuiWindowFlags_NoCollapse |        //
+            ImGuiWindowFlags_NoResize |          //
+            ImGuiWindowFlags_NoScrollbar |       //
+            ImGuiWindowFlags_AlwaysAutoResize |  //
+            ImGuiWindowFlags_NoSavedSettings |   //
+            ImGuiWindowFlags_NoNav |             //
             ImGuiWindowFlags_NoFocusOnAppearing;
-        // clang-format on
 
         ImGui::Begin("Test Simple Model", nullptr, window_flags);
         ImGui::Text("Controls:");
@@ -86,7 +84,7 @@ public:
         ImGui::Text("Object:");
         ImGui::Text("Rotation speed:");
         ImGui::SliderFloat("##", &object_rotation_speed_, 0.0f, 20.0f);
-        ImGui::Text("Current angle: %.2f degrees", vw::math::degrees(object_rotation_));
+        ImGui::Text("Current angle: %.2f degrees", math::degrees(object_rotation_));
         ImGui::End();
     }
 
@@ -210,9 +208,9 @@ private:
 
             auto voxel_hit = world.voxel_ray_cast(ray, selected_entities_);
             if (voxel_hit.has_value()) {
-                selected_entity_     = voxel_hit->ent;
-                selected_voxel_      = voxel_hit->voxel_pos;
-                selected_empty_pos_  = voxel_hit->empty_pos;
+                selected_entity_    = voxel_hit->ent;
+                selected_voxel_     = voxel_hit->voxel_pos;
+                selected_empty_pos_ = voxel_hit->empty_pos;
                 log::info(
                     "Selected entity: {}.{}, voxel: ({}, {}, {}), empty: ({}, {}, {})",
                     selected_entity_.index,
@@ -234,8 +232,8 @@ private:
     }
 
     void render_selected_voxel() {
-        auto& world                = get_engine().get_world();
-        
+        auto& world = get_engine().get_world();
+
         const bool can_be_rendered =  //
             selected_entity_.is_valid() &&
             world.has_component<gfx::transform_component>(selected_entity_);

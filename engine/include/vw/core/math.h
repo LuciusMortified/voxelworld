@@ -3,12 +3,15 @@
 #ifndef VW_CORE_MATH_H
 #define VW_CORE_MATH_H
 
-#include <cmath>
-
 #include "vw/core/color.h"
 #include "vw/core/mat4.h"
-#include "vw/core/transform.h"
 #include "vw/core/vec3.h"
+
+namespace vw {
+
+struct transform;
+
+}
 
 namespace vw::math {
 
@@ -46,8 +49,17 @@ vec3f cubic_bezier(const vec3f& a, const vec3f& b, float t, float control1, floa
 float apply_easing(float t, interpolation_type type);
 float apply_easing_bezier(float t, interpolation_type type, float control1, float control2);
 uint8 lerp(uint8 a, uint8 b, float t);
-vec3f interpolate(const vec3f& a, const vec3f& b, float t, interpolation_type type, float control1 = 0.0f, float control2 = 1.0f);
-color interpolate(color a, color b, float t, interpolation_type type, float control1 = 0.0f, float control2 = 1.0f);
+vec3f interpolate(
+    const vec3f& a,
+    const vec3f& b,
+    float t,
+    interpolation_type type,
+    float control1 = 0.0f,
+    float control2 = 1.0f
+);
+color interpolate(
+    color a, color b, float t, interpolation_type type, float control1 = 0.0f, float control2 = 1.0f
+);
 
 vec3f perpendicular(const vec3f& eye, const vec3f& target);
 
