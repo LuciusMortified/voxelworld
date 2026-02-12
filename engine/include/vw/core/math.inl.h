@@ -460,9 +460,9 @@ inline mat4f orthographic_matrix(
     matrix[0, 0] = 2.0f / (right - left);
     matrix[1, 1] = 2.0f / (top - bottom);
     matrix[2, 2] = -1.0f / (far - near);
-    matrix[3, 0] = -(right + left) / (right - left);
-    matrix[3, 1] = -(top + bottom) / (top - bottom);
-    matrix[3, 2] = -near / (far - near);
+    matrix[0, 3] = -(right + left) / (right - left);
+    matrix[1, 3] = -(top + bottom) / (top - bottom);
+    matrix[2, 3] = -near / (far - near);
 
     return matrix;
 }
