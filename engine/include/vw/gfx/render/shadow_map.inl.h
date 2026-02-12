@@ -263,7 +263,8 @@ inline void shadow_map::update(
         camera.get_fov(), camera.get_aspect_ratio(), cam_near, shadow_far
     );
     auto cam_view = camera.get_view_matrix();
-    auto inv_cam = math::inverse_matrix(cam_proj * cam_view);
+    auto inv_result = math::inverse_matrix(cam_proj * cam_view);
+    auto inv_cam = inv_result.value_or(math::identity_matrix());
 
     // Для каждого каскада вычисляем light space matrix
     float last_cascade_split = 0.0f;

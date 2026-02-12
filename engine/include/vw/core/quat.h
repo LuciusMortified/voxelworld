@@ -10,40 +10,41 @@ namespace vw {
 struct quat {
     float32 x, y, z, w;
 
-    quat() : x(0), y(0), z(0), w(1) {}
-    quat(float32 x_, float32 y_, float32 z_, float32 w_) : x(x_), y(y_), z(z_), w(w_) {}
+    constexpr quat() : x(0), y(0), z(0), w(1) {}
+    constexpr quat(float32 x_, float32 y_, float32 z_, float32 w_) : x(x_), y(y_), z(z_), w(w_) {}
 
-    [[nodiscard]] auto operator+(const quat& other) const -> quat {
-        return {x + other.x, y + other.y, z + other.z, w + other.w};
-    }
+    [[nodiscard]] constexpr float32& operator[](size_t index) { return (&x)[index]; }
+    [[nodiscard]] constexpr const float32& operator[](size_t index) const { return (&x)[index]; }
 
-    [[nodiscard]] auto operator-(const quat& other) const -> quat {
-        return {x - other.x, y - other.y, z - other.z, w - other.w};
-    }
+    [[nodiscard]] constexpr quat operator+() const { return *this; }
+    [[nodiscard]] constexpr quat operator-() const { return {-x, -y, -z, -w}; }
 
-    [[nodiscard]] auto operator-() const -> quat { return {-x, -y, -z, -w}; }
+    [[nodiscard]] constexpr quat operator+(const quat& o) const { return {x+o.x, y+o.y, z+o.z, w+o.w}; }
+    [[nodiscard]] constexpr quat operator-(const quat& o) const { return {x-o.x, y-o.y, z-o.z, w-o.w}; }
 
-    [[nodiscard]] auto operator*(float32 scalar) const -> quat {
-        return {x * scalar, y * scalar, z * scalar, w * scalar};
-    }
+    [[nodiscard]] constexpr quat operator*(float32 s) const { return {x*s, y*s, z*s, w*s}; }
+    [[nodiscard]] constexpr quat operator/(float32 s) const { return {x/s, y/s, z/s, w/s}; }
 
-    [[nodiscard]] auto operator*(const quat& other) const -> quat {
+    [[nodiscard]] constexpr quat operator*(const quat& o) const {
         return {
-            w * other.x + x * other.w + y * other.z - z * other.y,
-            w * other.y - x * other.z + y * other.w + z * other.x,
-            w * other.z + x * other.y - y * other.x + z * other.w,
-            w * other.w - x * other.x - y * other.y - z * other.z
+            w*o.x + x*o.w + y*o.z - z*o.y,
+            w*o.y - x*o.z + y*o.w + z*o.x,
+            w*o.z + x*o.y - y*o.x + z*o.w,
+            w*o.w - x*o.x - y*o.y - z*o.z
         };
     }
 
-    [[nodiscard]] auto operator==(const quat& other) const -> bool {
-        return x == other.x && y == other.y && z == other.z && w == other.w;
-    }
+    constexpr quat& operator+=(const quat& o) { x+=o.x; y+=o.y; z+=o.z; w+=o.w; return *this; }
+    constexpr quat& operator-=(const quat& o) { x-=o.x; y-=o.y; z-=o.z; w-=o.w; return *this; }
+    constexpr quat& operator*=(float32 s) { x*=s; y*=s; z*=s; w*=s; return *this; }
+    constexpr quat& operator/=(float32 s) { x/=s; y/=s; z/=s; w/=s; return *this; }
+    constexpr quat& operator*=(const quat& o) { *this = *this * o; return *this; }
 
-    [[nodiscard]] auto operator!=(const quat& other) const -> bool {
-        return !(*this == other);
-    }
+    [[nodiscard]] constexpr bool operator==(const quat& o) const { return x==o.x && y==o.y && z==o.z && w==o.w; }
+    [[nodiscard]] constexpr bool operator!=(const quat& o) const { return !(*this == o); }
 };
+
+[[nodiscard]] constexpr inline quat operator*(float32 scalar, const quat& q) { return q * scalar; }
 
 }  // namespace vw
 

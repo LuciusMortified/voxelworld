@@ -41,12 +41,30 @@ public:
     auto operator*(const vec4<T>& v) const -> vec4<T>;
     auto operator*(const vec3<T>& vec) const -> vec3<T>;
 
+    auto operator+(const mat4& other) const -> mat4;
+    auto operator-(const mat4& other) const -> mat4;
+
+    auto operator-() const -> mat4;
+
+    auto operator*(T scalar) const -> mat4;
+    auto operator/(T scalar) const -> mat4;
+
+    auto operator+=(const mat4& other) -> mat4&;
+    auto operator-=(const mat4& other) -> mat4&;
+    auto operator*=(const mat4& other) -> mat4&;
+    auto operator*=(T scalar) -> mat4&;
+    auto operator/=(T scalar) -> mat4&;
+
     auto operator==(const mat4& other) const -> bool;
     auto operator!=(const mat4& other) const -> bool;
 };
 
+template <typename T>
+auto operator*(T scalar, const mat4<T>& m) -> mat4<T>;
+
 using mat4f = mat4<float32>;
 using mat4d = mat4<float64>;
+
 }  // namespace vw
 
 #include "vw/core/mat4.inl.h"
