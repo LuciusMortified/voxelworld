@@ -3,8 +3,6 @@
 #ifndef VW_CORE_TRANSFORM_INL_H
 #define VW_CORE_TRANSFORM_INL_H
 
-#include "vw/core/math.h"
-#include "vw/core/transform.h"
 #include "vw/core/vec3.h"
 
 namespace vw {

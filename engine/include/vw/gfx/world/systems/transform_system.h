@@ -42,6 +42,7 @@ public:
     class transform_modifier {
     public:
         transform_modifier& set_transform(const transform& transform);
+        transform_modifier& set_transform_with_matrix(const transform& transform, const mat4f& local_matrix);
         transform_modifier& set_position(const vec3f& position);
         transform_modifier& set_rotation(const vec3f& rotation);
         transform_modifier& set_scale(const vec3f& scale);

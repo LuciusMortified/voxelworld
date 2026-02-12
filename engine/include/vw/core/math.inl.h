@@ -2,7 +2,11 @@
 
 #ifndef VW_CORE_MATH_INL_H
 #define VW_CORE_MATH_INL_H
+
 #include <limits>
+#include <cmath>
+
+#include "vw/core/transform.h"
 
 namespace vw::math {
 
@@ -267,6 +271,272 @@ inline vec3f lerp(
     const vec3f& a, const vec3f& b, float t
 ) {
     return {lerp(a.x, b.x, t), lerp(a.y, b.y, t), lerp(a.z, b.z, t)};
+}
+
+inline transform lerp(
+    const transform& a, const transform& b, float t
+) {
+    transform result;
+    result.set_position(lerp(a.get_position(), b.get_position(), t));
+
+    quat qa = euler_to_quat(a.get_rotation());
+    quat qb = euler_to_quat(b.get_rotation());
+    result.set_rotation(quat_to_euler(slerp(qa, qb, t)));
+
+    result.set_scale(lerp(a.get_scale(), b.get_scale(), t));
+    result.set_origin(lerp(a.get_origin(), b.get_origin(), t));
+    return result;
+}
+
+inline vec3f ease_in(const vec3f& a, const vec3f& b, float t) {
+    float eased_t = t * t;
+    return lerp(a, b, eased_t);
+}
+
+inline vec3f ease_out(const vec3f& a, const vec3f& b, float t) {
+    float eased_t = t * (2.0f - t);
+    return lerp(a, b, eased_t);
+}
+
+inline vec3f ease_in_out(const vec3f& a, const vec3f& b, float t) {
+    float eased_t;
+    if (t < 0.5f) {
+        eased_t = 2.0f * t * t;
+    } else {
+        eased_t = -1.0f + (4.0f - 2.0f * t) * t;
+    }
+    return lerp(a, b, eased_t);
+}
+
+inline float evaluate_cubic_bezier(float t, float p0, float p1, float p2, float p3) {
+    float one_minus_t = 1.0f - t;
+    float one_minus_t_sq = one_minus_t * one_minus_t;
+    float one_minus_t_cb = one_minus_t_sq * one_minus_t;
+    float t_sq = t * t;
+    float t_cb = t_sq * t;
+
+    return one_minus_t_cb * p0 + 3.0f * one_minus_t_sq * t * p1 +
+           3.0f * one_minus_t * t_sq * p2 + t_cb * p3;
+}
+
+inline uint8 lerp(uint8 a, uint8 b, float t) {
+    return static_cast<uint8>(a + t * (b - a));
+}
+
+inline vec3f cubic_bezier(
+    const vec3f& a,
+    const vec3f& b,
+    float t,
+    float control1,
+    float control2
+) {
+    float bezier_t = evaluate_cubic_bezier(t, 0.0f, control1, control2, 1.0f);
+    return lerp(a, b, bezier_t);
+}
+
+inline float apply_easing(float t, interpolation_type type) {
+    t = clamp(t, 0.0f, 1.0f);
+
+    switch (type) {
+        case interpolation_type::linear:
+            return t;
+
+        case interpolation_type::step:
+            return t < 1.0f ? 0.0f : 1.0f;
+
+        case interpolation_type::ease_in:
+            return t * t;
+
+        case interpolation_type::ease_out:
+            return t * (2.0f - t);
+
+        case interpolation_type::ease_in_out:
+            if (t < 0.5f) {
+                return 2.0f * t * t;
+            } else {
+                return -1.0f + (4.0f - 2.0f * t) * t;
+            }
+
+        case interpolation_type::cubic_bezier:
+            return t;
+
+        default:
+            return t;
+    }
+}
+
+inline float apply_easing_bezier(
+    float t,
+    interpolation_type type,
+    float control1,
+    float control2
+) {
+    if (type == interpolation_type::cubic_bezier) {
+        t = clamp(t, 0.0f, 1.0f);
+        return evaluate_cubic_bezier(t, 0.0f, control1, control2, 1.0f);
+    } else {
+        return apply_easing(t, type);
+    }
+}
+
+inline vec3f interpolate(
+    const vec3f& a,
+    const vec3f& b,
+    float t,
+    interpolation_type type,
+    float control1,
+    float control2
+) {
+    switch (type) {
+        case interpolation_type::linear:
+            return lerp(a, b, t);
+
+        case interpolation_type::step:
+            return t < 1.0f ? a : b;
+
+        case interpolation_type::ease_in:
+            return ease_in(a, b, t);
+
+        case interpolation_type::ease_out:
+            return ease_out(a, b, t);
+
+        case interpolation_type::ease_in_out:
+            return ease_in_out(a, b, t);
+
+        case interpolation_type::cubic_bezier:
+            return cubic_bezier(a, b, t, control1, control2);
+
+        default:
+            return lerp(a, b, t);
+    }
+}
+
+inline color interpolate(
+    color a,
+    color b,
+    float t,
+    interpolation_type type,
+    float control1,
+    float control2
+) {
+    if (type == interpolation_type::step) {
+        return t < 1.0f ? a : b;
+    }
+
+    float eased_t = apply_easing_bezier(t, type, control1, control2);
+
+    uint8 r = lerp(a.r(), b.r(), eased_t);
+    uint8 g = lerp(a.g(), b.g(), eased_t);
+    uint8 b_c = lerp(a.b(), b.b(), eased_t);
+    uint8 a_c = lerp(a.a(), b.a(), eased_t);
+
+    return color(r, g, b_c, a_c);
+}
+
+inline float dot(
+    const quat& a, const quat& b
+) {
+    return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+}
+
+inline quat normalize(
+    const quat& q
+) {
+    float len = std::sqrt(dot(q, q));
+    if (len > 0.0f) {
+        float inv = 1.0f / len;
+        return {q.x * inv, q.y * inv, q.z * inv, q.w * inv};
+    }
+    return q;
+}
+
+inline quat slerp(
+    const quat& a, const quat& b, float t
+) {
+    float d = dot(a, b);
+
+    quat b2 = b;
+    if (d < 0.0f) {
+        b2 = -b;
+        d = -d;
+    }
+
+    if (d > 0.9995f) {
+        quat result = {
+            a.x + t * (b2.x - a.x),
+            a.y + t * (b2.y - a.y),
+            a.z + t * (b2.z - a.z),
+            a.w + t * (b2.w - a.w)
+        };
+        return normalize(result);
+    }
+
+    float theta_0 = std::acos(d);
+    float theta = theta_0 * t;
+    float sin_theta = std::sin(theta);
+    float sin_theta_0 = std::sin(theta_0);
+
+    float s0 = std::cos(theta) - d * sin_theta / sin_theta_0;
+    float s1 = sin_theta / sin_theta_0;
+
+    return {
+        a.x * s0 + b2.x * s1,
+        a.y * s0 + b2.y * s1,
+        a.z * s0 + b2.z * s1,
+        a.w * s0 + b2.w * s1
+    };
+}
+
+inline quat euler_to_quat(
+    const vec3f& euler
+) {
+    float cx = std::cos(euler.x * 0.5f);
+    float sx = std::sin(euler.x * 0.5f);
+    float cy = std::cos(euler.y * 0.5f);
+    float sy = std::sin(euler.y * 0.5f);
+    float cz = std::cos(euler.z * 0.5f);
+    float sz = std::sin(euler.z * 0.5f);
+
+    return {
+        sx * cy * cz - cx * sy * sz,
+        cx * sy * cz + sx * cy * sz,
+        cx * cy * sz - sx * sy * cz,
+        cx * cy * cz + sx * sy * sz
+    };
+}
+
+inline vec3f quat_to_euler(
+    const quat& q
+) {
+    float sinr_cosp = 2.0f * (q.w * q.x + q.y * q.z);
+    float cosr_cosp = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
+    float rx = std::atan2(sinr_cosp, cosr_cosp);
+
+    float sinp = 2.0f * (q.w * q.y - q.z * q.x);
+    float ry;
+    if (std::abs(sinp) >= 1.0f) {
+        ry = std::copysign(pi * 0.5f, sinp);
+    } else {
+        ry = std::asin(sinp);
+    }
+
+    float siny_cosp = 2.0f * (q.w * q.z + q.x * q.y);
+    float cosy_cosp = 1.0f - 2.0f * (q.y * q.y + q.z * q.z);
+    float rz = std::atan2(siny_cosp, cosy_cosp);
+
+    return {rx, ry, rz};
+}
+
+inline quat interpolate(
+    const quat& a,
+    const quat& b,
+    float t,
+    interpolation_type type,
+    float control1,
+    float control2
+) {
+    float eased_t = apply_easing_bezier(t, type, control1, control2);
+    return slerp(a, b, eased_t);
 }
 
 inline vec3f perpendicular(

@@ -261,6 +261,32 @@ transform_system<Cs...>::transform_modifier& transform_system<Cs...>::transform_
 }
 
 template <typename... Cs>
+transform_system<Cs...>::transform_modifier& transform_system<Cs...>::transform_modifier::
+    set_transform_with_matrix(
+        const transform& transform,
+        const mat4f& local_matrix
+    ) {
+    if (!system_->registry_->template has<transform_component>(entity_)) {
+        return *this;
+    }
+
+    auto& transform_comp          = system_->registry_->template get<transform_component>(entity_);
+    transform_comp.transform_     = transform;
+    transform_comp.local_matrix_  = local_matrix;
+    transform_comp.local_dirty_   = false;
+    transform_comp.world_dirty_   = true;
+
+    system_->dirty_entities_.insert(entity_);
+    system_->mark_children_world_dirty(entity_);
+
+    if (system_->registry_->template has<spatial_component>(entity_)) {
+        system_->world_->get_spatial_system().mark_dirty(entity_);
+    }
+
+    return *this;
+}
+
+template <typename... Cs>
 void transform_system<Cs...>::update() {
     if (dirty_entities_.empty()) {
         return;

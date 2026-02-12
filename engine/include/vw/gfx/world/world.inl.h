@@ -15,13 +15,15 @@ world<Cs>::world(
       transform_system_(*this, registry_),
       hierarchy_system_(registry_, transform_system_),
       model_system_(registry_, mesh_pool_, spatial_system_),
-      light_system_(registry_) {}
+      light_system_(registry_),
+      animation_system_(*this, registry_, transform_system_, animation_clip_registry_) {}
 
 template <typename Cs>
-void world<Cs>::update() {
+void world<Cs>::update(float32 delta_time) {
     transform_system_.update();
     model_system_.update();
     spatial_system_.update();
+    animation_system_.update(delta_time);
 }
 
 template <typename Cs>
@@ -137,6 +139,16 @@ auto world<C>::get_spatial_system() -> spatial_system_type& {
 template <typename C>
 auto world<C>::get_light_system() -> light_system_type& {
     return light_system_;
+}
+
+template <typename C>
+auto world<C>::get_animation_system() -> animation_system_type& {
+    return animation_system_;
+}
+
+template <typename C>
+auto world<C>::get_animation_clip_registry() -> animation_clip_registry& {
+    return animation_clip_registry_;
 }
 
 template <typename WC>

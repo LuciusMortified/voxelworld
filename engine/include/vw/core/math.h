@@ -3,12 +3,27 @@
 #ifndef VW_CORE_MATH_H
 #define VW_CORE_MATH_H
 
-#include <cmath>
-
+#include "vw/core/color.h"
 #include "vw/core/mat4.h"
+#include "vw/core/quat.h"
 #include "vw/core/vec3.h"
 
+namespace vw {
+
+struct transform;
+
+}
+
 namespace vw::math {
+
+enum class interpolation_type : uint8 {
+    linear,
+    step,
+    ease_in,
+    ease_out,
+    ease_in_out,
+    cubic_bezier
+};
 
 constexpr float pi         = 3.14159265359f;
 constexpr float deg_to_rad = pi / 180.0f;
@@ -25,6 +40,41 @@ float dot(const vec3f& a, const vec3f& b);
 float clamp(float value, float min_val, float max_val);
 float lerp(float a, float b, float t);
 vec3f lerp(const vec3f& a, const vec3f& b, float t);
+transform lerp(const transform& a, const transform& b, float t);
+
+vec3f ease_in(const vec3f& a, const vec3f& b, float t);
+vec3f ease_out(const vec3f& a, const vec3f& b, float t);
+vec3f ease_in_out(const vec3f& a, const vec3f& b, float t);
+float evaluate_cubic_bezier(float t, float p0, float p1, float p2, float p3);
+vec3f cubic_bezier(const vec3f& a, const vec3f& b, float t, float control1, float control2);
+float apply_easing(float t, interpolation_type type);
+float apply_easing_bezier(float t, interpolation_type type, float control1, float control2);
+uint8 lerp(uint8 a, uint8 b, float t);
+vec3f interpolate(
+    const vec3f& a,
+    const vec3f& b,
+    float t,
+    interpolation_type type,
+    float control1 = 0.0f,
+    float control2 = 1.0f
+);
+color interpolate(
+    color a, color b, float t, interpolation_type type, float control1 = 0.0f, float control2 = 1.0f
+);
+
+float dot(const quat& a, const quat& b);
+quat normalize(const quat& q);
+quat slerp(const quat& a, const quat& b, float t);
+quat euler_to_quat(const vec3f& euler);
+vec3f quat_to_euler(const quat& q);
+quat interpolate(
+    const quat& a,
+    const quat& b,
+    float t,
+    interpolation_type type,
+    float control1 = 0.0f,
+    float control2 = 1.0f
+);
 
 vec3f perpendicular(const vec3f& eye, const vec3f& target);
 
