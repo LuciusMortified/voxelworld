@@ -4,7 +4,10 @@
 #define VW_GFX_ANIMATION_PLAYER_COMPONENT_H
 
 #include <memory>
+#include <string>
+#include <unordered_map>
 
+#include "vw/core/transform.h"
 #include "vw/core/types.h"
 #include "vw/gfx/animation/animation_clip.h"
 #include "vw/gfx/animation/animation_types.h"
@@ -28,6 +31,9 @@ private:
     float32 blend_duration_ = 0.0f;
     std::shared_ptr<animation_clip> previous_clip_;
     float32 previous_time_ = 0.0f;
+    float32 previous_playback_speed_ = 1.0f;
+    float32 previous_direction_ = 1.0f;
+    std::unordered_map<std::string, transform> blend_snapshot_;
 
 public:
     [[nodiscard]] auto get_clip() const -> std::shared_ptr<animation_clip>;

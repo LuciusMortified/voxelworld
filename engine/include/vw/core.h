@@ -6,6 +6,7 @@
 #include "vw/core/color.h"
 #include "vw/core/mat4.h"
 #include "vw/core/math.h"
+#include "vw/core/quat.h"
 #include "vw/core/transform.h"
 #include "vw/core/types.h"
 #include "vw/core/vec2.h"

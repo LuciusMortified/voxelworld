@@ -278,7 +278,11 @@ inline transform lerp(
 ) {
     transform result;
     result.set_position(lerp(a.get_position(), b.get_position(), t));
-    result.set_rotation(lerp(a.get_rotation(), b.get_rotation(), t));
+
+    quat qa = euler_to_quat(a.get_rotation());
+    quat qb = euler_to_quat(b.get_rotation());
+    result.set_rotation(quat_to_euler(slerp(qa, qb, t)));
+
     result.set_scale(lerp(a.get_scale(), b.get_scale(), t));
     result.set_origin(lerp(a.get_origin(), b.get_origin(), t));
     return result;
@@ -427,6 +431,112 @@ inline color interpolate(
     uint8 a_c = lerp(a.a(), b.a(), eased_t);
 
     return color(r, g, b_c, a_c);
+}
+
+inline float dot(
+    const quat& a, const quat& b
+) {
+    return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+}
+
+inline quat normalize(
+    const quat& q
+) {
+    float len = std::sqrt(dot(q, q));
+    if (len > 0.0f) {
+        float inv = 1.0f / len;
+        return {q.x * inv, q.y * inv, q.z * inv, q.w * inv};
+    }
+    return q;
+}
+
+inline quat slerp(
+    const quat& a, const quat& b, float t
+) {
+    float d = dot(a, b);
+
+    quat b2 = b;
+    if (d < 0.0f) {
+        b2 = -b;
+        d = -d;
+    }
+
+    if (d > 0.9995f) {
+        quat result = {
+            a.x + t * (b2.x - a.x),
+            a.y + t * (b2.y - a.y),
+            a.z + t * (b2.z - a.z),
+            a.w + t * (b2.w - a.w)
+        };
+        return normalize(result);
+    }
+
+    float theta_0 = std::acos(d);
+    float theta = theta_0 * t;
+    float sin_theta = std::sin(theta);
+    float sin_theta_0 = std::sin(theta_0);
+
+    float s0 = std::cos(theta) - d * sin_theta / sin_theta_0;
+    float s1 = sin_theta / sin_theta_0;
+
+    return {
+        a.x * s0 + b2.x * s1,
+        a.y * s0 + b2.y * s1,
+        a.z * s0 + b2.z * s1,
+        a.w * s0 + b2.w * s1
+    };
+}
+
+inline quat euler_to_quat(
+    const vec3f& euler
+) {
+    float cx = std::cos(euler.x * 0.5f);
+    float sx = std::sin(euler.x * 0.5f);
+    float cy = std::cos(euler.y * 0.5f);
+    float sy = std::sin(euler.y * 0.5f);
+    float cz = std::cos(euler.z * 0.5f);
+    float sz = std::sin(euler.z * 0.5f);
+
+    return {
+        sx * cy * cz - cx * sy * sz,
+        cx * sy * cz + sx * cy * sz,
+        cx * cy * sz - sx * sy * cz,
+        cx * cy * cz + sx * sy * sz
+    };
+}
+
+inline vec3f quat_to_euler(
+    const quat& q
+) {
+    float sinr_cosp = 2.0f * (q.w * q.x + q.y * q.z);
+    float cosr_cosp = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
+    float rx = std::atan2(sinr_cosp, cosr_cosp);
+
+    float sinp = 2.0f * (q.w * q.y - q.z * q.x);
+    float ry;
+    if (std::abs(sinp) >= 1.0f) {
+        ry = std::copysign(pi * 0.5f, sinp);
+    } else {
+        ry = std::asin(sinp);
+    }
+
+    float siny_cosp = 2.0f * (q.w * q.z + q.x * q.y);
+    float cosy_cosp = 1.0f - 2.0f * (q.y * q.y + q.z * q.z);
+    float rz = std::atan2(siny_cosp, cosy_cosp);
+
+    return {rx, ry, rz};
+}
+
+inline quat interpolate(
+    const quat& a,
+    const quat& b,
+    float t,
+    interpolation_type type,
+    float control1,
+    float control2
+) {
+    float eased_t = apply_easing_bezier(t, type, control1, control2);
+    return slerp(a, b, eased_t);
 }
 
 inline vec3f perpendicular(

@@ -39,7 +39,8 @@ private:
 };
 
 using animation_channel_variant = std::variant<
-    animation_channel<vec3f>
+    animation_channel<vec3f>,
+    animation_channel<quat>
 >;
 
 template <animation_property Prop>

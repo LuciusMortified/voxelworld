@@ -25,8 +25,8 @@ public:
             return true;
         });
 
-        camera.set_position({0.0f, 5.0f, -10.0f});
-        camera.set_rotation(0.0f, 0.0f);
+        camera.set_position({0.0f, 5.0f, -15.0f});
+        camera.set_rotation(-10.0f, 0.0f);
         get_engine().get_renderer().set_clear_color(0.1f, 0.1f, 0.15f, 1.0f);
 
         setup_scene();
@@ -234,8 +234,9 @@ private:
             track.add<gfx::animation_property::origin>(org_ch);
 
             auto rot_ch = gfx::make_animation_channel<gfx::animation_property::rotation>();
-            rot_ch.add({0.0f, vec3f{0.0f, 0.0f, 0.0f}});
-            rot_ch.add({1.0f, vec3f{math::radians(180.0f), 0.0f, 0.0f}});
+            rot_ch.add({0.0f, math::euler_to_quat({0.0f, 0.0f, 0.0f})});
+            rot_ch.add({1.0f, math::euler_to_quat({math::radians(180.0f), 0.0f, 0.0f})});
+            rot_ch.add({2.0f, math::euler_to_quat({math::radians(360.0f), 0.0f, 0.0f})});
             track.add<gfx::animation_property::rotation>(rot_ch);
 
             clip->add_track(track);
@@ -253,8 +254,9 @@ private:
             track.add<gfx::animation_property::origin>(org_ch);
 
             auto rot_ch = gfx::make_animation_channel<gfx::animation_property::rotation>();
-            rot_ch.add({0.0f, vec3f{0.0f, 0.0f, 0.0f}});
-            rot_ch.add({1.0f, vec3f{0.0f, math::radians(180.0f), 0.0f}});
+            rot_ch.add({0.0f, math::euler_to_quat({0.0f, 0.0f, 0.0f})});
+            rot_ch.add({1.0f, math::euler_to_quat({0.0f, math::radians(180.0f), 0.0f})});
+            rot_ch.add({2.0f, math::euler_to_quat({0.0f, math::radians(360.0f), 0.0f})});
             track.add<gfx::animation_property::rotation>(rot_ch);
 
             clip->add_track(track);
@@ -272,8 +274,9 @@ private:
             track.add<gfx::animation_property::origin>(org_ch);
 
             auto rot_ch = gfx::make_animation_channel<gfx::animation_property::rotation>();
-            rot_ch.add({0.0f, vec3f{0.0f, 0.0f, 0.0f}});
-            rot_ch.add({1.0f, vec3f{0.0f, 0.0f, math::radians(180.0f)}});
+            rot_ch.add({0.0f, math::euler_to_quat({0.0f, 0.0f, 0.0f})});
+            rot_ch.add({1.0f, math::euler_to_quat({0.0f, 0.0f, math::radians(180.0f)})});
+            rot_ch.add({2.0f, math::euler_to_quat({0.0f, 0.0f, math::radians(360.0f)})});
             track.add<gfx::animation_property::rotation>(rot_ch);
 
             clip->add_track(track);

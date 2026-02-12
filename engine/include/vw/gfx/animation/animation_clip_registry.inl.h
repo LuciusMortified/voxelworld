@@ -4,14 +4,15 @@ namespace vw::gfx {
 
 inline auto animation_clip_registry::create(std::string_view name)
     -> std::shared_ptr<animation_clip> {
-    auto clip = std::make_shared<animation_clip>(std::string(name));
-    clips_[std::string(name)] = clip;
+    std::string name_str(name);
+    auto clip = std::make_shared<animation_clip>(name_str);
+    clips_[std::move(name_str)] = clip;
     return clip;
 }
 
 inline auto animation_clip_registry::get(std::string_view name) const
     -> std::shared_ptr<animation_clip> {
-    auto it = clips_.find(std::string(name));
+    auto it = clips_.find(name);
     if (it != clips_.end()) {
         return it->second;
     }
@@ -19,15 +20,17 @@ inline auto animation_clip_registry::get(std::string_view name) const
 }
 
 inline auto animation_clip_registry::has(std::string_view name) const -> bool {
-    return clips_.find(std::string(name)) != clips_.end();
+    return clips_.find(name) != clips_.end();
 }
 
 inline void animation_clip_registry::remove(std::string_view name) {
-    clips_.erase(std::string(name));
+    auto it = clips_.find(name);
+    if (it != clips_.end()) {
+        clips_.erase(it);
+    }
 }
 
-inline auto animation_clip_registry::all() const
-    -> const std::unordered_map<std::string, std::shared_ptr<animation_clip>>& {
+inline auto animation_clip_registry::all() const -> const animation_clip_registry::map_type& {
     return clips_;
 }
 

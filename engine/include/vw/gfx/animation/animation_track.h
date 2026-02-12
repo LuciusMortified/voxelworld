@@ -20,7 +20,7 @@ public:
         empty
     };
 
-    explicit animation_track(std::string target_name, uint32 fps = 60);
+    explicit animation_track(std::string target_name, float32 fps = 60.0f);
 
     template <animation_property Prop>
     void add(animation_channel_for<Prop> channel);
@@ -28,7 +28,6 @@ public:
     void remove_channel(animation_property prop);
 
     [[nodiscard]] auto get_transform(float32 time) const -> std::expected<transform, error_type>;
-    [[nodiscard]] auto get_matrix(float32 time) const -> std::expected<mat4f, error_type>;
     [[nodiscard]] auto get_duration() const -> float32;
     [[nodiscard]] auto get_frame_time() const -> float32;
     [[nodiscard]] auto get_target_name() const -> const std::string& { return target_name_; }
@@ -43,11 +42,10 @@ private:
     std::vector<animation_channel_variant> channels_;
 
     mutable bool is_dirty_ = true;
-    mutable uint32 compiled_fps_;
+    mutable float32 compiled_fps_;
     mutable float32 frame_time_ = 0.0f;
     mutable float32 cached_duration_ = 0.0f;
     mutable std::vector<transform> compiled_transforms_;
-    mutable std::vector<mat4f> compiled_matrices_;
 };
 
 }  // namespace vw::gfx

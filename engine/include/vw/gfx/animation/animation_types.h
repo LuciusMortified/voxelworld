@@ -3,6 +3,7 @@
 #ifndef VW_GFX_ANIMATION_TYPES_H
 #define VW_GFX_ANIMATION_TYPES_H
 
+#include "vw/core/quat.h"
 #include "vw/core/types.h"
 #include "vw/core/vec3.h"
 
@@ -37,7 +38,7 @@ struct animation_property_traits<animation_property::position> {
 
 template <>
 struct animation_property_traits<animation_property::rotation> {
-    using type = vec3f;
+    using type = quat;
 };
 
 template <>

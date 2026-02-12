@@ -22,9 +22,9 @@ void animation_channel<T>::clear() {
 }
 
 template <typename T>
-auto animation_channel<T>::evaluate(float32 time) const -> std::expected<T, animation_channel<T>::error_type> {
+auto animation_channel<T>::evaluate(float32 time) const -> std::expected<T, error_type> {
     if (keyframes_.empty()) {
-        return std::unexpected(animation_channel<T>::error_type::empty);
+        return std::unexpected(error_type::empty);
     }
 
     if (keyframes_.size() == 1) {
@@ -72,7 +72,7 @@ auto animation_channel<T>::evaluate(float32 time) const -> std::expected<T, anim
 template <typename T>
 auto animation_channel<T>::get_duration() const -> std::expected<float32, animation_channel<T>::error_type> {
     if (keyframes_.empty()) {
-        return std::unexpected(animation_channel<T>::error_type::empty);
+        return std::unexpected(error_type::empty);
     }
     return keyframes_.back().time;
 }

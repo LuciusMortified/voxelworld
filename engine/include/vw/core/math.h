@@ -5,6 +5,7 @@
 
 #include "vw/core/color.h"
 #include "vw/core/mat4.h"
+#include "vw/core/quat.h"
 #include "vw/core/vec3.h"
 
 namespace vw {
@@ -59,6 +60,20 @@ vec3f interpolate(
 );
 color interpolate(
     color a, color b, float t, interpolation_type type, float control1 = 0.0f, float control2 = 1.0f
+);
+
+float dot(const quat& a, const quat& b);
+quat normalize(const quat& q);
+quat slerp(const quat& a, const quat& b, float t);
+quat euler_to_quat(const vec3f& euler);
+vec3f quat_to_euler(const quat& q);
+quat interpolate(
+    const quat& a,
+    const quat& b,
+    float t,
+    interpolation_type type,
+    float control1 = 0.0f,
+    float control2 = 1.0f
 );
 
 vec3f perpendicular(const vec3f& eye, const vec3f& target);
