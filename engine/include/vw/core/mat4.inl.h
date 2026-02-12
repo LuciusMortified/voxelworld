@@ -122,6 +122,94 @@ auto mat4<T>::operator!=(
     return !(*this == other);
 }
 
+template <typename T>
+auto mat4<T>::operator+(const mat4& other) const -> mat4 {
+    mat4 result;
+    for (int i = 0; i < size_; ++i) {
+        result.data_[i] = data_[i] + other.data_[i];
+    }
+    return result;
+}
+
+template <typename T>
+auto mat4<T>::operator-(const mat4& other) const -> mat4 {
+    mat4 result;
+    for (int i = 0; i < size_; ++i) {
+        result.data_[i] = data_[i] - other.data_[i];
+    }
+    return result;
+}
+
+template <typename T>
+auto mat4<T>::operator-() const -> mat4 {
+    mat4 result;
+    for (int i = 0; i < size_; ++i) {
+        result.data_[i] = -data_[i];
+    }
+    return result;
+}
+
+template <typename T>
+auto mat4<T>::operator*(T scalar) const -> mat4 {
+    mat4 result;
+    for (int i = 0; i < size_; ++i) {
+        result.data_[i] = data_[i] * scalar;
+    }
+    return result;
+}
+
+template <typename T>
+auto mat4<T>::operator/(T scalar) const -> mat4 {
+    mat4 result;
+    for (int i = 0; i < size_; ++i) {
+        result.data_[i] = data_[i] / scalar;
+    }
+    return result;
+}
+
+template <typename T>
+auto mat4<T>::operator+=(const mat4& other) -> mat4& {
+    for (int i = 0; i < size_; ++i) {
+        data_[i] += other.data_[i];
+    }
+    return *this;
+}
+
+template <typename T>
+auto mat4<T>::operator-=(const mat4& other) -> mat4& {
+    for (int i = 0; i < size_; ++i) {
+        data_[i] -= other.data_[i];
+    }
+    return *this;
+}
+
+template <typename T>
+auto mat4<T>::operator*=(const mat4& other) -> mat4& {
+    *this = *this * other;
+    return *this;
+}
+
+template <typename T>
+auto mat4<T>::operator*=(T scalar) -> mat4& {
+    for (int i = 0; i < size_; ++i) {
+        data_[i] *= scalar;
+    }
+    return *this;
+}
+
+template <typename T>
+auto mat4<T>::operator/=(T scalar) -> mat4& {
+    for (int i = 0; i < size_; ++i) {
+        data_[i] /= scalar;
+    }
+    return *this;
+}
+
+template <typename T>
+auto operator*(T scalar, const mat4<T>& m) -> mat4<T> {
+    return m * scalar;
+}
+
 }  // namespace vw
 
 #endif  // VW_CORE_MAT4_INL_H

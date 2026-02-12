@@ -290,7 +290,8 @@ auto spatial_system<Cs...>::voxel_ray_cast(
         const int depth  = model_size.z;
 
         const mat4f world_matrix    = transform_comp.get_world_matrix();
-        const mat4f inverse_world   = math::inverse_matrix(world_matrix);
+        const auto inv_result       = math::inverse_matrix(world_matrix);
+        const mat4f inverse_world   = inv_result.value_or(math::identity_matrix());
         const vec3f local_start     = inverse_world * r.start;
         const vec3f local_end       = inverse_world * r.end;
         const vec3f local_direction = math::normalize(local_end - local_start);

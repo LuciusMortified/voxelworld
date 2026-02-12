@@ -63,7 +63,7 @@ private:
     std::array<mat4f, cascade_count> light_space_matrices_ = {};
     std::array<float, cascade_count> cascade_splits_       = {};
 
-    float split_lambda_        = 0.75f;
+    float split_lambda_        = 0.9f;
     float shadow_far_          = 500.f;
 };
 

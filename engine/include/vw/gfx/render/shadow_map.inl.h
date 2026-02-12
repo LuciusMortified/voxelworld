@@ -259,11 +259,11 @@ inline void shadow_map::update(
     }
 
     // Вычисляем inverse view-projection матрицу камеры
-    auto cam_proj = math::perspective_matrix(
-        camera.get_fov(), camera.get_aspect_ratio(), cam_near, shadow_far
-    );
-    auto cam_view = camera.get_view_matrix();
-    auto inv_cam = math::inverse_matrix(cam_proj * cam_view);
+    auto cam_proj =
+        math::perspective_matrix(camera.get_fov(), camera.get_aspect_ratio(), cam_near, shadow_far);
+    auto cam_view   = camera.get_view_matrix();
+    auto inv_result = math::inverse_matrix(cam_proj * cam_view);
+    auto inv_cam    = inv_result.value_or(math::identity_matrix());
 
     // Для каждого каскада вычисляем light space matrix
     float last_cascade_split = 0.0f;
@@ -282,10 +282,10 @@ inline void shadow_map::update(
         };
 
         for (auto& corner : frustum_corners) {
-            vec4f corner_homogeneous = vec4f{corner.x, corner.y, corner.z, 1.0f};
-            vec4f corner_world       = inv_cam * corner_homogeneous;
-            corner_world             = corner_world * (1.f / corner_world.w);
-            corner                   = vec3f{corner_world.x, corner_world.y, corner_world.z};
+            auto corner_homogeneous = vec4f{corner.x, corner.y, corner.z, 1.0f};
+            auto corner_world       = inv_cam * corner_homogeneous;
+            corner_world            = corner_world * (1.f / corner_world.w);
+            corner                  = vec3f{corner_world.x, corner_world.y, corner_world.z};
         }
 
         for (int i = 0; i < 4; ++i) {
@@ -319,11 +319,31 @@ inline void shadow_map::update(
 
         const mat4f light_view = math::look_at_matrix(eye, target, up);
 
+        float min_z = std::numeric_limits<float>::max();
+        float max_z = std::numeric_limits<float>::lowest();
+        for (const auto& corner : frustum_corners) {
+            auto lv = light_view * vec4f{corner.x, corner.y, corner.z, 1.0f};
+            min_z   = std::min(min_z, lv.z);
+            max_z   = std::max(max_z, lv.z);
+        }
+
+        float ortho_near = std::max(-max_z - shadow_dist, 0.001f);
+        float ortho_far  = -min_z;
+
         auto light_proj = math::orthographic_matrix(
-            min_extents.x, max_extents.x, min_extents.y, max_extents.y, cam_near, shadow_far
+            min_extents.x, max_extents.x, min_extents.y, max_extents.y, ortho_near, ortho_far
         );
 
-        light_space_matrices_[cascade_index] = light_proj * light_view;
+        auto lsm = light_proj * light_view;
+
+        float half_size     = static_cast<float>(shadow_map_size) * 0.5f;
+        vec4f shadow_origin = lsm * vec4f{0.0f, 0.0f, 0.0f, 1.0f};
+        float rounded_x     = std::round(shadow_origin.x * half_size);
+        float rounded_y     = std::round(shadow_origin.y * half_size);
+        lsm[0, 3] += (rounded_x - shadow_origin.x * half_size) / half_size;
+        lsm[1, 3] += (rounded_y - shadow_origin.y * half_size) / half_size;
+
+        light_space_matrices_[cascade_index] = lsm;
 
         last_cascade_split = cascade_split;
     }

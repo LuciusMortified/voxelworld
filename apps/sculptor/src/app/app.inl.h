@@ -115,7 +115,7 @@ inline void app::render(
         update_title_();
     }
 
-#if 0
+#if 1
     ImGui::Begin("Shadow Map Debug");
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
     // Сетка 2x2 для всех каскадов

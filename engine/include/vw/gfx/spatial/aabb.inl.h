@@ -102,12 +102,12 @@ inline aabb aabb::merge(const aabb& a, const aabb& b) {
 
 inline bool aabb::operator==(const aabb& other) const {
     constexpr float epsilon = 1e-5f;
-    return vw::math::is_safe_zero(min.x, other.min.x, epsilon) &&
-           vw::math::is_safe_zero(min.y, other.min.y, epsilon) &&
-           vw::math::is_safe_zero(min.z, other.min.z, epsilon) &&
-           vw::math::is_safe_zero(max.x, other.max.x, epsilon) &&
-           vw::math::is_safe_zero(max.y, other.max.y, epsilon) &&
-           vw::math::is_safe_zero(max.z, other.max.z, epsilon);
+    return math::is_safe_zero(min.x - other.min.x, epsilon) &&
+           math::is_safe_zero(min.y - other.min.y, epsilon) &&
+           math::is_safe_zero(min.z - other.min.z, epsilon) &&
+           math::is_safe_zero(max.x - other.max.x, epsilon) &&
+           math::is_safe_zero(max.y - other.max.y, epsilon) &&
+           math::is_safe_zero(max.z - other.max.z, epsilon);
 }
 
 inline bool aabb::operator!=(const aabb& other) const {
