@@ -10,7 +10,7 @@ namespace vw::sculptor {
     constexpr int version_minor = @PROJECT_VERSION_MINOR@;
     constexpr int version_patch = @PROJECT_VERSION_PATCH@;
 
-    static constexpr std::string version_string = "@PROJECT_VERSION@";
+    inline static constexpr std::string_view version_string = "@PROJECT_VERSION@";
 } // namespace vw::sculptor
 
 #endif // VW_SCULPTOR_VERSION_H
