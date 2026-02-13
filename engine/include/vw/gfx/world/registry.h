@@ -56,9 +56,19 @@ public:
         return entity_pool_.create();
     }
 
+    [[nodiscard]]
+    auto batch_create(uint32 count) -> std::vector<entity> {
+        return entity_pool_.batch_create(count);
+    }
+
     template <typename T>
     void add(entity e, T&& value = {}) {
         get_pool<T>().add(e, std::forward<T>(value));
+    }
+
+    template <typename T>
+    void batch_add(const std::vector<entity>& entities, const T& value = {}) {
+        get_pool<T>().batch_add(entities, value);
     }
 
     template <typename T>
@@ -81,12 +91,21 @@ public:
         get_pool<T>().remove(e);
     }
 
+    template <typename T>
+    void batch_remove(const std::vector<entity>& entities) {
+        get_pool<T>().batch_remove(entities);
+    }
+
     void remove_all(entity e) {
         (remove<Ts>(e), ...);
     }
 
     void destroy(entity e) {
         entity_pool_.destroy(e);
+    }
+
+    void batch_destroy(const std::vector<entity>& entities) {
+        entity_pool_.batch_destroy(entities);
     }
 
     template <typename... Cs>

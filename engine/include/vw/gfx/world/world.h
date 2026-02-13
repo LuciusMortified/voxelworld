@@ -17,14 +17,22 @@
 #include "vw/gfx/world/systems/spatial_system.h"
 #include "vw/gfx/world/systems/transform_system.h"
 #include "vw/gfx/world/world_components.h"
-#include "vw/gfx/world/entity_builder.h"
 
 namespace vw::gfx {
+
+template <typename WC>
+class entity_guard;
+
+template <typename WC>
+class entity_guard_group;
 
 class vulkan_context;
 
 template <typename WC = base_world_components>
 class world final {
+    friend class entity_guard<WC>;
+    friend class entity_guard_group<WC>;
+
 public:
     using registry_type         = registry_from_tuple<WC>::type;
     using transform_system_type = transform_system_from_tuple<WC>::type;
@@ -43,8 +51,6 @@ public:
 
     void update(float32 delta_time);
 
-    [[nodiscard]] auto create_entity() -> entity;
-
     template <typename T>
     void add_component(entity ent, T&& value = {});
 
@@ -56,8 +62,6 @@ public:
 
     template <typename T>
     void remove_component(entity ent) noexcept;
-
-    void destroy_entity(entity ent) noexcept;
 
     [[nodiscard]] auto get_mesh_pool() const -> const mesh_pool&;
 
@@ -86,6 +90,12 @@ public:
     ) const -> std::optional<voxel_ray_hit>;
 
 private:
+    [[nodiscard]] auto create_entity() -> entity;
+    void destroy_entity(entity ent) noexcept;
+
+    [[nodiscard]] auto batch_create_entities(uint32 count) -> std::vector<entity>;
+    void batch_destroy_entities(const std::vector<entity>& entities) noexcept;
+
     registry_type registry_;
     mesh_pool mesh_pool_;
     spatial_system_type spatial_system_;

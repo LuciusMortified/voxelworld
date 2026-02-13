@@ -45,6 +45,34 @@ public:
         sparse_indices_[ent.index] = index;
     }
 
+    void batch_add(
+        const std::vector<entity>& entities, const T& value = {}
+    ) {
+        uint32 max_index = 0;
+        for (auto ent : entities) {
+            if (ent.index > max_index) {
+                max_index = ent.index;
+            }
+        }
+        if (max_index >= sparse_indices_.size()) {
+            sparse_indices_.resize(max_index + 1, entity::invalid_index);
+        }
+
+        dense_data_.reserve(dense_data_.size() + entities.size());
+        dense_entities_.reserve(dense_entities_.size() + entities.size());
+
+        for (auto ent : entities) {
+            if (has(ent)) [[unlikely]] {
+                dense_data_[sparse_indices_[ent.index]] = value;
+                continue;
+            }
+            const uint32 index = dense_data_.size();
+            dense_data_.push_back(value);
+            dense_entities_.push_back(ent);
+            sparse_indices_[ent.index] = index;
+        }
+    }
+
     void remove(
         entity ent
     ) {
@@ -65,6 +93,14 @@ public:
         dense_entities_.pop_back();
 
         sparse_indices_[ent.index] = entity::invalid_index;
+    }
+
+    void batch_remove(
+        const std::vector<entity>& entities
+    ) {
+        for (auto ent : entities) {
+            remove(ent);
+        }
     }
 
     [[nodiscard]]

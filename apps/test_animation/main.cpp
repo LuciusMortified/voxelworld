@@ -1,6 +1,8 @@
 #include <vw/core.h>
 #include <vw/gfx.h>
 
+#include "vw/gfx/world/entity_guard.h"
+
 using namespace vw;
 
 class test_animation_app final : public gfx::app<> {
@@ -67,27 +69,23 @@ private:
         auto blue_cube_model = model_registry.create("blue_cube", 3, 3, 3);
         blue_cube_model->fill(voxel{colors::blue});
 
-        root_ =
-            gfx::entity_builder<>{world}
-                .with<gfx::transform_component>()
-                .with<gfx::hierarchy_component>()
-                .with<gfx::animation_player_component>()
-                .with<gfx::animation_target_component>()
-                .release_guard();
+        root_ = std::make_unique<gfx::entity_guard<>>(world);
+        root_->with<gfx::transform_component>();
+        root_->with<gfx::hierarchy_component>();
+        root_->with<gfx::animation_player_component>();
+        root_->with<gfx::animation_target_component>();
         auto root_ent = root_->get_entity();
 
         animation_system  //
             .modify_target(root_ent)
             .set_target_name("root");
 
-        red_ =
-            gfx::entity_builder<>{world}
-                .with<gfx::transform_component>()
-                .with<gfx::hierarchy_component>()
-                .with<gfx::spatial_component>()
-                .with<gfx::model_component>()
-                .with<gfx::animation_target_component>()
-                .release_guard();
+        red_ = std::make_unique<gfx::entity_guard<>>(world);
+        red_->with<gfx::transform_component>();
+        red_->with<gfx::hierarchy_component>();
+        red_->with<gfx::spatial_component>();
+        red_->with<gfx::model_component>();
+        red_->with<gfx::animation_target_component>();
 
         auto red_ent = red_->get_entity();
         transform_system  //
@@ -103,14 +101,12 @@ private:
             .modify(red_ent)
             .set_parent(root_ent);
 
-        green_ =
-            gfx::entity_builder<>{world}
-                .with<gfx::transform_component>()
-                .with<gfx::hierarchy_component>()
-                .with<gfx::spatial_component>()
-                .with<gfx::model_component>()
-                .with<gfx::animation_target_component>()
-                .release_guard();
+        green_ = std::make_unique<gfx::entity_guard<>>(world);
+        green_->with<gfx::transform_component>();
+        green_->with<gfx::hierarchy_component>();
+        green_->with<gfx::spatial_component>();
+        green_->with<gfx::model_component>();
+        green_->with<gfx::animation_target_component>();
 
         auto green_ent = green_->get_entity();
         transform_system  //
@@ -126,14 +122,12 @@ private:
             .modify(green_ent)
             .set_parent(root_ent);
 
-        blue_ =
-            gfx::entity_builder<>{world}
-                .with<gfx::transform_component>()
-                .with<gfx::hierarchy_component>()
-                .with<gfx::spatial_component>()
-                .with<gfx::model_component>()
-                .with<gfx::animation_target_component>()
-                .release_guard();
+        blue_ = std::make_unique<gfx::entity_guard<>>(world);
+        blue_->with<gfx::transform_component>();
+        blue_->with<gfx::hierarchy_component>();
+        blue_->with<gfx::spatial_component>();
+        blue_->with<gfx::model_component>();
+        blue_->with<gfx::animation_target_component>();
 
         auto blue_ent = blue_->get_entity();
         transform_system  //

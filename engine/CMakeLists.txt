@@ -6,10 +6,10 @@ add_library(${PROJECT_NAME} INTERFACE
         include/vw/gfx/world/components/model_component.inl.h
         include/vw/gfx/world/entity_archetype.h
         include/vw/gfx/world/entity_archetype.inl.h
-        include/vw/gfx/world/entity_builder.h
         include/vw/gfx/world/entity_guard.h
-        include/vw/gfx/world/entity_builder.inl.h
         include/vw/gfx/world/entity_guard.inl.h
+        include/vw/gfx/world/entity_guard_group.h
+        include/vw/gfx/world/entity_guard_group.inl.h
         include/vw/gfx/world/serializers/vox_serializer.h
         include/vw/gfx/world/serializers/vox_serializer.inl.h
         include/vw/gfx/world/serializers/vox_deserializer.h
