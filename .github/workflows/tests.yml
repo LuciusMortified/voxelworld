@@ -6,10 +6,10 @@ jobs:
   test-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Install Vulkan SDK
-        uses: humbletim/install-vulkan-sdk@v1.1.1
+        uses: humbletim/install-vulkan-sdk@v1.2
         with:
           version: latest
           cache: true
@@ -40,6 +40,16 @@ jobs:
           sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
           sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
 
+      - name: Install X11 and GLFW dependencies
+        run: |
+          sudo apt-get install -y \
+            libx11-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libgl1-mesa-dev
+
       - name: Install vulkan sdk
         uses: humbletim/install-vulkan-sdk@v1.2
         with:
@@ -48,24 +58,6 @@ jobs:
 
       - name: Setup cmake
         uses: lukka/get-cmake@latest
-
-      # Restore vcpkg from the GitHub Action cache service. Note that packages are restored by vcpkg's binary caching
-      # when it is being run afterwards by CMake.
-      - name: Restore vcpkg
-        uses: actions/cache@v4
-        with:
-          # The first path is the location of vcpkg: it contains the vcpkg executable and data files, as long as the
-          # built package archives (aka binary cache) which are located by VCPKG_DEFAULT_BINARY_CACHE env var.
-          # The other paths starting with '!' are exclusions: they contain termporary files generated during the build of the installed packages.
-          path: |
-            ${{ env._VCPKG_ }}
-            !${{ env._VCPKG_ }}/buildtrees
-            !${{ env._VCPKG_ }}/packages
-            !${{ env._VCPKG_ }}/downloads
-            !${{ env._VCPKG_ }}/installed
-          # The key is composed in a way that it gets properly invalidated whenever a different version of vcpkg is being used.
-          key: |
-            ${{ hashFiles( '.git/modules/vcpkg/HEAD' )}}
 
       - name: Setup and run vcpkg
         uses: lukka/run-vcpkg@v11
