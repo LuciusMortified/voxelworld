@@ -77,13 +77,12 @@ void vox_deserializer<WC>::process_entity_(
     std::string name;
     iss >> name;
 
-    entity_builder<WC> builder(*world_);
-    builder.template with<hierarchy_component>();
-    builder.template with<transform_component>();
-    builder.template with<spatial_component>();
+    auto ent_guard = std::make_unique<entity_guard<WC>>(*world_);
+    ent_guard->template with<hierarchy_component>();
+    ent_guard->template with<transform_component>();
+    ent_guard->template with<spatial_component>();
 
-    auto ent_guard = builder.release_guard();
-    auto ent       = ent_guard->get_entity();
+    auto ent = ent_guard->get_entity();
 
     result_.name_to_entity[name] = ent;
     result_.entity_to_name[ent]  = name;
@@ -157,7 +156,7 @@ void vox_deserializer<WC>::process_model_(
 
     current_model_ = model_registry.create(ent_name, size);
 
-    world_->template add_component<model_component>(current_entity_);
+    current_entity_guard_->template with<model_component>();
 
     auto& model_system = world_->get_model_system();
     model_system.modify(current_entity_).set_model(current_model_);

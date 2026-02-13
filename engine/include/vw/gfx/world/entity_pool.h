@@ -30,6 +30,16 @@ public:
     }
 
     [[nodiscard]]
+    auto batch_create(uint32 count) -> std::vector<entity> {
+        std::vector<entity> result;
+        result.reserve(count);
+        for (uint32 i = 0; i < count; ++i) {
+            result.push_back(create());
+        }
+        return result;
+    }
+
+    [[nodiscard]]
     bool has(entity e) const {
         return e.index != entity::invalid_index && e.index < generations_.size() &&
             generations_[e.index] == e.generation;
@@ -39,6 +49,12 @@ public:
         if (has(e)) [[likely]] {
             ++generations_[e.index];
             free_indices_.push_back(e.index);
+        }
+    }
+
+    void batch_destroy(const std::vector<entity>& entities) {
+        for (auto e : entities) {
+            destroy(e);
         }
     }
 

@@ -64,15 +64,17 @@ inline void delete_entity_operation::undo() {
     auto& hierarchy_system = world.get_hierarchy_system();
     auto& transform_system = world.get_transform_system();
 
-    auto ent = world.create_entity();
-    world.template add_component<gfx::hierarchy_component>(ent);
-    world.template add_component<gfx::transform_component>(ent);
-    world.template add_component<gfx::spatial_component>(ent);
+    auto ent_guard = std::make_unique<gfx::entity_guard<>>(world);
+    ent_guard->with<gfx::hierarchy_component>();
+    ent_guard->with<gfx::transform_component>();
+    ent_guard->with<gfx::spatial_component>();
+
+    auto ent = ent_guard->get_entity();
 
     transform_system.modify(ent).set_transform(transform_);
 
     if (with_model_) {
-        world.template add_component<gfx::model_component>(ent);
+        ent_guard->with<gfx::model_component>();
 
         auto& model_registry = world.get_model_registry();
         auto& model_system   = world.get_model_system();
@@ -95,6 +97,8 @@ inline void delete_entity_operation::undo() {
     }
     state_->selected_name       = params_.name;
     state_->has_unsaved_changes = true;
+
+    state_->entities.push_back(std::move(ent_guard));
 }
 
 }  // namespace vw::sculptor

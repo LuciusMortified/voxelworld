@@ -1,8 +1,8 @@
 #include <vw/core.h>
 #include <vw/gfx.h>
 
-#include "vw/gfx/world/entity_builder.h"
 #include "vw/gfx/world/entity_guard.h"
+#include "vw/gfx/world/entity_guard_group.h"
 
 using namespace vw;
 
@@ -109,14 +109,11 @@ private:
         model_->set_voxel(0, 4, 1, colors::white);
         model_->set_voxel(2, 4, 1, colors::white);
 
-        // Создаем сущность с моделью
-        flower_ =
-            gfx::entity_builder<>{world}
-                .with<gfx::transform_component>()
-                .with<gfx::model_component>()
-                .with<gfx::hierarchy_component>()
-                .with<gfx::spatial_component>()
-                .release_guard();
+        flower_ = std::make_unique<gfx::entity_guard<>>(world);
+        flower_->with<gfx::transform_component>();
+        flower_->with<gfx::model_component>();
+        flower_->with<gfx::hierarchy_component>();
+        flower_->with<gfx::spatial_component>();
 
         // Настраиваем transform
         transform_system.modify(flower_->get_entity())
@@ -132,13 +129,13 @@ private:
 
 // Стресс-тест инстансами одной модели
 #if 0
-        for (int i = 0; i < 9999; i++) {
-            auto another_entity_ = world.create_entity();
-            world.add_component<gfx::transform_component>(another_entity_);
-            world.add_component<gfx::model_component>(another_entity_);
-            world.add_component<gfx::spatial_component>(another_entity_);
+        stress_group_ = std::make_unique<gfx::entity_guard_group<>>(world, 9999);
+        stress_group_->with<gfx::transform_component>();
+        stress_group_->with<gfx::model_component>();
+        stress_group_->with<gfx::spatial_component>();
 
-            transform_system.modify(another_entity_)
+        for (auto ent : *stress_group_) {
+            transform_system.modify(ent)
                 .set_position({
                     static_cast<float>(std::rand() % 100),
                     static_cast<float>(std::rand() % 100),
@@ -146,7 +143,7 @@ private:
                 })
                 .set_origin({1.5f, 3.0f, 1.5f});
 
-            model_system.modify(another_entity_).set_model(model_);
+            model_system.modify(ent).set_model(model_);
         }
 #endif
     }
@@ -278,6 +275,7 @@ private:
     float object_rotation_speed_{};
 
     std::unique_ptr<gfx::entity_guard<>> flower_;
+    std::unique_ptr<gfx::entity_guard_group<>> stress_group_;
 
     std::unordered_set<gfx::entity> selected_entities_;
     gfx::entity selected_entity_ = gfx::invalid_entity;

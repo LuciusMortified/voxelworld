@@ -17,21 +17,20 @@ inline void create_entity_operation::execute() {
     auto& model_registry   = world.get_model_registry();
     auto& model_system     = world.get_model_system();
 
-    auto ent_builder = gfx::entity_builder{world};
-    ent_builder.with<gfx::hierarchy_component>();
-    ent_builder.with<gfx::transform_component>();
-    ent_builder.with<gfx::spatial_component>();
+    auto ent_guard = std::make_unique<gfx::entity_guard<>>(world);
+    ent_guard->with<gfx::hierarchy_component>();
+    ent_guard->with<gfx::transform_component>();
+    ent_guard->with<gfx::spatial_component>();
 
     std::shared_ptr<gfx::model> model = nullptr;
     if (params_.with_model) {
-        ent_builder.with<gfx::model_component>();
+        ent_guard->with<gfx::model_component>();
 
         model = model_registry.create(params_.name, params_.size);
         model->fill(voxel{state_->selected_color});
     }
 
-    auto ent_guard = ent_builder.release_guard();
-    auto ent       = ent_guard->get_entity();
+    auto ent = ent_guard->get_entity();
 
     transform_system.modify(ent)
         .set_origin(vec3f{-params_.size.x / 2.f, -params_.size.y / 2.f, -params_.size.z / 2.f});
@@ -58,9 +57,20 @@ inline void create_entity_operation::execute() {
 }
 
 inline void create_entity_operation::undo() {
-    auto ent    = state_->name_to_entity[params_.name];
-    auto& world = engine_->get_world();
-    world.destroy_entity(ent);
+    auto ent = state_->name_to_entity[params_.name];
+
+    state_->entity_to_name.erase(ent);
+    state_->name_to_entity.erase(params_.name);
+
+    state_->entities.erase(
+        std::remove_if(
+            state_->entities.begin(),
+            state_->entities.end(),
+            [ent](const auto& guard) { return guard->get_entity() == ent; }
+        ),
+        state_->entities.end()
+    );
+
     if (state_->root_name == params_.name) {
         state_->root_name = "";
     }

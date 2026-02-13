@@ -100,6 +100,20 @@ void world<C>::destroy_entity(
     registry_.destroy(ent);
 }
 
+template <typename C>
+auto world<C>::batch_create_entities(
+    uint32 count
+) -> std::vector<entity> {
+    return registry_.batch_create(count);
+}
+
+template <typename C>
+void world<C>::batch_destroy_entities(
+    const std::vector<entity>& entities
+) noexcept {
+    registry_.batch_destroy(entities);
+}
+
 template <typename WC>
 auto world<WC>::get_mesh_pool() const -> const mesh_pool& {
     return mesh_pool_;
