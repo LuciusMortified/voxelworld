@@ -1,10 +1,6 @@
 name: Unit Tests
 
-on:
-  push:
-    branches: [master, "claude/*"]
-  pull_request:
-    branches: [master]
+on: push
 
 jobs:
   test-windows:
