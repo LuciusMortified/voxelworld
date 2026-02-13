@@ -1,5 +1,6 @@
 {
   "dependencies": [
+    "catch2",
     "glfw3",
     {
       "name": "imgui",

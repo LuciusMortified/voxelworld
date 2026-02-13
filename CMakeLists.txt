@@ -3,5 +3,17 @@ project(voxelworld)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+option(VW_BUILD_APPS "Build applications" ON)
+option(VW_BUILD_TESTS "Build unit tests" ON)
+
+enable_testing()
+
 add_subdirectory(engine)
-add_subdirectory(apps)
+
+if(VW_BUILD_APPS)
+    add_subdirectory(apps)
+endif()
+
+if(VW_BUILD_TESTS)
+    add_subdirectory(tests)
+endif()

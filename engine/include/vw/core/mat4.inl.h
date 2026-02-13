@@ -15,7 +15,7 @@ template <typename T>
 mat4<T>::mat4(
     const T* values
 ) {
-    memcpy(data_, values, size_ * sizeof(T));
+    memcpy(data_.data(), values, size_ * sizeof(T));
 }
 
 template <typename T>
