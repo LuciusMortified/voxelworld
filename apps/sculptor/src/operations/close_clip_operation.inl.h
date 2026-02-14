@@ -18,9 +18,9 @@ inline void close_clip_operation::execute() {
     if (state_->selected_clip_name == params_.name) {
         state_->selected_clip_name.clear();
         state_->selected_track_name.clear();
-        state_->selected_keyframe_time    = -1.f;
-        state_->has_unsaved_clip_changes = false;
+        state_->selected_keyframe_time = -1.f;
     }
+    state_->unsaved_clips.erase(params_.name);
 }
 
 inline void close_clip_operation::undo() {

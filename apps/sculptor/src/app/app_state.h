@@ -47,8 +47,11 @@ struct app_state {
 
     ui_state ui;
 
-    bool has_unsaved_changes      = false;
-    bool has_unsaved_clip_changes = false;
+    bool has_unsaved_changes = false;
+    std::unordered_map<std::string, bool> unsaved_clips;
+
+    [[nodiscard]] auto has_unsaved_clip(const std::string& name) const -> bool;
+    [[nodiscard]] auto has_any_unsaved_clip() const -> bool;
 
     std::string filename;
 
@@ -62,15 +65,7 @@ struct app_state {
 
     std::vector<std::unique_ptr<entity_guard_type>> entities;
 
-    auto find_guard(
-        gfx::entity ent
-    ) -> entity_guard_type* {
-        for (auto& g : entities) {
-            if (g->get_entity() == ent)
-                return g.get();
-        }
-        return nullptr;
-    }
+    auto find_guard(gfx::entity ent) -> entity_guard_type*;
 
     std::string selected_clip_name;
     std::string selected_track_name;
@@ -102,5 +97,7 @@ struct std::hash<vw::sculptor::tools> {
         return std::hash<vw::uint32>()(static_cast<vw::uint32>(t));
     }
 };
+
+#include "app_state.inl.h"
 
 #endif  // VW_SCULPTOR_STATE_H

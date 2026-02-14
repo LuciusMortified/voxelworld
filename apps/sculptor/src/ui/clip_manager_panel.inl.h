@@ -55,7 +55,7 @@ inline void clip_manager_panel::render(
 
     if (state_->ui.need_close_clip) {
         state_->ui.need_close_clip = false;
-        if (state_->has_unsaved_clip_changes) {
+        if (state_->has_unsaved_clip(state_->selected_clip_name)) {
             need_close_confirm_popup_ = true;
         } else {
             close_clip_();
@@ -87,7 +87,7 @@ inline void clip_manager_panel::render(
     ImGui::SameLine();
     ImGui::BeginDisabled(!has_selected);
     if (ImGui::Button("Close")) {
-        if (state_->has_unsaved_clip_changes) {
+        if (state_->has_unsaved_clip(state_->selected_clip_name)) {
             need_close_confirm_popup_ = true;
         } else {
             close_clip_();
@@ -253,7 +253,7 @@ inline auto clip_manager_panel::save_clip_() -> bool {
     gfx::voxa_serializer serializer(*clip);
     bool ok = serializer.serialize(filepath).has_value();
     if (ok) {
-        state_->has_unsaved_clip_changes = false;
+        state_->unsaved_clips[state_->selected_clip_name] = false;
     }
     return ok;
 }
@@ -271,7 +271,9 @@ inline void clip_manager_panel::save_all_clips() {
 
         fs::path filepath = asset_dir_path / std::format("{}.voxa", name);
         gfx::voxa_serializer serializer(*clip);
-        (void)serializer.serialize(filepath);
+        if (serializer.serialize(filepath).has_value()) {
+            state_->unsaved_clips[name] = false;
+        }
     }
 }
 

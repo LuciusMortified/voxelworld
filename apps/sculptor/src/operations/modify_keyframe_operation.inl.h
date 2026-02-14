@@ -60,8 +60,8 @@ inline void modify_keyframe_operation::apply(
     }
 
     track->mark_dirty();
-    state_->has_unsaved_changes      = true;
-    state_->has_unsaved_clip_changes = true;
+    state_->has_unsaved_changes               = true;
+    state_->unsaved_clips[params_.clip_name] = true;
 }
 
 }  // namespace vw::sculptor

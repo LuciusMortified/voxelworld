@@ -42,8 +42,9 @@ inline void remove_keyframe_operation::execute() {
     );
 
     track->mark_dirty();
-    state_->selected_keyframe_time = -1.f;
-    state_->has_unsaved_changes    = true;
+    state_->selected_keyframe_time            = -1.f;
+    state_->has_unsaved_changes               = true;
+    state_->unsaved_clips[params_.clip_name] = true;
 }
 
 inline void remove_keyframe_operation::undo() {
@@ -72,8 +73,8 @@ inline void remove_keyframe_operation::undo() {
     }
 
     track->mark_dirty();
-    state_->has_unsaved_changes      = true;
-    state_->has_unsaved_clip_changes = true;
+    state_->has_unsaved_changes               = true;
+    state_->unsaved_clips[params_.clip_name] = true;
 }
 
 }  // namespace vw::sculptor

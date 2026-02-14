@@ -125,9 +125,11 @@ inline void app::render(
     tools_[active_tool_]->render(delta_time);
 
     if (state_.has_unsaved_changes != prev_unsaved_state_ ||
-        state_.selected_clip_name != prev_clip_name_) {
-        prev_unsaved_state_ = state_.has_unsaved_changes;
-        prev_clip_name_     = state_.selected_clip_name;
+        state_.selected_clip_name != prev_clip_name_ ||
+        state_.has_any_unsaved_clip() != prev_clip_unsaved_state_) {
+        prev_unsaved_state_      = state_.has_unsaved_changes;
+        prev_clip_name_          = state_.selected_clip_name;
+        prev_clip_unsaved_state_ = state_.has_any_unsaved_clip();
         update_title_();
     }
 
@@ -307,8 +309,7 @@ inline void app::handle_animation_actions_() {
                         }
                     }
                     auto& anim_sys = world.get_animation_system();
-                    auto& player =
-                        world.get_component<gfx::animation_player_component>(root_ent);
+                    auto& player   = world.get_component<gfx::animation_player_component>(root_ent);
 
                     if (player.is_paused()) {
                         anim_sys.modify_player(root_ent).resume();
@@ -428,10 +429,12 @@ inline void app::update_title_() {
     if (state_.filename.empty()) {
         title = std::format("Sculptor {}", version_string);
     } else {
-        title = std::format("Sculptor {} | {}", version_string, state_.filename);
+        auto filename_suffix = state_.has_unsaved_changes ? "*" : "";
+        title = std::format("Sculptor {} | {}{}", version_string, state_.filename, filename_suffix);
 
         if (!state_.selected_clip_name.empty()) {
-            title += std::format(" | {}.voxa", state_.selected_clip_name);
+            auto clip_suffix = state_.has_unsaved_clip(state_.selected_clip_name) ? "*" : "";
+            title += std::format(" | {}.voxa{}", state_.selected_clip_name, clip_suffix);
         }
 
         if (state_.has_unsaved_changes) {

@@ -15,8 +15,8 @@ inline void create_clip_operation::execute() {
     (void)registry.create(params_.name);
     state_->selected_clip_name       = params_.name;
     state_->ui.show_timeline         = true;
-    state_->has_unsaved_changes      = true;
-    state_->has_unsaved_clip_changes = true;
+    state_->has_unsaved_changes          = true;
+    state_->unsaved_clips[params_.name] = true;
 }
 
 inline void create_clip_operation::undo() {
