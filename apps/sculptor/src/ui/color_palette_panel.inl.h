@@ -14,19 +14,22 @@ inline void color_palette_panel::render(
     float delta_time
 ) {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImVec2 window_pos =
-        ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + viewport->WorkSize.y - 10);
+    ImVec2 window_pos       = ImVec2(
+        viewport->WorkPos.x + 10,
+        viewport->WorkPos.y + viewport->WorkSize.y  //
+            - state_->ui.left_bottom_voffset        //
+            - 10
+    );
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.0f, 1.0f));
 
-    ImGuiWindowFlags window_flags =         //
-        //ImGuiWindowFlags_NoCollapse |       //
+    ImGuiWindowFlags window_flags =  //
+                                     // ImGuiWindowFlags_NoCollapse |       //
         ImGuiWindowFlags_NoSavedSettings |  //
-        //ImGuiWindowFlags_NoTitleBar |       //
-        ImGuiWindowFlags_NoMove |           //
+        // ImGuiWindowFlags_NoTitleBar |       //
+        ImGuiWindowFlags_NoMove |  //
         ImGuiWindowFlags_AlwaysAutoResize;
 
     ImGui::Begin("Color Palette", nullptr, window_flags);
-    //clamp_window_pos_to_viewport();
 
     const ImVec4 selected_color_imvec4 = to_imvec4(state_->selected_color);
     ImGui::ColorButton(
@@ -90,18 +93,20 @@ inline void color_palette_panel::render(
 
     ImGui::PopStyleVar();
 
+    state_->ui.left_bottom_voffset += ImGui::GetWindowHeight() + 10.f;
+
     ImGui::End();
 }
 
-ImVec4 color_palette_panel::to_imvec4(
+inline ImVec4 color_palette_panel::to_imvec4(
     const color& clr
-) const {
-    return ImVec4(
+) {
+    return {
         static_cast<float>(clr.r()) / 255.0f,
         static_cast<float>(clr.g()) / 255.0f,
         static_cast<float>(clr.b()) / 255.0f,
         1.0f
-    );
+    };
 }
 
 }  // namespace vw::sculptor

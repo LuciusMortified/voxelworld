@@ -56,6 +56,10 @@ add_executable(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME} vwengine)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
 
+if (MSVC)
+    target_compile_options(${PROJECT_NAME} PRIVATE /bigobj)
+endif()
+
 configure_file(
         ${CMAKE_CURRENT_SOURCE_DIR}/src/app/sculptor_version.h.in
         ${CMAKE_CURRENT_BINARY_DIR}/include/sculptor_version.h

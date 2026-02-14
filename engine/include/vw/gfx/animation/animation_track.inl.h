@@ -38,15 +38,16 @@ inline void animation_track::recompile_if_needed() const {
         );
     }
 
-    if (cached_duration_ <= 0.0f) {
+    if (cached_duration_ <= 0.0f && channels_.empty()) {
         is_dirty_ = false;
         return;
     }
 
-    float32 duration = cached_duration_;
+    frame_time_ = 1.0f / compiled_fps_;
 
-    frame_time_        = 1.0f / compiled_fps_;
-    uint32 frame_count = static_cast<uint32>(std::ceil(duration / frame_time_)) + 1;
+    uint32 frame_count = cached_duration_ > 0.0f
+                             ? static_cast<uint32>(std::ceil(cached_duration_ / frame_time_)) + 1
+                             : 1;
 
     compiled_transforms_.clear();
     compiled_transforms_.reserve(frame_count);
@@ -102,6 +103,10 @@ inline auto animation_track::get_transform(
 
     if (compiled_transforms_.empty()) {
         return std::unexpected(error_type::empty);
+    }
+
+    if (compiled_transforms_.size() == 1) {
+        return compiled_transforms_[0];
     }
 
     float32 frame_f  = time / frame_time_;
@@ -186,6 +191,27 @@ inline auto animation_track::get_channel(
     animation_property prop
 ) const -> const animation_channel_variant* {
     for (const auto& channel_var : channels_) {
+        bool found = false;
+        std::visit(
+            [&](const auto& channel) {
+                if (channel.get_property() == prop) {
+                    found = true;
+                }
+            },
+            channel_var
+        );
+
+        if (found) {
+            return &channel_var;
+        }
+    }
+    return nullptr;
+}
+
+inline auto animation_track::get_channel_mut(
+    animation_property prop
+) -> animation_channel_variant* {
+    for (auto& channel_var : channels_) {
         bool found = false;
         std::visit(
             [&](const auto& channel) {

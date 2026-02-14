@@ -16,7 +16,7 @@ inline void entity_properties_panel::render(
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImVec2 window_pos       = ImVec2(
         viewport->WorkPos.x + viewport->WorkSize.x - 10,
-        viewport->WorkPos.y + state_->ui.right_side_voffset + 10
+        viewport->WorkPos.y + state_->ui.right_top_voffset + 10
     );
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(1.0f, 0.0f));
 
@@ -53,7 +53,7 @@ inline void entity_properties_panel::render(
 
     ImGui::Dummy({200.0f, 0.0f});
 
-    state_->ui.right_side_voffset += ImGui::GetWindowHeight() + 10.0f;
+    state_->ui.right_top_voffset += ImGui::GetWindowHeight() + 10.0f;
 
     ImGui::End();
 }

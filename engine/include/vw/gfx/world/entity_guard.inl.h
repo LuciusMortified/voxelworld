@@ -10,12 +10,16 @@ namespace vw::gfx {
 namespace detail {
 
 template <typename Tuple, typename F, std::size_t... Is>
-void for_each_tuple_type_impl(F&& f, std::index_sequence<Is...>) noexcept {
+void for_each_tuple_type_impl(
+    F&& f, std::index_sequence<Is...>
+) noexcept {
     (static_cast<void>(f.template operator()<std::tuple_element_t<Is, Tuple>, Is>()), ...);
 }
 
 template <typename Tuple, typename F>
-void for_each_tuple_type(F&& f) noexcept {
+void for_each_tuple_type(
+    F&& f
+) noexcept {
     constexpr std::size_t N = std::tuple_size_v<Tuple>;
     for_each_tuple_type_impl<Tuple>(std::forward<F>(f), std::make_index_sequence<N>{});
 }
@@ -44,8 +48,8 @@ entity_guard<WC>::entity_guard(
     entity_guard&& other
 ) noexcept
     : world_(other.world_), ent_(other.ent_), archetype_(other.archetype_) {
-    other.world_ = nullptr;
-    other.ent_   = invalid_entity;
+    other.world_     = nullptr;
+    other.ent_       = invalid_entity;
     other.archetype_ = {};
 }
 
@@ -55,11 +59,11 @@ auto entity_guard<WC>::operator=(
 ) noexcept -> entity_guard& {
     if (this != &other) {
         cleanup_();
-        world_     = other.world_;
-        ent_       = other.ent_;
-        archetype_ = other.archetype_;
-        other.world_ = nullptr;
-        other.ent_   = invalid_entity;
+        world_           = other.world_;
+        ent_             = other.ent_;
+        archetype_       = other.archetype_;
+        other.world_     = nullptr;
+        other.ent_       = invalid_entity;
         other.archetype_ = {};
     }
     return *this;
@@ -84,6 +88,18 @@ auto entity_guard<WC>::without() -> entity_guard& {
 }
 
 template <typename WC>
+template <typename C>
+auto entity_guard<WC>::has() const -> bool {
+    return world_->template has_component<C>(ent_);
+}
+
+template <typename WC>
+template <typename C>
+auto entity_guard<WC>::get() const -> const C& {
+    return world_->template get_component<C>(ent_);
+}
+
+template <typename WC>
 auto entity_guard<WC>::get_entity() const -> entity {
     return ent_;
 }
@@ -100,7 +116,7 @@ auto entity_guard<WC>::is_valid() const -> bool {
 
 template <typename WC>
 auto entity_guard<WC>::release() -> entity {
-    auto ent = ent_;
+    auto ent   = ent_;
     world_     = nullptr;
     ent_       = invalid_entity;
     archetype_ = {};
@@ -116,6 +132,11 @@ void entity_guard<WC>::update_archetype() {
         }
     });
     archetype_ = new_archetype;
+}
+
+template <typename WC>
+auto entity_guard<WC>::operator*() const -> entity {
+    return ent_;
 }
 
 template <typename WC>

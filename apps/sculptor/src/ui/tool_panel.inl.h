@@ -15,7 +15,7 @@ inline void tool_panel::render(
 ) {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImVec2 window_pos =
-        ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + state_->ui.left_size_voffset + 10);
+        ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + state_->ui.left_top_voffset + 10);
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
 
     ImGuiWindowFlags window_flags =            //
@@ -33,7 +33,7 @@ inline void tool_panel::render(
 
     ImGui::PopStyleVar(1);
 
-    state_->ui.left_size_voffset += ImGui::GetWindowHeight() + 10.f;
+    state_->ui.left_top_voffset += ImGui::GetWindowHeight() + 10.f;
 
     ImGui::End();
 }

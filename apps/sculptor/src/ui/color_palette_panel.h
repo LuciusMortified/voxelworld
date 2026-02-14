@@ -15,7 +15,7 @@ public:
     void render(float delta_time);
 
 private:
-    ImVec4 to_imvec4(const color& clr) const;
+    static ImVec4 to_imvec4(const color& clr) ;
 
     app_state* state_;
 };

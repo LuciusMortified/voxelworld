@@ -2,9 +2,18 @@
 
 #ifndef VW_SCULPTOR_STATE_H
 #define VW_SCULPTOR_STATE_H
+
+#include <unordered_set>
+#include <variant>
+
+#include "vw/core/transform.h"
+#include "vw/gfx/animation/animation_types.h"
+#include "vw/gfx/animation/keyframe.h"
 #include "vw/gfx/world/entity_guard.h"
 
 namespace vw::sculptor {
+
+using keyframe_value = std::variant<gfx::keyframe_vec3f, gfx::keyframe_quat>;
 
 enum class tools : int {
     invalid,
@@ -14,13 +23,18 @@ enum class tools : int {
 };
 
 struct ui_state {
-    float left_size_voffset  = 0.f;
-    float right_side_voffset = 0.f;
+    float left_top_voffset    = 0.f;
+    float left_bottom_voffset = 0.f;
+    float right_top_voffset   = 0.f;
 
     bool need_startup_modal   = true;
     bool need_new_file_modal  = false;
     bool need_open_file_modal = false;
     bool need_save_as_modal   = false;
+
+    float bottom_panel_height   = 200.f;
+    bool show_timeline          = false;
+    bool need_create_clip_modal = false;
 };
 
 struct app_state {
@@ -43,6 +57,32 @@ struct app_state {
     std::unordered_map<gfx::entity, std::string> entity_to_name;
 
     std::vector<std::unique_ptr<entity_guard_type>> entities;
+
+    auto find_guard(
+        gfx::entity ent
+    ) -> entity_guard_type* {
+        for (auto& g : entities) {
+            if (g->get_entity() == ent)
+                return g.get();
+        }
+        return nullptr;
+    }
+
+    std::string selected_clip_name;
+    std::string selected_track_name;
+    gfx::animation_property selected_property = gfx::animation_property::position;
+    float32 selected_keyframe_time            = -1.f;
+    float32 timeline_cursor                   = 0.f;
+    std::unordered_set<std::string> expanded_tracks;
+    bool is_previewing = false;
+
+    bool need_toggle_playback = false;
+    bool need_stop_playback   = false;
+    bool need_add_keyframe    = false;
+    bool need_delete_keyframe = false;
+
+    std::unordered_map<std::string, transform> saved_transforms;
+    bool has_saved_transforms = false;
 };
 
 }  // namespace vw::sculptor

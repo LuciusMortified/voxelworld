@@ -32,6 +32,8 @@ public:
     [[nodiscard]] auto get_property() const -> animation_property { return property_; }
     [[nodiscard]] auto is_empty() const -> bool { return keyframes_.empty(); }
     [[nodiscard]] auto keyframe_count() const -> size_t { return keyframes_.size(); }
+    [[nodiscard]] auto get_keyframes() const -> const std::vector<keyframe<T>>& { return keyframes_; }
+    [[nodiscard]] auto get_keyframes_mut() -> std::vector<keyframe<T>>& { return keyframes_; }
 
 private:
     animation_property property_;

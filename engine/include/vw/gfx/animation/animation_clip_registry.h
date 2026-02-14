@@ -32,6 +32,7 @@ public:
     animation_clip_registry() = default;
 
     [[nodiscard]] auto create(std::string_view name) -> std::shared_ptr<animation_clip>;
+    void add(std::string_view name, std::shared_ptr<animation_clip> clip);
     [[nodiscard]] auto get(std::string_view name) const -> std::shared_ptr<animation_clip>;
     [[nodiscard]] auto has(std::string_view name) const -> bool;
     void remove(std::string_view name);

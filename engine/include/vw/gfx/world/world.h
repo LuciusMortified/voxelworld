@@ -52,16 +52,10 @@ public:
     void update(float32 delta_time);
 
     template <typename T>
-    void add_component(entity ent, T&& value = {});
-
-    template <typename T>
     [[nodiscard]] auto has_component(entity ent) const -> bool;
 
     template <typename T>
     [[nodiscard]] auto get_component(entity ent) -> T&;
-
-    template <typename T>
-    void remove_component(entity ent) noexcept;
 
     [[nodiscard]] auto get_mesh_pool() const -> const mesh_pool&;
 
@@ -90,6 +84,12 @@ public:
     ) const -> std::optional<voxel_ray_hit>;
 
 private:
+    template <typename T>
+    void add_component(entity ent, T&& value = {});
+
+    template <typename T>
+    void remove_component(entity ent) noexcept;
+
     [[nodiscard]] auto create_entity() -> entity;
     void destroy_entity(entity ent) noexcept;
 
