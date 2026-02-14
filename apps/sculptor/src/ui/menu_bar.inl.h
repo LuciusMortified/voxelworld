@@ -81,6 +81,30 @@ inline void menu_bar::render(
         ImGui::EndMenu();
     }
 
+    if (ImGui::BeginMenu("Animation")) {
+        if (ImGui::MenuItem("New Clip...")) {
+            state_->ui.need_create_clip_modal = true;
+        }
+        if (ImGui::MenuItem("Toggle Timeline", "T")) {
+            state_->ui.show_timeline ^= true;
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Play/Pause", "Space", false, !state_->selected_clip_name.empty())) {
+            state_->need_toggle_playback = true;
+        }
+        if (ImGui::MenuItem("Stop", "", false, state_->is_previewing)) {
+            state_->need_stop_playback = true;
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Add Keyframe", "K", false, !state_->selected_clip_name.empty())) {
+            state_->need_add_keyframe = true;
+        }
+        if (ImGui::MenuItem("Delete Keyframe", "Del", false, state_->selected_keyframe_time >= 0.f)) {
+            state_->need_delete_keyframe = true;
+        }
+        ImGui::EndMenu();
+    }
+
 #if 0
     if (ImGui::BeginMenu("Help")) {
         if (ImGui::MenuItem("About")) {
@@ -91,8 +115,8 @@ inline void menu_bar::render(
     }
 #endif
 
-    state_->ui.left_size_voffset += 20.0f;
-    state_->ui.right_side_voffset += 20.0f;
+    state_->ui.left_top_voffset += 20.0f;
+    state_->ui.right_top_voffset += 20.0f;
 
     ImGui::EndMenuBar();
 

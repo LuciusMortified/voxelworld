@@ -16,6 +16,9 @@
 #include "ui/open_file_modal.h"
 #include "ui/save_as_modal.h"
 #include "ui/startup_modal.h"
+#include "ui/clip_manager_panel.h"
+#include "ui/keyframe_properties_panel.h"
+#include "ui/timeline_panel.h"
 #include "ui/tool_panel.h"
 
 namespace vw::sculptor {
@@ -34,6 +37,7 @@ private:
     void handle_mouse_press(const gfx::mouse_press_event& ev);
     void handle_mouse_release(const gfx::mouse_release_event& ev);
 
+    void handle_animation_actions_();
     void update_title_();
     static void init_asset_dir_();
 
@@ -51,7 +55,10 @@ private:
     tool_panel tool_panel_;
     color_palette_panel color_palette_panel_;
     entity_properties_panel entity_properties_panel_;
+    keyframe_properties_panel keyframe_properties_panel_;
     entity_tree_panel entity_tree_panel_;
+    clip_manager_panel clip_manager_panel_;
+    timeline_panel timeline_panel_;
 
     startup_modal startup_modal_;
     new_file_modal new_file_modal_;

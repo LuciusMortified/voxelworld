@@ -10,6 +10,13 @@ inline auto animation_clip_registry::create(std::string_view name)
     return clip;
 }
 
+inline void animation_clip_registry::add(
+    std::string_view name, std::shared_ptr<animation_clip> clip
+) {
+    std::string name_str(name);
+    clips_[std::move(name_str)] = std::move(clip);
+}
+
 inline auto animation_clip_registry::get(std::string_view name) const
     -> std::shared_ptr<animation_clip> {
     auto it = clips_.find(name);

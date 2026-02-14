@@ -32,7 +32,9 @@ public:
     [[nodiscard]] auto get_frame_time() const -> float32;
     [[nodiscard]] auto get_target_name() const -> const std::string& { return target_name_; }
     [[nodiscard]] auto get_channel(animation_property prop) const -> const animation_channel_variant*;
+    [[nodiscard]] auto get_channel_mut(animation_property prop) -> animation_channel_variant*;
     [[nodiscard]] auto has_channel(animation_property prop) const -> bool;
+    void mark_dirty() { is_dirty_ = true; }
 
 private:
     void add_impl(animation_channel_variant channel);

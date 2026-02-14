@@ -5,6 +5,9 @@
 
 #include <filesystem>
 
+#include "operations/add_keyframe_operation.h"
+#include "operations/add_track_operation.h"
+#include "operations/remove_keyframe_operation.h"
 #include "tools/add_voxel_tool.h"
 #include "tools/paint_tool.h"
 #include "tools/remove_voxel_tool.h"
@@ -21,21 +24,23 @@ inline app::app(
     , tool_panel_(state_)
     , color_palette_panel_(state_)
     , entity_properties_panel_(eng, state_, op_manager_)
+    , keyframe_properties_panel_(eng, state_, op_manager_)
     , entity_tree_panel_(eng, state_, op_manager_)
+    , clip_manager_panel_(eng, state_, op_manager_)
+    , timeline_panel_(eng, state_, op_manager_)
     , startup_modal_(eng, state_)
     , new_file_modal_(eng, state_)
     , open_file_modal_(eng, state_)
     , save_as_modal_(eng, state_) {
-
     init_asset_dir_();
 
     auto& window   = eng.get_window();
     auto& camera   = eng.get_camera();
     auto& renderer = eng.get_renderer();
 
-    tools_[tools::add_voxel]     = std::make_unique<add_voxel_tool>(eng, state_, op_manager_);
-    tools_[tools::remove_voxel]  = std::make_unique<remove_voxel_tool>(eng, state_, op_manager_);
-    tools_[tools::paint_voxel]   = std::make_unique<paint_tool>(eng, state_, op_manager_);
+    tools_[tools::add_voxel]    = std::make_unique<add_voxel_tool>(eng, state_, op_manager_);
+    tools_[tools::remove_voxel] = std::make_unique<remove_voxel_tool>(eng, state_, op_manager_);
+    tools_[tools::paint_voxel]  = std::make_unique<paint_tool>(eng, state_, op_manager_);
 
     camera_controller_.setup(window, camera);
     camera_controller_.set_camera_speed(15.f);
@@ -89,24 +94,33 @@ inline void app::render(
     renderer.draw_line(vec3f{0, 0, 0}, vec3f{0, 100, 0}, colors::green);
     renderer.draw_line(vec3f{0, 0, 0}, vec3f{0, 0, 100}, colors::red);
 
-    state_.ui.left_size_voffset  = 0.f;
-    state_.ui.right_side_voffset = 0.f;
+    state_.ui.left_top_voffset    = 0.f;
+    state_.ui.left_bottom_voffset = 0.f;
+    state_.ui.right_top_voffset   = 0.f;
 
     menu_bar_.render(delta_time);
 
     // left side
     tool_panel_.render(delta_time);
+
+    if (state_.ui.show_timeline) {
+        timeline_panel_.render(delta_time);
+    }
     color_palette_panel_.render(delta_time);
 
     // right side
     entity_properties_panel_.render(delta_time);
+    keyframe_properties_panel_.render(delta_time);
     entity_tree_panel_.render(delta_time);
+    clip_manager_panel_.render(delta_time);
 
     // modals
     startup_modal_.render(delta_time);
     new_file_modal_.render(delta_time);
     open_file_modal_.render(delta_time);
     save_as_modal_.render(delta_time);
+
+    handle_animation_actions_();
 
     tools_[active_tool_]->render(delta_time);
 
@@ -115,7 +129,7 @@ inline void app::render(
         update_title_();
     }
 
-#if 1
+#if 0
     ImGui::Begin("Shadow Map Debug");
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
     // Сетка 2x2 для всех каскадов
@@ -173,6 +187,19 @@ inline void app::handle_key_press(
 
     tools_[active_tool_]->on_key_press(ev);
 
+    if (ev.key == keys::SPACE && !ev.with(mods::CTRL)) {
+        state_.need_toggle_playback = true;
+    }
+    if (ev.key == keys::K && !ev.with(mods::CTRL)) {
+        state_.need_add_keyframe = true;
+    }
+    if (ev.key == static_cast<keys>(261) && !ev.with(mods::CTRL)) {
+        state_.need_delete_keyframe = true;
+    }
+    if (ev.key == keys::T && !ev.with(mods::CTRL)) {
+        state_.ui.show_timeline ^= true;
+    }
+
     if (ev.key == keys::N && ev.with(mods::CTRL)) {
         state_.ui.need_new_file_modal = true;
     }
@@ -181,9 +208,7 @@ inline void app::handle_key_press(
     }
     if (ev.key == keys::S && ev.with(mods::CTRL) && !ev.with(mods::SHIFT)) {
         gfx::vox_serializer serializer{
-            get_engine().get_world(),
-            state_.name_to_entity[state_.root_name],
-            state_.entity_to_name
+            get_engine().get_world(), state_.name_to_entity[state_.root_name], state_.entity_to_name
         };
 
         namespace fs = std::filesystem;
@@ -249,6 +274,140 @@ inline void app::handle_mouse_release(
 
     if (!camera_movement_enabled_) {
         tools_[active_tool_]->on_mouse_release(ev);
+    }
+}
+
+inline void app::handle_animation_actions_() {
+    auto& world = get_engine().get_world();
+
+    if (state_.need_toggle_playback) {
+        state_.need_toggle_playback = false;
+        if (!state_.selected_clip_name.empty() && !state_.root_name.empty() &&
+            state_.name_to_entity.contains(state_.root_name)) {
+            auto root_ent = state_.name_to_entity[state_.root_name];
+
+            if (state_.is_previewing) {
+                if (world.has_component<gfx::animation_player_component>(root_ent)) {
+                    world.get_animation_system().modify_player(root_ent).pause();
+                }
+                state_.is_previewing = false;
+            } else {
+                auto& clip_reg = world.get_animation_clip_registry();
+                auto clip      = clip_reg.get(state_.selected_clip_name);
+                if (clip) {
+                    if (!world.has_component<gfx::animation_player_component>(root_ent)) {
+                        auto* guard = state_.find_guard(root_ent);
+                        if (guard) {
+                            guard->with<gfx::animation_player_component>();
+                        }
+                    }
+                    auto& anim_sys = world.get_animation_system();
+                    anim_sys.modify_player(root_ent).set_clip(clip);
+                    anim_sys.modify_player(root_ent).play();
+                    state_.is_previewing = true;
+                }
+            }
+        }
+    }
+
+    if (state_.need_stop_playback) {
+        state_.need_stop_playback = false;
+        if (!state_.root_name.empty() && state_.name_to_entity.contains(state_.root_name)) {
+            auto root_ent = state_.name_to_entity[state_.root_name];
+            if (world.has_component<gfx::animation_player_component>(root_ent)) {
+                world.get_animation_system().modify_player(root_ent).stop();
+            }
+        }
+        state_.is_previewing   = false;
+        state_.timeline_cursor = 0.f;
+    }
+
+    if (state_.need_add_keyframe) {
+        state_.need_add_keyframe = false;
+        if (!state_.selected_clip_name.empty() && !state_.selected_name.empty()) {
+            auto& clip_reg = world.get_animation_clip_registry();
+            auto clip      = clip_reg.get(state_.selected_clip_name);
+            if (clip) {
+                auto entity_name = state_.selected_name;
+                auto ent         = state_.name_to_entity[entity_name];
+                auto prop        = state_.selected_property;
+                float32 time     = state_.timeline_cursor;
+
+                if (world.has_component<gfx::transform_component>(ent)) {
+                    auto& tc = world.get_component<gfx::transform_component>(ent);
+
+                    keyframe_value kf_val;
+                    if (prop == gfx::animation_property::rotation) {
+                        kf_val = gfx::keyframe_quat{time, math::euler_to_quat(tc.get_rotation())};
+                    } else if (prop == gfx::animation_property::position) {
+                        kf_val = gfx::keyframe_vec3f{time, tc.get_position()};
+                    } else if (prop == gfx::animation_property::scale) {
+                        kf_val = gfx::keyframe_vec3f{time, tc.get_scale()};
+                    } else {
+                        kf_val = gfx::keyframe_vec3f{time, tc.get_origin()};
+                    }
+
+                    if (!clip->has_track(entity_name)) {
+                        add_track_params params = {
+                            .clip_name  = state_.selected_clip_name,
+                            .track_name = entity_name,
+                            .property   = prop,
+                            .keyframe   = kf_val,
+                        };
+                        auto op =
+                            std::make_unique<add_track_operation>(get_engine(), state_, params);
+                        op_manager_.execute(std::move(op));
+                    } else {
+                        add_keyframe_params params = {
+                            .clip_name  = state_.selected_clip_name,
+                            .track_name = entity_name,
+                            .property   = prop,
+                            .keyframe   = kf_val,
+                        };
+                        auto op =
+                            std::make_unique<add_keyframe_operation>(get_engine(), state_, params);
+                        op_manager_.execute(std::move(op));
+                    }
+                }
+            }
+        }
+    }
+
+    if (state_.need_delete_keyframe) {
+        state_.need_delete_keyframe = false;
+        if (state_.selected_keyframe_time >= 0.f && !state_.selected_clip_name.empty() &&
+            !state_.selected_track_name.empty()) {
+            auto& clip_reg = world.get_animation_clip_registry();
+            auto clip      = clip_reg.get(state_.selected_clip_name);
+            if (clip) {
+                auto* track = clip->get_track(state_.selected_track_name);
+                if (track) {
+                    auto* ch = track->get_channel(state_.selected_property);
+                    if (ch) {
+                        std::visit(
+                            [&](const auto& channel) {
+                                for (const auto& kf : channel.get_keyframes()) {
+                                    if (std::abs(kf.time - state_.selected_keyframe_time) <
+                                        0.0001f) {
+                                        remove_keyframe_params params;
+                                        params.clip_name  = state_.selected_clip_name;
+                                        params.track_name = state_.selected_track_name;
+                                        params.property   = state_.selected_property;
+                                        params.keyframe   = keyframe_value(kf);
+                                        auto op = std::make_unique<remove_keyframe_operation>(
+                                            get_engine(), state_, params
+                                        );
+                                        op_manager_.execute(std::move(op));
+                                        return;
+                                    }
+                                }
+                            },
+                            *ch
+                        );
+                    }
+                }
+            }
+        }
     }
 }
 
