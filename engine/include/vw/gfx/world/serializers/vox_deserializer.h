@@ -2,7 +2,9 @@
 
 #ifndef VW_GFX_VOX_DESERIALIZER_H
 #define VW_GFX_VOX_DESERIALIZER_H
+#include <expected>
 #include <filesystem>
+#include <optional>
 
 #include "vw/gfx/world/world.h"
 
@@ -13,6 +15,8 @@ public:
     using world_type        = world<WC>;
     using entity_guard_type = entity_guard<WC>;
 
+    enum class error_type { file_open_failed, parse_error };
+
     struct result {
         std::string root_name;
         std::unordered_map<std::string, entity> name_to_entity;
@@ -22,19 +26,21 @@ public:
 
     vox_deserializer(world_type& world);
 
-    auto deserialize(const std::filesystem::path& filepath) -> std::optional<result>;
+    auto deserialize(const std::filesystem::path& filepath) -> std::expected<result, error_type>;
 
 private:
     void process_root_(std::istringstream& iss);
     void process_entity_(std::istringstream& iss);
     void process_parent_(std::istringstream& iss);
     void process_transform_(std::istringstream& iss);
+    void process_target_(std::istringstream& iss);
     void process_model_(std::istringstream& iss);
     void process_voxel_(std::istringstream& iss);
 
     world_type* world_;
 
     result result_;
+    std::optional<error_type> error_;
 
     entity current_entity_ = invalid_entity;
     std::unique_ptr<entity_guard_type> current_entity_guard_;

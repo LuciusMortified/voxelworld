@@ -56,7 +56,8 @@ inline void add_track_operation::execute() {
         }
     }
 
-    state_->has_unsaved_changes = true;
+    state_->has_unsaved_changes      = true;
+    state_->has_unsaved_clip_changes = true;
 }
 
 inline void add_track_operation::undo() {
@@ -67,7 +68,8 @@ inline void add_track_operation::undo() {
     }
 
     clip->remove_track(params_.track_name);
-    state_->has_unsaved_changes = true;
+    state_->has_unsaved_changes      = true;
+    state_->has_unsaved_clip_changes = true;
 }
 
 }  // namespace vw::sculptor

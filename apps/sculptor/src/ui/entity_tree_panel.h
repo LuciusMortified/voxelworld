@@ -9,7 +9,7 @@
 
 namespace vw::sculptor {
 
-class entity_tree_panel {
+class entity_tree_panel final {
 public:
     using engine_type = gfx::engine<>;
 

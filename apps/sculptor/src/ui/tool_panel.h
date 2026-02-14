@@ -8,7 +8,7 @@
 
 namespace vw::sculptor {
 
-class tool_panel {
+class tool_panel final {
 public:
     explicit tool_panel(app_state& st);
 

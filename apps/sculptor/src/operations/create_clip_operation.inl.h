@@ -13,9 +13,10 @@ inline create_clip_operation::create_clip_operation(
 inline void create_clip_operation::execute() {
     auto& registry = engine_->get_world().get_animation_clip_registry();
     (void)registry.create(params_.name);
-    state_->selected_clip_name = params_.name;
-    state_->ui.show_timeline   = true;
-    state_->has_unsaved_changes = true;
+    state_->selected_clip_name       = params_.name;
+    state_->ui.show_timeline         = true;
+    state_->has_unsaved_changes      = true;
+    state_->has_unsaved_clip_changes = true;
 }
 
 inline void create_clip_operation::undo() {

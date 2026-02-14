@@ -1,16 +1,16 @@
 #pragma once
 
-#ifndef VW_SCULPTOR_DELETE_CLIP_OPERATION_INL_H
-#define VW_SCULPTOR_DELETE_CLIP_OPERATION_INL_H
+#ifndef VW_SCULPTOR_CLOSE_CLIP_OPERATION_INL_H
+#define VW_SCULPTOR_CLOSE_CLIP_OPERATION_INL_H
 
 namespace vw::sculptor {
 
-inline delete_clip_operation::delete_clip_operation(
-    engine_type& engine, app_state& state, const delete_clip_params& params
+inline close_clip_operation::close_clip_operation(
+    engine_type& engine, app_state& state, const close_clip_params& params
 )
     : base_operation(), engine_(&engine), state_(&state), params_(params) {}
 
-inline void delete_clip_operation::execute() {
+inline void close_clip_operation::execute() {
     auto& registry = engine_->get_world().get_animation_clip_registry();
     saved_clip_    = registry.get(params_.name);
     registry.remove(params_.name);
@@ -18,18 +18,17 @@ inline void delete_clip_operation::execute() {
     if (state_->selected_clip_name == params_.name) {
         state_->selected_clip_name.clear();
         state_->selected_track_name.clear();
-        state_->selected_keyframe_time = -1.f;
+        state_->selected_keyframe_time    = -1.f;
+        state_->has_unsaved_clip_changes = false;
     }
-    state_->has_unsaved_changes = true;
 }
 
-inline void delete_clip_operation::undo() {
+inline void close_clip_operation::undo() {
     auto& registry = engine_->get_world().get_animation_clip_registry();
     registry.add(params_.name, saved_clip_);
-    state_->selected_clip_name  = params_.name;
-    state_->has_unsaved_changes = true;
+    state_->selected_clip_name = params_.name;
 }
 
 }  // namespace vw::sculptor
 
-#endif  // VW_SCULPTOR_DELETE_CLIP_OPERATION_INL_H
+#endif  // VW_SCULPTOR_CLOSE_CLIP_OPERATION_INL_H

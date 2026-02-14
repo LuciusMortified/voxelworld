@@ -20,6 +20,8 @@ inline timeline_panel::timeline_panel(
 inline void timeline_panel::render(
     float delta_time
 ) {
+    keyframe_clicked_ = false;
+
     auto& clip_registry = engine_->get_world().get_animation_clip_registry();
     auto clip           = clip_registry.get(state_->selected_clip_name);
     if (!clip) {
@@ -79,6 +81,17 @@ inline void timeline_panel::render(
     float clip_duration = clip->get_duration();
     if (clip_duration <= 0.f) {
         clip_duration = 1.f;
+    }
+
+    if (state_->need_step_forward) {
+        state_->need_step_forward = false;
+        float step = clip_duration * 0.01f;
+        state_->timeline_cursor = std::min(state_->timeline_cursor + step, clip_duration);
+    }
+    if (state_->need_step_backward) {
+        state_->need_step_backward = false;
+        float step = clip_duration * 0.01f;
+        state_->timeline_cursor = std::max(state_->timeline_cursor - step, 0.f);
     }
 
     if (!state_->is_previewing && std::abs(state_->timeline_cursor - prev_cursor_time_) > 0.0001f) {
@@ -162,12 +175,18 @@ inline void timeline_panel::render_toolbar(
                 }
 
                 auto& anim_sys = world.get_animation_system();
-                anim_sys.modify_player(root_ent).set_clip(clip);
-                anim_sys.modify_player(root_ent).set_playback_speed(playback_speed_);
+                auto& player = world.get_component<gfx::animation_player_component>(root_ent);
 
-                auto loop = static_cast<gfx::animation_loop_mode>(loop_mode_index_);
-                anim_sys.modify_player(root_ent).set_loop_mode(loop);
-                anim_sys.modify_player(root_ent).play();
+                if (player.is_paused()) {
+                    anim_sys.modify_player(root_ent).resume();
+                } else {
+                    anim_sys.modify_player(root_ent).set_clip(clip);
+                    anim_sys.modify_player(root_ent).set_playback_speed(playback_speed_);
+
+                    auto loop = static_cast<gfx::animation_loop_mode>(loop_mode_index_);
+                    anim_sys.modify_player(root_ent).set_loop_mode(loop);
+                    anim_sys.modify_player(root_ent).play();
+                }
                 state_->is_previewing = true;
             }
         }
@@ -327,6 +346,9 @@ inline void timeline_panel::render_tracks() {
 
     float tracks_start_y = ImGui::GetCursorScreenPos().y;
 
+    draw_list->ChannelsSplit(2);
+    draw_list->ChannelsSetCurrent(1);
+
     auto& tracks = clip->get_tracks();
     for (const auto& track : tracks) {
         render_track_row(track, clip, usable_track_width, clip_duration, scroll_offset_);
@@ -337,9 +359,11 @@ inline void timeline_panel::render_tracks() {
 
     ImGui::Columns(1);
 
+    draw_list->ChannelsSetCurrent(0);
     render_playhead(
         track_area_x, usable_track_width, clip_duration, time_ruler_y, tracks_end_y, scroll_offset_
     );
+    draw_list->ChannelsMerge();
 
     if (max_scroll > 0.f) {
         constexpr float bar_height = 10.f;
@@ -577,6 +601,7 @@ inline void timeline_panel::render_keyframe_markers(
                         state_->selected_track_name    = track_name;
                         state_->selected_property      = prop;
                         state_->selected_keyframe_time = kf.time;
+                        keyframe_clicked_              = true;
                     }
 
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
@@ -642,7 +667,8 @@ inline void timeline_panel::render_playhead(
     }
 
     ImVec2 mouse = ImGui::GetMousePos();
-    if (mouse.x >= track_area_x && mouse.x <= track_area_x + track_width && mouse.y >= area_top &&
+    if (!keyframe_clicked_ && mouse.x >= track_area_x &&
+        mouse.x <= track_area_x + track_width && mouse.y >= area_top &&
         mouse.y <= area_bottom) {
         if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) ||
             ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {

@@ -35,6 +35,9 @@ struct ui_state {
     float bottom_panel_height   = 200.f;
     bool show_timeline          = false;
     bool need_create_clip_modal = false;
+    bool need_save_clip         = false;
+    bool need_load_clip_modal   = false;
+    bool need_close_clip        = false;
 };
 
 struct app_state {
@@ -44,7 +47,8 @@ struct app_state {
 
     ui_state ui;
 
-    bool has_unsaved_changes = false;
+    bool has_unsaved_changes      = false;
+    bool has_unsaved_clip_changes = false;
 
     std::string filename;
 
@@ -71,8 +75,9 @@ struct app_state {
     std::string selected_clip_name;
     std::string selected_track_name;
     gfx::animation_property selected_property = gfx::animation_property::position;
-    float32 selected_keyframe_time            = -1.f;
-    float32 timeline_cursor                   = 0.f;
+
+    float32 selected_keyframe_time = -1.f;
+    float32 timeline_cursor        = 0.f;
     std::unordered_set<std::string> expanded_tracks;
     bool is_previewing = false;
 
@@ -80,6 +85,8 @@ struct app_state {
     bool need_stop_playback   = false;
     bool need_add_keyframe    = false;
     bool need_delete_keyframe = false;
+    bool need_step_forward    = false;
+    bool need_step_backward   = false;
 
     std::unordered_map<std::string, transform> saved_transforms;
     bool has_saved_transforms = false;

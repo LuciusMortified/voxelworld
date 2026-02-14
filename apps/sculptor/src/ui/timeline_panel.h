@@ -69,7 +69,8 @@ private:
     float scrollbar_drag_start_   = 0.f;
     float scrollbar_scroll_start_ = 0.f;
 
-    float prev_cursor_time_ = -1.f;
+    float prev_cursor_time_  = -1.f;
+    bool keyframe_clicked_   = false;
 };
 
 }  // namespace vw::sculptor

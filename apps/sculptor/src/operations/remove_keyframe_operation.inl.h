@@ -72,7 +72,8 @@ inline void remove_keyframe_operation::undo() {
     }
 
     track->mark_dirty();
-    state_->has_unsaved_changes = true;
+    state_->has_unsaved_changes      = true;
+    state_->has_unsaved_clip_changes = true;
 }
 
 }  // namespace vw::sculptor

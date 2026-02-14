@@ -54,7 +54,7 @@ inline void menu_bar::render(
             namespace fs = std::filesystem;
             fs::path assets_dir_path{app_state::asset_dir_name};
             fs::path filepath{assets_dir_path / state_->filename};
-            serializer.serialize(filepath);
+            (void)serializer.serialize(filepath);
             state_->has_unsaved_changes = false;
         }
         if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S")) {
@@ -81,39 +81,41 @@ inline void menu_bar::render(
         ImGui::EndMenu();
     }
 
+    bool has_clip = !state_->selected_clip_name.empty();
     if (ImGui::BeginMenu("Animation")) {
         if (ImGui::MenuItem("New Clip...")) {
             state_->ui.need_create_clip_modal = true;
         }
+        if (ImGui::MenuItem("Open Clip...")) {
+            state_->ui.need_load_clip_modal = true;
+        }
+        if (ImGui::MenuItem("Save Clip", nullptr, false, has_clip)) {
+            state_->ui.need_save_clip = true;
+        }
+        if (ImGui::MenuItem("Close Clip", nullptr, false, has_clip)) {
+            state_->ui.need_close_clip = true;
+        }
+        ImGui::Separator();
         if (ImGui::MenuItem("Toggle Timeline", "T")) {
             state_->ui.show_timeline ^= true;
         }
-        ImGui::Separator();
-        if (ImGui::MenuItem("Play/Pause", "Space", false, !state_->selected_clip_name.empty())) {
+        if (ImGui::MenuItem("Play/Pause", "Space", false, has_clip)) {
             state_->need_toggle_playback = true;
         }
-        if (ImGui::MenuItem("Stop", "", false, state_->is_previewing)) {
+        if (ImGui::MenuItem("Stop", nullptr, false, state_->is_previewing)) {
             state_->need_stop_playback = true;
         }
         ImGui::Separator();
-        if (ImGui::MenuItem("Add Keyframe", "K", false, !state_->selected_clip_name.empty())) {
+        if (ImGui::MenuItem("Add Keyframe", nullptr, false, has_clip)) {
             state_->need_add_keyframe = true;
         }
-        if (ImGui::MenuItem("Delete Keyframe", "Del", false, state_->selected_keyframe_time >= 0.f)) {
+        if (ImGui::MenuItem(
+                "Delete Keyframe", nullptr, false, state_->selected_keyframe_time >= 0.f
+            )) {
             state_->need_delete_keyframe = true;
         }
         ImGui::EndMenu();
     }
-
-#if 0
-    if (ImGui::BeginMenu("Help")) {
-        if (ImGui::MenuItem("About")) {
-            ImGui::ShowAboutWindow();
-        }
-
-        ImGui::EndMenu();
-    }
-#endif
 
     state_->ui.left_top_voffset += 20.0f;
     state_->ui.right_top_voffset += 20.0f;

@@ -43,7 +43,8 @@ private:
 
     gfx::fps_camera_controller camera_controller_;
     bool camera_movement_enabled_ = false;
-    bool prev_unsaved_state_      = false;
+    bool prev_unsaved_state_       = false;
+    std::string prev_clip_name_;
 
     app_state state_;
     operation_manager op_manager_;

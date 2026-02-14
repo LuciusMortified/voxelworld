@@ -124,8 +124,10 @@ inline void app::render(
 
     tools_[active_tool_]->render(delta_time);
 
-    if (state_.has_unsaved_changes != prev_unsaved_state_) {
+    if (state_.has_unsaved_changes != prev_unsaved_state_ ||
+        state_.selected_clip_name != prev_clip_name_) {
         prev_unsaved_state_ = state_.has_unsaved_changes;
+        prev_clip_name_     = state_.selected_clip_name;
         update_title_();
     }
 
@@ -190,14 +192,14 @@ inline void app::handle_key_press(
     if (ev.key == keys::SPACE && !ev.with(mods::CTRL)) {
         state_.need_toggle_playback = true;
     }
-    if (ev.key == keys::K && !ev.with(mods::CTRL)) {
-        state_.need_add_keyframe = true;
-    }
-    if (ev.key == static_cast<keys>(261) && !ev.with(mods::CTRL)) {
-        state_.need_delete_keyframe = true;
-    }
     if (ev.key == keys::T && !ev.with(mods::CTRL)) {
         state_.ui.show_timeline ^= true;
+    }
+    if (ev.key == keys::LEFT && !ev.with(mods::CTRL) && state_.ui.show_timeline) {
+        state_.need_step_backward = true;
+    }
+    if (ev.key == keys::RIGHT && !ev.with(mods::CTRL) && state_.ui.show_timeline) {
+        state_.need_step_forward = true;
     }
 
     if (ev.key == keys::N && ev.with(mods::CTRL)) {
@@ -214,7 +216,10 @@ inline void app::handle_key_press(
         namespace fs = std::filesystem;
         fs::path assets_dir_path{app_state::asset_dir_name};
         fs::path filepath{assets_dir_path / state_.filename};
-        serializer.serialize(filepath);
+        (void)serializer.serialize(filepath);
+
+        clip_manager_panel_.save_all_clips();
+
         state_.has_unsaved_changes = false;
     }
     if (ev.key == keys::S && ev.with(mods::CTRL) && ev.with(mods::SHIFT)) {
@@ -302,8 +307,15 @@ inline void app::handle_animation_actions_() {
                         }
                     }
                     auto& anim_sys = world.get_animation_system();
-                    anim_sys.modify_player(root_ent).set_clip(clip);
-                    anim_sys.modify_player(root_ent).play();
+                    auto& player =
+                        world.get_component<gfx::animation_player_component>(root_ent);
+
+                    if (player.is_paused()) {
+                        anim_sys.modify_player(root_ent).resume();
+                    } else {
+                        anim_sys.modify_player(root_ent).set_clip(clip);
+                        anim_sys.modify_player(root_ent).play();
+                    }
                     state_.is_previewing = true;
                 }
             }
@@ -415,10 +427,16 @@ inline void app::update_title_() {
     std::string title;
     if (state_.filename.empty()) {
         title = std::format("Sculptor {}", version_string);
-    } else if (state_.has_unsaved_changes) {
-        title = std::format("Sculptor {} | {} | UNSAVED CHANGES", version_string, state_.filename);
     } else {
         title = std::format("Sculptor {} | {}", version_string, state_.filename);
+
+        if (!state_.selected_clip_name.empty()) {
+            title += std::format(" | {}.voxa", state_.selected_clip_name);
+        }
+
+        if (state_.has_unsaved_changes) {
+            title += " | UNSAVED CHANGES";
+        }
     }
     get_engine().get_window().set_title(title);
 }

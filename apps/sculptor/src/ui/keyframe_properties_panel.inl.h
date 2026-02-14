@@ -77,7 +77,7 @@ inline void keyframe_properties_panel::render(
                 ImGui::AlignTextToFramePadding();
                 ImGui::Text("Time");
                 ImGui::SameLine(110.f);
-                ImGui::PushItemWidth(120.f);
+                ImGui::PushItemWidth(80.f);
                 ImGui::DragFloat("##Time_kf", &new_time, 0.01f, 0.f, 100.f, "%.3f");
                 ImGui::PopItemWidth();
 
@@ -103,6 +103,9 @@ inline void keyframe_properties_panel::render(
                         value_changed = true;
                     }
                 }
+
+                ImGui::Separator();
+                ImGui::TextDisabled("Transition to next keyframe");
 
                 int interp_idx             = static_cast<int>(kf.interp);
                 const char* interp_names[] = {
@@ -159,6 +162,8 @@ inline void keyframe_properties_panel::render(
                     state_->selected_keyframe_time = new_time;
                 }
 
+                ImGui::Spacing();
+
                 if (ImGui::Button("Delete Keyframe")) {
                     remove_keyframe_params rm_params;
                     rm_params.clip_name  = state_->selected_clip_name;
@@ -191,12 +196,15 @@ inline bool keyframe_properties_panel::render_vec3f_field(
     ImGui::PushID(label);
 
     ImGui::AlignTextToFramePadding();
-    auto text = std::format("{}:", label);
+    auto text = std::format("{}", label);
     ImGui::Text("%s", text.c_str());
+    ImGui::SameLine(110.f);
 
+    /*
     ImGui::AlignTextToFramePadding();
     ImGui::Text("X");
     ImGui::SameLine();
+    */
 
     ImGui::PushItemWidth(80.0f);
     auto drag_x_id = std::format("##{}X", label);
@@ -204,9 +212,11 @@ inline bool keyframe_properties_panel::render_vec3f_field(
     ImGui::PopItemWidth();
     ImGui::SameLine();
 
+    /*
     ImGui::AlignTextToFramePadding();
     ImGui::Text("Y");
     ImGui::SameLine();
+    */
 
     ImGui::PushItemWidth(80.0f);
     auto drag_y_id = std::format("##{}Y", label);
@@ -214,9 +224,11 @@ inline bool keyframe_properties_panel::render_vec3f_field(
     ImGui::PopItemWidth();
     ImGui::SameLine();
 
+    /*
     ImGui::AlignTextToFramePadding();
     ImGui::Text("Z");
     ImGui::SameLine();
+    */
 
     ImGui::PushItemWidth(80.0f);
     auto drag_z_id = std::format("##{}Z", label);

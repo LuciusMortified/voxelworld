@@ -2,11 +2,17 @@
 
 #ifndef VW_GFX_VOX_DESERIALIZER_INL_H
 #define VW_GFX_VOX_DESERIALIZER_INL_H
-#include <iso646.h>
 
+#include <charconv>
 #include <fstream>
 
+#include "vw/log/logger.h"
+
 namespace vw::gfx {
+
+namespace detail {
+inline constexpr log::log_category vox_deserializer_lc{"vox_deserializer"};
+}  // namespace detail
 
 template <typename WC>
 vox_deserializer<WC>::vox_deserializer(
@@ -17,36 +23,53 @@ vox_deserializer<WC>::vox_deserializer(
 template <typename WC>
 auto vox_deserializer<WC>::deserialize(
     const std::filesystem::path& filepath
-) -> std::optional<result> {
+) -> std::expected<result, error_type> {
+    result_ = {};
+    error_ = std::nullopt;
+    current_entity_ = invalid_entity;
+    current_entity_guard_ = nullptr;
+    current_model_ = nullptr;
+
     std::ifstream file(filepath);
     if (!file.is_open()) {
-        return std::nullopt;
+        log::warn(detail::vox_deserializer_lc, "failed to open file: {}", filepath.string());
+        return std::unexpected(error_type::file_open_failed);
     }
 
     std::string line;
     while (std::getline(file, line)) {
+        if (error_.has_value()) break;
+
         std::istringstream iss(line);
         std::string cmd;
         iss >> cmd;
 
+        if (cmd.empty() || cmd[0] == '#') {
+            continue;
+        }
+
         if (cmd == "root") {
             process_root_(iss);
-        }
-        if (cmd == "entity") {
+        } else if (cmd == "entity") {
             process_entity_(iss);
-        }
-        if (cmd == "parent") {
+        } else if (cmd == "parent") {
             process_parent_(iss);
-        }
-        if (cmd == "t") {
+        } else if (cmd == "t") {
             process_transform_(iss);
-        }
-        if (cmd == "m") {
+        } else if (cmd == "target") {
+            process_target_(iss);
+        } else if (cmd == "m") {
             process_model_(iss);
-        }
-        if (cmd == "v") {
+        } else if (cmd == "v") {
             process_voxel_(iss);
+        } else {
+            log::warn(detail::vox_deserializer_lc, "unknown command: {}", cmd);
         }
+    }
+
+    if (error_.has_value()) {
+        log::warn(detail::vox_deserializer_lc, "parse error in file: {}", filepath.string());
+        return std::unexpected(*error_);
     }
 
     if (current_entity_guard_) {
@@ -62,6 +85,10 @@ void vox_deserializer<WC>::process_root_(
 ) {
     std::string name;
     iss >> name;
+    if (iss.fail()) {
+        error_ = error_type::parse_error;
+        return;
+    }
 
     result_.root_name = name;
 }
@@ -76,6 +103,10 @@ void vox_deserializer<WC>::process_entity_(
 
     std::string name;
     iss >> name;
+    if (iss.fail()) {
+        error_ = error_type::parse_error;
+        return;
+    }
 
     auto ent_guard = std::make_unique<entity_guard<WC>>(*world_);
     ent_guard->template with<hierarchy_component>();
@@ -101,6 +132,10 @@ void vox_deserializer<WC>::process_parent_(
 
     std::string parent_name;
     iss >> parent_name;
+    if (iss.fail()) {
+        error_ = error_type::parse_error;
+        return;
+    }
 
     if (!result_.name_to_entity.contains(parent_name)) {
         return;
@@ -131,12 +166,38 @@ void vox_deserializer<WC>::process_transform_(
     vec3f origin;
     iss >> origin.x >> origin.y >> origin.z;
 
+    if (iss.fail()) {
+        error_ = error_type::parse_error;
+        return;
+    }
+
     auto& transform_system = world_->get_transform_system();
     transform_system.modify(current_entity_)
         .set_position(position)
         .set_rotation(rotation)
         .set_scale(scale)
         .set_origin(origin);
+}
+
+template <typename WC>
+void vox_deserializer<WC>::process_target_(
+    std::istringstream& iss
+) {
+    if (!current_entity_.is_valid()) {
+        return;
+    }
+
+    std::string target_name;
+    iss >> target_name;
+    if (iss.fail()) {
+        error_ = error_type::parse_error;
+        return;
+    }
+
+    current_entity_guard_->template with<animation_target_component>();
+
+    auto& animation_system = world_->get_animation_system();
+    animation_system.modify_target(current_entity_).set_target_name(target_name);
 }
 
 template <typename WC>
@@ -149,6 +210,10 @@ void vox_deserializer<WC>::process_model_(
 
     vec3i size;
     iss >> size.x >> size.y >> size.z;
+    if (iss.fail()) {
+        error_ = error_type::parse_error;
+        return;
+    }
 
     auto ent_name = result_.entity_to_name[current_entity_];
 
@@ -172,11 +237,30 @@ void vox_deserializer<WC>::process_voxel_(
 
     vec3i position;
     iss >> position.x >> position.y >> position.z;
+    if (iss.fail()) {
+        error_ = error_type::parse_error;
+        return;
+    }
 
     std::string color_str;
     iss >> color_str;
+    if (iss.fail()) {
+        error_ = error_type::parse_error;
+        return;
+    }
 
-    uint32 color_value = std::stoul(color_str, nullptr, 16);
+    std::string_view sv = color_str;
+    if (sv.starts_with("0x") || sv.starts_with("0X")) {
+        sv.remove_prefix(2);
+    }
+
+    uint32 color_value = 0;
+    auto [ptr, ec] = std::from_chars(sv.data(), sv.data() + sv.size(), color_value, 16);
+    if (ec != std::errc{}) {
+        log::warn(detail::vox_deserializer_lc, "invalid color value: {}", color_str);
+        error_ = error_type::parse_error;
+        return;
+    }
 
     current_model_->set_voxel(position, color{color_value});
 }

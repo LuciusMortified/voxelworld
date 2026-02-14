@@ -19,12 +19,26 @@ public:
 
     void render(float delta_time);
 
+    void save_all_clips();
+
 private:
+    void render_close_confirm_popup_();
+    void render_load_popup_();
+    void close_clip_();
+    void load_voxa_filenames_();
+    auto save_clip_() -> bool;
+    auto load_clip_(const std::string& filename) -> bool;
+
     engine_type* engine_;
     app_state* state_;
     operation_manager* op_manager_;
 
     create_clip_modal create_modal_;
+
+    bool need_load_popup_          = false;
+    bool need_close_confirm_popup_ = false;
+    std::vector<std::string> voxa_filenames_;
+    std::string selected_load_filename_;
 };
 
 }  // namespace vw::sculptor
