@@ -26,7 +26,9 @@ private:
     app_state* state_;
     operation_manager* op_manager_;
 
-    bool need_open_ = false;
+    bool need_open_                  = false;
+    bool need_overwrite_confirmation_ = false;
+    bool has_overwrite_confirmation_  = false;
     std::string name_;
     std::string error_;
 };

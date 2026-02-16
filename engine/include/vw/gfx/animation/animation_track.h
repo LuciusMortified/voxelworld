@@ -34,6 +34,8 @@ public:
     [[nodiscard]] auto get_channel(animation_property prop) const -> const animation_channel_variant*;
     [[nodiscard]] auto get_channel_mut(animation_property prop) -> animation_channel_variant*;
     [[nodiscard]] auto has_channel(animation_property prop) const -> bool;
+    [[nodiscard]] auto get_channels() const -> const std::vector<animation_channel_variant>&;
+    [[nodiscard]] auto get_fps() const -> float32 { return compiled_fps_; }
     void mark_dirty() { is_dirty_ = true; }
 
 private:

@@ -54,7 +54,8 @@ inline void add_keyframe_operation::execute() {
     }
 
     track->mark_dirty();
-    state_->has_unsaved_changes = true;
+    state_->has_unsaved_changes               = true;
+    state_->unsaved_clips[params_.clip_name] = true;
 }
 
 inline void add_keyframe_operation::undo() {
@@ -93,7 +94,8 @@ inline void add_keyframe_operation::undo() {
     }
 
     track->mark_dirty();
-    state_->has_unsaved_changes = true;
+    state_->has_unsaved_changes               = true;
+    state_->unsaved_clips[params_.clip_name] = true;
 }
 
 }  // namespace vw::sculptor

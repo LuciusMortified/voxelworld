@@ -4,8 +4,13 @@
 #define VW_GFX_VOX_SERIALIZER_INL_H
 #include <fstream>
 
+#include "vw/log/logger.h"
+
 namespace vw::gfx {
 
+namespace detail {
+inline constexpr log::log_category vox_serializer_lc{"vox_serializer"};
+}  // namespace detail
 
 template <typename WC>
 vox_serializer<WC>::vox_serializer(
@@ -21,10 +26,11 @@ vox_serializer<WC>::vox_serializer(
 template <typename WC>
 auto vox_serializer<WC>::serialize(
     const std::filesystem::path& filepath
-) -> bool {
+) -> std::expected<void, error_type> {
     std::ofstream file(filepath.string(), std::ios::trunc);
     if (!file.is_open()) {
-        return false;
+        log::warn(detail::vox_serializer_lc, "failed to open file for writing: {}", filepath.string());
+        return std::unexpected(error_type::file_open_failed);
     }
 
     write_header_(file);
@@ -46,7 +52,12 @@ auto vox_serializer<WC>::serialize(
         }
     }
 
-    return true;
+    if (!file.good()) {
+        log::warn(detail::vox_serializer_lc, "write error for file: {}", filepath.string());
+        return std::unexpected(error_type::write_failed);
+    }
+
+    return {};
 }
 
 template <typename WC>
@@ -115,6 +126,11 @@ void vox_serializer<WC>::write_entity_(
         scl.x, scl.y, scl.z,
         ori.x, ori.y, ori.z
     );
+
+    if (world_->template has_component<animation_target_component>(ent)) {
+        auto& target = world_->template get_component<animation_target_component>(ent);
+        file << std::format("\ttarget {}\n", target.get_name());
+    }
 
     write_model_(file, ent);
 }

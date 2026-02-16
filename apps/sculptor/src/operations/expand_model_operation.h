@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef VW_SCULPTOR_RESIZE_MODEL_OPERATION_H
-#define VW_SCULPTOR_RESIZE_MODEL_OPERATION_H
+#ifndef VW_SCULPTOR_EXPAND_MODEL_OPERATION_H
+#define VW_SCULPTOR_EXPAND_MODEL_OPERATION_H
 
 #include "app/app_state.h"
 #include "base_operation.h"
@@ -30,8 +30,8 @@ private:
     vec3i previous_size_;
 };
 
-}
+}  // namespace vw::sculptor
 
 #include "expand_model_operation.inl.h"
 
-#endif  // VW_SCULPTOR_RESIZE_MODEL_OPERATION_H
+#endif  // VW_SCULPTOR_EXPAND_MODEL_OPERATION_H

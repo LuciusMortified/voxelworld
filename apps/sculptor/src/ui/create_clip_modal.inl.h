@@ -3,6 +3,8 @@
 #ifndef VW_SCULPTOR_CREATE_CLIP_MODAL_INL_H
 #define VW_SCULPTOR_CREATE_CLIP_MODAL_INL_H
 
+#include <filesystem>
+
 #include "operations/create_clip_operation.h"
 
 namespace vw::sculptor {
@@ -16,6 +18,9 @@ inline void create_clip_modal::open() {
     need_open_ = true;
     auto& registry = engine_->get_world().get_animation_clip_registry();
     name_ = std::format("clip_{}", registry.count());
+    error_.clear();
+    need_overwrite_confirmation_ = false;
+    has_overwrite_confirmation_  = false;
 }
 
 inline void create_clip_modal::render(
@@ -30,20 +35,41 @@ inline void create_clip_modal::render(
         ImGuiWindowFlags_AlwaysAutoResize |  //
         ImGuiWindowFlags_NoMove;
     if (ImGui::BeginPopupModal("Create Animation Clip", nullptr, dialog_flags)) {
-        if (!error_.empty()) {
-            ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "%s", error_.c_str());
-        }
+        if (need_overwrite_confirmation_) {
+            ImGui::TextColored(
+                ImVec4{1.0f, 1.0f, 0.0f, 1.0f},
+                "File \"%s.voxa\" already exists. Overwrite on save?",
+                name_.c_str()
+            );
+            ImGui::Spacing();
 
-        imgui_input_text_string("Name", name_);
+            if (ImGui::Button("Yes")) {
+                need_overwrite_confirmation_ = false;
+                has_overwrite_confirmation_  = true;
+                if (create_clip()) {
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("No")) {
+                need_overwrite_confirmation_ = false;
+            }
+        } else {
+            if (!error_.empty()) {
+                ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "%s", error_.c_str());
+            }
 
-        if (ImGui::Button("Create")) {
-            if (create_clip()) {
+            imgui_input_text_string("Name", name_);
+
+            if (ImGui::Button("Create")) {
+                if (create_clip()) {
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("Cancel")) {
                 ImGui::CloseCurrentPopup();
             }
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel")) {
-            ImGui::CloseCurrentPopup();
         }
 
         ImGui::EndPopup();
@@ -51,6 +77,8 @@ inline void create_clip_modal::render(
 }
 
 inline bool create_clip_modal::create_clip() {
+    namespace fs = std::filesystem;
+
     error_.clear();
 
     if (name_.empty()) {
@@ -62,6 +90,15 @@ inline bool create_clip_modal::create_clip() {
     if (registry.has(name_)) {
         error_ = "A clip with this name already exists.";
         return false;
+    }
+
+    if (!has_overwrite_confirmation_) {
+        fs::path filepath =
+            fs::path{app_state::asset_dir_name} / std::format("{}.voxa", name_);
+        if (fs::exists(filepath)) {
+            need_overwrite_confirmation_ = true;
+            return false;
+        }
     }
 
     create_clip_params params = {.name = name_};

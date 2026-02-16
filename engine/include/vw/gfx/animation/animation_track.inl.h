@@ -235,4 +235,9 @@ inline auto animation_track::has_channel(
     return get_channel(prop) != nullptr;
 }
 
+inline auto animation_track::get_channels() const
+    -> const std::vector<animation_channel_variant>& {
+    return channels_;
+}
+
 }  // namespace vw::gfx

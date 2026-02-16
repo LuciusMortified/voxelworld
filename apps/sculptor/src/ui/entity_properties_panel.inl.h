@@ -153,12 +153,15 @@ inline bool entity_properties_panel::render_vec3f_field(
     ImGui::PushID(label);
 
     ImGui::AlignTextToFramePadding();
-    std::string text = std::format("{}:", label);
+    std::string text = std::format("{}", label);
     ImGui::Text("%s", text.c_str());
+    ImGui::SameLine(80.f);
 
+    /*
     ImGui::AlignTextToFramePadding();
     ImGui::Text("X");
     ImGui::SameLine();
+    */
 
     ImGui::PushItemWidth(80.0f);
     std::string drag_x_id = std::format("##{}X", label);
@@ -166,9 +169,11 @@ inline bool entity_properties_panel::render_vec3f_field(
     ImGui::PopItemWidth();
     ImGui::SameLine();
 
+    /*
     ImGui::AlignTextToFramePadding();
     ImGui::Text("Y");
     ImGui::SameLine();
+    */
 
     ImGui::PushItemWidth(80.0f);
     std::string drag_y_id = std::format("##{}Y", label);
@@ -176,9 +181,11 @@ inline bool entity_properties_panel::render_vec3f_field(
     ImGui::PopItemWidth();
     ImGui::SameLine();
 
+    /*
     ImGui::AlignTextToFramePadding();
     ImGui::Text("Z");
     ImGui::SameLine();
+    */
 
     ImGui::PushItemWidth(80.0f);
     std::string drag_z_id = std::format("##{}Z", label);
