@@ -288,7 +288,7 @@ inline auto clip_manager_panel::load_clip_(const std::string& filename) -> bool 
         return false;
     }
 
-    auto clip = *result;
+    const auto& clip = *result;
     auto& registry = engine_->get_world().get_animation_clip_registry();
     registry.add(clip->get_name(), clip);
 
