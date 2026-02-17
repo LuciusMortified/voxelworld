@@ -89,9 +89,7 @@ jobs:
         run: >
           cmake -B build -S .
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+          -DCMAKE_CXX_CLANG_TIDY="clang-tidy;--header-filter=.*/engine/include/.*"
 
-      - name: Run clang-tidy
-        run: |
-          find engine/include -name '*.h' -not -name '*.inl.h' | head -50 | \
-          xargs clang-tidy -p build
+      - name: Build with clang-tidy
+        run: cmake --build build
