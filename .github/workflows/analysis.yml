@@ -94,6 +94,4 @@ jobs:
       - name: Run clang-tidy
         run: |
           find engine/include -name '*.h' -not -name '*.inl.h' | head -50 | \
-          xargs clang-tidy -p build \
-            --checks='-*,bugprone-*,performance-*,modernize-*,readability-*,-readability-magic-numbers,-readability-identifier-length,-readability-uppercase-literal-suffix,-bugprone-easily-swappable-parameters' \
-            --warnings-as-errors='bugprone-*,performance-*'
+          xargs clang-tidy -p build
