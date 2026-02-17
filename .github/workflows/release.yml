@@ -62,8 +62,7 @@ jobs:
             libxinerama-dev \
             libxcursor-dev \
             libxi-dev \
-            libgl1-mesa-dev \
-            patchelf
+            libgl1-mesa-dev
 
       - name: Install Vulkan SDK
         uses: humbletim/install-vulkan-sdk@v1.2
@@ -84,6 +83,7 @@ jobs:
           cmake -B build -S .
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
           -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++"
           -DVW_BUILD_TESTS=OFF
 
       - name: Build sculptor
@@ -94,13 +94,6 @@ jobs:
           mkdir package
           cp build/apps/sculptor/sculptor package/
           cp -r build/apps/sculptor/shaders package/
-          ldd build/apps/sculptor/sculptor | grep "=> /" | awk '{print $3}' | while read lib; do
-            case "$lib" in
-              /lib/x86_64-linux-gnu/libc.so*|/lib/x86_64-linux-gnu/libm.so*|/lib/x86_64-linux-gnu/libdl.so*|/lib/x86_64-linux-gnu/libpthread.so*|/lib/x86_64-linux-gnu/librt.so*|/lib/x86_64-linux-gnu/ld-linux*) ;;
-              *) cp "$lib" package/ ;;
-            esac
-          done
-          patchelf --set-rpath '$ORIGIN' package/sculptor
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
