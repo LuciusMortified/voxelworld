@@ -1,9 +1,9 @@
-name: Tests
+name: CI
 
 on: push
 
 jobs:
-  test-windows:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
@@ -28,7 +28,10 @@ jobs:
       - name: Run tests
         run: ctest --test-dir build --build-config Release --output-on-failure
 
-  test-ubuntu:
+      - name: Build sculptor
+        run: cmake --build build --config Release --target sculptor
+
+  ubuntu:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -75,13 +78,16 @@ jobs:
       - name: Run tests
         run: ctest --test-dir build --build-config Release --output-on-failure
 
-  test-macos:
+      - name: Build sculptor
+        run: cmake --build build --config Release --target sculptor
+
+  macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
 
       - name: Install Vulkan SDK
-        run: brew install vulkan-loader vulkan-headers
+        run: brew install vulkan-loader vulkan-headers shaderc
 
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
@@ -98,3 +104,6 @@ jobs:
 
       - name: Run tests
         run: ctest --test-dir build --build-config Release --output-on-failure
+
+      - name: Build sculptor
+        run: cmake --build build --config Release --target sculptor
