@@ -17,13 +17,30 @@ public:
     
     explicit light_system(registry_type& registry);
     
-    void update();  // Пока пустой, можно использовать для других целей
-    
-    void mark_dirty(entity ent);  // Опционально
-    
+    void update();
+
+    void mark_dirty(entity ent);
+
+    class light_modifier {
+    public:
+        auto set_color(const vec3f& color) -> light_modifier&;
+        auto set_intensity(float32 intensity) -> light_modifier&;
+        auto set_range(float32 range) -> light_modifier&;
+        auto set_attenuation(float32 constant, float32 linear, float32 quadratic) -> light_modifier&;
+
+    private:
+        friend class light_system;
+        light_modifier(light_system* system, entity ent);
+
+        light_system* system_;
+        entity entity_;
+    };
+
+    auto modify(entity ent) -> light_modifier;
+
     [[nodiscard]] auto get_render_dirty_entities() -> std::unordered_set<entity>&;
     void mark_render_dirty(entity ent);
-    
+
 private:
     registry_type* registry_;
     std::unordered_set<entity> dirty_entities_;

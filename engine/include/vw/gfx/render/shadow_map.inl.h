@@ -344,6 +344,19 @@ inline void shadow_map::update(
         lsm[1, 3] += (rounded_y - shadow_origin.y * half_size) / half_size;
 
         light_space_matrices_[cascade_index] = lsm;
+        cascade_frustums_[cascade_index]    = frustum::from_view_projection_matrix(lsm);
+
+#if 0
+        std::string matrix_values;
+        matrix_values += "\n";
+        for (int row = 0; row < 4; ++row) {
+            for (int col = 0; col < 4; ++col) {
+                matrix_values += std::to_string(lsm[row, col]) + " ";
+            }
+            matrix_values += "\n";
+        }
+        log::info("{}: {}", cascade_index, matrix_values);
+#endif
 
         last_cascade_split = cascade_split;
     }
@@ -362,6 +375,10 @@ inline const std::array<mat4f, shadow_map::cascade_count>& shadow_map::
 
 inline const std::array<float, shadow_map::cascade_count>& shadow_map::get_cascade_splits() const {
     return cascade_splits_;
+}
+
+inline const std::array<frustum, shadow_map::cascade_count>& shadow_map::get_cascade_frustums() const {
+    return cascade_frustums_;
 }
 
 inline VkImage shadow_map::get_image() const {

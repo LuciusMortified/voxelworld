@@ -243,7 +243,8 @@ void renderer<C>::render(
     }
 
     shadow_map_->update(camera, directional_light_settings_.direction);
-    combined_buffer_pool_->update(world, camera);
+    const auto& cascade_frustums = shadow_map_->get_cascade_frustums();
+    combined_buffer_pool_->update(world, camera, cascade_frustums);
 
     render_shadow_pass(world, camera);
 

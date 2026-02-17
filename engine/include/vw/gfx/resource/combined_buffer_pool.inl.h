@@ -21,10 +21,10 @@ combined_buffer_pool<C>::combined_buffer_pool(
 
 template <typename C>
 void combined_buffer_pool<C>::update(
-    world_type& world, const camera& camera
+    world_type& world, const camera& camera, std::span<const frustum> shadow_frustums
 ) {
     const frustum& view_frustum = camera.get_frustum();
-    update_visibility_cache_(world, view_frustum);
+    update_visibility_cache_(world, view_frustum, shadow_frustums);
     update_meshes_(world, view_frustum);
     update_transforms_(world, view_frustum);
 }
@@ -183,17 +183,19 @@ void combined_buffer_pool<C>::update_transforms_(
 
 template <typename C>
 void combined_buffer_pool<C>::update_visibility_cache_(
-    world_type& world, const frustum& view_frustum
+    world_type& world,
+    const frustum& view_frustum,
+    std::span<const frustum> shadow_frustums
 ) {
     auto& spatial_system = world.get_spatial_system();
 
-    const float angle_threshold        = math::radians(2.f);
+    constexpr float angle_threshold    = math::radians(2.f);
     constexpr float distance_threshold = 0.5f;
 
     auto& render_dirty_entities = spatial_system.get_render_dirty_entities();
     const bool has_render_dirty = !render_dirty_entities.empty();
 
-    const bool frustum_changed =  //
+    const bool frustum_changed =
         !visibility_cache_.frustum.approximately_equal(
             view_frustum, angle_threshold, distance_threshold
         );
@@ -201,6 +203,11 @@ void combined_buffer_pool<C>::update_visibility_cache_(
     visibility_cache_.changed.clear();
     if (frustum_changed || has_render_dirty) {
         spatial_system.query_all(view_frustum, visibility_cache_.tmp_visible);
+
+        for (const auto& shadow_frustum : shadow_frustums) {
+            spatial_system.query_all(shadow_frustum, shadow_query_tmp_);
+            visibility_cache_.tmp_visible.insert_range(shadow_query_tmp_);
+        }
 
         for (auto ent : visibility_cache_.visible) {
             if (!visibility_cache_.tmp_visible.contains(ent)) {

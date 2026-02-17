@@ -7,6 +7,7 @@
 
 #include <map>
 #include <memory>
+#include <span>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -63,7 +64,11 @@ public:
     combined_buffer_pool(combined_buffer_pool&&)                 = delete;
     combined_buffer_pool& operator=(combined_buffer_pool&&)      = delete;
 
-    void update(world_type& world, const camera& camera);
+    void update(
+        world_type& world,
+        const camera& camera,
+        std::span<const frustum> shadow_frustums = {}
+    );
 
     [[nodiscard]] auto get_buffers() const -> const std::vector<std::unique_ptr<combined_buffer>>&;
 
@@ -79,7 +84,9 @@ private:
     void update_meshes_(world_type& world, const frustum& view_frustum);
     void update_transforms_(world_type& world, const frustum& view_frustum);
     void update_visibility_cache_(
-        world_type& world, const frustum& view_frustum
+        world_type& world,
+        const frustum& view_frustum,
+        std::span<const frustum> shadow_frustums
     );
 
     vulkan_context* context_;
@@ -92,6 +99,7 @@ private:
 
     visibility_cache visibility_cache_{};
     std::unordered_set<entity> entities_to_process_;
+    std::unordered_set<entity> shadow_query_tmp_;
 
     mutable combined_buffer_pool_stats stats_;
 };

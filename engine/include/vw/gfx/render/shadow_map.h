@@ -34,6 +34,7 @@ public:
     [[nodiscard]] mat4f get_light_space_matrix(uint32 cascade_index) const;
     [[nodiscard]] const std::array<mat4f, cascade_count>& get_light_space_matrices() const;
     [[nodiscard]] const std::array<float, cascade_count>& get_cascade_splits() const;
+    [[nodiscard]] const std::array<frustum, cascade_count>& get_cascade_frustums() const;
     [[nodiscard]] VkImage get_image() const;
     [[nodiscard]] VkImageView get_image_view(uint32 cascade_index) const;
     [[nodiscard]] VkImageView get_array_image_view() const;
@@ -60,7 +61,8 @@ private:
     std::array<VkFramebuffer, cascade_count> shadow_framebuffers_      = {};
     VkRenderPass shadow_render_pass_                                   = VK_NULL_HANDLE;
 
-    std::array<mat4f, cascade_count> light_space_matrices_ = {};
+    std::array<mat4f, cascade_count> light_space_matrices_  = {};
+    std::array<frustum, cascade_count> cascade_frustums_   = {};
     std::array<float, cascade_count> cascade_splits_       = {};
 
     float split_lambda_        = 0.9f;

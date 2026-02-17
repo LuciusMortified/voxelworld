@@ -121,7 +121,10 @@ float calculateShadow(vec3 normal, float viewDepth) {
 }
 
 vec3 calculateDirectionalLight(vec3 normal, vec3 viewDir, float shadow) {
-    float sunFactor = step(0.0, -ubo.directional_light.direction.y);
+    float sunElevation = -ubo.directional_light.direction.y;
+
+    float dayFactor = smoothstep(0.2, 0.4, sunElevation);
+    float twilightFactor = smoothstep(0.0, 0.2, sunElevation) * (1.0 - dayFactor);
 
     vec3 lightDir = normalize(-ubo.directional_light.direction);
 
@@ -130,8 +133,11 @@ vec3 calculateDirectionalLight(vec3 normal, vec3 viewDir, float shadow) {
     vec3 reflectDir = reflect(-lightDir, normal);
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 64.0);
 
-    vec3 diffuse = diff * ubo.directional_light.color * ubo.directional_light.intensity * sunFactor * shadow;
-    vec3 specular = spec * ubo.directional_light.color * ubo.directional_light.intensity * sunFactor * shadow * 0.5;
+    vec3 sunColor = ubo.directional_light.color * ubo.directional_light.intensity;
+    vec3 twilightColor = vec3(1.0, 0.5, 0.2) * ubo.directional_light.intensity * 0.3;
+
+    vec3 diffuse = diff * shadow * (sunColor * dayFactor + twilightColor * twilightFactor);
+    vec3 specular = spec * shadow * sunColor * dayFactor * 0.5;
 
     return diffuse + specular;
 }
@@ -143,16 +149,19 @@ vec3 calculatePointLight(uint lightIndex, vec3 normal, vec3 fragPos, vec3 viewDi
     vec3 lightDir = normalize(light.position.xyz - fragPos);
     float distance = length(light.position.xyz - fragPos);
 
-    // Проверка range (если distance > range, не учитываем свет)
     if (distance > light.range) {
         return vec3(0.0);
     }
 
-    // Затухание
     float attenuation = light.attenuation_constant +
-    light.attenuation_linear * distance +
-    light.attenuation_quadratic * distance * distance;
-    attenuation = 1.0 / max(attenuation, 0.001);// Защита от деления на ноль
+        light.attenuation_linear * distance +
+        light.attenuation_quadratic * distance * distance;
+    attenuation = 1.0 / max(attenuation, 0.001);
+
+    float ratio = distance / light.range;
+    float smoothFalloff = clamp(1.0 - ratio * ratio, 0.0, 1.0);
+    smoothFalloff *= smoothFalloff;
+    attenuation *= smoothFalloff;
 
     // Diffuse
     float diff = max(dot(normal, lightDir), 0.0);
@@ -197,8 +206,9 @@ void main() {
     vec3 normal = normalize(fragNormal);
     vec3 viewDir = normalize(ubo.viewPos - fragPos);
 
-    // Вычисляем shadow (normal bias применяется внутри функции)
-    float shadow = calculateShadow(normal, viewDepth);
+    float sunElevation = -ubo.directional_light.direction.y;
+    float shadowReliability = smoothstep(0.15, 0.3, sunElevation);
+    float shadow = mix(1.0, calculateShadow(normal, viewDepth), shadowReliability);
 
     // Ambient lighting
     float ambientStrength = 0.15;
