@@ -32,6 +32,7 @@ jobs:
         run: |
           mkdir package
           cp build/apps/sculptor/Release/sculptor.exe package/
+          cp build/apps/sculptor/Release/*.dll package/ 2>/dev/null || true
           cp -r build/apps/sculptor/Release/shaders package/
         shell: bash
 
@@ -61,7 +62,8 @@ jobs:
             libxinerama-dev \
             libxcursor-dev \
             libxi-dev \
-            libgl1-mesa-dev
+            libgl1-mesa-dev \
+            patchelf
 
       - name: Install Vulkan SDK
         uses: humbletim/install-vulkan-sdk@v1.2
@@ -92,6 +94,13 @@ jobs:
           mkdir package
           cp build/apps/sculptor/sculptor package/
           cp -r build/apps/sculptor/shaders package/
+          ldd build/apps/sculptor/sculptor | grep "=> /" | awk '{print $3}' | while read lib; do
+            case "$lib" in
+              /lib/x86_64-linux-gnu/libc.so*|/lib/x86_64-linux-gnu/libm.so*|/lib/x86_64-linux-gnu/libdl.so*|/lib/x86_64-linux-gnu/libpthread.so*|/lib/x86_64-linux-gnu/librt.so*|/lib/x86_64-linux-gnu/ld-linux*) ;;
+              *) cp "$lib" package/ ;;
+            esac
+          done
+          patchelf --set-rpath '$ORIGIN' package/sculptor
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
