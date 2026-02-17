@@ -46,13 +46,12 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install gcc 15
+      - name: Install gcc 13
         run: |
-          sudo add-apt-repository -y ppa:ubuntu-toolchain-r/ppa
           sudo apt-get update
-          sudo apt-get install -y gcc-15 g++-15
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-15 100
-          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-15 100
+          sudo apt-get install -y gcc-13 g++-13
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
 
       - name: Install X11 and GLFW dependencies
         run: |

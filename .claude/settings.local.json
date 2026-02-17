@@ -6,7 +6,8 @@
       "Bash(cmake:*)",
       "Bash(C:/Users/lucius/vcpkg/vcpkg install --triplet x64-windows)",
       "Bash(ctest:*)",
-      "WebFetch(domain:github.com)"
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:launchpad.net)"
     ]
   }
 }
