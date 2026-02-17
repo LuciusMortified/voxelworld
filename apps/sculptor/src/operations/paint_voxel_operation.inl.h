@@ -19,7 +19,7 @@ inline void paint_voxel_operation::execute() {
     auto& model_comp = world.get_component<gfx::model_component>(ent);
     previous_color_  = model_comp.get_voxel(params_.position).value;
 
-    model_system.modify(ent).set_voxel(params_.position, params_.color);
+    model_system.modify(ent).set_voxel(params_.position, params_.new_color);
     state_->has_unsaved_changes = true;
 }
 

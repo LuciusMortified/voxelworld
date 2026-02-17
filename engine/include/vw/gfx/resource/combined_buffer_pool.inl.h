@@ -196,7 +196,7 @@ void combined_buffer_pool<C>::update_visibility_cache_(
     const bool has_render_dirty = !render_dirty_entities.empty();
 
     const bool frustum_changed =
-        !visibility_cache_.frustum.approximately_equal(
+        !visibility_cache_.view_frustum.approximately_equal(
             view_frustum, angle_threshold, distance_threshold
         );
 
@@ -221,7 +221,7 @@ void combined_buffer_pool<C>::update_visibility_cache_(
         }
 
         visibility_cache_.visible = visibility_cache_.tmp_visible;
-        visibility_cache_.frustum = view_frustum;
+        visibility_cache_.view_frustum = view_frustum;
 
         if (has_render_dirty) {
             render_dirty_entities.clear();

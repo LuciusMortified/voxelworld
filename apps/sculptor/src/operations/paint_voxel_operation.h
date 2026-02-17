@@ -16,7 +16,7 @@ namespace vw::sculptor {
 struct paint_voxel_params {
     std::string name;
     vec3i position;
-    color color;
+    color new_color;
 };
 
 class paint_voxel_operation final : public base_operation {

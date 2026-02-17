@@ -16,7 +16,7 @@ inline void add_voxel_operation::execute() {
     auto& world        = engine_->get_world();
     auto& model_system = world.get_model_system();
 
-    model_system.modify(ent).set_voxel(params_.position, params_.color);
+    model_system.modify(ent).set_voxel(params_.position, params_.new_color);
     state_->has_unsaved_changes = true;
 }
 

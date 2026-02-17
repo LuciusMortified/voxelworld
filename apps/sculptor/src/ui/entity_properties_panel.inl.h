@@ -70,7 +70,7 @@ inline void entity_properties_panel::render_position() {
 
         set_transform_params params = {
             .name      = state_->selected_name,
-            .transform = new_transform,
+            .new_transform = new_transform,
         };
         auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
         op_manager_->execute(std::move(op));
@@ -100,7 +100,7 @@ inline void entity_properties_panel::render_rotation() {
 
         set_transform_params params = {
             .name      = state_->selected_name,
-            .transform = new_transform,
+            .new_transform = new_transform,
         };
         auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
         op_manager_->execute(std::move(op));
@@ -119,7 +119,7 @@ inline void entity_properties_panel::render_scale() {
 
         set_transform_params params = {
             .name      = state_->selected_name,
-            .transform = new_transform,
+            .new_transform = new_transform,
         };
         auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
         op_manager_->execute(std::move(op));
@@ -138,7 +138,7 @@ inline void entity_properties_panel::render_origin() {
 
         set_transform_params params = {
             .name      = state_->selected_name,
-            .transform = new_transform,
+            .new_transform = new_transform,
         };
         auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
         op_manager_->execute(std::move(op));

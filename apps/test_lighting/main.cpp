@@ -68,7 +68,7 @@ private:
         floor_model_ = model_registry.create("floor", 80, 1, 80);
         for (uint32 x = 0; x < 80; ++x) {
             for (uint32 z = 0; z < 80; ++z) {
-                auto gray = ((x + z) % 2 == 0) ? color(0xAAAAAAFF) : color(0x999999FF);
+                auto gray = ((x + z) % 2 == 0) ? color(0x666688FF) : color(0x8888AAFF);
                 floor_model_->set_voxel(x, 0, z, gray);
             }
         }
@@ -120,7 +120,7 @@ private:
         constexpr float32 two_pi = 2.0f * 3.14159265f;
         float32 phase = static_cast<float32>(index) / static_cast<float32>(total) * two_pi;
         float32 radius = 16.0f + 10.0f * std::sin(phase * 3.0f + 0.5f);
-        float32 height = 6.0f + 8.0f * std::cos(phase * 2.0f + 1.0f);
+        float32 height = 16.0f + 8.0f * std::cos(phase * 2.0f + 1.0f);
         const auto& base_color = palette[index % std::size(palette)];
 
         return {base_color, radius, height, phase};

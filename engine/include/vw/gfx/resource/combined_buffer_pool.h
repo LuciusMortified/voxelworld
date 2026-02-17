@@ -41,7 +41,7 @@ struct combined_buffer_pool_stats {
 };
 
 struct visibility_cache {
-    frustum frustum;
+    frustum view_frustum;
     std::unordered_set<entity> visible;
     std::unordered_set<entity> tmp_visible;
     std::unordered_set<entity> changed;
