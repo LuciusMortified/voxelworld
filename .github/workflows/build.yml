@@ -1,9 +1,9 @@
-name: Tests
+name: Build
 
 on: push
 
 jobs:
-  test-windows:
+  build-windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
@@ -22,13 +22,10 @@ jobs:
           cmake -B build -S .
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
-      - name: Build tests
-        run: cmake --build build --config Release --target core_tests
+      - name: Build sculptor
+        run: cmake --build build --config Release --target sculptor
 
-      - name: Run tests
-        run: ctest --test-dir build --build-config Release --output-on-failure
-
-  test-ubuntu:
+  build-ubuntu:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -69,13 +66,10 @@ jobs:
           cmake -B build -S .
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
-      - name: Build tests
-        run: cmake --build build --config Release --target core_tests
+      - name: Build sculptor
+        run: cmake --build build --config Release --target sculptor
 
-      - name: Run tests
-        run: ctest --test-dir build --build-config Release --output-on-failure
-
-  test-macos:
+  build-macos:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
@@ -96,8 +90,5 @@ jobs:
           cmake -B build -S .
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
-      - name: Build tests
-        run: cmake --build build --config Release --target core_tests
-
-      - name: Run tests
-        run: ctest --test-dir build --build-config Release --output-on-failure
+      - name: Build sculptor
+        run: cmake --build build --config Release --target sculptor

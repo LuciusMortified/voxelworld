@@ -1,34 +1,9 @@
-name: Tests
+name: Sanitizers
 
 on: push
 
 jobs:
-  test-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install Vulkan SDK
-        uses: humbletim/install-vulkan-sdk@v1.2
-        with:
-          version: latest
-          cache: true
-
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
-
-      - name: Configure CMake
-        run: >
-          cmake -B build -S .
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-
-      - name: Build tests
-        run: cmake --build build --config Release --target core_tests
-
-      - name: Run tests
-        run: ctest --test-dir build --build-config Release --output-on-failure
-
-  test-ubuntu:
+  asan-ubsan:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -68,17 +43,33 @@ jobs:
         run: >
           cmake -B build -S .
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
 
       - name: Build tests
-        run: cmake --build build --config Release --target core_tests
+        run: cmake --build build --target core_tests
 
-      - name: Run tests
-        run: ctest --test-dir build --build-config Release --output-on-failure
+      - name: Run tests with ASan + UBSan
+        run: ctest --test-dir build --output-on-failure
 
-  test-macos:
-    runs-on: macos-latest
+  clang-tidy:
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-13 g++-13 clang-tidy \
+            libx11-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libgl1-mesa-dev
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
 
       - name: Install Vulkan SDK
         uses: humbletim/install-vulkan-sdk@v1.2
@@ -86,7 +77,10 @@ jobs:
           version: latest
           cache: true
 
-      - name: Setup vcpkg
+      - name: Setup cmake
+        uses: lukka/get-cmake@latest
+
+      - name: Setup and run vcpkg
         uses: lukka/run-vcpkg@v11
         with:
           runVcpkgInstall: true
@@ -95,9 +89,11 @@ jobs:
         run: >
           cmake -B build -S .
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-      - name: Build tests
-        run: cmake --build build --config Release --target core_tests
-
-      - name: Run tests
-        run: ctest --test-dir build --build-config Release --output-on-failure
+      - name: Run clang-tidy
+        run: |
+          find engine/include -name '*.h' -not -name '*.inl.h' | head -50 | \
+          xargs clang-tidy -p build \
+            --checks='-*,bugprone-*,performance-*,modernize-*,readability-*,-readability-magic-numbers,-readability-identifier-length,-readability-uppercase-literal-suffix,-bugprone-easily-swappable-parameters' \
+            --warnings-as-errors='bugprone-*,performance-*'
