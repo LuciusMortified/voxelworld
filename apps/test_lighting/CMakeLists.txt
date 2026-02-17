@@ -1,4 +1,4 @@
-project(test_animation)
+project(test_lighting)
 
 add_executable(${PROJECT_NAME}
     main.cpp
