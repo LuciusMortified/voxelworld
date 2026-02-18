@@ -45,27 +45,25 @@ inline app::app(
     camera_controller_.setup(window, camera);
     camera_controller_.set_camera_speed(15.f);
 
-    window.sub<gfx::key_press_event>([this](const gfx::key_press_event& ev) {
+    window.sub<gfx::key_press_event>([this](const gfx::key_press_event& ev) -> bool {
         handle_key_press(ev);
         return true;
     });
 
-    window.sub<gfx::window_close_event>([this](const gfx::window_close_event&) {
+    window.sub<gfx::window_close_event>([this](const gfx::window_close_event&) -> bool {
         get_engine().shutdown();
         return true;
     });
 
-    window.sub<gfx::mouse_move_event>([this](const gfx::mouse_move_event& ev) {
+    window.sub<gfx::mouse_move_event>([this](const gfx::mouse_move_event& ev) -> bool {
         handle_mouse_move(ev);
         return true;
     });
-
-    window.sub<gfx::mouse_press_event>([this](const gfx::mouse_press_event& ev) {
+    window.sub<gfx::mouse_press_event>([this](const gfx::mouse_press_event& ev) -> bool {
         handle_mouse_press(ev);
         return true;
     });
-
-    window.sub<gfx::mouse_release_event>([this](const gfx::mouse_release_event& ev) {
+    window.sub<gfx::mouse_release_event>([this](const gfx::mouse_release_event& ev) -> bool {
         handle_mouse_release(ev);
         return true;
     });

@@ -4,10 +4,11 @@
       "Bash(cmake --build:*)",
       "Bash(glslc:*)",
       "Bash(cmake:*)",
-      "Bash(C:/Users/lucius/vcpkg/vcpkg install --triplet x64-windows)",
       "Bash(ctest:*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:launchpad.net)"
+      "WebFetch(domain:launchpad.net)",
+      "Bash(echo:*)",
+      "Bash(where:*)"
     ]
   }
 }

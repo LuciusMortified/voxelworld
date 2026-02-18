@@ -271,8 +271,8 @@ struct vertex {
 - Поддержка платформ (macOS через MoltenVK)
 
 ### Ветки
-- **Формат**: `snake_case`, краткое описание задачи
-- **Примеры**: `fix_shadow_artifacts`, `add_rotate_tool`, `refactor_ecs_registry`
+- **Формат**: `kebab-case`, краткое описание задачи
+- **Примеры**: `fix-shadow-artifacts`, `add-rotate-tool`, `refactor-ecs-registry`
 
 ### Коммиты
 - **Язык**: английский (обязательно)
