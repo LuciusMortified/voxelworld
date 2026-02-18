@@ -3,6 +3,8 @@
 #ifndef VW_SCULPTOR_UI_UTILS_H
 #define VW_SCULPTOR_UI_UTILS_H
 
+#include <cstring>
+
 namespace vw::sculptor {
 
 inline void imgui_input_text_string(
@@ -11,11 +13,7 @@ inline void imgui_input_text_string(
     constexpr size_t max_length = 64;
     char buffer[max_length]{};
 
-#ifdef __APPLE__
-    strlcpy(buffer, value.data(), sizeof(buffer));
-#else
-    strcpy_s(buffer, sizeof(buffer), value.data());
-#endif
+    std::strncpy(buffer, value.data(), max_length - 1);
 
     if (ImGui::InputText(label.data(), buffer, max_length)) {
         value = std::string{buffer};

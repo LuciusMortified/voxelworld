@@ -1,0 +1,124 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: latest
+          cache: true
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+
+      - name: Configure CMake
+        run: >
+          cmake -B build -S .
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          -DVW_BUILD_TESTS=OFF
+
+      - name: Build sculptor
+        run: cmake --build build --config Release --target sculptor
+
+      - name: Package
+        run: |
+          mkdir package
+          cp build/apps/sculptor/Release/sculptor.exe package/
+          cp build/apps/sculptor/Release/*.dll package/ 2>/dev/null || true
+          cp -r build/apps/sculptor/Release/shaders package/
+        shell: bash
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sculptor-windows
+          path: package/
+
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install gcc 13
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-13 g++-13
+          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
+          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+
+      - name: Install X11 and GLFW dependencies
+        run: |
+          sudo apt-get install -y \
+            libx11-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libxi-dev \
+            libgl1-mesa-dev
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: latest
+          cache: true
+
+      - name: Setup cmake
+        uses: lukka/get-cmake@latest
+
+      - name: Setup and run vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          runVcpkgInstall: true
+
+      - name: Configure CMake
+        run: >
+          cmake -B build -S .
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++"
+          -DVW_BUILD_TESTS=OFF
+
+      - name: Build sculptor
+        run: cmake --build build --target sculptor
+
+      - name: Package
+        run: |
+          mkdir package
+          cp build/apps/sculptor/sculptor package/
+          cp -r build/apps/sculptor/shaders package/
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sculptor-linux
+          path: package/
+
+  release:
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Create zip archives
+        run: |
+          cd sculptor-windows && zip -r ../sculptor-${{ github.ref_name }}-windows.zip . && cd ..
+          cd sculptor-linux && zip -r ../sculptor-${{ github.ref_name }}-linux.zip . && cd ..
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            sculptor-${{ github.ref_name }}-windows.zip
+            sculptor-${{ github.ref_name }}-linux.zip
+          generate_release_notes: true

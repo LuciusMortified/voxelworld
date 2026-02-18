@@ -1,9 +1,9 @@
-name: Unit Tests
+name: CI
 
 on: push
 
 jobs:
-  test-windows:
+  windows:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
@@ -28,7 +28,10 @@ jobs:
       - name: Run tests
         run: ctest --test-dir build --build-config Release --output-on-failure
 
-  test-ubuntu:
+      - name: Build sculptor
+        run: cmake --build build --config Release --target sculptor
+
+  ubuntu:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -50,7 +53,7 @@ jobs:
             libxi-dev \
             libgl1-mesa-dev
 
-      - name: Install vulkan sdk
+      - name: Install Vulkan SDK
         uses: humbletim/install-vulkan-sdk@v1.2
         with:
           version: latest
@@ -74,3 +77,33 @@ jobs:
 
       - name: Run tests
         run: ctest --test-dir build --build-config Release --output-on-failure
+
+      - name: Build sculptor
+        run: cmake --build build --config Release --target sculptor
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Vulkan SDK
+        run: brew install vulkan-loader vulkan-headers shaderc
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          runVcpkgInstall: true
+
+      - name: Configure CMake
+        run: >
+          cmake -B build -S .
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+      - name: Build tests
+        run: cmake --build build --config Release --target core_tests
+
+      - name: Run tests
+        run: ctest --test-dir build --build-config Release --output-on-failure
+
+      - name: Build sculptor
+        run: cmake --build build --config Release --target sculptor

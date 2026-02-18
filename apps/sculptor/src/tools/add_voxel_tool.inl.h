@@ -122,7 +122,7 @@ inline void add_voxel_tool::on_mouse_press(
         add_voxel_params params;
         params.name     = state_->selected_name;
         params.position = hovered_voxel_;
-        params.color    = state_->selected_color;
+        params.new_color = state_->selected_color;
 
         auto op = std::make_unique<add_voxel_operation>(
             *engine_, *state_, params

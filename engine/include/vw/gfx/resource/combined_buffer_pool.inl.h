@@ -77,8 +77,8 @@ void combined_buffer_pool<C>::update_meshes_(
     auto& dirty_entities = model_system.get_render_dirty_entities();
 
     entities_to_process_.clear();
-    entities_to_process_.insert_range(visibility_cache_.changed);
-    entities_to_process_.insert_range(dirty_entities);
+    entities_to_process_.insert(visibility_cache_.changed.begin(), visibility_cache_.changed.end());
+    entities_to_process_.insert(dirty_entities.begin(), dirty_entities.end());
 
     for (entity ent : entities_to_process_) {
         bool has_spatial = world.template has_component<spatial_component>(ent);
@@ -154,8 +154,8 @@ void combined_buffer_pool<C>::update_transforms_(
     auto& dirty_entities   = transform_system.get_render_dirty_entities();
 
     entities_to_process_.clear();
-    entities_to_process_.insert_range(visibility_cache_.changed);
-    entities_to_process_.insert_range(dirty_entities);
+    entities_to_process_.insert(visibility_cache_.changed.begin(), visibility_cache_.changed.end());
+    entities_to_process_.insert(dirty_entities.begin(), dirty_entities.end());
 
     for (entity ent : entities_to_process_) {
         bool has_spatial = world.template has_component<spatial_component>(ent);
@@ -196,7 +196,7 @@ void combined_buffer_pool<C>::update_visibility_cache_(
     const bool has_render_dirty = !render_dirty_entities.empty();
 
     const bool frustum_changed =
-        !visibility_cache_.frustum.approximately_equal(
+        !visibility_cache_.view_frustum.approximately_equal(
             view_frustum, angle_threshold, distance_threshold
         );
 
@@ -206,7 +206,7 @@ void combined_buffer_pool<C>::update_visibility_cache_(
 
         for (const auto& shadow_frustum : shadow_frustums) {
             spatial_system.query_all(shadow_frustum, shadow_query_tmp_);
-            visibility_cache_.tmp_visible.insert_range(shadow_query_tmp_);
+            visibility_cache_.tmp_visible.insert(shadow_query_tmp_.begin(), shadow_query_tmp_.end());
         }
 
         for (auto ent : visibility_cache_.visible) {
@@ -221,7 +221,7 @@ void combined_buffer_pool<C>::update_visibility_cache_(
         }
 
         visibility_cache_.visible = visibility_cache_.tmp_visible;
-        visibility_cache_.frustum = view_frustum;
+        visibility_cache_.view_frustum = view_frustum;
 
         if (has_render_dirty) {
             render_dirty_entities.clear();

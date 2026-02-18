@@ -85,7 +85,7 @@ inline void paint_tool::on_mouse_press(
         paint_voxel_params params;
         params.name     = state_->selected_name;
         params.position = hovered_voxel_;
-        params.color    = state_->selected_color;
+        params.new_color = state_->selected_color;
 
         auto op = std::make_unique<paint_voxel_operation>(
             *engine_, *state_, params

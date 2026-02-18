@@ -13,7 +13,7 @@ namespace vw::sculptor {
 
 struct set_transform_params {
     std::string name;
-    transform transform;
+    transform new_transform;
 };
 
 class set_transform_operation final : public base_operation {
