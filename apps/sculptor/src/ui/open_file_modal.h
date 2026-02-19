@@ -18,7 +18,7 @@ public:
 
 private:
     void load_existing_filenames_();
-    bool open_file_();
+    auto open_file_() -> bool;
 
     engine_type* engine_;
     app_state* state_;

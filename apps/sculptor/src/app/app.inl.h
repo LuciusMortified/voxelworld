@@ -157,13 +157,11 @@ inline void app::render(
 inline void app::handle_key_press(
     const gfx::key_press_event& ev
 ) {
-    auto& io                  = ImGui::GetIO();
-    bool really_want_keyboard = ImGui::IsAnyItemActive() || ImGui::IsAnyItemFocused();
-    if (io.WantCaptureKeyboard && really_want_keyboard) {
-        return;
-    }
+    const auto& io = ImGui::GetIO();
 
-    if (camera_movement_enabled_) {
+    const bool really_want_keyboard =  //
+        ImGui::IsAnyItemActive() || ImGui::IsAnyItemFocused();
+    if (io.WantCaptureKeyboard && really_want_keyboard || camera_movement_enabled_) {
         return;
     }
 
@@ -202,6 +200,15 @@ inline void app::handle_key_press(
         state_.need_step_forward = true;
     }
 
+    handle_file_shortcuts(ev);
+}
+
+inline void app::handle_file_shortcuts(
+    const gfx::key_press_event& ev
+) {
+    using keys = gfx::keyboard::keys;
+    using mods = gfx::keyboard::mods;
+
     if (ev.key == keys::N && ev.with(mods::CTRL)) {
         state_.ui.need_new_file_modal = true;
     }
@@ -214,9 +221,11 @@ inline void app::handle_key_press(
         };
 
         namespace fs = std::filesystem;
-        fs::path assets_dir_path{app_state::asset_dir_name};
-        fs::path filepath{assets_dir_path / state_.filename};
-        (void)serializer.serialize(filepath);
+        const fs::path assets_dir_path{app_state::asset_dir_name};
+        const fs::path filepath{assets_dir_path / state_.filename};
+
+        auto result = serializer.serialize(filepath);
+        // TODO: handle errors
 
         clip_manager_panel_.save_all_clips();
 
@@ -283,143 +292,176 @@ inline void app::handle_mouse_release(
 }
 
 inline void app::handle_animation_actions_() {
-    auto& world = get_engine().get_world();
-
     if (state_.need_toggle_playback) {
         state_.need_toggle_playback = false;
-        if (!state_.selected_clip_name.empty() && !state_.root_name.empty() &&
-            state_.name_to_entity.contains(state_.root_name)) {
-            auto root_ent = state_.name_to_entity[state_.root_name];
-
-            if (state_.is_previewing) {
-                if (world.has_component<gfx::animation_player_component>(root_ent)) {
-                    world.get_animation_system().modify_player(root_ent).pause();
-                }
-                state_.is_previewing = false;
-            } else {
-                auto& clip_reg = world.get_animation_clip_registry();
-                auto clip      = clip_reg.get(state_.selected_clip_name);
-                if (clip) {
-                    if (!world.has_component<gfx::animation_player_component>(root_ent)) {
-                        auto* guard = state_.find_guard(root_ent);
-                        if (guard) {
-                            guard->with<gfx::animation_player_component>();
-                        }
-                    }
-                    auto& anim_sys = world.get_animation_system();
-                    auto& player   = world.get_component<gfx::animation_player_component>(root_ent);
-
-                    if (player.is_paused()) {
-                        anim_sys.modify_player(root_ent).resume();
-                    } else {
-                        anim_sys.modify_player(root_ent).set_clip(clip);
-                        anim_sys.modify_player(root_ent).play();
-                    }
-                    state_.is_previewing = true;
-                }
-            }
-        }
+        handle_toggle_playback();
     }
 
     if (state_.need_stop_playback) {
         state_.need_stop_playback = false;
-        if (!state_.root_name.empty() && state_.name_to_entity.contains(state_.root_name)) {
-            auto root_ent = state_.name_to_entity[state_.root_name];
-            if (world.has_component<gfx::animation_player_component>(root_ent)) {
-                world.get_animation_system().modify_player(root_ent).stop();
-            }
-        }
-        state_.is_previewing   = false;
-        state_.timeline_cursor = 0.f;
+        handle_stop_playback();
     }
 
     if (state_.need_add_keyframe) {
         state_.need_add_keyframe = false;
-        if (!state_.selected_clip_name.empty() && !state_.selected_name.empty()) {
-            auto& clip_reg = world.get_animation_clip_registry();
-            auto clip      = clip_reg.get(state_.selected_clip_name);
-            if (clip) {
-                auto entity_name = state_.selected_name;
-                auto ent         = state_.name_to_entity[entity_name];
-                auto prop        = state_.selected_property;
-                float32 time     = state_.timeline_cursor;
-
-                if (world.has_component<gfx::transform_component>(ent)) {
-                    auto& tc = world.get_component<gfx::transform_component>(ent);
-
-                    keyframe_value kf_val;
-                    if (prop == gfx::animation_property::rotation) {
-                        kf_val = gfx::keyframe_quat{time, math::euler_to_quat(tc.get_rotation())};
-                    } else if (prop == gfx::animation_property::position) {
-                        kf_val = gfx::keyframe_vec3f{time, tc.get_position()};
-                    } else if (prop == gfx::animation_property::scale) {
-                        kf_val = gfx::keyframe_vec3f{time, tc.get_scale()};
-                    } else {
-                        kf_val = gfx::keyframe_vec3f{time, tc.get_origin()};
-                    }
-
-                    if (!clip->has_track(entity_name)) {
-                        add_track_params params = {
-                            .clip_name  = state_.selected_clip_name,
-                            .track_name = entity_name,
-                            .property   = prop,
-                            .keyframe   = kf_val,
-                        };
-                        auto op =
-                            std::make_unique<add_track_operation>(get_engine(), state_, params);
-                        op_manager_.execute(std::move(op));
-                    } else {
-                        add_keyframe_params params = {
-                            .clip_name  = state_.selected_clip_name,
-                            .track_name = entity_name,
-                            .property   = prop,
-                            .keyframe   = kf_val,
-                        };
-                        auto op =
-                            std::make_unique<add_keyframe_operation>(get_engine(), state_, params);
-                        op_manager_.execute(std::move(op));
-                    }
-                }
-            }
-        }
+        handle_add_keyframe();
     }
 
     if (state_.need_delete_keyframe) {
         state_.need_delete_keyframe = false;
-        if (state_.selected_keyframe_time >= 0.f && !state_.selected_clip_name.empty() &&
-            !state_.selected_track_name.empty()) {
-            auto& clip_reg = world.get_animation_clip_registry();
-            auto clip      = clip_reg.get(state_.selected_clip_name);
-            if (clip) {
-                auto* track = clip->get_track(state_.selected_track_name);
-                if (track) {
-                    auto* ch = track->get_channel(state_.selected_property);
-                    if (ch) {
-                        std::visit(
-                            [&](const auto& channel) {
-                                for (const auto& kf : channel.get_keyframes()) {
-                                    if (std::abs(kf.time - state_.selected_keyframe_time) <
-                                        0.0001f) {
-                                        remove_keyframe_params params;
-                                        params.clip_name  = state_.selected_clip_name;
-                                        params.track_name = state_.selected_track_name;
-                                        params.property   = state_.selected_property;
-                                        params.keyframe   = keyframe_value(kf);
-                                        auto op = std::make_unique<remove_keyframe_operation>(
-                                            get_engine(), state_, params
-                                        );
-                                        op_manager_.execute(std::move(op));
-                                        return;
-                                    }
-                                }
-                            },
-                            *ch
-                        );
-                    }
-                }
-            }
+        handle_delete_keyframe();
+    }
+}
+
+inline void app::handle_toggle_playback() {
+    if (state_.selected_clip_name.empty() || state_.root_name.empty() ||
+        !state_.name_to_entity.contains(state_.root_name)) {
+        return;
+    }
+
+    auto& world   = get_engine().get_world();
+    auto root_ent = state_.name_to_entity[state_.root_name];
+
+    if (state_.is_previewing) {
+        if (world.has_component<gfx::animation_player_component>(root_ent)) {
+            world.get_animation_system().modify_player(root_ent).pause();
+        }
+        state_.is_previewing = false;
+        return;
+    }
+
+    auto& clip_reg = world.get_animation_clip_registry();
+    auto clip      = clip_reg.get(state_.selected_clip_name);
+    if (!clip) {
+        return;
+    }
+
+    if (!world.has_component<gfx::animation_player_component>(root_ent)) {
+        if (auto* guard = state_.find_guard(root_ent)) {
+            guard->with<gfx::animation_player_component>();
         }
     }
+
+    auto& anim_sys = world.get_animation_system();
+    auto& player   = world.get_component<gfx::animation_player_component>(root_ent);
+
+    if (player.is_paused()) {
+        anim_sys.modify_player(root_ent).resume();
+    } else {
+        anim_sys.modify_player(root_ent).set_clip(clip);
+        anim_sys.modify_player(root_ent).play();
+    }
+    state_.is_previewing = true;
+}
+
+inline void app::handle_stop_playback() {
+    if (!state_.root_name.empty() && state_.name_to_entity.contains(state_.root_name)) {
+        auto& world   = get_engine().get_world();
+        auto root_ent = state_.name_to_entity[state_.root_name];
+        if (world.has_component<gfx::animation_player_component>(root_ent)) {
+            world.get_animation_system().modify_player(root_ent).stop();
+        }
+    }
+    state_.is_previewing   = false;
+    state_.timeline_cursor = 0.f;
+}
+
+inline void app::handle_add_keyframe() {
+    if (state_.selected_clip_name.empty() || state_.selected_name.empty()) {
+        return;
+    }
+
+    auto& world    = get_engine().get_world();
+    auto& clip_reg = world.get_animation_clip_registry();
+    auto clip      = clip_reg.get(state_.selected_clip_name);
+    if (!clip) {
+        return;
+    }
+
+    auto entity_name = state_.selected_name;
+    auto ent         = state_.name_to_entity[entity_name];
+    auto prop        = state_.selected_property;
+    float32 time     = state_.timeline_cursor;
+
+    if (!world.has_component<gfx::transform_component>(ent)) {
+        return;
+    }
+
+    auto& tc = world.get_component<gfx::transform_component>(ent);
+
+    keyframe_value kf_val;
+    if (prop == gfx::animation_property::rotation) {
+        kf_val = gfx::keyframe_quat{time, math::euler_to_quat(tc.get_rotation())};
+    } else if (prop == gfx::animation_property::position) {
+        kf_val = gfx::keyframe_vec3f{time, tc.get_position()};
+    } else if (prop == gfx::animation_property::scale) {
+        kf_val = gfx::keyframe_vec3f{time, tc.get_scale()};
+    } else {
+        kf_val = gfx::keyframe_vec3f{time, tc.get_origin()};
+    }
+
+    if (!clip->has_track(entity_name)) {
+        add_track_params params = {
+            .clip_name  = state_.selected_clip_name,
+            .track_name = entity_name,
+            .property   = prop,
+            .keyframe   = kf_val,
+        };
+        auto op = std::make_unique<add_track_operation>(get_engine(), state_, params);
+        op_manager_.execute(std::move(op));
+    } else {
+        add_keyframe_params params = {
+            .clip_name  = state_.selected_clip_name,
+            .track_name = entity_name,
+            .property   = prop,
+            .keyframe   = kf_val,
+        };
+        auto op = std::make_unique<add_keyframe_operation>(get_engine(), state_, params);
+        op_manager_.execute(std::move(op));
+    }
+}
+
+inline void app::handle_delete_keyframe() {
+    if (state_.selected_keyframe_time < 0.f || state_.selected_clip_name.empty() ||
+        state_.selected_track_name.empty()) {
+        return;
+    }
+
+    auto& world          = get_engine().get_world();
+    const auto& clip_reg = world.get_animation_clip_registry();
+    const auto clip      = clip_reg.get(state_.selected_clip_name);
+    if (!clip) {
+        return;
+    }
+
+    const auto* track = clip->get_track(state_.selected_track_name);
+    if (track == nullptr) {
+        return;
+    }
+
+    const auto* ch = track->get_channel(state_.selected_property);
+    if (ch == nullptr) {
+        return;
+    }
+
+    std::visit(
+        [&](const auto& channel) {
+            for (const auto& kf : channel.get_keyframes()) {
+                if (std::abs(kf.time - state_.selected_keyframe_time) < 0.0001f) {
+                    remove_keyframe_params params;
+                    params.clip_name  = state_.selected_clip_name;
+                    params.track_name = state_.selected_track_name;
+                    params.property   = state_.selected_property;
+                    params.keyframe   = keyframe_value(kf);
+                    auto op =
+                        std::make_unique<remove_keyframe_operation>(get_engine(), state_, params);
+                    op_manager_.execute(std::move(op));
+                    return;
+                }
+            }
+        },
+        *ch
+    );
 }
 
 inline void app::update_title_() {

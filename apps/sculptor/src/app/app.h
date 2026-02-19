@@ -33,11 +33,16 @@ public:
 
 private:
     void handle_key_press(const gfx::key_press_event& ev);
+    void handle_file_shortcuts(const gfx::key_press_event& ev);
     void handle_mouse_move(const gfx::mouse_move_event& ev);
     void handle_mouse_press(const gfx::mouse_press_event& ev);
     void handle_mouse_release(const gfx::mouse_release_event& ev);
 
     void handle_animation_actions_();
+    void handle_toggle_playback();
+    void handle_stop_playback();
+    void handle_add_keyframe();
+    void handle_delete_keyframe();
     void update_title_();
     static void init_asset_dir_();
 

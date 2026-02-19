@@ -10,22 +10,22 @@
 
 namespace vw::math {
 
-constexpr float radians(
+constexpr auto radians(
     float degrees
-) {
+) -> float {
     return degrees * deg_to_rad;
 }
 
-constexpr float degrees(
+constexpr auto degrees(
     float radians
-) {
+) -> float {
     return radians * rad_to_deg;
 }
 
 template <typename T>
-constexpr T clamp(
+constexpr auto clamp(
     T value, T min_val, T max_val
-) {
+) -> T {
     if (value < min_val)
         return min_val;
     if (value > max_val)
@@ -34,41 +34,41 @@ constexpr T clamp(
 }
 
 template <typename T>
-constexpr T sign(
+constexpr auto sign(
     T value
-) {
+) -> T {
     return value > T(0) ? T(1) : value < T(0) ? T(-1) : T(0);
 }
 
-inline bool approx_equal(
+inline auto approx_equal(
     float a, float b, float epsilon
-) {
+) -> bool {
     return std::abs(a - b) < epsilon;
 }
 
-inline bool approx_equal(
+inline auto approx_equal(
     const vec2f& a, const vec2f& b, float epsilon
-) {
+) -> bool {
     return approx_equal(a.x, b.x, epsilon) && approx_equal(a.y, b.y, epsilon);
 }
 
-inline bool approx_equal(
+inline auto approx_equal(
     const vec3f& a, const vec3f& b, float epsilon
-) {
+) -> bool {
     return approx_equal(a.x, b.x, epsilon) && approx_equal(a.y, b.y, epsilon) &&
         approx_equal(a.z, b.z, epsilon);
 }
 
-inline bool approx_equal(
+inline auto approx_equal(
     const vec4f& a, const vec4f& b, float epsilon
-) {
+) -> bool {
     return approx_equal(a.x, b.x, epsilon) && approx_equal(a.y, b.y, epsilon) &&
         approx_equal(a.z, b.z, epsilon) && approx_equal(a.w, b.w, epsilon);
 }
 
-inline bool approx_equal(
+inline auto approx_equal(
     const mat4f& a, const mat4f& b, float epsilon
-) {
+) -> bool {
     for (int i = 0; i < 16; ++i) {
         if (!approx_equal(a[i], b[i], epsilon)) {
             return false;
@@ -77,28 +77,28 @@ inline bool approx_equal(
     return true;
 }
 
-inline bool approx_equal(
+inline auto approx_equal(
     const quat& a, const quat& b, float epsilon
-) {
+) -> bool {
     return approx_equal(a.x, b.x, epsilon) && approx_equal(a.y, b.y, epsilon) &&
         approx_equal(a.z, b.z, epsilon) && approx_equal(a.w, b.w, epsilon);
 }
 
-inline float length(
+inline auto length(
     const vec2f& v
-) {
-    return std::sqrt(v.x * v.x + v.y * v.y);
+) -> float {
+    return std::sqrt((v.x * v.x) + (v.y * v.y));
 }
 
-inline float length_squared(
+inline auto length_squared(
     const vec2f& v
-) {
-    return v.x * v.x + v.y * v.y;
+) -> float {
+    return (v.x * v.x) + (v.y * v.y);
 }
 
-inline vec2f normalize(
+inline auto normalize(
     const vec2f& v
-) {
+) -> vec2f {
     float len = length(v);
     if (len > 0.0f) {
         return {v.x / len, v.y / len};
@@ -106,96 +106,96 @@ inline vec2f normalize(
     return v;
 }
 
-inline float dot(
+inline auto dot(
     const vec2f& a, const vec2f& b
-) {
-    return a.x * b.x + a.y * b.y;
+) -> float {
+    return (a.x * b.x) + (a.y * b.y);
 }
 
-inline float cross(
+inline auto cross(
     const vec2f& a, const vec2f& b
-) {
-    return a.x * b.y - a.y * b.x;
+) -> float {
+    return (a.x * b.y) - (a.y * b.x);
 }
 
-inline vec2f lerp(
+inline auto lerp(
     const vec2f& a, const vec2f& b, float t
-) {
-    return {a.x + t * (b.x - a.x), a.y + t * (b.y - a.y)};
+) -> vec2f {
+    return {a.x + (t * (b.x - a.x)), a.y + (t * (b.y - a.y))};
 }
 
-inline vec2f min(
+inline auto min(
     const vec2f& a, const vec2f& b
-) {
+) -> vec2f {
     return {std::min(a.x, b.x), std::min(a.y, b.y)};
 }
 
-inline vec2f max(
+inline auto max(
     const vec2f& a, const vec2f& b
-) {
+) -> vec2f {
     return {std::max(a.x, b.x), std::max(a.y, b.y)};
 }
 
-inline vec2f abs(
+inline auto abs(
     const vec2f& v
-) {
+) -> vec2f {
     return {std::abs(v.x), std::abs(v.y)};
 }
 
-inline vec2f floor(
+inline auto floor(
     const vec2f& v
-) {
+) -> vec2f {
     return {std::floor(v.x), std::floor(v.y)};
 }
 
-inline vec2f ceil(
+inline auto ceil(
     const vec2f& v
-) {
+) -> vec2f {
     return {std::ceil(v.x), std::ceil(v.y)};
 }
 
-inline vec2f round(
+inline auto round(
     const vec2f& v
-) {
+) -> vec2f {
     return {std::round(v.x), std::round(v.y)};
 }
 
-inline vec2f fract(
+inline auto fract(
     const vec2f& v
-) {
+) -> vec2f {
     return {v.x - std::floor(v.x), v.y - std::floor(v.y)};
 }
 
-inline vec2f sign(
+inline auto sign(
     const vec2f& v
-) {
+) -> vec2f {
     return {
         (v.x > 0.0f) ? 1.0f : ((v.x < 0.0f) ? -1.0f : 0.0f),
         (v.y > 0.0f) ? 1.0f : ((v.y < 0.0f) ? -1.0f : 0.0f)
     };
 }
 
-inline vec2f clamp(
+inline auto clamp(
     const vec2f& v, const vec2f& min_v, const vec2f& max_v
-) {
+) -> vec2f {
     return {clamp(v.x, min_v.x, max_v.x), clamp(v.y, min_v.y, max_v.y)};
 }
 
-inline float length(
+inline auto length(
     const vec3f& v
-) {
-    return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+) -> float {
+    return std::sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z));
 }
 
-inline float length_squared(
+inline auto length_squared(
     const vec3f& v
-) {
-    return v.x * v.x + v.y * v.y + v.z * v.z;
+) -> float {
+    return (v.x * v.x) + (v.y * v.y) + (v.z * v.z);
 }
 
-inline vec3f normalize(
+inline auto normalize(
     const vec3f& v
-) {
+) -> vec3f {
     float len = length(v);
     if (len > 0.0f) {
         return {v.x / len, v.y / len, v.z / len};
@@ -203,63 +203,63 @@ inline vec3f normalize(
     return v;
 }
 
-inline vec3f cross(
+inline auto cross(
     const vec3f& a, const vec3f& b
-) {
-    return {a.y * b.z - a.z * b.y, a.z * b.x - a.x * b.z, a.x * b.y - a.y * b.x};
+) -> vec3f {
+    return {(a.y * b.z) - (a.z * b.y), (a.z * b.x) - (a.x * b.z), (a.x * b.y) - (a.y * b.x)};
 }
 
-inline float dot(
+inline auto dot(
     const vec3f& a, const vec3f& b
-) {
-    return a.x * b.x + a.y * b.y + a.z * b.z;
+) -> float {
+    return (a.x * b.x) + (a.y * b.y) + (a.z * b.z);
 }
 
-inline vec3f min(
+inline auto min(
     const vec3f& a, const vec3f& b
-) {
+) -> vec3f {
     return {std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z)};
 }
 
-inline vec3f max(
+inline auto max(
     const vec3f& a, const vec3f& b
-) {
+) -> vec3f {
     return {std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z)};
 }
 
-inline vec3f abs(
+inline auto abs(
     const vec3f& v
-) {
+) -> vec3f {
     return {std::abs(v.x), std::abs(v.y), std::abs(v.z)};
 }
 
-inline vec3f floor(
+inline auto floor(
     const vec3f& v
-) {
+) -> vec3f {
     return {std::floor(v.x), std::floor(v.y), std::floor(v.z)};
 }
 
-inline vec3f ceil(
+inline auto ceil(
     const vec3f& v
-) {
+) -> vec3f {
     return {std::ceil(v.x), std::ceil(v.y), std::ceil(v.z)};
 }
 
-inline vec3f round(
+inline auto round(
     const vec3f& v
-) {
+) -> vec3f {
     return {std::round(v.x), std::round(v.y), std::round(v.z)};
 }
 
-inline vec3f fract(
+inline auto fract(
     const vec3f& v
-) {
+) -> vec3f {
     return {v.x - std::floor(v.x), v.y - std::floor(v.y), v.z - std::floor(v.z)};
 }
 
-inline vec3f sign(
+inline auto sign(
     const vec3f& v
-) {
+) -> vec3f {
     return {
         (v.x > 0.0f) ? 1.0f : ((v.x < 0.0f) ? -1.0f : 0.0f),
         (v.y > 0.0f) ? 1.0f : ((v.y < 0.0f) ? -1.0f : 0.0f),
@@ -267,29 +267,29 @@ inline vec3f sign(
     };
 }
 
-inline vec3f clamp(
+inline auto clamp(
     const vec3f& v, const vec3f& min_v, const vec3f& max_v
-) {
+) -> vec3f {
     return {
         clamp(v.x, min_v.x, max_v.x), clamp(v.y, min_v.y, max_v.y), clamp(v.z, min_v.z, max_v.z)
     };
 }
 
-inline float distance(
+inline auto distance(
     const vec3f& a, const vec3f& b
-) {
+) -> float {
     return length(b - a);
 }
 
-inline float distance_squared(
+inline auto distance_squared(
     const vec3f& a, const vec3f& b
-) {
+) -> float {
     return length_squared(b - a);
 }
 
-inline float angle(
+inline auto angle(
     const vec3f& a, const vec3f& b
-) {
+) -> float {
     float len_a = length(a);
     float len_b = length(b);
     if (len_a > 0.0f && len_b > 0.0f) {
@@ -299,28 +299,27 @@ inline float angle(
     return 0.0f;
 }
 
-inline vec3f reflect(
+inline auto reflect(
     const vec3f& incident, const vec3f& normal
-) {
+) -> vec3f {
     return incident - normal * (2.0f * dot(incident, normal));
 }
 
-inline vec3f refract(
+inline auto refract(
     const vec3f& incident, const vec3f& normal, float eta
-) {
+) -> vec3f {
     float cos_i  = -dot(incident, normal);
-    float sin2_t = eta * eta * (1.0f - cos_i * cos_i);
+    float sin2_t = (eta * eta) * (1.0f - (cos_i * cos_i));
     if (sin2_t > 1.0f) {
-        // Полное внутреннее отражение
         return reflect(incident, normal);
     }
     float cos_t = std::sqrt(1.0f - sin2_t);
-    return incident * eta + normal * (eta * cos_i - cos_t);
+    return (incident * eta) + (normal * ((eta * cos_i) - cos_t));
 }
 
-inline vec3f project(
+inline auto project(
     const vec3f& a, const vec3f& onto
-) {
+) -> vec3f {
     float len_sq = length_squared(onto);
     if (len_sq > 0.0f) {
         return onto * (dot(a, onto) / len_sq);
@@ -328,27 +327,27 @@ inline vec3f project(
     return vec3f{0.0f, 0.0f, 0.0f};
 }
 
-inline vec3f reject(
+inline auto reject(
     const vec3f& a, const vec3f& from
-) {
+) -> vec3f {
     return a - project(a, from);
 }
 
-inline float length(
+inline auto length(
     const vec4f& v
-) {
-    return std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z + v.w * v.w);
+) -> float {
+    return std::sqrt((v.x * v.x) + (v.y * v.y) + (v.z * v.z) + (v.w * v.w));
 }
 
-inline float length_squared(
+inline auto length_squared(
     const vec4f& v
-) {
-    return v.x * v.x + v.y * v.y + v.z * v.z + v.w * v.w;
+) -> float {
+    return (v.x * v.x) + (v.y * v.y) + (v.z * v.z) + (v.w * v.w);
 }
 
-inline vec4f normalize(
+inline auto normalize(
     const vec4f& v
-) {
+) -> vec4f {
     float len = length(v);
     if (len > 0.0f) {
         return {v.x / len, v.y / len, v.z / len, v.w / len};
@@ -356,67 +355,70 @@ inline vec4f normalize(
     return v;
 }
 
-inline float dot(
+inline auto dot(
     const vec4f& a, const vec4f& b
-) {
-    return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+) -> float {
+    return (a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w);
 }
 
-inline vec4f lerp(
+inline auto lerp(
     const vec4f& a, const vec4f& b, float t
-) {
+) -> vec4f {
     return {
-        a.x + t * (b.x - a.x), a.y + t * (b.y - a.y), a.z + t * (b.z - a.z), a.w + t * (b.w - a.w)
+        a.x + (t * (b.x - a.x)),
+        a.y + (t * (b.y - a.y)),
+        a.z + (t * (b.z - a.z)),
+        a.w + (t * (b.w - a.w))
     };
 }
 
-inline vec4f min(
+inline auto min(
     const vec4f& a, const vec4f& b
-) {
+) -> vec4f {
     return {std::min(a.x, b.x), std::min(a.y, b.y), std::min(a.z, b.z), std::min(a.w, b.w)};
 }
 
-inline vec4f max(
+inline auto max(
     const vec4f& a, const vec4f& b
-) {
+) -> vec4f {
     return {std::max(a.x, b.x), std::max(a.y, b.y), std::max(a.z, b.z), std::max(a.w, b.w)};
 }
 
-inline vec4f abs(
+inline auto abs(
     const vec4f& v
-) {
+) -> vec4f {
     return {std::abs(v.x), std::abs(v.y), std::abs(v.z), std::abs(v.w)};
 }
 
-inline vec4f floor(
+inline auto floor(
     const vec4f& v
-) {
+) -> vec4f {
     return {std::floor(v.x), std::floor(v.y), std::floor(v.z), std::floor(v.w)};
 }
 
-inline vec4f ceil(
+inline auto ceil(
     const vec4f& v
-) {
+) -> vec4f {
     return {std::ceil(v.x), std::ceil(v.y), std::ceil(v.z), std::ceil(v.w)};
 }
 
-inline vec4f round(
+inline auto round(
     const vec4f& v
-) {
+) -> vec4f {
     return {std::round(v.x), std::round(v.y), std::round(v.z), std::round(v.w)};
 }
 
-inline vec4f fract(
+inline auto fract(
     const vec4f& v
-) {
+) -> vec4f {
     return {
         v.x - std::floor(v.x), v.y - std::floor(v.y), v.z - std::floor(v.z), v.w - std::floor(v.w)
     };
 }
 
-inline vec4f sign(
+inline auto sign(
     const vec4f& v
-) {
+) -> vec4f {
     return {
         (v.x > 0.0f) ? 1.0f : ((v.x < 0.0f) ? -1.0f : 0.0f),
         (v.y > 0.0f) ? 1.0f : ((v.y < 0.0f) ? -1.0f : 0.0f),
@@ -425,9 +427,9 @@ inline vec4f sign(
     };
 }
 
-inline vec4f clamp(
+inline auto clamp(
     const vec4f& v, const vec4f& min_v, const vec4f& max_v
-) {
+) -> vec4f {
     return {
         clamp(v.x, min_v.x, max_v.x),
         clamp(v.y, min_v.y, max_v.y),
@@ -436,9 +438,9 @@ inline vec4f clamp(
     };
 }
 
-inline mat4f perspective_matrix(
+inline auto perspective_matrix(
     float fov, float aspect, float near, float far
-) {
+) -> mat4f {
     mat4f matrix  = identity_matrix();
     const float f = 1.0f / std::tan(radians(fov * 0.5f));
 
@@ -452,9 +454,9 @@ inline mat4f perspective_matrix(
     return matrix;
 }
 
-inline mat4f orthographic_matrix(
+inline auto orthographic_matrix(
     float left, float right, float bottom, float top, float near, float far
-) {
+) -> mat4f {
     mat4f matrix = identity_matrix();
 
     matrix[0, 0] = 2.0f / (right - left);
@@ -467,9 +469,9 @@ inline mat4f orthographic_matrix(
     return matrix;
 }
 
-inline mat4f look_at_matrix(
+inline auto look_at_matrix(
     const vec3f& eye, const vec3f& target
-) {
+) -> mat4f {
     mat4f matrix  = identity_matrix();
     const vec3f f = normalize(target - eye);
     auto up       = vec3f{0.0f, 1.0f, 0.0f};
@@ -498,9 +500,9 @@ inline mat4f look_at_matrix(
     return matrix;
 }
 
-inline mat4f look_at_matrix(
+inline auto look_at_matrix(
     const vec3f& eye, const vec3f& target, const vec3f& up
-) {
+) -> mat4f {
     mat4f matrix  = identity_matrix();
     const vec3f f = normalize(target - eye);
     const vec3f s = normalize(cross(up, f));
@@ -524,7 +526,7 @@ inline mat4f look_at_matrix(
     return matrix;
 }
 
-inline mat4f identity_matrix() {
+inline auto identity_matrix() -> mat4f {
     mat4f matrix;
     matrix[0, 0] = 1.0f;
     matrix[1, 1] = 1.0f;
@@ -533,9 +535,9 @@ inline mat4f identity_matrix() {
     return matrix;
 }
 
-inline mat4f translation_matrix(
+inline auto translation_matrix(
     const vec3f& translation
-) {
+) -> mat4f {
     mat4f matrix = identity_matrix();
     matrix[0, 3] = translation.x;
     matrix[1, 3] = translation.y;
@@ -543,9 +545,9 @@ inline mat4f translation_matrix(
     return matrix;
 }
 
-inline mat4f rotation_matrix_x(
+inline auto rotation_matrix_x(
     float angle
-) {
+) -> mat4f {
     mat4f matrix  = identity_matrix();
     const float c = std::cos(angle);
     const float s = std::sin(angle);
@@ -558,9 +560,9 @@ inline mat4f rotation_matrix_x(
     return matrix;
 }
 
-inline mat4f rotation_matrix_y(
+inline auto rotation_matrix_y(
     float angle
-) {
+) -> mat4f {
     mat4f matrix  = identity_matrix();
     const float c = std::cos(angle);
     const float s = std::sin(angle);
@@ -573,9 +575,9 @@ inline mat4f rotation_matrix_y(
     return matrix;
 }
 
-inline mat4f rotation_matrix_z(
+inline auto rotation_matrix_z(
     float angle
-) {
+) -> mat4f {
     mat4f matrix  = identity_matrix();
     const float c = std::cos(angle);
     const float s = std::sin(angle);
@@ -588,9 +590,9 @@ inline mat4f rotation_matrix_z(
     return matrix;
 }
 
-inline mat4f rotation_matrix(
+inline auto rotation_matrix(
     const vec3f& rotation
-) {
+) -> mat4f {
     const mat4f rot_x = rotation_matrix_x(rotation.x);
     const mat4f rot_y = rotation_matrix_y(rotation.y);
     const mat4f rot_z = rotation_matrix_z(rotation.z);
@@ -598,9 +600,9 @@ inline mat4f rotation_matrix(
     return rot_z * rot_y * rot_x;
 }
 
-inline mat4f scale_matrix(
+inline auto scale_matrix(
     const vec3f& scale
-) {
+) -> mat4f {
     mat4f matrix = identity_matrix();
     matrix[0, 0] = scale.x;
     matrix[1, 1] = scale.y;
@@ -608,9 +610,9 @@ inline mat4f scale_matrix(
     return matrix;
 }
 
-inline mat4f transform_matrix(
+inline auto transform_matrix(
     const vec3f& position, const vec3f& rotation, const vec3f& scale, const vec3f& origin
-) {
+) -> mat4f {
     const mat4f trans     = translation_matrix(position);
     const mat4f orig_back = translation_matrix(origin);
     const mat4f rot       = rotation_matrix(rotation);
@@ -619,9 +621,9 @@ inline mat4f transform_matrix(
     return trans * rot * scl * orig_back;
 }
 
-inline mat4f transpose_matrix(
+inline auto transpose_matrix(
     const mat4f& matrix
-) {
+) -> mat4f {
     mat4f result;
     for (int i = 0; i < 4; i++) {
         for (int j = 0; j < 4; j++) {
@@ -631,21 +633,21 @@ inline mat4f transpose_matrix(
     return result;
 }
 
-inline float lerp(
+inline auto lerp(
     float a, float b, float t
-) {
-    return a + t * (b - a);
+) -> float {
+    return a + (t * (b - a));
 }
 
-inline vec3f lerp(
+inline auto lerp(
     const vec3f& a, const vec3f& b, float t
-) {
-    return {a.x + t * (b.x - a.x), a.y + t * (b.y - a.y), a.z + t * (b.z - a.z)};
+) -> vec3f {
+    return {a.x + (t * (b.x - a.x)), a.y + (t * (b.y - a.y)), a.z + (t * (b.z - a.z))};
 }
 
-inline transform lerp(
+inline auto lerp(
     const transform& a, const transform& b, float t
-) {
+) -> transform {
     transform result;
     result.set_position(lerp(a.get_position(), b.get_position(), t));
 
@@ -658,22 +660,22 @@ inline transform lerp(
     return result;
 }
 
-inline float smoothstep(
+inline auto smoothstep(
     float edge0, float edge1, float x
-) {
+) -> float {
     float t = clamp((x - edge0) / (edge1 - edge0), 0.0f, 1.0f);
-    return t * t * (3.0f - 2.0f * t);
+    return (t * t) * (3.0f - (2.0f * t));
 }
 
-inline vec2f smoothstep(
+inline auto smoothstep(
     const vec2f& edge0, const vec2f& edge1, const vec2f& x
-) {
+) -> vec2f {
     return {smoothstep(edge0.x, edge1.x, x.x), smoothstep(edge0.y, edge1.y, x.y)};
 }
 
-inline vec3f smoothstep(
+inline auto smoothstep(
     const vec3f& edge0, const vec3f& edge1, const vec3f& x
-) {
+) -> vec3f {
     return {
         smoothstep(edge0.x, edge1.x, x.x),
         smoothstep(edge0.y, edge1.y, x.y),
@@ -681,9 +683,9 @@ inline vec3f smoothstep(
     };
 }
 
-inline vec4f smoothstep(
+inline auto smoothstep(
     const vec4f& edge0, const vec4f& edge1, const vec4f& x
-) {
+) -> vec4f {
     return {
         smoothstep(edge0.x, edge1.x, x.x),
         smoothstep(edge0.y, edge1.y, x.y),
@@ -692,63 +694,63 @@ inline vec4f smoothstep(
     };
 }
 
-inline vec3f ease_in(
+inline auto ease_in(
     const vec3f& a, const vec3f& b, float t
-) {
+) -> vec3f {
     float eased_t = t * t;
     return lerp(a, b, eased_t);
 }
 
-inline vec3f ease_out(
+inline auto ease_out(
     const vec3f& a, const vec3f& b, float t
-) {
+) -> vec3f {
     float eased_t = t * (2.0f - t);
     return lerp(a, b, eased_t);
 }
 
-inline vec3f ease_in_out(
+inline auto ease_in_out(
     const vec3f& a, const vec3f& b, float t
-) {
+) -> vec3f {
     float eased_t;
     if (t < 0.5f) {
         eased_t = 2.0f * t * t;
     } else {
-        eased_t = -1.0f + (4.0f - 2.0f * t) * t;
+        eased_t = -1.0f + ((4.0f - (2.0f * t)) * t);
     }
     return lerp(a, b, eased_t);
 }
 
-inline float evaluate_cubic_bezier(
+inline auto evaluate_cubic_bezier(
     float t, float p0, float p1, float p2, float p3
-) {
+) -> float {
     float one_minus_t    = 1.0f - t;
     float one_minus_t_sq = one_minus_t * one_minus_t;
     float one_minus_t_cb = one_minus_t_sq * one_minus_t;
     float t_sq           = t * t;
     float t_cb           = t_sq * t;
 
-    return one_minus_t_cb * p0 + 3.0f * one_minus_t_sq * t * p1 + 3.0f * one_minus_t * t_sq * p2 +
-        t_cb * p3;
+    return (one_minus_t_cb * p0) + (3.0f * one_minus_t_sq * t * p1) +
+        (3.0f * one_minus_t * t_sq * p2) + (t_cb * p3);
 }
 
-inline uint8 lerp(
+inline auto lerp(
     uint8 a, uint8 b, float t
-) {
+) -> uint8 {
     auto fa = static_cast<float>(a);
     auto fb = static_cast<float>(b);
-    return static_cast<uint8>(fa + t * (fb - fa));
+    return static_cast<uint8>(fa + (t * (fb - fa)));
 }
 
-inline vec3f cubic_bezier(
+inline auto cubic_bezier(
     const vec3f& a, const vec3f& b, float t, float control1, float control2
-) {
+) -> vec3f {
     float bezier_t = evaluate_cubic_bezier(t, 0.0f, control1, control2, 1.0f);
     return lerp(a, b, bezier_t);
 }
 
-inline float apply_easing(
+inline auto apply_easing(
     float t, interpolation_type type
-) {
+) -> float {
     t = clamp(t, 0.0f, 1.0f);
 
     switch (type) {
@@ -768,7 +770,7 @@ inline float apply_easing(
             if (t < 0.5f) {
                 return 2.0f * t * t;
             } else {
-                return -1.0f + (4.0f - 2.0f * t) * t;
+                return -1.0f + ((4.0f - (2.0f * t)) * t);
             }
 
         case interpolation_type::cubic_bezier:
@@ -779,9 +781,9 @@ inline float apply_easing(
     }
 }
 
-inline float apply_easing_bezier(
+inline auto apply_easing_bezier(
     float t, interpolation_type type, float control1, float control2
-) {
+) -> float {
     if (type == interpolation_type::cubic_bezier) {
         t = clamp(t, 0.0f, 1.0f);
         return evaluate_cubic_bezier(t, 0.0f, control1, control2, 1.0f);
@@ -789,9 +791,9 @@ inline float apply_easing_bezier(
     return apply_easing(t, type);
 }
 
-inline vec3f interpolate(
+inline auto interpolate(
     const vec3f& a, const vec3f& b, float t, interpolation_type type, float control1, float control2
-) {
+) -> vec3f {
     switch (type) {
         case interpolation_type::linear:
             return lerp(a, b, t);
@@ -816,11 +818,12 @@ inline vec3f interpolate(
     }
 }
 
-inline color interpolate(
+inline auto interpolate(
     color a, color b, float t, interpolation_type type, float control1, float control2
-) {
+) -> color {
     if (type == interpolation_type::step) {
-        return {t < 1.0f ? a : b};
+        const auto r = t < 1.0f ? a : b;
+        return r;
     }
 
     float eased_t = apply_easing_bezier(t, type, control1, control2);
@@ -833,26 +836,26 @@ inline color interpolate(
     return {r, g, b_c, a_c};
 }
 
-inline float dot(
+inline auto dot(
     const quat& a, const quat& b
-) {
-    return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+) -> float {
+    return (a.x * b.x) + (a.y * b.y) + (a.z * b.z) + (a.w * b.w);
 }
 
-inline quat normalize(
+inline auto normalize(
     const quat& q
-) {
-    float len = std::sqrt(dot(q, q));
+) -> quat {
+    const float len = std::sqrt(dot(q, q));
     if (len > 0.0f) {
-        float inv = 1.0f / len;
+        const float inv = 1.0f / len;
         return {q.x * inv, q.y * inv, q.z * inv, q.w * inv};
     }
     return q;
 }
 
-inline quat slerp(
+inline auto slerp(
     const quat& a, const quat& b, float t
-) {
+) -> quat {
     float d = dot(a, b);
 
     quat b2 = b;
@@ -862,31 +865,36 @@ inline quat slerp(
     }
 
     if (d > 0.9995f) {
-        auto result = normalize(
+        const auto r = normalize(
             quat{
-                a.x + t * (b2.x - a.x),
-                a.y + t * (b2.y - a.y),
-                a.z + t * (b2.z - a.z),
-                a.w + t * (b2.w - a.w)
+                a.x + (t * (b2.x - a.x)),
+                a.y + (t * (b2.y - a.y)),
+                a.z + (t * (b2.z - a.z)),
+                a.w + (t * (b2.w - a.w))
             }
         );
-        return result;
+        return r;
     }
 
-    float theta_0     = std::acos(d);
-    float theta       = theta_0 * t;
-    float sin_theta   = std::sin(theta);
-    float sin_theta_0 = std::sin(theta_0);
+    const float theta_0     = std::acos(d);
+    const float theta       = theta_0 * t;
+    const float sin_theta   = std::sin(theta);
+    const float sin_theta_0 = std::sin(theta_0);
 
-    float s0 = std::cos(theta) - d * sin_theta / sin_theta_0;
-    float s1 = sin_theta / sin_theta_0;
+    const float s0 = std::cos(theta) - (d * sin_theta / sin_theta_0);
+    const float s1 = sin_theta / sin_theta_0;
 
-    return {a.x * s0 + b2.x * s1, a.y * s0 + b2.y * s1, a.z * s0 + b2.z * s1, a.w * s0 + b2.w * s1};
+    return {
+        (a.x * s0) + (b2.x * s1),
+        (a.y * s0) + (b2.y * s1),
+        (a.z * s0) + (b2.z * s1),
+        (a.w * s0) + (b2.w * s1)
+    };
 }
 
-inline quat euler_to_quat(
+inline auto euler_to_quat(
     const vec3f& euler
-) {
+) -> quat {
     float cx = std::cos(euler.x * 0.5f);
     float sx = std::sin(euler.x * 0.5f);
     float cy = std::cos(euler.y * 0.5f);
@@ -895,21 +903,21 @@ inline quat euler_to_quat(
     float sz = std::sin(euler.z * 0.5f);
 
     return {
-        sx * cy * cz - cx * sy * sz,
-        cx * sy * cz + sx * cy * sz,
-        cx * cy * sz - sx * sy * cz,
-        cx * cy * cz + sx * sy * sz
+        (sx * cy * cz) - (cx * sy * sz),
+        (cx * sy * cz) + (sx * cy * sz),
+        (cx * cy * sz) - (sx * sy * cz),
+        (cx * cy * cz) + (sx * sy * sz)
     };
 }
 
-inline vec3f quat_to_euler(
+inline auto quat_to_euler(
     const quat& q
-) {
-    float sinr_cosp = 2.0f * (q.w * q.x + q.y * q.z);
-    float cosr_cosp = 1.0f - 2.0f * (q.x * q.x + q.y * q.y);
-    float rx        = std::atan2(sinr_cosp, cosr_cosp);
+) -> vec3f {
+    const float sinr_cosp = 2.0f * ((q.w * q.x) + (q.y * q.z));
+    const float cosr_cosp = 1.0f - (2.0f * ((q.x * q.x) + (q.y * q.y)));
+    const float rx        = std::atan2(sinr_cosp, cosr_cosp);
 
-    float sinp = 2.0f * (q.w * q.y - q.z * q.x);
+    const float sinp = 2.0f * ((q.w * q.y) - (q.z * q.x));
     float ry;
     if (std::abs(sinp) >= 1.0f) {
         ry = std::copysign(pi * 0.5f, sinp);
@@ -917,23 +925,23 @@ inline vec3f quat_to_euler(
         ry = std::asin(sinp);
     }
 
-    float siny_cosp = 2.0f * (q.w * q.z + q.x * q.y);
-    float cosy_cosp = 1.0f - 2.0f * (q.y * q.y + q.z * q.z);
-    float rz        = std::atan2(siny_cosp, cosy_cosp);
+    const float siny_cosp = 2.0f * ((q.w * q.z) + (q.x * q.y));
+    const float cosy_cosp = 1.0f - (2.0f * ((q.y * q.y) + (q.z * q.z)));
+    const float rz        = std::atan2(siny_cosp, cosy_cosp);
 
     return {rx, ry, rz};
 }
 
-inline quat interpolate(
+inline auto interpolate(
     const quat& a, const quat& b, float t, interpolation_type type, float control1, float control2
-) {
+) -> quat {
     float eased_t = apply_easing_bezier(t, type, control1, control2);
     return slerp(a, b, eased_t);
 }
 
-inline vec3f perpendicular(
+inline auto perpendicular(
     const vec3f& eye, const vec3f& target
-) {
+) -> vec3f {
     auto dir = normalize(target - eye);
     auto up  = vec3f{0.0f, 1.0f, 0.0f};
 
@@ -944,102 +952,102 @@ inline vec3f perpendicular(
     return normalize(cross(up, dir));
 }
 
-inline bool is_safe_zero(
+inline auto is_safe_zero(
     float a, float epsilon
-) {
+) -> bool {
     return std::abs(a) < epsilon;
 }
 
-inline std::expected<mat4f, error_type> inverse_matrix(
+inline auto inverse_matrix(
     const mat4f& matrix
-) {
+) -> std::expected<mat4f, error_type> {
     mat4f inv;
 
     inv[0, 0] =  //
-        matrix[1, 1] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2]) -
-        matrix[1, 2] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1]) +
-        matrix[1, 3] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1]);
+        (matrix[1, 1] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2])) -
+        (matrix[1, 2] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1])) +
+        (matrix[1, 3] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1]));
 
     inv[0, 1] =  //
-        -(matrix[0, 1] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2]) -
-          matrix[0, 2] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1]) +
-          matrix[0, 3] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1]));
+        -((matrix[0, 1] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2])) -
+          (matrix[0, 2] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1])) +
+          (matrix[0, 3] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1])));
 
     inv[0, 2] =  //
-        matrix[0, 1] * (matrix[1, 2] * matrix[3, 3] - matrix[1, 3] * matrix[3, 2]) -
-        matrix[0, 2] * (matrix[1, 1] * matrix[3, 3] - matrix[1, 3] * matrix[3, 1]) +
-        matrix[0, 3] * (matrix[1, 1] * matrix[3, 2] - matrix[1, 2] * matrix[3, 1]);
+        (matrix[0, 1] * (matrix[1, 2] * matrix[3, 3] - matrix[1, 3] * matrix[3, 2])) -
+        (matrix[0, 2] * (matrix[1, 1] * matrix[3, 3] - matrix[1, 3] * matrix[3, 1])) +
+        (matrix[0, 3] * (matrix[1, 1] * matrix[3, 2] - matrix[1, 2] * matrix[3, 1]));
 
     inv[0, 3] =  //
-        -(matrix[0, 1] * (matrix[1, 2] * matrix[2, 3] - matrix[1, 3] * matrix[2, 2]) -
-          matrix[0, 2] * (matrix[1, 1] * matrix[2, 3] - matrix[1, 3] * matrix[2, 1]) +
-          matrix[0, 3] * (matrix[1, 1] * matrix[2, 2] - matrix[1, 2] * matrix[2, 1]));
+        -((matrix[0, 1] * (matrix[1, 2] * matrix[2, 3] - matrix[1, 3] * matrix[2, 2])) -
+          (matrix[0, 2] * (matrix[1, 1] * matrix[2, 3] - matrix[1, 3] * matrix[2, 1])) +
+          (matrix[0, 3] * (matrix[1, 1] * matrix[2, 2] - matrix[1, 2] * matrix[2, 1])));
 
     inv[1, 0] =  //
-        -(matrix[1, 0] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2]) -
-          matrix[1, 2] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0]) +
-          matrix[1, 3] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0]));
+        -((matrix[1, 0] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2])) -
+          (matrix[1, 2] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0])) +
+          (matrix[1, 3] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0])));
 
     inv[1, 1] =  //
-        matrix[0, 0] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2]) -
-        matrix[0, 2] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0]) +
-        matrix[0, 3] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0]);
+        (matrix[0, 0] * (matrix[2, 2] * matrix[3, 3] - matrix[2, 3] * matrix[3, 2])) -
+        (matrix[0, 2] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0])) +
+        (matrix[0, 3] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0]));
 
     inv[1, 2] =  //
-        -(matrix[0, 0] * (matrix[1, 2] * matrix[3, 3] - matrix[1, 3] * matrix[3, 2]) -
-          matrix[0, 2] * (matrix[1, 0] * matrix[3, 3] - matrix[1, 3] * matrix[3, 0]) +
-          matrix[0, 3] * (matrix[1, 0] * matrix[3, 2] - matrix[1, 2] * matrix[3, 0]));
+        -((matrix[0, 0] * (matrix[1, 2] * matrix[3, 3] - matrix[1, 3] * matrix[3, 2])) -
+          (matrix[0, 2] * (matrix[1, 0] * matrix[3, 3] - matrix[1, 3] * matrix[3, 0])) +
+          (matrix[0, 3] * (matrix[1, 0] * matrix[3, 2] - matrix[1, 2] * matrix[3, 0])));
 
     inv[1, 3] =  //
-        matrix[0, 0] * (matrix[1, 2] * matrix[2, 3] - matrix[1, 3] * matrix[2, 2]) -
-        matrix[0, 2] * (matrix[1, 0] * matrix[2, 3] - matrix[1, 3] * matrix[2, 0]) +
-        matrix[0, 3] * (matrix[1, 0] * matrix[2, 2] - matrix[1, 2] * matrix[2, 0]);
+        (matrix[0, 0] * (matrix[1, 2] * matrix[2, 3] - matrix[1, 3] * matrix[2, 2])) -
+        (matrix[0, 2] * (matrix[1, 0] * matrix[2, 3] - matrix[1, 3] * matrix[2, 0])) +
+        (matrix[0, 3] * (matrix[1, 0] * matrix[2, 2] - matrix[1, 2] * matrix[2, 0]));
 
     inv[2, 0] =  //
-        matrix[1, 0] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1]) -
-        matrix[1, 1] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0]) +
-        matrix[1, 3] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0]);
+        (matrix[1, 0] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1])) -
+        (matrix[1, 1] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0])) +
+        (matrix[1, 3] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0]));
 
     inv[2, 1] =  //
-        -(matrix[0, 0] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1]) -
-          matrix[0, 1] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0]) +
-          matrix[0, 3] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0]));
+        -((matrix[0, 0] * (matrix[2, 1] * matrix[3, 3] - matrix[2, 3] * matrix[3, 1])) -
+          (matrix[0, 1] * (matrix[2, 0] * matrix[3, 3] - matrix[2, 3] * matrix[3, 0])) +
+          (matrix[0, 3] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0])));
 
     inv[2, 2] =  //
-        matrix[0, 0] * (matrix[1, 1] * matrix[3, 3] - matrix[1, 3] * matrix[3, 1]) -
-        matrix[0, 1] * (matrix[1, 0] * matrix[3, 3] - matrix[1, 3] * matrix[3, 0]) +
-        matrix[0, 3] * (matrix[1, 0] * matrix[3, 1] - matrix[1, 1] * matrix[3, 0]);
+        (matrix[0, 0] * (matrix[1, 1] * matrix[3, 3] - matrix[1, 3] * matrix[3, 1])) -
+        (matrix[0, 1] * (matrix[1, 0] * matrix[3, 3] - matrix[1, 3] * matrix[3, 0])) +
+        (matrix[0, 3] * (matrix[1, 0] * matrix[3, 1] - matrix[1, 1] * matrix[3, 0]));
 
     inv[2, 3] =  //
-        -(matrix[0, 0] * (matrix[1, 1] * matrix[2, 3] - matrix[1, 3] * matrix[2, 1]) -
-          matrix[0, 1] * (matrix[1, 0] * matrix[2, 3] - matrix[1, 3] * matrix[2, 0]) +
-          matrix[0, 3] * (matrix[1, 0] * matrix[2, 1] - matrix[1, 1] * matrix[2, 0]));
+        -((matrix[0, 0] * (matrix[1, 1] * matrix[2, 3] - matrix[1, 3] * matrix[2, 1])) -
+          (matrix[0, 1] * (matrix[1, 0] * matrix[2, 3] - matrix[1, 3] * matrix[2, 0])) +
+          (matrix[0, 3] * (matrix[1, 0] * matrix[2, 1] - matrix[1, 1] * matrix[2, 0])));
 
     inv[3, 0] =  //
-        -(matrix[1, 0] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1]) -
-          matrix[1, 1] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0]) +
-          matrix[1, 2] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0]));
+        -((matrix[1, 0] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1])) -
+          (matrix[1, 1] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0])) +
+          (matrix[1, 2] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0])));
 
     inv[3, 1] =  //
-        matrix[0, 0] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1]) -
-        matrix[0, 1] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0]) +
-        matrix[0, 2] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0]);
+        (matrix[0, 0] * (matrix[2, 1] * matrix[3, 2] - matrix[2, 2] * matrix[3, 1])) -
+        (matrix[0, 1] * (matrix[2, 0] * matrix[3, 2] - matrix[2, 2] * matrix[3, 0])) +
+        (matrix[0, 2] * (matrix[2, 0] * matrix[3, 1] - matrix[2, 1] * matrix[3, 0]));
 
     inv[3, 2] =  //
-        -(matrix[0, 0] * (matrix[1, 1] * matrix[3, 2] - matrix[1, 2] * matrix[3, 1]) -
-          matrix[0, 1] * (matrix[1, 0] * matrix[3, 2] - matrix[1, 2] * matrix[3, 0]) +
-          matrix[0, 2] * (matrix[1, 0] * matrix[3, 1] - matrix[1, 1] * matrix[3, 0]));
+        -((matrix[0, 0] * (matrix[1, 1] * matrix[3, 2] - matrix[1, 2] * matrix[3, 1])) -
+          (matrix[0, 1] * (matrix[1, 0] * matrix[3, 2] - matrix[1, 2] * matrix[3, 0])) +
+          (matrix[0, 2] * (matrix[1, 0] * matrix[3, 1] - matrix[1, 1] * matrix[3, 0])));
 
     inv[3, 3] =  //
-        matrix[0, 0] * (matrix[1, 1] * matrix[2, 2] - matrix[1, 2] * matrix[2, 1]) -
-        matrix[0, 1] * (matrix[1, 0] * matrix[2, 2] - matrix[1, 2] * matrix[2, 0]) +
-        matrix[0, 2] * (matrix[1, 0] * matrix[2, 1] - matrix[1, 1] * matrix[2, 0]);
+        (matrix[0, 0] * (matrix[1, 1] * matrix[2, 2] - matrix[1, 2] * matrix[2, 1])) -
+        (matrix[0, 1] * (matrix[1, 0] * matrix[2, 2] - matrix[1, 2] * matrix[2, 0])) +
+        (matrix[0, 2] * (matrix[1, 0] * matrix[2, 1] - matrix[1, 1] * matrix[2, 0]));
 
-    float det =                     //
-        matrix[0, 0] * inv[0, 0] +  //
-        matrix[0, 1] * inv[1, 0] +  //
-        matrix[0, 2] * inv[2, 0] +  //
-        matrix[0, 3] * inv[3, 0];
+    float det =                       //
+        (matrix[0, 0] * inv[0, 0]) +  //
+        (matrix[0, 1] * inv[1, 0]) +  //
+        (matrix[0, 2] * inv[2, 0]) +  //
+        (matrix[0, 3] * inv[3, 0]);
 
     if (is_safe_zero(det)) {
         return std::unexpected{error_type::zero_determinant};

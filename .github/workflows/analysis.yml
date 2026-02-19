@@ -89,7 +89,7 @@ jobs:
         run: >
           cmake -B build -S .
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-          -DCMAKE_CXX_CLANG_TIDY="clang-tidy;--header-filter=.*/engine/include/.*"
+          -DCMAKE_CXX_CLANG_TIDY="clang-tidy;--header-filter=."
 
       - name: Build with clang-tidy
         run: cmake --build build

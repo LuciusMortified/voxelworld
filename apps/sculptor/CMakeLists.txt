@@ -76,3 +76,6 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 include(shaders)
 vw_setup_shaders(${PROJECT_NAME})
+
+include(static-analyzers)
+vw_setup_static_analyzers(${PROJECT_NAME})

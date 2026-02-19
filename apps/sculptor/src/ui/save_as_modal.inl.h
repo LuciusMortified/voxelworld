@@ -37,48 +37,55 @@ inline void save_as_modal::render(
         ImGuiWindowFlags_NoMove;
     if (ImGui::BeginPopupModal("Save As", nullptr, dialog_flags)) {
         if (need_overwrite_confirmation_) {
-            ImGui::TextColored(ImVec4{1.0f, 1.0f, 0.0f, 1.0f}, "File already exists. Overwrite?");
-            ImGui::Spacing();
-
-            if (ImGui::Button("Yes")) {
-                need_overwrite_confirmation_ = false;
-                has_overwrite_confirmation_  = true;
-                if (save_file_()) {
-                    ImGui::CloseCurrentPopup();
-                }
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("No")) {
-                need_overwrite_confirmation_ = false;
-            }
+            render_overwrite_confirmation();
         } else {
-            if (!error_.empty()) {
-                ImGui::TextColored(ImVec4{1.0f, 0.0f, 0.0f, 1.0f}, "%s", error_.c_str());
-                ImGui::Spacing();
-            }
-
-            imgui_input_text_string("Filename", filename_);
-
-            ImGui::Spacing();
-
-            if (filename_.empty()) {
-                ImGui::BeginDisabled();
-            }
-            if (ImGui::Button("Save")) {
-                if (save_file_()) {
-                    ImGui::CloseCurrentPopup();
-                }
-            }
-            if (filename_.empty()) {
-                ImGui::EndDisabled();
-            }
-            ImGui::SameLine();
-            if (ImGui::Button("Cancel")) {
-                ImGui::CloseCurrentPopup();
-            }
+            render_save_form();
         }
-
         ImGui::EndPopup();
+    }
+}
+
+inline void save_as_modal::render_overwrite_confirmation() {
+    ImGui::TextColored(ImVec4{1.0f, 1.0f, 0.0f, 1.0f}, "File already exists. Overwrite?");
+    ImGui::Spacing();
+
+    if (ImGui::Button("Yes")) {
+        need_overwrite_confirmation_ = false;
+        has_overwrite_confirmation_  = true;
+        if (save_file_()) {
+            ImGui::CloseCurrentPopup();
+        }
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("No")) {
+        need_overwrite_confirmation_ = false;
+    }
+}
+
+inline void save_as_modal::render_save_form() {
+    if (!error_.empty()) {
+        ImGui::TextColored(ImVec4{1.0f, 0.0f, 0.0f, 1.0f}, "%s", error_.c_str());
+        ImGui::Spacing();
+    }
+
+    imgui_input_text_string("Filename", filename_);
+
+    ImGui::Spacing();
+
+    if (filename_.empty()) {
+        ImGui::BeginDisabled();
+    }
+    if (ImGui::Button("Save")) {
+        if (save_file_()) {
+            ImGui::CloseCurrentPopup();
+        }
+    }
+    if (filename_.empty()) {
+        ImGui::EndDisabled();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel")) {
+        ImGui::CloseCurrentPopup();
     }
 }
 

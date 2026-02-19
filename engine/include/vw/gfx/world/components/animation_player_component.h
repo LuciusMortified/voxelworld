@@ -17,22 +17,22 @@ namespace vw::gfx {
 template <typename... Cs>
 class animation_system;
 
-// Компонент анимации - хранит состояние воспроизведения анимации
-// Прикрепляется к корневому entity иерархии (например, body персонажа)
 struct animation_player_component final {
 private:
     std::shared_ptr<animation_clip> clip_;
-    animation_state state_ = animation_state::stopped;
-    float32 current_time_ = 0.0f;
-    float32 playback_speed_ = 1.0f;
-    animation_loop_mode loop_mode_ = animation_loop_mode::once;
-    float32 direction_ = 1.0f;
-    float32 blend_time_ = 0.0f;
-    float32 blend_duration_ = 0.0f;
     std::shared_ptr<animation_clip> previous_clip_;
-    float32 previous_time_ = 0.0f;
+
+    animation_state state_           = animation_state::stopped;
+    float32 current_time_            = 0.0f;
+    float32 playback_speed_          = 1.0f;
+    animation_loop_mode loop_mode_   = animation_loop_mode::once;
+    float32 direction_               = 1.0f;
+    float32 blend_time_              = 0.0f;
+    float32 blend_duration_          = 0.0f;
+    float32 previous_time_           = 0.0f;
     float32 previous_playback_speed_ = 1.0f;
-    float32 previous_direction_ = 1.0f;
+    float32 previous_direction_      = 1.0f;
+
     std::unordered_map<std::string, transform> blend_snapshot_;
 
 public:

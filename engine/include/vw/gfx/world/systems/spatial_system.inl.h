@@ -298,8 +298,8 @@ auto spatial_system<Cs...>::voxel_ray_cast(
 
         // AABB модели в локальных координатах (от (0,0,0) до (width, height, depth))
         const aabb model_aabb{
-            vec3f{-1.f, -1.f, -1.f},
-            vec3f{
+            .min=vec3f{-1.f, -1.f, -1.f},
+            .max=vec3f{
                 static_cast<float>(width) + 1.f,
                 static_cast<float>(height) + 1.f,
                 static_cast<float>(depth) + 1.f

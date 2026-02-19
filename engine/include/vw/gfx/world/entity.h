@@ -27,7 +27,9 @@ struct entity final {
         return !(*this == rhs);
     }
 
-    [[nodiscard]] auto operator<(const entity& rhs) const -> bool {
+    [[nodiscard]] auto operator<(
+        const entity& rhs
+    ) const -> bool {
         return index != rhs.index ? index < rhs.index : generation < rhs.generation;
     }
 
@@ -40,15 +42,14 @@ static constexpr entity invalid_entity = entity{};
 
 }  // namespace vw::gfx
 
-namespace std {
 template <>
-struct hash<vw::gfx::entity> {
+struct std::hash<vw::gfx::entity> {
     auto operator()(
         const vw::gfx::entity& ent
-    ) const noexcept -> size_t {
-        return std::hash<vw::uint32>()(ent.index) ^ (std::hash<vw::uint32>()(ent.generation) << 1);
+    ) const noexcept -> std::size_t {
+        return std::hash<std::size_t>()(ent.index) ^
+            (std::hash<std::size_t>()(ent.generation) << 1);
     }
-};
-}  // namespace std
+};  // namespace std
 
 #endif  // VW_GFX_ENTITY_H
