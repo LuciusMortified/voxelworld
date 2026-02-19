@@ -41,3 +41,5 @@ vcpkg_installed/
 *.user 
 
 .cache/
+
+.claude/settings.local.json1
