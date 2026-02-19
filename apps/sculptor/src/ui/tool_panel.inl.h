@@ -18,9 +18,9 @@ inline void tool_panel::render(
         ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + state_->ui.left_top_voffset + 10);
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);
 
-    ImGuiWindowFlags window_flags =            //
-        ImGuiWindowFlags_NoCollapse |          //
-        ImGuiWindowFlags_NoSavedSettings |     //
+    ImGuiWindowFlags window_flags =         //
+        ImGuiWindowFlags_NoCollapse |       //
+        ImGuiWindowFlags_NoSavedSettings |  //
         ImGuiWindowFlags_AlwaysAutoResize;
 
     ImGui::Begin("Tools", nullptr, window_flags);
@@ -41,17 +41,13 @@ inline void tool_panel::render(
 inline void tool_panel::render_tool_button(
     tools tool, std::string_view label, std::string_view shortcut
 ) {
-    if (state_->selected_tool == tool) {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]);
-        ImGui::PushStyleColor(
-            ImGuiCol_ButtonHovered, ImGui::GetStyle().Colors[ImGuiCol_ButtonActive]
-        );
-    } else {
-        ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[ImGuiCol_Button]);
-        ImGui::PushStyleColor(
-            ImGuiCol_ButtonHovered, ImGui::GetStyle().Colors[ImGuiCol_ButtonHovered]
-        );
-    }
+    const bool is_selected        = state_->selected_tool == tool;
+    const auto button_color       = is_selected ? ImGuiCol_ButtonActive : ImGuiCol_Button;
+    const auto button_hover_color = is_selected ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered;
+
+    ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyle().Colors[button_color]);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyle().Colors[button_hover_color]);
+
     if (ImGui::Button(label.data(), ImVec2(100, 0))) {
         state_->selected_tool = tool;
     }

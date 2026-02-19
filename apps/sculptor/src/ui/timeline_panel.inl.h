@@ -85,13 +85,13 @@ inline void timeline_panel::render(
 
     if (state_->need_step_forward) {
         state_->need_step_forward = false;
-        float step = clip_duration * 0.01f;
-        state_->timeline_cursor = std::min(state_->timeline_cursor + step, clip_duration);
+        float step                = clip_duration * 0.01f;
+        state_->timeline_cursor   = std::min(state_->timeline_cursor + step, clip_duration);
     }
     if (state_->need_step_backward) {
         state_->need_step_backward = false;
-        float step = clip_duration * 0.01f;
-        state_->timeline_cursor = std::max(state_->timeline_cursor - step, 0.f);
+        float step                 = clip_duration * 0.01f;
+        state_->timeline_cursor    = std::max(state_->timeline_cursor - step, 0.f);
     }
 
     if (!state_->is_previewing && std::abs(state_->timeline_cursor - prev_cursor_time_) > 0.0001f) {
@@ -151,59 +151,7 @@ inline void timeline_panel::render_toolbar(
         ImGui::SameLine();
     }
 
-    if (state_->is_previewing) {
-        if (ImGui::Button("||")) {
-            if (!state_->root_name.empty() && state_->name_to_entity.contains(state_->root_name)) {
-                auto root_ent = state_->name_to_entity[state_->root_name];
-                auto& world   = engine_->get_world();
-                if (world.has_component<gfx::animation_player_component>(root_ent)) {
-                    world.get_animation_system().modify_player(root_ent).pause();
-                    state_->is_previewing = false;
-                }
-            }
-        }
-    } else {
-        if (ImGui::Button(">")) {
-            if (!state_->root_name.empty() && state_->name_to_entity.contains(state_->root_name)) {
-                auto root_ent = state_->name_to_entity[state_->root_name];
-                auto& world   = engine_->get_world();
-
-                if (!world.has_component<gfx::animation_player_component>(root_ent)) {
-                    if (auto* guard = state_->find_guard(root_ent)) {
-                        guard->with<gfx::animation_player_component>();
-                    }
-                }
-
-                auto& anim_sys = world.get_animation_system();
-                auto& player = world.get_component<gfx::animation_player_component>(root_ent);
-
-                if (player.is_paused()) {
-                    anim_sys.modify_player(root_ent).resume();
-                } else {
-                    anim_sys.modify_player(root_ent).set_clip(clip);
-                    anim_sys.modify_player(root_ent).set_playback_speed(playback_speed_);
-
-                    auto loop = static_cast<gfx::animation_loop_mode>(loop_mode_index_);
-                    anim_sys.modify_player(root_ent).set_loop_mode(loop);
-                    anim_sys.modify_player(root_ent).play();
-                }
-                state_->is_previewing = true;
-            }
-        }
-    }
-
-    ImGui::SameLine();
-    if (ImGui::Button("[]")) {
-        if (!state_->root_name.empty() && state_->name_to_entity.contains(state_->root_name)) {
-            auto root_ent = state_->name_to_entity[state_->root_name];
-            auto& world   = engine_->get_world();
-            if (world.has_component<gfx::animation_player_component>(root_ent)) {
-                world.get_animation_system().modify_player(root_ent).stop();
-            }
-        }
-        state_->is_previewing   = false;
-        state_->timeline_cursor = 0.f;
-    }
+    render_playback_controls(clip);
 
     ImGui::SameLine();
     ImGui::TextDisabled("|");
@@ -221,8 +169,8 @@ inline void timeline_panel::render_toolbar(
     ImGui::Text("Loop");
     ImGui::SameLine();
     ImGui::PushItemWidth(80.f);
-    const char* loop_modes[] = {"Once", "Loop", "Ping-Pong"};
-    ImGui::Combo("##Loop", &loop_mode_index_, loop_modes, 3);
+    constexpr std::array loop_modes = {"Once", "Loop", "Ping-Pong"};
+    ImGui::Combo("##Loop", &loop_mode_index_, loop_modes.data(), 3);
     ImGui::PopItemWidth();
 
     ImGui::SameLine();
@@ -244,8 +192,9 @@ inline void timeline_panel::render_toolbar(
 }
 
 inline void timeline_panel::render_tracks() {
-    auto& clip_registry = engine_->get_world().get_animation_clip_registry();
-    auto clip           = clip_registry.get(state_->selected_clip_name);
+    const auto& clip_registry = engine_->get_world().get_animation_clip_registry();
+
+    const auto clip = clip_registry.get(state_->selected_clip_name);
     if (!clip) {
         return;
     }
@@ -261,14 +210,13 @@ inline void timeline_panel::render_tracks() {
 
     constexpr float label_width = 150.f;
     constexpr float end_padding = 20.f;
-    float available_width       = ImGui::GetContentRegionAvail().x;
-    float base_track_width      = available_width - label_width;
-    if (base_track_width < 100.f) {
-        base_track_width = 100.f;
-    }
+    const float available_width = ImGui::GetContentRegionAvail().x;
 
-    float usable_track_width = base_track_width - end_padding;
-    float track_area_width   = usable_track_width * (zoom_percent_ / 100.f);
+    float base_track_width = available_width - label_width;
+    base_track_width       = std::max(base_track_width, 100.f);
+
+    const float usable_track_width = base_track_width - end_padding;
+    float track_area_width         = usable_track_width * (zoom_percent_ / 100.f);
 
     float max_scroll = std::max(0.f, track_area_width - usable_track_width);
     scroll_offset_   = std::clamp(scroll_offset_, 0.f, max_scroll);
@@ -299,53 +247,18 @@ inline void timeline_panel::render_tracks() {
     ImGui::Columns(2, "timeline_columns", false);
     ImGui::SetColumnWidth(0, label_width);
 
-    float time_ruler_y = ImGui::GetCursorScreenPos().y;
+    const float time_ruler_y = ImGui::GetCursorScreenPos().y;
 
     ImGui::TextDisabled("Tracks");
     ImGui::NextColumn();
 
-    ImVec2 ruler_start = ImGui::GetCursorScreenPos();
-    float ruler_width  = usable_track_width;
+    const ImVec2 ruler_start = ImGui::GetCursorScreenPos();
+    const float ruler_width  = usable_track_width;
 
-    auto* draw_list = ImGui::GetWindowDrawList();
-
-    float visible_start = scroll_offset_ / track_area_width * clip_duration;
-    float visible_end   = (scroll_offset_ + usable_track_width) / track_area_width * clip_duration;
-    float visible_range = visible_end - visible_start;
-
-    constexpr float min_tick_spacing = 60.f;
-    int tick_count = std::max(2, static_cast<int>(ruler_width / min_tick_spacing));
-
-    float time_per_tick = visible_range / static_cast<float>(tick_count);
-
-    int precision = 1;
-    if (time_per_tick < 0.001f) {
-        precision = 4;
-    } else if (time_per_tick < 0.01f) {
-        precision = 3;
-    } else if (time_per_tick < 0.1f) {
-        precision = 2;
-    }
-
-    auto fmt = std::format("{{:.{}f}}", precision);
-
-    for (int i = 0; i <= tick_count; ++i) {
-        float t    = static_cast<float>(i) / static_cast<float>(tick_count);
-        float time = visible_start + t * visible_range;
-        float x    = ruler_start.x + t * ruler_width;
-        draw_list->AddLine(
-            ImVec2(x, ruler_start.y), ImVec2(x, ruler_start.y + 12.f), IM_COL32(180, 180, 180, 255)
-        );
-        auto label = std::vformat(fmt, std::make_format_args(time));
-        draw_list->AddText(
-            ImVec2(x + 2, ruler_start.y), IM_COL32(180, 180, 180, 255), label.c_str()
-        );
-    }
-    ImGui::Dummy(ImVec2(ruler_width, 16.f));
+    render_time_ruler(ruler_start, ruler_width, track_area_width, clip_duration);
     ImGui::NextColumn();
 
-    float tracks_start_y = ImGui::GetCursorScreenPos().y;
-
+    auto* draw_list = ImGui::GetWindowDrawList();
     draw_list->ChannelsSplit(2);
     draw_list->ChannelsSetCurrent(1);
 
@@ -354,8 +267,8 @@ inline void timeline_panel::render_tracks() {
         render_track_row(track, clip, usable_track_width, clip_duration, scroll_offset_);
     }
 
-    float tracks_end_y = ImGui::GetCursorScreenPos().y;
-    float track_area_x = ruler_start.x;
+    const float tracks_end_y = ImGui::GetCursorScreenPos().y;
+    const float track_area_x = ruler_start.x;
 
     ImGui::Columns(1);
 
@@ -365,68 +278,7 @@ inline void timeline_panel::render_tracks() {
     );
     draw_list->ChannelsMerge();
 
-    if (max_scroll > 0.f) {
-        constexpr float bar_height = 10.f;
-        float bar_width            = ImGui::GetContentRegionAvail().x;
-        float ratio                = usable_track_width / track_area_width;
-        float thumb_w              = std::max(20.f, bar_width * ratio);
-        float thumb_x              = (scroll_offset_ / max_scroll) * (bar_width - thumb_w);
-
-        ImVec2 bar_pos = ImGui::GetCursorScreenPos();
-        auto* dl       = ImGui::GetWindowDrawList();
-        dl->AddRectFilled(
-            bar_pos,
-            ImVec2(bar_pos.x + bar_width, bar_pos.y + bar_height),
-            IM_COL32(60, 60, 60, 255)
-        );
-
-        bool thumb_hovered = false;
-        ImVec2 mouse       = ImGui::GetMousePos();
-        if (mouse.x >= bar_pos.x + thumb_x && mouse.x <= bar_pos.x + thumb_x + thumb_w &&
-            mouse.y >= bar_pos.y && mouse.y <= bar_pos.y + bar_height) {
-            thumb_hovered = true;
-        }
-
-        ImU32 thumb_color = thumb_hovered || scrollbar_dragging_ ?
-            IM_COL32(180, 180, 180, 255) :
-            IM_COL32(120, 120, 120, 255);
-
-        dl->AddRectFilled(
-            ImVec2(bar_pos.x + thumb_x, bar_pos.y),
-            ImVec2(bar_pos.x + thumb_x + thumb_w, bar_pos.y + bar_height),
-            thumb_color,
-            3.f
-        );
-
-        ImGui::InvisibleButton("##scrollbar", ImVec2(bar_width, bar_height));
-
-        if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
-            if (thumb_hovered) {
-                scrollbar_dragging_     = true;
-                scrollbar_drag_start_   = mouse.x;
-                scrollbar_scroll_start_ = scroll_offset_;
-            } else {
-                float click_ratio = (mouse.x - bar_pos.x) / bar_width;
-                scroll_offset_    = click_ratio * max_scroll;
-                scroll_offset_    = std::clamp(scroll_offset_, 0.f, max_scroll);
-            }
-        }
-
-        if (scrollbar_dragging_) {
-            if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
-                float delta        = mouse.x - scrollbar_drag_start_;
-                float scroll_range = bar_width - thumb_w;
-                if (scroll_range > 0.f) {
-                    scroll_offset_ = scrollbar_scroll_start_ + (delta / scroll_range) * max_scroll;
-                    scroll_offset_ = std::clamp(scroll_offset_, 0.f, max_scroll);
-                }
-            } else {
-                scrollbar_dragging_ = false;
-            }
-        }
-    } else {
-        scrollbar_dragging_ = false;
-    }
+    render_scrollbar(usable_track_width, track_area_width, max_scroll);
 
     ImGui::EndChild();
 }
@@ -460,18 +312,7 @@ inline void timeline_panel::render_track_row(
         state_->selected_track_name = target;
     }
 
-    auto ctx_id = std::format("TrackCtx_{}", target);
-    if (ImGui::BeginPopupContextItem(ctx_id.c_str())) {
-        state_->selected_track_name = target;
-        if (ImGui::MenuItem("Add Keyframe...")) {
-            create_kf_modal_.open(target);
-        }
-        ImGui::Separator();
-        if (ImGui::MenuItem("Delete Track...")) {
-            delete_track_modal_.open(target);
-        }
-        ImGui::EndPopup();
-    }
+    render_track_context_menu(target);
 
     if (opened != is_expanded) {
         if (opened) {
@@ -506,48 +347,253 @@ inline void timeline_panel::render_track_row(
     ImGui::NextColumn();
 
     if (opened) {
-        const char* prop_names[] = {"Position", "Rotation", "Scale", "Origin"};
+        render_expanded_channels(track, target, track_area_width, clip_duration, scroll_offset);
+        ImGui::TreePop();
+    }
+}
 
-        constexpr gfx::animation_property props[] = {
+inline auto timeline_panel::try_get_root_entity() -> std::optional<gfx::entity> {
+    if (state_->root_name.empty() || !state_->name_to_entity.contains(state_->root_name)) {
+        return std::nullopt;
+    }
+    return state_->name_to_entity[state_->root_name];
+}
+
+inline void timeline_panel::handle_pause(
+    gfx::entity root
+) {
+    auto& world = engine_->get_world();
+    if (world.has_component<gfx::animation_player_component>(root)) {
+        world.get_animation_system().modify_player(root).pause();
+        state_->is_previewing = false;
+    }
+}
+
+inline void timeline_panel::handle_play(
+    gfx::entity root, const std::shared_ptr<gfx::animation_clip>& clip
+) {
+    auto& world = engine_->get_world();
+
+    if (!world.has_component<gfx::animation_player_component>(root)) {
+        if (auto* guard = state_->find_guard(root)) {
+            guard->with<gfx::animation_player_component>();
+        }
+    }
+
+    auto& anim_sys = world.get_animation_system();
+    auto& player   = world.get_component<gfx::animation_player_component>(root);
+
+    if (player.is_paused()) {
+        anim_sys.modify_player(root).resume();
+    } else {
+        anim_sys.modify_player(root).set_clip(clip);
+        anim_sys.modify_player(root).set_playback_speed(playback_speed_);
+
+        auto loop = static_cast<gfx::animation_loop_mode>(loop_mode_index_);
+        anim_sys.modify_player(root).set_loop_mode(loop);
+        anim_sys.modify_player(root).play();
+    }
+    state_->is_previewing = true;
+}
+
+inline void timeline_panel::handle_stop(
+    gfx::entity root
+) {
+    auto& world = engine_->get_world();
+    if (world.has_component<gfx::animation_player_component>(root)) {
+        world.get_animation_system().modify_player(root).stop();
+    }
+    state_->is_previewing   = false;
+    state_->timeline_cursor = 0.f;
+}
+
+inline void timeline_panel::render_playback_controls(
+    const std::shared_ptr<gfx::animation_clip>& clip
+) {
+    const char* play_label = state_->is_previewing ? "||" : ">";
+    if (ImGui::Button(play_label)) {
+        if (auto root = try_get_root_entity()) {
+            state_->is_previewing ? handle_pause(*root) : handle_play(*root, clip);
+        }
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Button("[]")) {
+        if (auto root = try_get_root_entity()) {
+            handle_stop(*root);
+        } else {
+            state_->is_previewing   = false;
+            state_->timeline_cursor = 0.f;
+        }
+    }
+}
+
+inline void timeline_panel::render_time_ruler(
+    ImVec2 ruler_start, float ruler_width, float track_area_width, float clip_duration
+) const {
+    auto* draw_list = ImGui::GetWindowDrawList();
+
+    const float visible_start = scroll_offset_ / track_area_width * clip_duration;
+    const float visible_end   = (scroll_offset_ + ruler_width) / track_area_width * clip_duration;
+    const float visible_range = visible_end - visible_start;
+
+    constexpr float min_tick_spacing = 60.f;
+    const int tick_count = std::max(2, static_cast<int>(ruler_width / min_tick_spacing));
+
+    const float time_per_tick = visible_range / static_cast<float>(tick_count);
+
+    int precision = 1;
+    if (time_per_tick < 0.001f) {
+        precision = 4;
+    } else if (time_per_tick < 0.01f) {
+        precision = 3;
+    } else if (time_per_tick < 0.1f) {
+        precision = 2;
+    }
+
+    const auto fmt = std::format("{{:.{}f}}", precision);
+
+    for (int i = 0; i <= tick_count; ++i) {
+        const float t    = static_cast<float>(i) / static_cast<float>(tick_count);
+        const float time = visible_start + (t * visible_range);
+        const float x    = ruler_start.x + (t * ruler_width);
+        draw_list->AddLine(
+            ImVec2(x, ruler_start.y), ImVec2(x, ruler_start.y + 12.f), IM_COL32(180, 180, 180, 255)
+        );
+        auto label = std::vformat(fmt, std::make_format_args(time));
+        draw_list->AddText(
+            ImVec2(x + 2, ruler_start.y), IM_COL32(180, 180, 180, 255), label.c_str()
+        );
+    }
+    ImGui::Dummy(ImVec2(ruler_width, 16.f));
+}
+
+inline void timeline_panel::render_scrollbar(
+    float usable_track_width, float track_area_width, float max_scroll
+) {
+    if (max_scroll <= 0.f) {
+        scrollbar_dragging_ = false;
+        return;
+    }
+
+    constexpr float bar_height = 10.f;
+
+    const float bar_width = ImGui::GetContentRegionAvail().x;
+    const float ratio     = usable_track_width / track_area_width;
+    const float thumb_w   = std::max(20.f, bar_width * ratio);
+    const float thumb_x   = (scroll_offset_ / max_scroll) * (bar_width - thumb_w);
+
+    const ImVec2 bar_pos = ImGui::GetCursorScreenPos();
+
+    auto* dl = ImGui::GetWindowDrawList();
+    dl->AddRectFilled(
+        bar_pos, ImVec2(bar_pos.x + bar_width, bar_pos.y + bar_height), IM_COL32(60, 60, 60, 255)
+    );
+
+    bool thumb_hovered = false;
+    ImVec2 mouse       = ImGui::GetMousePos();
+    if (mouse.x >= bar_pos.x + thumb_x && mouse.x <= bar_pos.x + thumb_x + thumb_w &&
+        mouse.y >= bar_pos.y && mouse.y <= bar_pos.y + bar_height) {
+        thumb_hovered = true;
+    }
+
+    ImU32 thumb_color = thumb_hovered || scrollbar_dragging_ ?
+        IM_COL32(180, 180, 180, 255) :
+        IM_COL32(120, 120, 120, 255);
+
+    dl->AddRectFilled(
+        ImVec2(bar_pos.x + thumb_x, bar_pos.y),
+        ImVec2(bar_pos.x + thumb_x + thumb_w, bar_pos.y + bar_height),
+        thumb_color,
+        3.f
+    );
+
+    ImGui::InvisibleButton("##scrollbar", ImVec2(bar_width, bar_height));
+
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) {
+        if (thumb_hovered) {
+            scrollbar_dragging_     = true;
+            scrollbar_drag_start_   = mouse.x;
+            scrollbar_scroll_start_ = scroll_offset_;
+        } else {
+            const float click_ratio = (mouse.x - bar_pos.x) / bar_width;
+            scroll_offset_          = click_ratio * max_scroll;
+            scroll_offset_          = std::clamp(scroll_offset_, 0.f, max_scroll);
+        }
+    }
+
+    if (scrollbar_dragging_) {
+        if (ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
+            const float delta        = mouse.x - scrollbar_drag_start_;
+            const float scroll_range = bar_width - thumb_w;
+            if (scroll_range > 0.f) {
+                scroll_offset_ = scrollbar_scroll_start_ + (delta / scroll_range * max_scroll);
+                scroll_offset_ = std::clamp(scroll_offset_, 0.f, max_scroll);
+            }
+        } else {
+            scrollbar_dragging_ = false;
+        }
+    }
+}
+
+inline void timeline_panel::render_track_context_menu(
+    const std::string& target
+) {
+    auto ctx_id = std::format("TrackCtx_{}", target);
+    if (ImGui::BeginPopupContextItem(ctx_id.c_str())) {
+        state_->selected_track_name = target;
+        if (ImGui::MenuItem("Add Keyframe...")) {
+            create_kf_modal_.open(target);
+        }
+        ImGui::Separator();
+        if (ImGui::MenuItem("Delete Track...")) {
+            delete_track_modal_.open(target);
+        }
+        ImGui::EndPopup();
+    }
+}
+
+inline void timeline_panel::render_expanded_channels(
+    const gfx::animation_track& track,
+    const std::string& target,
+    float track_area_width,
+    float clip_duration,
+    float scroll_offset
+) {
+    for (int i = 0; i < 4; ++i) {
+        constexpr std::array prop_names{"Position", "Rotation", "Scale", "Origin"};
+        constexpr std::array props = {
             gfx::animation_property::position,
             gfx::animation_property::rotation,
             gfx::animation_property::scale,
             gfx::animation_property::origin
         };
 
-        for (int i = 0; i < 4; ++i) {
-            auto prop = props[i];
-            bool has  = track.has_channel(prop);
+        const auto prop = props[i];
+        const bool has  = track.has_channel(prop);
 
-            if (has) {
-                ImGui::Text("  %s", prop_names[i]);
-            } else {
-                ImGui::TextDisabled("  %s", prop_names[i]);
-            }
+        (has ? ImGui::Text : ImGui::TextDisabled)("  %s", prop_names[i]);
 
-            auto sub_ctx_id = std::format("SubTrackCtx_{}_{}", target, i);
-            if (ImGui::BeginPopupContextItem(sub_ctx_id.c_str())) {
-                auto label = std::format("Add {} Keyframe...", prop_names[i]);
-                if (ImGui::MenuItem(label.c_str())) {
-                    state_->selected_property = prop;
-                    create_kf_modal_.open(target);
-                }
-                ImGui::EndPopup();
+        auto sub_ctx_id = std::format("SubTrackCtx_{}_{}", target, i);
+        if (ImGui::BeginPopupContextItem(sub_ctx_id.c_str())) {
+            auto label = std::format("Add {} Keyframe...", prop_names[i]);
+            if (ImGui::MenuItem(label.c_str())) {
+                state_->selected_property = prop;
+                create_kf_modal_.open(target);
             }
-            ImGui::NextColumn();
-
-            if (has) {
-                if (auto* channel_var = track.get_channel(prop)) {
-                    render_keyframe_markers(
-                        *channel_var, target, prop, track_area_width, clip_duration, scroll_offset
-                    );
-                }
-            }
-            ImGui::Dummy(ImVec2(track_area_width, 16.f));
-            ImGui::NextColumn();
+            ImGui::EndPopup();
         }
+        ImGui::NextColumn();
 
-        ImGui::TreePop();
+        if (has) {
+            if (auto* channel_var = track.get_channel(prop)) {
+                render_keyframe_markers(
+                    *channel_var, target, prop, track_area_width, clip_duration, scroll_offset
+                );
+            }
+        }
+        ImGui::Dummy(ImVec2(track_area_width, 16.f));
+        ImGui::NextColumn();
     }
 }
 
@@ -637,7 +683,7 @@ inline void timeline_panel::render_playhead(
     }
 
     float scale     = track_width * (zoom_percent_ / 100.f);
-    float pixel_pos = (state_->timeline_cursor / clip_duration) * scale - scroll_offset;
+    float pixel_pos = (state_->timeline_cursor / clip_duration * scale) - scroll_offset;
     float x         = track_area_x + pixel_pos;
 
     if (pixel_pos >= -2.f && pixel_pos <= track_width + 2.f) {
@@ -667,9 +713,8 @@ inline void timeline_panel::render_playhead(
     }
 
     ImVec2 mouse = ImGui::GetMousePos();
-    if (!keyframe_clicked_ && mouse.x >= track_area_x &&
-        mouse.x <= track_area_x + track_width && mouse.y >= area_top &&
-        mouse.y <= area_bottom) {
+    if (!keyframe_clicked_ && mouse.x >= track_area_x && mouse.x <= track_area_x + track_width &&
+        mouse.y >= area_top && mouse.y <= area_bottom) {
         if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) ||
             ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             if (!ImGui::IsAnyItemActive()) {
@@ -683,7 +728,7 @@ inline void timeline_panel::render_playhead(
 
 inline void timeline_panel::delete_selected_keyframe() {
     auto& clip_reg = engine_->get_world().get_animation_clip_registry();
-    auto clip = clip_reg.get(state_->selected_clip_name);
+    auto clip      = clip_reg.get(state_->selected_clip_name);
     if (!clip) {
         return;
     }

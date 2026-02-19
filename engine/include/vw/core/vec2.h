@@ -20,33 +20,33 @@ struct vec2 {
         : x(static_cast<T>(other.x))
         , y(static_cast<T>(other.y)) {}
 
-    [[nodiscard]] constexpr T& operator[](size_t index) { return (&x)[index]; }
-    [[nodiscard]] constexpr const T& operator[](size_t index) const { return (&x)[index]; }
+    [[nodiscard]] constexpr auto operator[](size_t index) -> T& { return (&x)[index]; }
+    [[nodiscard]] constexpr auto operator[](size_t index) const -> const T& { return (&x)[index]; }
 
-    [[nodiscard]] constexpr vec2 operator+() const { return *this; }
-    [[nodiscard]] constexpr vec2 operator-() const { return vec2(-x, -y); }
+    [[nodiscard]] constexpr auto operator+() const -> vec2 { return *this; }
+    [[nodiscard]] constexpr auto operator-() const -> vec2 { return vec2(-x, -y); }
 
-    [[nodiscard]] constexpr vec2 operator+(const vec2& o) const { return {x + o.x, y + o.y}; }
-    [[nodiscard]] constexpr vec2 operator-(const vec2& o) const { return {x - o.x, y - o.y}; }
-    [[nodiscard]] constexpr vec2 operator*(const vec2& o) const { return {x * o.x, y * o.y}; }
-    [[nodiscard]] constexpr vec2 operator/(const vec2& o) const { return {x / o.x, y / o.y}; }
+    [[nodiscard]] constexpr auto operator+(const vec2& o) const -> vec2 { return {x + o.x, y + o.y}; }
+    [[nodiscard]] constexpr auto operator-(const vec2& o) const -> vec2 { return {x - o.x, y - o.y}; }
+    [[nodiscard]] constexpr auto operator*(const vec2& o) const -> vec2 { return {x * o.x, y * o.y}; }
+    [[nodiscard]] constexpr auto operator/(const vec2& o) const -> vec2 { return {x / o.x, y / o.y}; }
 
-    [[nodiscard]] constexpr vec2 operator*(T s) const { return {x * s, y * s}; }
-    [[nodiscard]] constexpr vec2 operator/(T s) const { return {x / s, y / s}; }
+    [[nodiscard]] constexpr auto operator*(T s) const -> vec2 { return {x * s, y * s}; }
+    [[nodiscard]] constexpr auto operator/(T s) const -> vec2 { return {x / s, y / s}; }
 
-    [[nodiscard]] constexpr bool operator==(const vec2& o) const { return x == o.x && y == o.y; }
-    [[nodiscard]] constexpr bool operator!=(const vec2& o) const { return !(*this == o); }
+    [[nodiscard]] constexpr auto operator==(const vec2& o) const -> bool { return x == o.x && y == o.y; }
+    [[nodiscard]] constexpr auto operator!=(const vec2& o) const -> bool { return !(*this == o); }
 
-    constexpr vec2& operator+=(const vec2& o) { x += o.x; y += o.y; return *this; }
-    constexpr vec2& operator-=(const vec2& o) { x -= o.x; y -= o.y; return *this; }
-    constexpr vec2& operator*=(const vec2& o) { x *= o.x; y *= o.y; return *this; }
-    constexpr vec2& operator/=(const vec2& o) { x /= o.x; y /= o.y; return *this; }
-    constexpr vec2& operator*=(T s) { x *= s; y *= s; return *this; }
-    constexpr vec2& operator/=(T s) { x /= s; y /= s; return *this; }
+    constexpr auto operator+=(const vec2& o) -> vec2& { x += o.x; y += o.y; return *this; }
+    constexpr auto operator-=(const vec2& o) -> vec2& { x -= o.x; y -= o.y; return *this; }
+    constexpr auto operator*=(const vec2& o) -> vec2& { x *= o.x; y *= o.y; return *this; }
+    constexpr auto operator/=(const vec2& o) -> vec2& { x /= o.x; y /= o.y; return *this; }
+    constexpr auto operator*=(T s) -> vec2& { x *= s; y *= s; return *this; }
+    constexpr auto operator/=(T s) -> vec2& { x /= s; y /= s; return *this; }
 };
 
 template <typename T>
-[[nodiscard]] constexpr vec2<T> operator*(T scalar, const vec2<T>& v) { return v * scalar; }
+[[nodiscard]] constexpr auto operator*(T scalar, const vec2<T>& v) -> vec2<T> { return v * scalar; }
 
 using vec2i = vec2<int32>;
 using vec2f = vec2<float32>;

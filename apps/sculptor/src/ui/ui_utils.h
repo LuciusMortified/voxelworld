@@ -3,20 +3,18 @@
 #ifndef VW_SCULPTOR_UI_UTILS_H
 #define VW_SCULPTOR_UI_UTILS_H
 
-#include <cstring>
-
 namespace vw::sculptor {
 
 inline void imgui_input_text_string(
     std::string_view label, std::string& value
 ) {
     constexpr size_t max_length = 64;
-    char buffer[max_length]{};
+    std::array<char, max_length> buffer{};
 
-    std::strncpy(buffer, value.data(), max_length - 1);
+    std::strncpy(buffer.data(), value.data(), max_length - 1);
 
-    if (ImGui::InputText(label.data(), buffer, max_length)) {
-        value = std::string{buffer};
+    if (ImGui::InputText(label.data(), buffer.data(), max_length)) {
+        value = std::string{buffer.data()};
     }
 }
 

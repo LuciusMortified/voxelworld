@@ -3,6 +3,8 @@
 #ifndef VW_SCULPTOR_TIMELINE_PANEL_H
 #define VW_SCULPTOR_TIMELINE_PANEL_H
 
+#include <optional>
+
 #include <vw/gfx/engine/engine.h>
 
 #include "app/app_state.h"
@@ -30,6 +32,21 @@ private:
         float clip_duration,
         float scroll_offset
     );
+    void render_time_ruler(
+        ImVec2 ruler_start,
+        float ruler_width,
+        float track_area_width,
+        float clip_duration
+    ) const;
+    void render_scrollbar(float usable_track_width, float track_area_width, float max_scroll);
+    void render_track_context_menu(const std::string& target);
+    void render_expanded_channels(
+        const gfx::animation_track& track,
+        const std::string& target,
+        float track_area_width,
+        float clip_duration,
+        float scroll_offset
+    );
     void render_keyframe_markers(
         const gfx::animation_channel_variant& channel_var,
         const std::string& track_name,
@@ -46,6 +63,12 @@ private:
         float area_bottom,
         float scroll_offset
     );
+
+    void render_playback_controls(const std::shared_ptr<gfx::animation_clip>& clip);
+    void handle_play(gfx::entity root, const std::shared_ptr<gfx::animation_clip>& clip);
+    void handle_pause(gfx::entity root);
+    void handle_stop(gfx::entity root);
+    auto try_get_root_entity() -> std::optional<gfx::entity>;
 
     void delete_selected_keyframe();
 

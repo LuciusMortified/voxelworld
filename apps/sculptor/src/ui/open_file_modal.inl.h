@@ -88,7 +88,7 @@ inline void open_file_modal::load_existing_filenames_() {
     }
 }
 
-inline bool open_file_modal::open_file_() {
+inline auto open_file_modal::open_file_() -> bool {
     namespace fs = std::filesystem;
 
     gfx::vox_deserializer deserializer{engine_->get_world()};

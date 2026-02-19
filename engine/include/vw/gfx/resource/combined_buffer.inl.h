@@ -53,6 +53,7 @@ inline combined_buffer::combined_buffer(
             VK_BUFFER_USAGE_TRANSFER_DST_BIT    //
     );
 
+
     // Выделяем descriptor set из pool
     VkDescriptorSetAllocateInfo alloc_info{};
     alloc_info.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;

@@ -15,7 +15,7 @@ namespace vw::sculptor {
 
 using keyframe_value = std::variant<gfx::keyframe_vec3f, gfx::keyframe_quat>;
 
-enum class tools : int {
+enum class tools : uint8 {
     invalid,
     add_voxel,
     remove_voxel,

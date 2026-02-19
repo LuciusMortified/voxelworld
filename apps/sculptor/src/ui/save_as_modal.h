@@ -16,6 +16,8 @@ public:
     void render(float delta_time);
 
 private:
+    void render_overwrite_confirmation();
+    void render_save_form();
     auto save_file_() -> bool;
 
     engine_type* engine_;

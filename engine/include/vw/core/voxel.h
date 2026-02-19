@@ -13,7 +13,7 @@ struct voxel {
     constexpr explicit voxel(color c) : value(c) {}
 
     [[nodiscard]]
-    constexpr bool is_empty() const {
+    constexpr auto is_empty() const -> bool {
         return value.is_empty();
     }
 };

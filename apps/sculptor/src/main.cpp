@@ -2,9 +2,9 @@
 
 #include "app/app.h"
 
-int main() {
+auto main() -> int {
     try {
-        auto title = std::format("Sculptor {}", vw::sculptor::version_string);
+        const auto title = std::format("Sculptor {}", vw::sculptor::version_string);
         vw::gfx::engine{1600, 1200, title}.run<vw::sculptor::app>();
     } catch (const std::exception& e) {
         vw::log::error("Ошибка выполнения: {}", e.what());

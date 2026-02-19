@@ -28,33 +28,33 @@ struct vec4 {
         : x(static_cast<T>(v.x)), y(static_cast<T>(v.y))
         , z(static_cast<T>(v.z)), w(w_) {}
 
-    [[nodiscard]] constexpr T& operator[](size_t index) { return (&x)[index]; }
-    [[nodiscard]] constexpr const T& operator[](size_t index) const { return (&x)[index]; }
+    [[nodiscard]] constexpr auto operator[](size_t index) -> T& { return (&x)[index]; }
+    [[nodiscard]] constexpr auto operator[](size_t index) const -> const T& { return (&x)[index]; }
 
-    [[nodiscard]] constexpr vec4 operator+() const { return *this; }
-    [[nodiscard]] constexpr vec4 operator-() const { return vec4(-x, -y, -z, -w); }
+    [[nodiscard]] constexpr auto operator+() const -> vec4 { return *this; }
+    [[nodiscard]] constexpr auto operator-() const -> vec4 { return vec4(-x, -y, -z, -w); }
 
-    [[nodiscard]] constexpr vec4 operator+(const vec4& o) const { return {x+o.x, y+o.y, z+o.z, w+o.w}; }
-    [[nodiscard]] constexpr vec4 operator-(const vec4& o) const { return {x-o.x, y-o.y, z-o.z, w-o.w}; }
-    [[nodiscard]] constexpr vec4 operator*(const vec4& o) const { return {x*o.x, y*o.y, z*o.z, w*o.w}; }
-    [[nodiscard]] constexpr vec4 operator/(const vec4& o) const { return {x/o.x, y/o.y, z/o.z, w/o.w}; }
+    [[nodiscard]] constexpr auto operator+(const vec4& o) const -> vec4 { return {x+o.x, y+o.y, z+o.z, w+o.w}; }
+    [[nodiscard]] constexpr auto operator-(const vec4& o) const -> vec4 { return {x-o.x, y-o.y, z-o.z, w-o.w}; }
+    [[nodiscard]] constexpr auto operator*(const vec4& o) const -> vec4 { return {x*o.x, y*o.y, z*o.z, w*o.w}; }
+    [[nodiscard]] constexpr auto operator/(const vec4& o) const -> vec4 { return {x/o.x, y/o.y, z/o.z, w/o.w}; }
 
-    [[nodiscard]] constexpr vec4 operator*(T s) const { return {x*s, y*s, z*s, w*s}; }
-    [[nodiscard]] constexpr vec4 operator/(T s) const { return {x/s, y/s, z/s, w/s}; }
+    [[nodiscard]] constexpr auto operator*(T s) const -> vec4 { return {x*s, y*s, z*s, w*s}; }
+    [[nodiscard]] constexpr auto operator/(T s) const -> vec4 { return {x/s, y/s, z/s, w/s}; }
 
-    [[nodiscard]] constexpr bool operator==(const vec4& o) const { return x==o.x && y==o.y && z==o.z && w==o.w; }
-    [[nodiscard]] constexpr bool operator!=(const vec4& o) const { return !(*this == o); }
+    [[nodiscard]] constexpr auto operator==(const vec4& o) const -> bool { return x==o.x && y==o.y && z==o.z && w==o.w; }
+    [[nodiscard]] constexpr auto operator!=(const vec4& o) const -> bool { return !(*this == o); }
 
-    constexpr vec4& operator+=(const vec4& o) { x+=o.x; y+=o.y; z+=o.z; w+=o.w; return *this; }
-    constexpr vec4& operator-=(const vec4& o) { x-=o.x; y-=o.y; z-=o.z; w-=o.w; return *this; }
-    constexpr vec4& operator*=(const vec4& o) { x*=o.x; y*=o.y; z*=o.z; w*=o.w; return *this; }
-    constexpr vec4& operator/=(const vec4& o) { x/=o.x; y/=o.y; z/=o.z; w/=o.w; return *this; }
-    constexpr vec4& operator*=(T s) { x*=s; y*=s; z*=s; w*=s; return *this; }
-    constexpr vec4& operator/=(T s) { x/=s; y/=s; z/=s; w/=s; return *this; }
+    constexpr auto operator+=(const vec4& o) -> vec4& { x+=o.x; y+=o.y; z+=o.z; w+=o.w; return *this; }
+    constexpr auto operator-=(const vec4& o) -> vec4& { x-=o.x; y-=o.y; z-=o.z; w-=o.w; return *this; }
+    constexpr auto operator*=(const vec4& o) -> vec4& { x*=o.x; y*=o.y; z*=o.z; w*=o.w; return *this; }
+    constexpr auto operator/=(const vec4& o) -> vec4& { x/=o.x; y/=o.y; z/=o.z; w/=o.w; return *this; }
+    constexpr auto operator*=(T s) -> vec4& { x*=s; y*=s; z*=s; w*=s; return *this; }
+    constexpr auto operator/=(T s) -> vec4& { x/=s; y/=s; z/=s; w/=s; return *this; }
 };
 
 template <typename T>
-[[nodiscard]] constexpr vec4<T> operator*(T scalar, const vec4<T>& v) { return v * scalar; }
+[[nodiscard]] constexpr auto operator*(T scalar, const vec4<T>& v) -> vec4<T> { return v * scalar; }
 
 using vec4i = vec4<int32>;
 using vec4f = vec4<float32>;

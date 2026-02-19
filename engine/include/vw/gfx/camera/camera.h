@@ -14,33 +14,33 @@ public:
         float fov = 60.0f, float aspect = 16.0f / 9.0f, float near = 0.1f, float far = 10000.0f
     );
 
-    void set_position(const vec3f& position);
-    void set_rotation(float pitch, float yaw);
-    void set_aspect_ratio(float aspect);
+    auto set_position(const vec3f& position) -> void;
+    auto set_rotation(float pitch, float yaw) -> void;
+    auto set_aspect_ratio(float aspect) -> void;
 
-    [[nodiscard]] float get_near() const;
-    [[nodiscard]] float get_far() const;
-    [[nodiscard]] float get_fov() const;
-    [[nodiscard]] float get_aspect_ratio() const;
+    [[nodiscard]] auto get_near() const -> float;
+    [[nodiscard]] auto get_far() const -> float;
+    [[nodiscard]] auto get_fov() const -> float;
+    [[nodiscard]] auto get_aspect_ratio() const -> float;
 
-    [[nodiscard]] vec3f get_position() const;
-    [[nodiscard]] float get_pitch() const;
-    [[nodiscard]] float get_yaw() const;
+    [[nodiscard]] auto get_position() const -> vec3f;
+    [[nodiscard]] auto get_pitch() const -> float;
+    [[nodiscard]] auto get_yaw() const -> float;
 
-    [[nodiscard]] mat4f get_view_matrix() const;
-    [[nodiscard]] mat4f get_projection_matrix() const;
-    [[nodiscard]] mat4f get_view_projection_matrix() const;
-    
-    [[nodiscard]] const frustum& get_frustum() const;
+    [[nodiscard]] auto get_view_matrix() const -> mat4f;
+    [[nodiscard]] auto get_projection_matrix() const -> mat4f;
+    [[nodiscard]] auto get_view_projection_matrix() const -> mat4f;
 
-    void move_forward(float distance);
-    void move_right(float distance);
-    void move_up(float distance);
-    void rotate(float delta_pitch, float delta_yaw);
+    [[nodiscard]] auto get_frustum() const -> const frustum&;
 
-    vec3f get_forward() const;
-    vec3f get_right() const;
-    vec3f get_up() const;
+    auto move_forward(float distance) -> void;
+    auto move_right(float distance) -> void;
+    auto move_up(float distance) -> void;
+    auto rotate(float delta_pitch, float delta_yaw) -> void;
+
+    auto get_forward() const -> vec3f;
+    auto get_right() const -> vec3f;
+    auto get_up() const -> vec3f;
 
     [[nodiscard]] auto screen_to_world_ray(
         const vec2d& mouse_pos,
@@ -48,10 +48,10 @@ public:
     ) const -> ray;
 
 private:
-    void update_vectors() const;
-    void update_view_matrix() const;
-    void update_projection_matrix() const;
-    void update_frustum() const;
+    auto update_vectors() const -> void;
+    auto update_view_matrix() const -> void;
+    auto update_projection_matrix() const -> void;
+    auto update_frustum() const -> void;
 
     vec3f position_;
     float pitch_, yaw_;
