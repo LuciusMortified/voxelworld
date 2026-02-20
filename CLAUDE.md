@@ -192,7 +192,44 @@ target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_23)
 
 ## Тестирование
 
-Формальный фреймворк тестирования отсутствует. Тестирование через специальные приложения:
+Фреймворк: **Catch2 v3**. Тесты разделены на два executable:
+- `core_tests` — чистая математика и типы (`tests/core/`): vec, mat, quat, color, voxel, transform, math
+- `ecs_tests` — ECS (`tests/ecs/`): entity_pool, component_pool, registry, socket
+
+### Сборка и запуск тестов
+
+Тесты собираются в **отдельной build-директории** (не в основной `build/debug` или `build/release`):
+
+```bash
+# Конфигурация (только тесты, без приложений)
+cmake -S . -B build/tests \
+  -DCMAKE_TOOLCHAIN_FILE=C:/Users/lucius/vcpkg/scripts/buildsystems/vcpkg.cmake \
+  -DVCPKG_TARGET_TRIPLET=x64-windows \
+  -DVW_BUILD_APPS=OFF
+
+# Сборка
+cmake --build build/tests --target core_tests ecs_tests
+
+# Запуск всех тестов
+ctest --test-dir build/tests --output-on-failure
+
+# Запуск только core или ecs
+ctest --test-dir build/tests -R core
+ctest --test-dir build/tests -R ecs
+```
+
+### Структура тестов
+
+```
+tests/
+├── CMakeLists.txt          # Два executable: core_tests + ecs_tests
+├── core/                   # Математика и типы (линкуется с vwengine)
+└── ecs/                    # ECS: registry, pools, systems (линкуется с vwengine)
+```
+
+### Ручные тестовые приложения
+
+Для интеграционного тестирования с графикой используются приложения:
 - `test_window` — создание окна и обработка ввода
 - `test_simple_model` — валидация рендеринга модели
 - `test_math_matrix` — проверка математической библиотеки

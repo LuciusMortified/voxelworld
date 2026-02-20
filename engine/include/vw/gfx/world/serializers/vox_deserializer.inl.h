@@ -22,9 +22,10 @@ vox_deserializer<WC>::vox_deserializer(
 
 template <typename WC>
 auto vox_deserializer<WC>::deserialize(
-    const std::filesystem::path& filepath
+    const std::filesystem::path& filepath, const options& opts
 ) -> std::expected<result, error_type> {
     result_ = {};
+    options_ = opts;
     error_ = std::nullopt;
     current_entity_ = invalid_entity;
     current_entity_guard_ = nullptr;
@@ -183,7 +184,7 @@ template <typename WC>
 void vox_deserializer<WC>::process_target_(
     std::istringstream& iss
 ) {
-    if (!current_entity_.is_valid()) {
+    if (!current_entity_.is_valid() || options_.skip_targets) {
         return;
     }
 

@@ -85,6 +85,14 @@ struct app_state {
 
     std::unordered_map<std::string, transform> saved_transforms;
     bool has_saved_transforms = false;
+
+    struct socket_preview {
+        std::string filename;
+        std::string preview_root_name;
+        std::vector<std::unique_ptr<entity_guard_type>> guards;
+    };
+
+    std::unordered_map<std::string, socket_preview> socket_previews;
 };
 
 }  // namespace vw::sculptor

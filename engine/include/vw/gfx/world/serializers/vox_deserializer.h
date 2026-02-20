@@ -17,6 +17,11 @@ public:
 
     enum class error_type { file_open_failed, parse_error };
 
+    struct options {
+        bool skip_sockets = false;
+        bool skip_targets = false;
+    };
+
     struct result {
         std::string root_name;
         std::unordered_map<std::string, entity> name_to_entity;
@@ -26,7 +31,8 @@ public:
 
     vox_deserializer(world_type& world);
 
-    auto deserialize(const std::filesystem::path& filepath) -> std::expected<result, error_type>;
+    auto deserialize(const std::filesystem::path& filepath, const options& opts = {})
+        -> std::expected<result, error_type>;
 
 private:
     void process_root_(std::istringstream& iss);
@@ -38,6 +44,7 @@ private:
     void process_voxel_(std::istringstream& iss);
 
     world_type* world_;
+    options options_;
 
     result result_;
     std::optional<error_type> error_;

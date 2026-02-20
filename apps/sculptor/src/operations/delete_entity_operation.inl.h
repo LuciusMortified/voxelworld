@@ -46,16 +46,9 @@ inline void delete_entity_operation::execute() {
         state_->selected_name = "";
     }
 
-    state_->entities.erase(
-        std::remove_if(
-            state_->entities.begin(),
-            state_->entities.end(),
-            [ent](const auto& guard) {
-                return guard->get_entity() == ent;
-            }
-        ),
-        state_->entities.end()
-    );
+    std::erase_if(state_->entities, [ent](const auto& guard) {
+        return guard->get_entity() == ent;
+    });
     state_->has_unsaved_changes = true;
 }
 

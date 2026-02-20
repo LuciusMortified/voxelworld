@@ -24,6 +24,7 @@ inline app::app(
     , tool_panel_(state_)
     , color_palette_panel_(state_)
     , entity_properties_panel_(eng, state_, op_manager_)
+    , socket_panel_(eng, state_, op_manager_)
     , keyframe_properties_panel_(eng, state_, op_manager_)
     , entity_tree_panel_(eng, state_, op_manager_)
     , clip_manager_panel_(eng, state_, op_manager_)
@@ -108,6 +109,7 @@ inline void app::render(
 
     // right side
     entity_properties_panel_.render(delta_time);
+    socket_panel_.render(delta_time);
     keyframe_properties_panel_.render(delta_time);
     entity_tree_panel_.render(delta_time);
     clip_manager_panel_.render(delta_time);

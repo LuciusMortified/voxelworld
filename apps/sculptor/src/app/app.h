@@ -19,6 +19,7 @@
 #include "ui/clip_manager_panel.h"
 #include "ui/keyframe_properties_panel.h"
 #include "ui/timeline_panel.h"
+#include "ui/socket_panel.h"
 #include "ui/tool_panel.h"
 
 namespace vw::sculptor {
@@ -62,6 +63,7 @@ private:
     tool_panel tool_panel_;
     color_palette_panel color_palette_panel_;
     entity_properties_panel entity_properties_panel_;
+    socket_panel socket_panel_;
     keyframe_properties_panel keyframe_properties_panel_;
     entity_tree_panel entity_tree_panel_;
     clip_manager_panel clip_manager_panel_;

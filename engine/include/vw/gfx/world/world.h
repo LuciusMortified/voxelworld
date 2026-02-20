@@ -14,6 +14,7 @@
 #include "vw/gfx/world/systems/hierarchy_system.h"
 #include "vw/gfx/world/systems/light_system.h"
 #include "vw/gfx/world/systems/model_system.h"
+#include "vw/gfx/world/systems/socket_system.h"
 #include "vw/gfx/world/systems/spatial_system.h"
 #include "vw/gfx/world/systems/transform_system.h"
 #include "vw/gfx/world/world_components.h"
@@ -40,6 +41,7 @@ public:
     using model_system_type     = model_system_from_tuple<WC>::type;
     using spatial_system_type   = spatial_system_from_tuple<WC>::type;
     using light_system_type     = light_system_from_tuple<WC>::type;
+    using socket_system_type    = socket_system_from_tuple<WC>::type;
     using animation_system_type = animation_system_from_tuple<WC>::type;
 
     explicit world(vulkan_context& context);
@@ -74,6 +76,8 @@ public:
 
     [[nodiscard]] auto get_light_system() -> light_system_type&;
 
+    [[nodiscard]] auto get_socket_system() -> socket_system_type&;
+
     [[nodiscard]] auto get_animation_system() -> animation_system_type&;
 
     [[nodiscard]] auto get_animation_clip_registry() -> animation_clip_registry&;
@@ -104,6 +108,7 @@ private:
     model_registry model_registry_;
     model_system_type model_system_;
     light_system_type light_system_;
+    socket_system_type socket_system_;
     animation_clip_registry animation_clip_registry_;
     animation_system_type animation_system_;
 };
