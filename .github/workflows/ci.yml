@@ -23,7 +23,7 @@ jobs:
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
       - name: Build tests
-        run: cmake --build build --config Release --target core_tests
+        run: cmake --build build --config Release --target core_tests ecs_tests
 
       - name: Run tests
         run: ctest --test-dir build --build-config Release --output-on-failure
@@ -73,7 +73,7 @@ jobs:
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
       - name: Build tests
-        run: cmake --build build --config Release --target core_tests
+        run: cmake --build build --config Release --target core_tests ecs_tests
 
       - name: Run tests
         run: ctest --test-dir build --build-config Release --output-on-failure
@@ -100,7 +100,7 @@ jobs:
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
       - name: Build tests
-        run: cmake --build build --config Release --target core_tests
+        run: cmake --build build --config Release --target core_tests ecs_tests
 
       - name: Run tests
         run: ctest --test-dir build --build-config Release --output-on-failure
