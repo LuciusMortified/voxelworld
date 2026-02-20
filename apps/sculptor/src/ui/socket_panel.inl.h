@@ -321,12 +321,12 @@ inline void socket_panel::unload_preview_(
 inline void socket_panel::update_preview_transform_(
     const std::string& key, const vec3f& position, const vec3f& rotation, const vec3f& scale
 ) {
-    auto it = state_->socket_previews.find(key);
+    const auto it = state_->socket_previews.find(key);
     if (it == state_->socket_previews.end()) {
         return;
     }
 
-    auto& preview = it->second;
+    const auto& preview = it->second;
     if (preview.guards.empty()) {
         return;
     }
