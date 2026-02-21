@@ -11,7 +11,11 @@ inline void imgui_input_text_string(
     constexpr size_t max_length = 64;
     std::array<char, max_length> buffer{};
 
+#ifdef _WIN32
     strncpy_s(buffer.data(), max_length, value.data(), max_length - 1);
+#else
+    std::strncpy(buffer.data(), value.data(), max_length - 1);
+#endif
 
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(label.data(), label.data() + label.size());
