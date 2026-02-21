@@ -24,20 +24,42 @@ inline void entity_tree_panel::render(
     );
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(1.0f, 0.0f));
 
-    ImGuiWindowFlags window_flags =          //
-        ImGuiWindowFlags_NoSavedSettings |   //
-        ImGuiWindowFlags_AlwaysAutoResize |  //
+    constexpr ImGuiWindowFlags window_flags =  //
+        ImGuiWindowFlags_NoSavedSettings |     //
+        ImGuiWindowFlags_AlwaysAutoResize |    //
         ImGuiWindowFlags_NoMove;
 
     ImGui::Begin("Entity Tree", nullptr, window_flags);
 
-    if (state_->root_name.empty()) {
-        if (ImGui::Button("New root")) {
-            creation_modal_.open();
-        }
+    const bool can_add = state_->root_name.empty() || !state_->selected_name.empty();
+    if (!can_add) {
+        ImGui::BeginDisabled();
+    }
+    if (ImGui::Button("Add Entity")) {
+        creation_modal_.open();
+    }
+    if (!can_add) {
+        ImGui::EndDisabled();
+    }
+
+    ImGui::SameLine();
+
+    const bool can_remove = !state_->selected_name.empty() &&
+                            state_->name_to_entity.contains(state_->selected_name);
+    if (!can_remove) {
+        ImGui::BeginDisabled();
+    }
+    if (ImGui::Button("Remove Entity")) {
+        deletion_modal_.open(state_->selected_name);
+    }
+    if (!can_remove) {
+        ImGui::EndDisabled();
     }
 
     if (!state_->root_name.empty()) {
+        ImGui::Spacing();
+        ImGui::Separator();
+        ImGui::Spacing();
         render_entity_node(state_->root_name);
     }
 
@@ -61,27 +83,26 @@ inline void entity_tree_panel::render_entity_node(
     auto ent    = state_->name_to_entity[name];
     auto& world = engine_->get_world();
 
-    bool has_hierarchy = world.has_component<gfx::hierarchy_component>(ent);
-    bool has_children  = false;
+    const bool has_hierarchy = world.has_component<gfx::hierarchy_component>(ent);
+    bool has_children        = false;
 
     if (has_hierarchy) {
         const auto& hierarchy_comp = world.get_component<gfx::hierarchy_component>(ent);
         has_children               = !hierarchy_comp.get_children().empty();
     }
 
-    bool is_selected = state_->selected_name == name;
-    bool is_open     = false;
+    const bool is_selected = state_->selected_name == name;
+    bool is_open           = false;
 
     ImGuiTreeNodeFlags node_flags =       //
         ImGuiTreeNodeFlags_OpenOnArrow |  //
-        ImGuiTreeNodeFlags_OpenOnDoubleClick |
-        ImGuiTreeNodeFlags_DefaultOpen;
+        ImGuiTreeNodeFlags_OpenOnDoubleClick | ImGuiTreeNodeFlags_DefaultOpen;
 
     if (is_selected) {
         node_flags |= ImGuiTreeNodeFlags_Selected;
     }
 
-    auto node_id = std::format("{}##{}.{}", name, ent.index, ent.generation);
+    const auto node_id = std::format("{}##{}.{}", name, ent.index, ent.generation);
     if (has_children) {
         if (ImGui::TreeNodeEx(node_id.c_str(), node_flags)) {
             is_open = true;
@@ -96,7 +117,7 @@ inline void entity_tree_panel::render_entity_node(
         state_->selected_name = name;
     }
 
-    auto context_menu_id = std::format("EntityContextMenu_{}_{}", ent.index, ent.generation);
+    const auto context_menu_id = std::format("EntityContextMenu_{}_{}", ent.index, ent.generation);
     if (ImGui::BeginPopupContextItem(context_menu_id.c_str())) {
         state_->selected_name = name;
         if (ImGui::MenuItem("Create child")) {

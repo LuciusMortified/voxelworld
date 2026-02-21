@@ -15,7 +15,7 @@ public:
     using world_type        = world<WC>;
     using entity_guard_type = entity_guard<WC>;
 
-    enum class error_type { file_open_failed, parse_error };
+    enum class error_type : uint8 { file_open_failed, parse_error };
 
     struct options {
         bool skip_sockets = false;
@@ -40,6 +40,8 @@ private:
     void process_parent_(std::istringstream& iss);
     void process_transform_(std::istringstream& iss);
     void process_target_(std::istringstream& iss);
+    void process_sockets_();
+    void process_socket_(std::istringstream& iss);
     void process_model_(std::istringstream& iss);
     void process_voxel_(std::istringstream& iss);
 

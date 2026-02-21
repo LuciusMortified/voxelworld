@@ -20,7 +20,7 @@ public:
     void render(float delta_time);
 
 private:
-    bool create_entity();
+    auto create_entity() -> bool;
 
     engine_type* engine_;
     app_state* state_;
@@ -29,7 +29,8 @@ private:
     bool need_open_ = false;
 
     std::string name_;
-    bool with_model_ = false;
+    bool with_model_  = false;
+    bool with_socket_ = false;
     vec3i size_{12, 12, 12};
 
     std::string error_;

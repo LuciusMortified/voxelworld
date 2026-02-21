@@ -161,7 +161,7 @@ inline void timeline_panel::render_toolbar(
     ImGui::Text("Speed");
     ImGui::SameLine();
     ImGui::PushItemWidth(60.f);
-    ImGui::DragFloat("##Speed", &playback_speed_, 0.01f, 0.1f, 5.0f, "%.2f");
+    const bool speed_changed = ImGui::DragFloat("##Speed", &playback_speed_, 0.01f, 0.1f, 5.0f, "%.2f");
     ImGui::PopItemWidth();
 
     ImGui::SameLine();
@@ -170,8 +170,24 @@ inline void timeline_panel::render_toolbar(
     ImGui::SameLine();
     ImGui::PushItemWidth(80.f);
     constexpr std::array loop_modes = {"Once", "Loop", "Ping-Pong"};
-    ImGui::Combo("##Loop", &loop_mode_index_, loop_modes.data(), 3);
+    const bool loop_changed = ImGui::Combo("##Loop", &loop_mode_index_, loop_modes.data(), 3);
     ImGui::PopItemWidth();
+
+    if ((speed_changed || loop_changed) && state_->is_previewing &&
+        !state_->root_name.empty()) {
+        auto root_ent = state_->name_to_entity[state_->root_name];
+        auto& world   = engine_->get_world();
+        if (world.has_component<gfx::animation_player_component>(root_ent)) {
+            auto& anim_sys = world.get_animation_system();
+            if (speed_changed) {
+                anim_sys.modify_player(root_ent).set_playback_speed(playback_speed_);
+            }
+            if (loop_changed) {
+                auto loop = static_cast<gfx::animation_loop_mode>(loop_mode_index_);
+                anim_sys.modify_player(root_ent).set_loop_mode(loop);
+            }
+        }
+    }
 
     ImGui::SameLine();
     ImGui::Text("%.2f / %.2fs", state_->timeline_cursor, clip_duration);
@@ -209,7 +225,7 @@ inline void timeline_panel::render_tracks() {
     );
 
     constexpr float label_width = 150.f;
-    constexpr float end_padding = 20.f;
+    constexpr float end_padding = 60.f;
     const float available_width = ImGui::GetContentRegionAvail().x;
 
     float base_track_width = available_width - label_width;
@@ -384,6 +400,9 @@ inline void timeline_panel::handle_play(
     auto& player   = world.get_component<gfx::animation_player_component>(root);
 
     if (player.is_paused()) {
+        anim_sys.modify_player(root).set_playback_speed(playback_speed_);
+        auto loop = static_cast<gfx::animation_loop_mode>(loop_mode_index_);
+        anim_sys.modify_player(root).set_loop_mode(loop);
         anim_sys.modify_player(root).resume();
     } else {
         anim_sys.modify_player(root).set_clip(clip);

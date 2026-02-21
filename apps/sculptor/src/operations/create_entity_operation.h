@@ -15,8 +15,9 @@ struct create_entity_params {
     std::string name;
     std::string parent_name;
 
-    bool with_model = false;
-    vec3i size      = vec3i{6, 6, 6};
+    bool with_model  = false;
+    bool with_socket = false;
+    vec3i size       = vec3i{6, 6, 6};
 };
 
 class create_entity_operation final : public base_operation {

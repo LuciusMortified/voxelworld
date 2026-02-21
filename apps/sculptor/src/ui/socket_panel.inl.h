@@ -29,7 +29,7 @@ inline void socket_panel::render(
     }
 
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
-    const ImVec2 window_pos       = ImVec2(
+    const auto window_pos         = ImVec2(
         viewport->WorkPos.x + viewport->WorkSize.x - 10,
         viewport->WorkPos.y + state_->ui.right_top_voffset + 10
     );
@@ -40,47 +40,72 @@ inline void socket_panel::render(
         ImGuiWindowFlags_NoMove |              //
         ImGuiWindowFlags_AlwaysAutoResize;
 
-    ImGui::Begin("Sockets", nullptr, window_flags);
+    bool still_open = true;
+    ImGui::Begin("Sockets", &still_open, window_flags);
+    if (!still_open) {
+        state_->ui.show_sockets = false;
+    }
+
+    render_add_socket_();
 
     const auto& socket_comp = world.template get_component<gfx::socket_component>(ent);
     const auto& sockets     = socket_comp.get_sockets();
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Spacing();
 
     if (sockets.empty()) {
         ImGui::TextDisabled("No sockets");
     } else {
         std::string socket_to_remove;
         for (const auto& sp : sockets) {
-            ImGui::PushID(sp.name.c_str());
-            render_socket_(ent, sp);
-
-            ImGui::SameLine();
-            if (ImGui::SmallButton("X")) {
-                socket_to_remove = sp.name;
-            }
+            const auto socket_id = std::format("##socket_{}", sp.name);
+            ImGui::PushID(socket_id.c_str());
+            render_socket_(sp, socket_to_remove);
             ImGui::PopID();
         }
 
         if (!socket_to_remove.empty()) {
-            remove_socket_params params = {
-                .entity_name = state_->selected_name,
-                .socket_name = socket_to_remove,
-            };
-            auto op = std::make_unique<remove_socket_operation>(*engine_, *state_, params);
-            op_manager_->execute(std::move(op));
-
-            unload_preview_(socket_to_remove);
+            pending_remove_socket_ = socket_to_remove;
+            ImGui::OpenPopup("Remove Socket?");
         }
     }
 
-    ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Spacing();
+    constexpr ImGuiWindowFlags popup_flags =  //
+        ImGuiWindowFlags_AlwaysAutoResize;
 
-    render_add_socket_(ent);
+    if (ImGui::BeginPopupModal("Remove Socket?", nullptr, popup_flags)) {
+        ImGui::Text("Remove socket \"%s\"?", pending_remove_socket_.c_str());
+        ImGui::Spacing();
+
+        if (ImGui::Button("Remove")) {
+            remove_socket_params params = {
+                .entity_name = state_->selected_name,
+                .socket_name = pending_remove_socket_,
+            };
+            auto op = std::make_unique<remove_socket_operation>(*engine_, *state_, params);
+            op_manager_->execute(std::move(op));
+            const auto pkey =
+                app_state::socket_preview_key(state_->selected_name, pending_remove_socket_);
+            unload_preview_(pkey);
+            pending_remove_socket_.clear();
+            ImGui::CloseCurrentPopup();
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            pending_remove_socket_.clear();
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
+    }
 
     ImGui::Dummy({220.0f, 0.0f});
 
     state_->ui.right_top_voffset += ImGui::GetWindowHeight() + 10.0f;
+
+    render_add_socket_modal_();
 
     ImGui::End();
 
@@ -88,9 +113,12 @@ inline void socket_panel::render(
 }
 
 inline void socket_panel::render_socket_(
-    gfx::entity ent, const gfx::socket_point& sp
+    const gfx::socket_point& sp, std::string& socket_to_remove
 ) {
-    if (ImGui::TreeNode(sp.name.c_str())) {
+    constexpr ImGuiTreeNodeFlags flags =  //
+        ImGuiTreeNodeFlags_OpenOnArrow |  //
+        ImGuiTreeNodeFlags_OpenOnDoubleClick;
+    if (ImGui::TreeNodeEx(sp.name.c_str(), flags)) {
         vec3f position     = sp.position;
         vec3f rotation_deg = {
             math::degrees(sp.rotation.x),
@@ -101,34 +129,36 @@ inline void socket_panel::render_socket_(
 
         bool changed = false;
 
-        ImGui::PushItemWidth(60.0f);
+        ImGui::PushItemWidth(80.0f);
+
         ImGui::Text("Pos");
-        ImGui::SameLine(40.f);
-        changed |= ImGui::DragFloat("##PX", &position.x, 0.1f, 0, 0, "%.2f");
+        ImGui::SameLine(80.f);
+        changed |= ImGui::DragFloat("##PX", &position.x, 0.1f, 0, 0, "%.4f");
         ImGui::SameLine();
-        changed |= ImGui::DragFloat("##PY", &position.y, 0.1f, 0, 0, "%.2f");
+        changed |= ImGui::DragFloat("##PY", &position.y, 0.1f, 0, 0, "%.4f");
         ImGui::SameLine();
-        changed |= ImGui::DragFloat("##PZ", &position.z, 0.1f, 0, 0, "%.2f");
+        changed |= ImGui::DragFloat("##PZ", &position.z, 0.1f, 0, 0, "%.4f");
 
         ImGui::Text("Rot");
-        ImGui::SameLine(40.f);
-        changed |= ImGui::DragFloat("##RX", &rotation_deg.x, 0.5f, 0, 0, "%.1f");
+        ImGui::SameLine(80.f);
+        changed |= ImGui::DragFloat("##RX", &rotation_deg.x, 0.5f, 0, 0, "%.4f");
         ImGui::SameLine();
-        changed |= ImGui::DragFloat("##RY", &rotation_deg.y, 0.5f, 0, 0, "%.1f");
+        changed |= ImGui::DragFloat("##RY", &rotation_deg.y, 0.5f, 0, 0, "%.4f");
         ImGui::SameLine();
-        changed |= ImGui::DragFloat("##RZ", &rotation_deg.z, 0.5f, 0, 0, "%.1f");
+        changed |= ImGui::DragFloat("##RZ", &rotation_deg.z, 0.5f, 0, 0, "%.4f");
 
         ImGui::Text("Scale");
-        ImGui::SameLine(40.f);
-        changed |= ImGui::DragFloat("##SX", &scale.x, 0.01f, 0, 0, "%.2f");
+        ImGui::SameLine(80.f);
+        changed |= ImGui::DragFloat("##SX", &scale.x, 0.01f, 0, 0, "%.4f");
         ImGui::SameLine();
-        changed |= ImGui::DragFloat("##SY", &scale.y, 0.01f, 0, 0, "%.2f");
+        changed |= ImGui::DragFloat("##SY", &scale.y, 0.01f, 0, 0, "%.4f");
         ImGui::SameLine();
-        changed |= ImGui::DragFloat("##SZ", &scale.z, 0.01f, 0, 0, "%.2f");
+        changed |= ImGui::DragFloat("##SZ", &scale.z, 0.01f, 0, 0, "%.4f");
+
         ImGui::PopItemWidth();
 
         if (changed) {
-            vec3f new_rotation = {
+            const auto new_rotation = vec3f{
                 math::radians(rotation_deg.x),
                 math::radians(rotation_deg.y),
                 math::radians(rotation_deg.z),
@@ -144,63 +174,96 @@ inline void socket_panel::render_socket_(
             auto op = std::make_unique<set_socket_transform_operation>(*engine_, *state_, params);
             op_manager_->execute(std::move(op));
 
-            update_preview_transform_(sp.name, position, new_rotation, scale);
+            const auto pkey = app_state::socket_preview_key(state_->selected_name, sp.name);
+            update_preview_transform_(pkey, position, new_rotation, scale);
         }
 
+        const auto pkey        = app_state::socket_preview_key(state_->selected_name, sp.name);
+        const bool has_preview = state_->socket_previews.contains(pkey);
         if (sp.attached.is_valid()) {
-            auto it = state_->entity_to_name.find(sp.attached);
+            const auto it = state_->entity_to_name.find(sp.attached);
             if (it != state_->entity_to_name.end()) {
                 ImGui::Text("Attached: %s", it->second.c_str());
             } else {
                 ImGui::Text("Attached: %u.%u", sp.attached.index, sp.attached.generation);
             }
-        } else {
+        } else if (!has_preview) {
             ImGui::TextDisabled("Empty");
         }
 
-        bool has_preview = state_->socket_previews.contains(sp.name);
-
         if (has_preview) {
-            auto& preview = state_->socket_previews[sp.name];
+            const auto& preview = state_->socket_previews[pkey];
             ImGui::Text("Preview: %s", preview.filename.c_str());
             ImGui::SameLine();
             if (ImGui::SmallButton("Unload")) {
-                unload_preview_(sp.name);
+                unload_preview_(pkey);
             }
         } else {
             if (ImGui::SmallButton("Load Preview")) {
-                need_preview_modal_ = true;
-                preview_modal_key_  = sp.name;
+                need_preview_modal_   = true;
+                preview_modal_socket_ = sp.name;
             }
+        }
+
+        ImGui::Spacing();
+        if (ImGui::SmallButton("Remove Socket")) {
+            socket_to_remove = sp.name;
         }
 
         ImGui::TreePop();
     }
 }
 
-inline void socket_panel::render_add_socket_(
-    gfx::entity /*ent*/
-) {
-    ImGui::PushItemWidth(120.0f);
-    imgui_input_text_string("##new_socket", new_socket_name_);
-    ImGui::PopItemWidth();
-    ImGui::SameLine();
-
-    bool disabled = new_socket_name_.empty();
-    if (disabled) {
-        ImGui::BeginDisabled();
-    }
+inline void socket_panel::render_add_socket_() {
     if (ImGui::Button("Add Socket")) {
-        add_socket_params params = {
-            .entity_name = state_->selected_name,
-            .socket_name = new_socket_name_,
-        };
-        auto op = std::make_unique<add_socket_operation>(*engine_, *state_, params);
-        op_manager_->execute(std::move(op));
+        need_add_socket_modal_ = true;
         new_socket_name_.clear();
+        add_socket_error_.clear();
     }
-    if (disabled) {
-        ImGui::EndDisabled();
+}
+
+inline void socket_panel::render_add_socket_modal_() {
+    if (need_add_socket_modal_) {
+        ImGui::OpenPopup("Add Socket");
+        need_add_socket_modal_ = false;
+    }
+
+    constexpr ImGuiWindowFlags flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove;
+    if (ImGui::BeginPopupModal("Add Socket", nullptr, flags)) {
+        if (!add_socket_error_.empty()) {
+            ImGui::TextColored(ImVec4(1.f, 0.f, 0.f, 1.f), "%s", add_socket_error_.c_str());
+        }
+
+        imgui_input_text_string("Name", new_socket_name_);
+
+        if (ImGui::Button("Create")) {
+            if (new_socket_name_.empty()) {
+                add_socket_error_ = "Name cannot be empty.";
+            } else {
+                auto ent = state_->name_to_entity[state_->selected_name];
+                const auto& sc =
+                    engine_->get_world().template get_component<gfx::socket_component>(ent);
+                if (sc.find(new_socket_name_) != nullptr) {
+                    add_socket_error_ = "A socket with this name already exists.";
+                } else {
+                    add_socket_params params = {
+                        .entity_name = state_->selected_name,
+                        .socket_name = new_socket_name_,
+                    };
+                    auto op = std::make_unique<add_socket_operation>(*engine_, *state_, params);
+                    op_manager_->execute(std::move(op));
+                    new_socket_name_.clear();
+                    ImGui::CloseCurrentPopup();
+                }
+            }
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("Cancel")) {
+            new_socket_name_.clear();
+            ImGui::CloseCurrentPopup();
+        }
+
+        ImGui::EndPopup();
     }
 }
 
@@ -209,9 +272,10 @@ inline void socket_panel::render_preview_file_list_() {
         ImGui::OpenPopup("Load Preview");
         need_preview_modal_ = false;
 
-        namespace fs = std::filesystem;
         vox_filenames_.clear();
-        fs::path asset_dir{app_state::asset_dir_name};
+
+        namespace fs = std::filesystem;
+        const fs::path asset_dir{app_state::asset_dir_name};
         if (fs::exists(asset_dir)) {
             for (const auto& entry : fs::directory_iterator(asset_dir)) {
                 if (entry.is_regular_file() && entry.path().extension() == ".vox") {
@@ -221,23 +285,24 @@ inline void socket_panel::render_preview_file_list_() {
         }
     }
 
-    ImGuiWindowFlags dialog_flags =          //
-        ImGuiWindowFlags_AlwaysAutoResize |  //
+    constexpr ImGuiWindowFlags dialog_flags =  //
+        ImGuiWindowFlags_AlwaysAutoResize |    //
         ImGuiWindowFlags_NoMove;
     if (ImGui::BeginPopupModal("Load Preview", nullptr, dialog_flags)) {
         ImGui::Text("Select VOX file:");
         ImGui::Spacing();
 
-        const float list_height     = ImGui::GetTextLineHeightWithSpacing() * 7.5f;
-        ImGuiChildFlags child_flags =                 //
+        const float list_height = ImGui::GetTextLineHeightWithSpacing() * 7.5f;
+
+        constexpr ImGuiChildFlags child_flags =       //
             ImGuiChildFlags_AlwaysUseWindowPadding |  //
             ImGuiChildFlags_Borders;
-        static std::string selected_file;
+
         if (ImGui::BeginChild("##preview_file_list", ImVec2(300.f, list_height), child_flags)) {
             for (const auto& f : vox_filenames_) {
-                bool is_selected = selected_file == f;
+                const bool is_selected = preview_selected_file_ == f;
                 if (ImGui::Selectable(f.c_str(), is_selected)) {
-                    selected_file = f;
+                    preview_selected_file_ = f;
                 }
             }
             ImGui::EndChild();
@@ -245,20 +310,21 @@ inline void socket_panel::render_preview_file_list_() {
 
         ImGui::Spacing();
 
-        if (selected_file.empty()) {
+        const bool is_preview_empty = preview_selected_file_.empty();
+        if (is_preview_empty) {
             ImGui::BeginDisabled();
         }
         if (ImGui::Button("Load")) {
-            load_preview_(preview_modal_key_, selected_file);
-            selected_file.clear();
+            load_preview_(preview_modal_socket_, preview_selected_file_);
+            preview_selected_file_.clear();
             ImGui::CloseCurrentPopup();
         }
-        if (selected_file.empty()) {
+        if (is_preview_empty) {
             ImGui::EndDisabled();
         }
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
-            selected_file.clear();
+            preview_selected_file_.clear();
             ImGui::CloseCurrentPopup();
         }
 
@@ -268,26 +334,29 @@ inline void socket_panel::render_preview_file_list_() {
 
 inline void socket_panel::load_preview_(
     const std::string& socket_name, const std::string& filename
-) {
-    unload_preview_(socket_name);
+) const {
+    const auto pkey = app_state::socket_preview_key(state_->selected_name, socket_name);
+    unload_preview_(pkey);
 
     namespace fs = std::filesystem;
 
     gfx::vox_deserializer deserializer{engine_->get_world()};
-    fs::path filepath = fs::path{app_state::asset_dir_name} / fs::path{filename};
+    const fs::path filepath = fs::path{app_state::asset_dir_name} / fs::path{filename};
 
-    gfx::vox_deserializer<>::options opts;
-    opts.skip_sockets = true;
-    opts.skip_targets = true;
+    const gfx::vox_deserializer<>::options opts{
+        .skip_sockets = true,
+        .skip_targets = true,
+    };
+
     auto result = deserializer.deserialize(filepath, opts);
     if (!result.has_value()) {
         return;
     }
 
-    auto parent_ent   = state_->name_to_entity[state_->selected_name];
-    auto& world       = engine_->get_world();
-    auto& socket_comp = world.template get_component<gfx::socket_component>(parent_ent);
-    const auto* sp    = socket_comp.find(socket_name);
+    const auto parent_ent   = state_->name_to_entity[state_->selected_name];
+    auto& world             = engine_->get_world();
+    const auto& socket_comp = world.template get_component<gfx::socket_component>(parent_ent);
+    const auto* sp          = socket_comp.find(socket_name);
     if (!sp) {
         return;
     }
@@ -298,8 +367,8 @@ inline void socket_panel::load_preview_(
     preview.guards            = std::move(result->entities);
 
     if (result->name_to_entity.contains(result->root_name)) {
-        auto preview_root      = result->name_to_entity[result->root_name];
-        auto& transform_system = world.get_transform_system();
+        const auto preview_root = result->name_to_entity[result->root_name];
+        auto& transform_system  = world.get_transform_system();
         transform_system.modify(preview_root)
             .set_position(sp->position)
             .set_rotation(sp->rotation)
@@ -309,18 +378,18 @@ inline void socket_panel::load_preview_(
         hierarchy_system.modify(preview_root).set_parent(parent_ent);
     }
 
-    state_->socket_previews[socket_name] = std::move(preview);
+    state_->socket_previews[pkey] = std::move(preview);
 }
 
 inline void socket_panel::unload_preview_(
     const std::string& key
-) {
+) const {
     state_->socket_previews.erase(key);
 }
 
 inline void socket_panel::update_preview_transform_(
     const std::string& key, const vec3f& position, const vec3f& rotation, const vec3f& scale
-) {
+) const {
     const auto it = state_->socket_previews.find(key);
     if (it == state_->socket_previews.end()) {
         return;
@@ -331,8 +400,8 @@ inline void socket_panel::update_preview_transform_(
         return;
     }
 
-    auto preview_root      = preview.guards[0]->get_entity();
-    auto& transform_system = engine_->get_world().get_transform_system();
+    const auto preview_root = preview.guards[0]->get_entity();
+    auto& transform_system  = engine_->get_world().get_transform_system();
     transform_system.modify(preview_root)
         .set_position(position)
         .set_rotation(rotation)

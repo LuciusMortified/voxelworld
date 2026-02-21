@@ -22,8 +22,8 @@ inline void color_palette_panel::render(
     );
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.0f, 1.0f));
 
-    ImGuiWindowFlags window_flags =  //
-                                     // ImGuiWindowFlags_NoCollapse |       //
+    ImGuiWindowFlags window_flags =         //
+                                            // ImGuiWindowFlags_NoCollapse |       //
         ImGuiWindowFlags_NoSavedSettings |  //
         // ImGuiWindowFlags_NoTitleBar |       //
         ImGuiWindowFlags_NoMove |  //
@@ -62,12 +62,12 @@ inline void color_palette_panel::render(
     for (auto clr : colors::all) {
         const ImVec4 clr_imvec4 = to_imvec4(clr);
 
-        auto btn_id = std::format("##{}", clr.value);
+        auto btn_id = std::format("##color_palette_{}", clr.value);
         ImGui::PushID(btn_id.c_str());
 
-        ImGuiColorEditFlags btn_flags =     //
-            ImGuiColorEditFlags_NoAlpha |   //
-            ImGuiColorEditFlags_NoPicker |  //
+        constexpr ImGuiColorEditFlags btn_flags =  //
+            ImGuiColorEditFlags_NoAlpha |          //
+            ImGuiColorEditFlags_NoPicker |         //
             ImGuiColorEditFlags_NoBorder;
 
         auto color_picked =

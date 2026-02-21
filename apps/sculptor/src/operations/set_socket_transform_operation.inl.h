@@ -35,6 +35,7 @@ inline void set_socket_transform_operation::execute() {
     }
 
     update_attached_(params_.position, params_.rotation, params_.scale);
+    update_preview_(params_.position, params_.rotation, params_.scale);
     state_->has_unsaved_changes = true;
 }
 
@@ -54,6 +55,7 @@ inline void set_socket_transform_operation::undo() {
     }
 
     update_attached_(previous_position_, previous_rotation_, previous_scale_);
+    update_preview_(previous_position_, previous_rotation_, previous_scale_);
     state_->has_unsaved_changes = true;
 }
 
@@ -71,6 +73,27 @@ inline void set_socket_transform_operation::update_attached_(
 
     auto& transform_system = world.get_transform_system();
     transform_system.modify(sp->attached)
+        .set_position(position)
+        .set_rotation(rotation)
+        .set_scale(scale);
+}
+
+inline void set_socket_transform_operation::update_preview_(
+    const vec3f& position, const vec3f& rotation, const vec3f& scale
+) {
+    const auto pkey = app_state::socket_preview_key(params_.entity_name, params_.socket_name);
+    const auto it   = state_->socket_previews.find(pkey);
+    if (it == state_->socket_previews.end()) {
+        return;
+    }
+
+    const auto& preview = it->second;
+    if (preview.guards.empty()) {
+        return;
+    }
+
+    auto& transform_system = engine_->get_world().get_transform_system();
+    transform_system.modify(preview.guards[0]->get_entity())
         .set_position(position)
         .set_rotation(rotation)
         .set_scale(scale);

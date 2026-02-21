@@ -80,6 +80,8 @@ inline void remove_voxel_tool::on_mouse_press(
             *engine_, *state_, params
         );
         op_manager_->execute(std::move(op));
+
+        update_hovered_voxel_();
     }
 }
 
@@ -96,14 +98,18 @@ inline void remove_voxel_tool::update_hovered_voxel_() {
     const auto& window = engine_->get_window();
     const auto& camera = engine_->get_camera();
 
-    auto ray = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
-
-    auto voxel_hit = world.voxel_ray_cast(ray, ray_cast_entities_);
-    if (voxel_hit.has_value()) {
-        hovered_voxel_ = voxel_hit->voxel_pos;
-        state_->selected_name = state_->entity_to_name[voxel_hit->ent];
-    } else {
+    const auto ray = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
+    const auto hit = world.voxel_ray_cast(ray, ray_cast_entities_);
+    if (!hit) {
         hovered_voxel_ = vec3i{-1, -1, -1};
+        return;
+    }
+
+    const bool is_selected_entity =  //
+        state_->name_to_entity.contains(state_->selected_name) &&
+        hit->ent == state_->name_to_entity[state_->selected_name];
+    if (is_selected_entity) {
+        hovered_voxel_ = hit->voxel_pos;
     }
 }
 

@@ -15,53 +15,50 @@ inline add_voxel_tool::add_voxel_tool(
 inline void add_voxel_tool::render(
     float /*delta_time*/
 ) {
-    if (hovered_voxel_ == vec3i{-1, -1, -1}) {
+    const bool is_hovered          = hovered_voxel_ != vec3i{-1, -1, -1};
+    const bool has_selected_entity = state_->name_to_entity.contains(state_->selected_name);
+
+    if (!is_hovered || !has_selected_entity) {
         return;
     }
 
-    if (!state_->name_to_entity.contains(state_->selected_name)) {
-        return;
-    }
+    auto& world    = engine_->get_world();
+    const auto ent = state_->name_to_entity[state_->selected_name];
 
-    auto ent = state_->name_to_entity[state_->selected_name];
-
-    auto& world        = engine_->get_world();
-    bool is_renderable =  //
+    const bool is_renderable =  //
         world.has_component<gfx::transform_component>(ent) &&
         world.has_component<gfx::model_component>(ent);
     if (!is_renderable) {
         return;
     }
 
-    auto& model_comp = world.get_component<gfx::model_component>(ent);
-    bool is_outside = //
-        hovered_voxel_.x < 0 || hovered_voxel_.x >= model_comp.width() ||
-        hovered_voxel_.y < 0 || hovered_voxel_.y >= model_comp.height() ||
-        hovered_voxel_.z < 0 || hovered_voxel_.z >= model_comp.depth();
+    const auto& model_comp = world.get_component<gfx::model_component>(ent);
+    const bool is_outside  =  //
+        hovered_voxel_.x < 0 || hovered_voxel_.x >= model_comp.width() || hovered_voxel_.y < 0 ||
+        hovered_voxel_.y >= model_comp.height() || hovered_voxel_.z < 0 ||
+        hovered_voxel_.z >= model_comp.depth();
 
-    auto& renderer = engine_->get_renderer();
-    auto voxel_local_pos = vec3f{
+    const vec3f voxel_local_pos{
         static_cast<float>(hovered_voxel_.x),
         static_cast<float>(hovered_voxel_.y),
         static_cast<float>(hovered_voxel_.z)
     };
 
-    auto voxel_world_pos =  //
+    const auto voxel_world_pos =  //
         world.get_component<gfx::transform_component>(ent).get_world_matrix() *
-        math::translation_matrix(voxel_local_pos) *         //
+        math::translation_matrix(voxel_local_pos) *       //
         math::scale_matrix(vec3f{1.01f, 1.01f, 1.01f}) *  //
         math::translation_matrix(vec3f{-0.005f, -0.005f, -0.005f});
 
     const auto draw_color = is_outside ? colors::red : colors::black;
 
+    auto& renderer = engine_->get_renderer();
     renderer.draw_box(voxel_world_pos, vec3f{1.f, 1.f, 1.f}, draw_color);
 }
 
 inline void add_voxel_tool::on_key_press(
     const gfx::key_press_event& /*ev*/
-) {
-
-}
+) {}
 
 inline void add_voxel_tool::on_mouse_move(
     const gfx::mouse_move_event& /*ev*/
@@ -93,26 +90,32 @@ inline void add_voxel_tool::on_mouse_press(
             return;
         }
 
-        auto& model_comp = world.get_component<gfx::model_component>(ent);
-
-        bool is_outside = //
+        const auto& model_comp = world.get_component<gfx::model_component>(ent);
+        const bool is_outside  =  //
             hovered_voxel_.x < 0 || hovered_voxel_.x >= model_comp.width() ||
             hovered_voxel_.y < 0 || hovered_voxel_.y >= model_comp.height() ||
             hovered_voxel_.z < 0 || hovered_voxel_.z >= model_comp.depth();
         if (is_outside) {
-            vec3i expand_dir = vec3i{
-                hovered_voxel_.x < 0 ? -1 : hovered_voxel_.x >= model_comp.width() ? 1 : 0,
-                hovered_voxel_.y < 0 ? -1 : hovered_voxel_.y >= model_comp.height() ? 1 : 0,
-                hovered_voxel_.z < 0 ? -1 : hovered_voxel_.z >= model_comp.depth() ? 1 : 0
-            };
+            const auto is_x_less    = hovered_voxel_.x < 0;
+            const auto is_x_greater = hovered_voxel_.x >= model_comp.width();
+            const auto x            = is_x_less ? -1 : is_x_greater ? 1 : 0;
+
+            const auto is_y_less    = hovered_voxel_.y < 0;
+            const auto is_y_greater = hovered_voxel_.y >= model_comp.height();
+            const auto y            = is_y_less ? -1 : is_y_greater ? 1 : 0;
+
+            const auto is_z_less    = hovered_voxel_.z < 0;
+            const auto is_z_greater = hovered_voxel_.z >= model_comp.depth();
+            const auto z            = is_z_less ? -1 : is_z_greater ? 1 : 0;
+
+            const auto expand_dir = vec3i{x, y, z};
 
             expand_model_params expand_params = {
                 .name = state_->selected_name,
-                .dir = expand_dir,
+                .dir  = expand_dir,
             };
-            auto expand_op = std::make_unique<expand_model_operation>(
-                *engine_, *state_, expand_params
-            );
+            auto expand_op =
+                std::make_unique<expand_model_operation>(*engine_, *state_, expand_params);
             op_manager_->execute(std::move(expand_op));
 
             update_hovered_voxel_();
@@ -120,13 +123,11 @@ inline void add_voxel_tool::on_mouse_press(
         }
 
         add_voxel_params params;
-        params.name     = state_->selected_name;
-        params.position = hovered_voxel_;
+        params.name      = state_->selected_name;
+        params.position  = hovered_voxel_;
         params.new_color = state_->selected_color;
 
-        auto op = std::make_unique<add_voxel_operation>(
-            *engine_, *state_, params
-        );
+        auto op = std::make_unique<add_voxel_operation>(*engine_, *state_, params);
         op_manager_->execute(std::move(op));
 
         update_hovered_voxel_();
@@ -147,12 +148,17 @@ inline void add_voxel_tool::update_hovered_voxel_() {
     const auto& camera = engine_->get_camera();
 
     const auto ray = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
-
-    if (const auto hit = world.voxel_ray_cast(ray, ray_cast_entities_); hit) {
-        hovered_voxel_ = hit->empty_pos;
-        state_->selected_name = state_->entity_to_name[hit->ent];
-    } else {
+    const auto hit = world.voxel_ray_cast(ray, ray_cast_entities_);
+    if (!hit) {
         hovered_voxel_ = vec3i{-1, -1, -1};
+        return;
+    }
+
+    const bool is_selected_entity =  //
+        state_->name_to_entity.contains(state_->selected_name) &&
+        hit->ent == state_->name_to_entity[state_->selected_name];
+    if (is_selected_entity) {
+        hovered_voxel_ = hit->empty_pos;
     }
 }
 

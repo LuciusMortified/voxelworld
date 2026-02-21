@@ -34,7 +34,11 @@ inline void clip_manager_panel::render(
         ImGuiWindowFlags_AlwaysAutoResize |  //
         ImGuiWindowFlags_NoMove;
 
-    ImGui::Begin("Animation Clips", nullptr, window_flags);
+    bool still_open = true;
+    ImGui::Begin("Animation Clips", &still_open, window_flags);
+    if (!still_open) {
+        state_->ui.show_clip_manager = false;
+    }
 
     if (state_->ui.need_create_clip_modal) {
         create_modal_.open();

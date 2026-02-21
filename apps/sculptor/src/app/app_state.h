@@ -34,6 +34,8 @@ struct ui_state {
 
     float bottom_panel_height   = 200.f;
     bool show_timeline          = false;
+    bool show_clip_manager      = false;
+    bool show_sockets           = true;
     bool need_create_clip_modal = false;
     bool need_save_clip         = false;
     bool need_load_clip_modal   = false;
@@ -93,6 +95,22 @@ struct app_state {
     };
 
     std::unordered_map<std::string, socket_preview> socket_previews;
+
+    [[nodiscard]] static auto socket_preview_key(
+        const std::string& entity_name, const std::string& socket_name
+    ) -> std::string {
+        return std::format("{}:{}", entity_name, socket_name);
+    }
+
+    [[nodiscard]] auto get_preview_entities() const -> std::unordered_set<gfx::entity> {
+        std::unordered_set<gfx::entity> result;
+        for (const auto& preview : socket_previews | std::views::values) {
+            for (const auto& guard : preview.guards) {
+                result.insert(guard->get_entity());
+            }
+        }
+        return result;
+    }
 };
 
 }  // namespace vw::sculptor

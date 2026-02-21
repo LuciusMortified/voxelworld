@@ -31,6 +31,7 @@ public:
 
 private:
     void update_attached_(const vec3f& position, const vec3f& rotation, const vec3f& scale);
+    void update_preview_(const vec3f& position, const vec3f& rotation, const vec3f& scale);
 
     engine_type* engine_;
     app_state* state_;

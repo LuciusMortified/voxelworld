@@ -25,7 +25,8 @@ inline void add_socket_operation::undo() {
     auto& socket_system = world.get_socket_system();
 
     auto ent = state_->name_to_entity[params_.entity_name];
-    state_->socket_previews.erase(params_.socket_name);
+    const auto pkey = app_state::socket_preview_key(params_.entity_name, params_.socket_name);
+    state_->socket_previews.erase(pkey);
     socket_system.modify(ent).remove_socket(params_.socket_name);
     state_->has_unsaved_changes = true;
 }

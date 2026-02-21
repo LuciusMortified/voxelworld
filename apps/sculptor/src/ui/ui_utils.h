@@ -11,11 +11,25 @@ inline void imgui_input_text_string(
     constexpr size_t max_length = 64;
     std::array<char, max_length> buffer{};
 
-    std::strncpy(buffer.data(), value.data(), max_length - 1);
+    strncpy_s(buffer.data(), max_length, value.data(), max_length - 1);
 
-    if (ImGui::InputText(label.data(), buffer.data(), max_length)) {
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(label.data(), label.data() + label.size());
+    ImGui::SameLine();
+
+    const auto hidden_label = std::format("##{}", label);
+    if (ImGui::InputText(hidden_label.c_str(), buffer.data(), max_length)) {
         value = std::string{buffer.data()};
     }
+}
+
+inline auto imgui_input_int_left(std::string_view label, int* value) -> bool {
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(label.data(), label.data() + label.size());
+    ImGui::SameLine();
+
+    const auto hidden_label = std::format("##{}", label);
+    return ImGui::InputInt(hidden_label.c_str(), value);
 }
 
 inline void imgui_clamp_window_pos_to_viewport() {

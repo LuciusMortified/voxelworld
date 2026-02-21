@@ -16,7 +16,7 @@ public:
 
     menu_bar(engine_type& eng, app_state& state, operation_manager& op_manager);
 
-    void render(float delta_time);
+    void render(float delta_time) const;
 
 private:
     engine_type* engine_;

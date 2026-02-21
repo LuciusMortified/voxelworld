@@ -24,7 +24,8 @@ inline void remove_socket_operation::execute() {
         saved_scale_    = sp->scale;
     }
 
-    state_->socket_previews.erase(params_.socket_name);
+    const auto pkey = app_state::socket_preview_key(params_.entity_name, params_.socket_name);
+    state_->socket_previews.erase(pkey);
     socket_system.modify(ent).remove_socket(params_.socket_name);
     state_->has_unsaved_changes = true;
 }

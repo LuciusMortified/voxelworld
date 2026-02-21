@@ -44,9 +44,12 @@ inline void modify_keyframe_operation::apply(
     std::visit(
         [remove_time](auto& channel) {
             auto& kfs = channel.get_keyframes_mut();
-            std::erase_if(kfs, [remove_time](const auto& kf) {
+            auto it   = std::find_if(kfs.begin(), kfs.end(), [remove_time](const auto& kf) {
                 return std::abs(kf.time - remove_time) < 0.0001f;
             });
+            if (it != kfs.end()) {
+                kfs.erase(it);
+            }
         },
         *channel_var
     );
