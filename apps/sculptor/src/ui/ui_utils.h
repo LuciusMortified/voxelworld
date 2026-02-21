@@ -27,7 +27,9 @@ inline void imgui_input_text_string(
     }
 }
 
-inline auto imgui_input_int_left(std::string_view label, int* value) -> bool {
+inline auto imgui_input_int_left(
+    std::string_view label, int* value
+) -> bool {
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted(label.data(), label.data() + label.size());
     ImGui::SameLine();
@@ -38,17 +40,17 @@ inline auto imgui_input_int_left(std::string_view label, int* value) -> bool {
 
 inline void imgui_clamp_window_pos_to_viewport() {
     if (!ImGui::IsWindowCollapsed() && !ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
-        ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImVec2 window_pos       = ImGui::GetWindowPos();
-        ImVec2 window_size      = ImGui::GetWindowSize();
+        const ImGuiViewport* viewport = ImGui::GetMainViewport();
+        const ImVec2 window_pos       = ImGui::GetWindowPos();
+        const ImVec2 window_size      = ImGui::GetWindowSize();
 
-        ImVec2 viewport_pos  = ImVec2{viewport->WorkPos.x + 10, viewport->WorkPos.y + 10};
-        ImVec2 viewport_size = ImVec2{viewport->WorkSize.x - 20, viewport->WorkSize.y - 20};
+        const auto viewport_pos  = ImVec2{viewport->WorkPos.x + 10, viewport->WorkPos.y + 10};
+        const auto viewport_size = ImVec2{viewport->WorkSize.x - 20, viewport->WorkSize.y - 20};
 
-        float new_x = std::max(
+        const float new_x = std::max(
             viewport_pos.x, std::min(window_pos.x, viewport_pos.x + viewport_size.x - window_size.x)
         );
-        float new_y = std::max(
+        const float new_y = std::max(
             viewport_pos.y, std::min(window_pos.y, viewport_pos.y + viewport_size.y - window_size.y)
         );
 
