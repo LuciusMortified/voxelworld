@@ -180,17 +180,6 @@ inline void socket_panel::render_socket_(
 
         const auto pkey        = app_state::socket_preview_key(state_->selected_name, sp.name);
         const bool has_preview = state_->socket_previews.contains(pkey);
-        if (sp.attached.is_valid()) {
-            const auto it = state_->entity_to_name.find(sp.attached);
-            if (it != state_->entity_to_name.end()) {
-                ImGui::Text("Attached: %s", it->second.c_str());
-            } else {
-                ImGui::Text("Attached: %u.%u", sp.attached.index, sp.attached.generation);
-            }
-        } else if (!has_preview) {
-            ImGui::TextDisabled("Empty");
-        }
-
         if (has_preview) {
             const auto& preview = state_->socket_previews[pkey];
             ImGui::Text("Preview: %s", preview.filename.c_str());
@@ -199,13 +188,16 @@ inline void socket_panel::render_socket_(
                 unload_preview_(pkey);
             }
         } else {
-            if (ImGui::SmallButton("Load Preview")) {
+            ImGui::TextDisabled("Preview: Empty");
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Load")) {
                 need_preview_modal_   = true;
                 preview_modal_socket_ = sp.name;
             }
         }
 
         ImGui::Spacing();
+
         if (ImGui::SmallButton("Remove Socket")) {
             socket_to_remove = sp.name;
         }

@@ -242,7 +242,7 @@ inline void app::handle_file_shortcuts(
         const fs::path filepath{assets_dir_path / state_.filename};
 
         auto result = serializer.serialize(filepath);
-        // TODO: handle errors
+        // TODO: handle serialize errors
 
         clip_manager_panel_.save_all_clips();
 

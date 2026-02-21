@@ -11,7 +11,7 @@ inline add_voxel_operation::add_voxel_operation(
     : engine_(&eng), state_(&st), params_(params) {}
 
 inline void add_voxel_operation::execute() {
-    auto ent = state_->name_to_entity[params_.name];
+    const auto ent = state_->name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
     auto& model_system = world.get_model_system();
@@ -21,7 +21,7 @@ inline void add_voxel_operation::execute() {
 }
 
 inline void add_voxel_operation::undo() {
-    auto ent = state_->name_to_entity[params_.name];
+    const auto ent = state_->name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
     auto& model_system = world.get_model_system();
