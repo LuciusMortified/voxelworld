@@ -15,7 +15,7 @@ public:
 
     entity_properties_panel(engine_type& eng, app_state& st, operation_manager& op_manager);
 
-    void render(float delta_time);
+    void render(float delta_time) const;
 
 private:
     engine_type* engine_;
@@ -24,12 +24,12 @@ private:
 
     void render_model_info();
 
-    void render_position();
-    void render_rotation();
-    void render_scale();
-    void render_origin();
+    void render_position() const;
+    void render_rotation() const;
+    void render_scale() const;
+    void render_origin() const;
 
-    bool render_vec3f_field(const char* label, vec3f& vec);
+    static bool render_vec3f_field(std::string_view label, vec3f& vec);
 };
 
 }  // namespace vw::sculptor

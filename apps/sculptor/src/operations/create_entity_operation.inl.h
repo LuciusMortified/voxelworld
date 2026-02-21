@@ -30,6 +30,10 @@ inline void create_entity_operation::execute() {
         model->fill(voxel{state_->selected_color});
     }
 
+    if (params_.with_socket) {
+        ent_guard->with<gfx::socket_component>();
+    }
+
     auto ent = ent_guard->get_entity();
 
     transform_system.modify(ent)

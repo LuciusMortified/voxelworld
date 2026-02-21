@@ -12,19 +12,19 @@ inline menu_bar::menu_bar(
     : engine_(&eng), state_(&state), op_manager_(&op_manager) {}
 
 inline void menu_bar::render(
-    float delta_time
-) {
-    ImGuiWindowFlags menu_window_flags =          //
-        ImGuiWindowFlags_MenuBar |                //
-        ImGuiWindowFlags_NoTitleBar |             //
-        ImGuiWindowFlags_NoCollapse |             //
-        ImGuiWindowFlags_NoResize |               //
-        ImGuiWindowFlags_NoMove |                 //
-        ImGuiWindowFlags_NoBringToFrontOnFocus |  //
-        ImGuiWindowFlags_NoNavFocus |             //
+    float /*delta_time*/
+) const {
+    constexpr ImGuiWindowFlags menu_window_flags =  //
+        ImGuiWindowFlags_MenuBar |                  //
+        ImGuiWindowFlags_NoTitleBar |               //
+        ImGuiWindowFlags_NoCollapse |               //
+        ImGuiWindowFlags_NoResize |                 //
+        ImGuiWindowFlags_NoMove |                   //
+        ImGuiWindowFlags_NoBringToFrontOnFocus |    //
+        ImGuiWindowFlags_NoNavFocus |               //
         ImGuiWindowFlags_NoBackground;
 
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
     ImGui::SetNextWindowSize(ImVec2{viewport->WorkSize.x, 10.f});
 
@@ -48,16 +48,19 @@ inline void menu_bar::render(
             gfx::vox_serializer serializer{
                 engine_->get_world(),
                 state_->name_to_entity.at(state_->root_name),
-                state_->entity_to_name
+                {.entity_names = state_->entity_to_name, .excluded = state_->get_preview_entities()}
             };
 
             namespace fs = std::filesystem;
-            fs::path assets_dir_path{app_state::asset_dir_name};
-            fs::path filepath{assets_dir_path / state_->filename};
-            (void)serializer.serialize(filepath);
+            const fs::path assets_dir_path{app_state::asset_dir_name};
+            const fs::path filepath{assets_dir_path / state_->filename};
+            auto result = serializer.serialize(filepath);
+
+            // TODO: handle serialization errors
+
             state_->has_unsaved_changes = false;
         }
-        if (ImGui::MenuItem("Save As...", "Ctrl+Shift+S")) {
+        if (ImGui::MenuItem("Save As", "Ctrl+Shift+S")) {
             state_->ui.need_save_as_modal = true;
         }
 
@@ -81,12 +84,25 @@ inline void menu_bar::render(
         ImGui::EndMenu();
     }
 
-    bool has_clip = !state_->selected_clip_name.empty();
+    if (ImGui::BeginMenu("View")) {
+        if (ImGui::MenuItem("Sockets", "Alt+S", state_->ui.show_sockets)) {
+            state_->ui.show_sockets ^= true;
+        }
+        if (ImGui::MenuItem("Animation Clips", "Alt+A", state_->ui.show_clip_manager)) {
+            state_->ui.show_clip_manager ^= true;
+        }
+        if (ImGui::MenuItem("Animation Timeline", "Alt+T", state_->ui.show_timeline)) {
+            state_->ui.show_timeline ^= true;
+        }
+        ImGui::EndMenu();
+    }
+
+    const bool has_clip = !state_->selected_clip_name.empty();
     if (ImGui::BeginMenu("Animation")) {
-        if (ImGui::MenuItem("New Clip...")) {
+        if (ImGui::MenuItem("New Clip")) {
             state_->ui.need_create_clip_modal = true;
         }
-        if (ImGui::MenuItem("Open Clip...")) {
+        if (ImGui::MenuItem("Open Clip")) {
             state_->ui.need_load_clip_modal = true;
         }
         if (ImGui::MenuItem("Save Clip", nullptr, false, has_clip)) {
@@ -96,9 +112,6 @@ inline void menu_bar::render(
             state_->ui.need_close_clip = true;
         }
         ImGui::Separator();
-        if (ImGui::MenuItem("Toggle Timeline", "T")) {
-            state_->ui.show_timeline ^= true;
-        }
         if (ImGui::MenuItem("Play/Pause", "Space", false, has_clip)) {
             state_->need_toggle_playback = true;
         }

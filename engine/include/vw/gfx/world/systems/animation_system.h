@@ -20,9 +20,6 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-class world;
-
 template <typename... Cs>
 class transform_system;
 
@@ -31,12 +28,10 @@ class transform_system;
 template <typename... Cs>
 class animation_system final {
 public:
-    using world_type = world<std::tuple<Cs...>>;
     using registry_type = registry<Cs...>;
     using transform_system_type = transform_system<Cs...>;
 
     explicit animation_system(
-        world_type& world,
         registry_type& registry,
         transform_system_type& transform_sys,
         animation_clip_registry& clip_registry
@@ -102,7 +97,6 @@ private:
     void update_anim_time(animation_player_component& anim_comp, float32 delta_time);
     void apply_animation(entity root_ent, const animation_player_component& anim_comp);
 
-    world_type* world_;
     registry_type* registry_;
     transform_system_type* transform_system_;
     animation_clip_registry* clip_registry_;

@@ -112,7 +112,7 @@ inline auto save_as_modal::save_file_() -> bool {
     gfx::vox_serializer serializer{
         engine_->get_world(),
         state_->name_to_entity.at(state_->root_name),
-        state_->entity_to_name
+        {.entity_names = state_->entity_to_name, .excluded = state_->get_preview_entities()}
     };
 
     if (!serializer.serialize(filepath)) {

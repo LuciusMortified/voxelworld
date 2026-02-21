@@ -10,6 +10,7 @@
 #include "vw/gfx/world/components/hierarchy_component.h"
 #include "vw/gfx/world/components/light_component.h"
 #include "vw/gfx/world/components/model_component.h"
+#include "vw/gfx/world/components/socket_component.h"
 #include "vw/gfx/world/components/spatial_component.h"
 #include "vw/gfx/world/components/transform_component.h"
 
@@ -21,6 +22,7 @@ using base_world_components = std::tuple<
     model_component,
     spatial_component,
     light_component,
+    socket_component,
     animation_player_component,
     animation_target_component>;
 

@@ -13,8 +13,9 @@ inline create_entity_modal::create_entity_modal(
 
 inline void create_entity_modal::open() {
     need_open_ = true;
-    name_      = std::format("new entity {}", state_->name_to_entity.size());
-    with_model_ = false;
+    name_        = std::format("new entity {}", state_->name_to_entity.size());
+    with_model_  = false;
+    with_socket_ = false;
 }
 
 inline void create_entity_modal::render(
@@ -35,12 +36,14 @@ inline void create_entity_modal::render(
 
         imgui_input_text_string("Name", name_);
 
-        ImGui::Checkbox("With Model?", &with_model_);
+        ImGui::Checkbox("With Model", &with_model_);
         if (with_model_) {
-            ImGui::InputInt("Size X", &size_.x);
-            ImGui::InputInt("Size Y", &size_.y);
-            ImGui::InputInt("Size Z", &size_.z);
+            imgui_input_int_left("Size X", &size_.x);
+            imgui_input_int_left("Size Y", &size_.y);
+            imgui_input_int_left("Size Z", &size_.z);
         }
+
+        ImGui::Checkbox("With Socket", &with_socket_);
 
         if (ImGui::Button("Create")) {
             if (create_entity()) {
@@ -56,7 +59,7 @@ inline void create_entity_modal::render(
     }
 }
 
-inline bool create_entity_modal::create_entity() {
+inline auto create_entity_modal::create_entity() -> bool {
     error_.clear();
 
     if (name_.empty()) {
@@ -76,6 +79,7 @@ inline bool create_entity_modal::create_entity() {
         .name        = name_,
         .parent_name = state_->selected_name,
         .with_model  = with_model_,
+        .with_socket = with_socket_,
         .size        = size_,
     };
 

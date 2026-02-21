@@ -16,9 +16,6 @@ add_executable(core_tests
     core/mat4.test.cpp
     core/math.test.cpp
     core/transform.test.cpp
-    core/entity_pool.test.cpp
-    core/component_pool.test.cpp
-    core/registry.test.cpp
 )
 
 target_link_libraries(core_tests PRIVATE
@@ -29,3 +26,19 @@ target_link_libraries(core_tests PRIVATE
 target_compile_features(core_tests PRIVATE cxx_std_23)
 
 catch_discover_tests(core_tests)
+
+add_executable(ecs_tests
+    ecs/entity_pool.test.cpp
+    ecs/component_pool.test.cpp
+    ecs/registry.test.cpp
+    ecs/socket.test.cpp
+)
+
+target_link_libraries(ecs_tests PRIVATE
+    vwengine
+    Catch2::Catch2WithMain
+)
+
+target_compile_features(ecs_tests PRIVATE cxx_std_23)
+
+catch_discover_tests(ecs_tests)

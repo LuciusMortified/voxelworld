@@ -19,7 +19,7 @@ public:
     void render(float delta_time);
 
 private:
-    bool render_vec3f_field(const char* label, vec3f& vec);
+    static auto render_vec3f_field(std::string_view label, vec3f& vec) -> bool;
 
     engine_type* engine_;
     app_state* state_;

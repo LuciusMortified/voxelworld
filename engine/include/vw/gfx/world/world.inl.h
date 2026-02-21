@@ -12,11 +12,12 @@ world<Cs>::world(
 )
     : mesh_pool_{context},
       spatial_system_(registry_),
-      transform_system_(*this, registry_),
+      transform_system_(registry_, spatial_system_, hierarchy_system_),
       hierarchy_system_(registry_, transform_system_),
       model_system_(registry_, mesh_pool_, spatial_system_),
       light_system_(registry_),
-      animation_system_(*this, registry_, transform_system_, animation_clip_registry_) {}
+      socket_system_(registry_, hierarchy_system_, transform_system_),
+      animation_system_(registry_, transform_system_, animation_clip_registry_) {}
 
 template <typename Cs>
 void world<Cs>::update(float32 delta_time) {
@@ -90,6 +91,9 @@ void world<Cs>::remove_component(
     if constexpr (std::same_as<T, light_component>) {
         light_system_.mark_render_dirty(ent);
     }
+    if constexpr (std::same_as<T, socket_component>) {
+        socket_system_.cleanup(ent);
+    }
     registry_.template remove<T>(ent);
 }
 
@@ -153,6 +157,11 @@ auto world<C>::get_spatial_system() -> spatial_system_type& {
 template <typename C>
 auto world<C>::get_light_system() -> light_system_type& {
     return light_system_;
+}
+
+template <typename C>
+auto world<C>::get_socket_system() -> socket_system_type& {
+    return socket_system_;
 }
 
 template <typename C>

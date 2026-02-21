@@ -103,14 +103,14 @@ public:
 
     void set_render_mode(render_mode mode);
 
-    [[nodiscard]] render_mode get_render_mode() const;
+    [[nodiscard]] auto get_render_mode() const -> render_mode;
 
-    [[nodiscard]] const renderer_stats& get_stats() const;
+    [[nodiscard]] auto get_stats() const -> const renderer_stats&;
 
-    [[nodiscard]] VkDescriptorPool get_descriptor_pool() const {
+    [[nodiscard]] auto get_descriptor_pool() const -> VkDescriptorPool {
         return descriptor_pool_;
     }
-    [[nodiscard]] VkDescriptorSetLayout get_storage_descriptor_set_layout() const {
+    [[nodiscard]] auto get_storage_descriptor_set_layout() const -> VkDescriptorSetLayout {
         return storage_descriptor_set_layout_;
     }
 

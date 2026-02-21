@@ -264,7 +264,7 @@ void renderer<C>::draw_line(
 
 template <typename C>
 void renderer<C>::draw_box(
-    const mat4f& matrix, const vec3f& size, color col
+    const mat4f& matrix, const vec3f& size, const color col
 ) {
     debug_primitives_.add_box(matrix, size, col);
 }

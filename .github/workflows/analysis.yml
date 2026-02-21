@@ -48,7 +48,7 @@ jobs:
           -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
 
       - name: Build tests
-        run: cmake --build build --target core_tests
+        run: cmake --build build --target core_tests ecs_tests
 
       - name: Run tests with ASan + UBSan
         run: ctest --test-dir build --output-on-failure

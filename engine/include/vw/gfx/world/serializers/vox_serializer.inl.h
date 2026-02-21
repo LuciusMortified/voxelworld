@@ -14,10 +14,10 @@ inline constexpr log::log_category vox_serializer_lc{"vox_serializer"};
 
 template <typename WC>
 vox_serializer<WC>::vox_serializer(
-    world_type& world, entity root, std::optional<entity_names_type> entity_names
-) : world_(&world), root_(root) {
-    if (entity_names.has_value()) {
-        entity_names_ = std::move(entity_names.value());
+    world_type& world, entity root, options opts
+) : world_(&world), root_(root), excluded_(std::move(opts.excluded)) {
+    if (opts.entity_names.has_value()) {
+        entity_names_ = std::move(opts.entity_names.value());
     } else {
         generate_entity_names_();
     }
@@ -41,6 +41,10 @@ auto vox_serializer<WC>::serialize(
     while (!to_process.empty()) {
         entity current = to_process.front();
         to_process.pop_front();
+
+        if (excluded_.contains(current)) {
+            continue;
+        }
 
         write_entity_(file, current);
 
@@ -69,6 +73,10 @@ void vox_serializer<WC>::generate_entity_names_() {
     while (!to_process.empty()) {
         entity current = to_process.front();
         to_process.pop_front();
+
+        if (excluded_.contains(current)) {
+            continue;
+        }
 
         if (!entity_names_.contains(current)) {
             std::string name = std::format("child_{}", entity_names_.size());
@@ -130,6 +138,20 @@ void vox_serializer<WC>::write_entity_(
     if (world_->template has_component<animation_target_component>(ent)) {
         auto& target = world_->template get_component<animation_target_component>(ent);
         file << std::format("\ttarget {}\n", target.get_name());
+    }
+
+    if (world_->template has_component<socket_component>(ent)) {
+        auto& socket_comp = world_->template get_component<socket_component>(ent);
+        file << "\tsockets\n";
+        for (const auto& sp : socket_comp.get_sockets()) {
+            file << std::format(
+                "\t\tsocket {} {} {} {} {} {} {} {} {} {}\n",
+                sp.name,
+                sp.position.x, sp.position.y, sp.position.z,
+                sp.rotation.x, sp.rotation.y, sp.rotation.z,
+                sp.scale.x, sp.scale.y, sp.scale.z
+            );
+        }
     }
 
     write_model_(file, ent);

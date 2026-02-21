@@ -15,7 +15,12 @@ public:
     using world_type        = world<WC>;
     using entity_guard_type = entity_guard<WC>;
 
-    enum class error_type { file_open_failed, parse_error };
+    enum class error_type : uint8 { file_open_failed, parse_error };
+
+    struct options {
+        bool skip_sockets = false;
+        bool skip_targets = false;
+    };
 
     struct result {
         std::string root_name;
@@ -26,7 +31,8 @@ public:
 
     vox_deserializer(world_type& world);
 
-    auto deserialize(const std::filesystem::path& filepath) -> std::expected<result, error_type>;
+    auto deserialize(const std::filesystem::path& filepath, const options& opts = {})
+        -> std::expected<result, error_type>;
 
 private:
     void process_root_(std::istringstream& iss);
@@ -34,10 +40,13 @@ private:
     void process_parent_(std::istringstream& iss);
     void process_transform_(std::istringstream& iss);
     void process_target_(std::istringstream& iss);
+    void process_sockets_();
+    void process_socket_(std::istringstream& iss);
     void process_model_(std::istringstream& iss);
     void process_voxel_(std::istringstream& iss);
 
     world_type* world_;
+    options options_;
 
     result result_;
     std::optional<error_type> error_;

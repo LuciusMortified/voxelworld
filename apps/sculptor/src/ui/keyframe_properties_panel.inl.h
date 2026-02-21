@@ -188,12 +188,13 @@ inline void keyframe_properties_panel::render(
     ImGui::End();
 }
 
-inline bool keyframe_properties_panel::render_vec3f_field(
-    const char* label, vec3f& vec
-) {
+inline auto keyframe_properties_panel::render_vec3f_field(
+    std::string_view label, vec3f& vec
+) -> bool {
     bool vec_changed = false;
 
-    ImGui::PushID(label);
+    const auto field_id = std::format("##keyframe_properties_{}", label);
+    ImGui::PushID(field_id.c_str());
 
     ImGui::AlignTextToFramePadding();
     auto text = std::format("{}", label);

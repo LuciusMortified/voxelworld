@@ -12,9 +12,9 @@ inline entity_properties_panel::entity_properties_panel(
 
 inline void entity_properties_panel::render(
     float /*delta_time*/
-) {
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImVec2 window_pos       = ImVec2(
+) const {
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const auto window_pos         = ImVec2(
         viewport->WorkPos.x + viewport->WorkSize.x - 10,
         viewport->WorkPos.y + state_->ui.right_top_voffset + 10
     );
@@ -30,10 +30,8 @@ inline void entity_properties_panel::render(
     if (state_->selected_name.empty()) {
         ImGui::TextDisabled("No entity selected");
     } else {
-        auto ent = state_->name_to_entity[state_->selected_name];
-
-        auto& world = engine_->get_world();
-        auto has_model = world.has_component<gfx::model_component>(ent);
+        const auto ent    = state_->name_to_entity[state_->selected_name];
+        const auto& world = engine_->get_world();
 
         ImGui::Text("Selected: %s %u.%u", state_->selected_name.c_str(), ent.index, ent.generation);
 
@@ -58,18 +56,18 @@ inline void entity_properties_panel::render(
     ImGui::End();
 }
 
-inline void entity_properties_panel::render_position() {
-    auto ent = state_->name_to_entity[state_->selected_name];
+inline void entity_properties_panel::render_position() const {
+    const auto ent = state_->name_to_entity[state_->selected_name];
 
-    auto& world          = engine_->get_world();
-    auto& transform_comp = world.get_component<gfx::transform_component>(ent);
-    vec3f position       = transform_comp.get_position();
-    if (render_vec3f_field("Position", position)) {
+    auto& world                = engine_->get_world();
+    const auto& transform_comp = world.get_component<gfx::transform_component>(ent);
+    vec3f position             = transform_comp.get_position();
+    if (render_vec3f_field("Pos", position)) {
         transform new_transform = transform_comp.get_transform();
         new_transform.set_position(position);
 
         set_transform_params params = {
-            .name      = state_->selected_name,
+            .name          = state_->selected_name,
             .new_transform = new_transform,
         };
         auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
@@ -77,20 +75,20 @@ inline void entity_properties_panel::render_position() {
     }
 }
 
-inline void entity_properties_panel::render_rotation() {
-    auto ent = state_->name_to_entity[state_->selected_name];
+inline void entity_properties_panel::render_rotation() const {
+    const auto ent = state_->name_to_entity[state_->selected_name];
 
-    auto& world          = engine_->get_world();
-    auto& transform_comp = world.get_component<gfx::transform_component>(ent);
-    vec3f rotation       = transform_comp.get_rotation();
-    vec3f rotation_deg   = {
+    auto& world                = engine_->get_world();
+    const auto& transform_comp = world.get_component<gfx::transform_component>(ent);
+    const vec3f rotation       = transform_comp.get_rotation();
+    vec3f rotation_deg         = {
         math::degrees(rotation.x),
         math::degrees(rotation.y),
         math::degrees(rotation.z),
     };
 
-    if (render_vec3f_field("Rotation", rotation_deg)) {
-        vec3f rotation_rad = {
+    if (render_vec3f_field("Rot", rotation_deg)) {
+        const vec3f rotation_rad = {
             math::radians(rotation_deg.x),
             math::radians(rotation_deg.y),
             math::radians(rotation_deg.z),
@@ -99,7 +97,7 @@ inline void entity_properties_panel::render_rotation() {
         new_transform.set_rotation(rotation_rad);
 
         set_transform_params params = {
-            .name      = state_->selected_name,
+            .name          = state_->selected_name,
             .new_transform = new_transform,
         };
         auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
@@ -107,7 +105,7 @@ inline void entity_properties_panel::render_rotation() {
     }
 }
 
-inline void entity_properties_panel::render_scale() {
+inline void entity_properties_panel::render_scale() const {
     auto ent = state_->name_to_entity[state_->selected_name];
 
     auto& world          = engine_->get_world();
@@ -118,7 +116,7 @@ inline void entity_properties_panel::render_scale() {
         new_transform.set_scale(scale);
 
         set_transform_params params = {
-            .name      = state_->selected_name,
+            .name          = state_->selected_name,
             .new_transform = new_transform,
         };
         auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
@@ -126,18 +124,18 @@ inline void entity_properties_panel::render_scale() {
     }
 }
 
-inline void entity_properties_panel::render_origin() {
-    auto ent = state_->name_to_entity[state_->selected_name];
+inline void entity_properties_panel::render_origin() const {
+    const auto ent = state_->name_to_entity[state_->selected_name];
 
-    auto& world          = engine_->get_world();
-    auto& transform_comp = world.get_component<gfx::transform_component>(ent);
-    vec3f origin         = transform_comp.get_origin();
+    auto& world                = engine_->get_world();
+    const auto& transform_comp = world.get_component<gfx::transform_component>(ent);
+    vec3f origin               = transform_comp.get_origin();
     if (render_vec3f_field("Origin", origin)) {
         transform new_transform = transform_comp.get_transform();
         new_transform.set_origin(origin);
 
         set_transform_params params = {
-            .name      = state_->selected_name,
+            .name          = state_->selected_name,
             .new_transform = new_transform,
         };
         auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
@@ -146,22 +144,17 @@ inline void entity_properties_panel::render_origin() {
 }
 
 inline bool entity_properties_panel::render_vec3f_field(
-    const char* label, vec3f& vec
+    std::string_view label, vec3f& vec
 ) {
     bool vec_changed = false;
 
-    ImGui::PushID(label);
+    const auto field_id = std::format("##entity_properties_{}", label);
+    ImGui::PushID(field_id.c_str());
 
     ImGui::AlignTextToFramePadding();
-    std::string text = std::format("{}", label);
+    const std::string text = std::format("{}", label);
     ImGui::Text("%s", text.c_str());
-    ImGui::SameLine(80.f);
-
-    /*
-    ImGui::AlignTextToFramePadding();
-    ImGui::Text("X");
-    ImGui::SameLine();
-    */
+    ImGui::SameLine(60.f);
 
     ImGui::PushItemWidth(80.0f);
     std::string drag_x_id = std::format("##{}X", label);
@@ -169,23 +162,11 @@ inline bool entity_properties_panel::render_vec3f_field(
     ImGui::PopItemWidth();
     ImGui::SameLine();
 
-    /*
-    ImGui::AlignTextToFramePadding();
-    ImGui::Text("Y");
-    ImGui::SameLine();
-    */
-
     ImGui::PushItemWidth(80.0f);
     std::string drag_y_id = std::format("##{}Y", label);
     vec_changed |= ImGui::DragFloat(drag_y_id.c_str(), &vec.y, 0.1f, 0, 0, "%.4f");
     ImGui::PopItemWidth();
     ImGui::SameLine();
-
-    /*
-    ImGui::AlignTextToFramePadding();
-    ImGui::Text("Z");
-    ImGui::SameLine();
-    */
 
     ImGui::PushItemWidth(80.0f);
     std::string drag_z_id = std::format("##{}Z", label);

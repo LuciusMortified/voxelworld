@@ -22,9 +22,10 @@ vox_deserializer<WC>::vox_deserializer(
 
 template <typename WC>
 auto vox_deserializer<WC>::deserialize(
-    const std::filesystem::path& filepath
+    const std::filesystem::path& filepath, const options& opts
 ) -> std::expected<result, error_type> {
     result_ = {};
+    options_ = opts;
     error_ = std::nullopt;
     current_entity_ = invalid_entity;
     current_entity_guard_ = nullptr;
@@ -58,6 +59,10 @@ auto vox_deserializer<WC>::deserialize(
             process_transform_(iss);
         } else if (cmd == "target") {
             process_target_(iss);
+        } else if (cmd == "sockets") {
+            process_sockets_();
+        } else if (cmd == "socket") {
+            process_socket_(iss);
         } else if (cmd == "m") {
             process_model_(iss);
         } else if (cmd == "v") {
@@ -183,7 +188,7 @@ template <typename WC>
 void vox_deserializer<WC>::process_target_(
     std::istringstream& iss
 ) {
-    if (!current_entity_.is_valid()) {
+    if (!current_entity_.is_valid() || options_.skip_targets) {
         return;
     }
 
@@ -198,6 +203,44 @@ void vox_deserializer<WC>::process_target_(
 
     auto& animation_system = world_->get_animation_system();
     animation_system.modify_target(current_entity_).set_target_name(target_name);
+}
+
+template <typename WC>
+void vox_deserializer<WC>::process_sockets_() {
+    if (!current_entity_.is_valid() || options_.skip_sockets) {
+        return;
+    }
+
+    current_entity_guard_->template with<socket_component>();
+}
+
+template <typename WC>
+void vox_deserializer<WC>::process_socket_(
+    std::istringstream& iss
+) {
+    if (!current_entity_.is_valid() || options_.skip_sockets) {
+        return;
+    }
+
+    std::string name;
+    iss >> name;
+
+    vec3f position;
+    iss >> position.x >> position.y >> position.z;
+
+    vec3f rotation;
+    iss >> rotation.x >> rotation.y >> rotation.z;
+
+    vec3f scale;
+    iss >> scale.x >> scale.y >> scale.z;
+
+    if (iss.fail()) {
+        error_ = error_type::parse_error;
+        return;
+    }
+
+    auto& socket_system = world_->get_socket_system();
+    socket_system.modify(current_entity_).add_socket(name, position, rotation, scale);
 }
 
 template <typename WC>

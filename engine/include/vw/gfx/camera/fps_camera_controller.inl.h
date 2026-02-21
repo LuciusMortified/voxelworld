@@ -104,8 +104,8 @@ inline void fps_camera_controller::handle_mouse_moved_(
         return;
     }
 
-    double delta_x = x - last_mouse_x_;
-    double delta_y = y - last_mouse_y_;
+    const double delta_x = x - last_mouse_x_;
+    const double delta_y = y - last_mouse_y_;
 
     last_mouse_x_ = x;
     last_mouse_y_ = y;
@@ -142,11 +142,11 @@ inline void fps_camera_controller::update_camera_movement_(
     }
 
     if (window_->is_key_pressed(keyboard::keys::SPACE)) {
-        const vec3f world_up(0.0f, 1.0f, 0.0f);
+        constexpr vec3f world_up(0.0f, 1.0f, 0.0f);
         camera_->set_position(camera_->get_position() + world_up * move_speed);
     }
     if (window_->is_key_pressed(keyboard::keys::LEFT_SHIFT)) {
-        const vec3f world_up(0.0f, 1.0f, 0.0f);
+        constexpr vec3f world_up(0.0f, 1.0f, 0.0f);
         camera_->set_position(camera_->get_position() - world_up * move_speed);
     }
 }

@@ -24,6 +24,7 @@ inline app::app(
     , tool_panel_(state_)
     , color_palette_panel_(state_)
     , entity_properties_panel_(eng, state_, op_manager_)
+    , socket_panel_(eng, state_, op_manager_)
     , keyframe_properties_panel_(eng, state_, op_manager_)
     , entity_tree_panel_(eng, state_, op_manager_)
     , clip_manager_panel_(eng, state_, op_manager_)
@@ -108,9 +109,17 @@ inline void app::render(
 
     // right side
     entity_properties_panel_.render(delta_time);
-    keyframe_properties_panel_.render(delta_time);
     entity_tree_panel_.render(delta_time);
-    clip_manager_panel_.render(delta_time);
+    if (state_.ui.show_sockets) {
+        socket_panel_.render(delta_time);
+    }
+    if (state_.ui.need_create_clip_modal || state_.ui.need_load_clip_modal) {
+        state_.ui.show_clip_manager = true;
+    }
+    if (state_.ui.show_clip_manager) {
+        clip_manager_panel_.render(delta_time);
+    }
+    keyframe_properties_panel_.render(delta_time);
 
     // modals
     startup_modal_.render(delta_time);
@@ -187,11 +196,17 @@ inline void app::handle_key_press(
 
     tools_[active_tool_]->on_key_press(ev);
 
+    if (ev.key == keys::S && ev.with(mods::ALT)) {
+        state_.ui.show_sockets ^= true;
+    }
+    if (ev.key == keys::A && ev.with(mods::ALT)) {
+        state_.ui.show_clip_manager ^= true;
+    }
+    if (ev.key == keys::T && ev.with(mods::ALT)) {
+        state_.ui.show_timeline ^= true;
+    }
     if (ev.key == keys::SPACE && !ev.with(mods::CTRL)) {
         state_.need_toggle_playback = true;
-    }
-    if (ev.key == keys::T && !ev.with(mods::CTRL)) {
-        state_.ui.show_timeline ^= true;
     }
     if (ev.key == keys::LEFT && !ev.with(mods::CTRL) && state_.ui.show_timeline) {
         state_.need_step_backward = true;
@@ -217,7 +232,9 @@ inline void app::handle_file_shortcuts(
     }
     if (ev.key == keys::S && ev.with(mods::CTRL) && !ev.with(mods::SHIFT)) {
         gfx::vox_serializer serializer{
-            get_engine().get_world(), state_.name_to_entity[state_.root_name], state_.entity_to_name
+            get_engine().get_world(),
+            state_.name_to_entity[state_.root_name],
+            {.entity_names = state_.entity_to_name, .excluded = state_.get_preview_entities()}
         };
 
         namespace fs = std::filesystem;
@@ -225,7 +242,7 @@ inline void app::handle_file_shortcuts(
         const fs::path filepath{assets_dir_path / state_.filename};
 
         auto result = serializer.serialize(filepath);
-        // TODO: handle errors
+        // TODO: handle serialize errors
 
         clip_manager_panel_.save_all_clips();
 
@@ -239,6 +256,11 @@ inline void app::handle_file_shortcuts(
 inline void app::handle_mouse_move(
     const gfx::mouse_move_event& ev
 ) {
+    const auto& io = ImGui::GetIO();
+    if (io.WantCaptureMouse) {
+        return;
+    }
+
     if (!camera_movement_enabled_) {
         tools_[active_tool_]->on_mouse_move(ev);
     }

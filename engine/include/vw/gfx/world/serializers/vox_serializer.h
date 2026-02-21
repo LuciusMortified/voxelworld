@@ -6,6 +6,7 @@
 #include <expected>
 #include <filesystem>
 #include <string_view>
+#include <unordered_set>
 
 #include "vw/gfx/world/world.h"
 
@@ -19,11 +20,14 @@ public:
     using world_type        = world<WC>;
     using entity_names_type = std::unordered_map<entity, std::string>;
 
-    enum class error_type { file_open_failed, write_failed };
+    enum class error_type : uint8 { file_open_failed, write_failed };
 
-    vox_serializer(
-        world_type& world, entity root, std::optional<entity_names_type> entity_names = std::nullopt
-    );
+    struct options {
+        std::optional<entity_names_type> entity_names;
+        std::unordered_set<entity> excluded;
+    };
+
+    vox_serializer(world_type& world, entity root, options opts = {});
 
     auto serialize(const std::filesystem::path& filepath) -> std::expected<void, error_type>;
 
@@ -36,6 +40,7 @@ private:
     world_type* world_;
     entity root_;
     entity_names_type entity_names_;
+    std::unordered_set<entity> excluded_;
 };
 
 }  // namespace vw::gfx

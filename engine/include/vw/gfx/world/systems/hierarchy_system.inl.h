@@ -124,7 +124,9 @@ auto hierarchy_system<Cs...>::hierarchy_modifier::remove_parent() -> hierarchy_m
         if (system_->registry_->template has<hierarchy_component>(child_component.parent_)) {
             auto& parent_component =
                 system_->registry_->template get<hierarchy_component>(child_component.parent_);
-            parent_component.children_.erase(entity_);
+            std::erase_if(parent_component.children_, [this](entity e) {
+                return e == entity_;
+            });
         }
 
         child_component.parent_ = invalid_entity;

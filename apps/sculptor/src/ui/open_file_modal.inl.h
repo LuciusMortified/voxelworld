@@ -22,16 +22,17 @@ inline void open_file_modal::render(
         load_existing_filenames_();
     }
 
-    ImGuiWindowFlags dialog_flags =          //
-        ImGuiWindowFlags_AlwaysAutoResize |  //
+    constexpr ImGuiWindowFlags dialog_flags =  //
+        ImGuiWindowFlags_AlwaysAutoResize |    //
         ImGuiWindowFlags_NoMove;
     if (ImGui::BeginPopupModal("Open File", nullptr, dialog_flags)) {
         ImGui::Text("Existing Files:");
         ImGui::Spacing();
 
         // Список существующих файлов с фиксированной высотой
-        const float list_height     = ImGui::GetTextLineHeightWithSpacing() * 7.5f;
-        ImGuiChildFlags child_flags =                 //
+        const float list_height = ImGui::GetTextLineHeightWithSpacing() * 7.5f;
+
+        constexpr ImGuiChildFlags child_flags =       //
             ImGuiChildFlags_AlwaysUseWindowPadding |  //
             ImGuiChildFlags_Borders;
         if (ImGui::BeginChild("##file_list", ImVec2(400.f, list_height), child_flags)) {
@@ -72,15 +73,13 @@ inline void open_file_modal::render(
 }
 
 inline void open_file_modal::load_existing_filenames_() {
-    namespace fs = std::filesystem;
-
     existing_filenames_.clear();
 
-    fs::path asset_dir_path{app_state::asset_dir_name};
+    namespace fs = std::filesystem;
+    const fs::path asset_dir_path{app_state::asset_dir_name};
     if (!fs::exists(asset_dir_path)) {
         log::critical("Asset directory does not exist: {}", asset_dir_path.string());
     }
-
     for (const auto& entry : fs::directory_iterator(asset_dir_path)) {
         if (entry.is_regular_file() && entry.path().extension() == ".vox") {
             existing_filenames_.emplace_back(entry.path().filename().string());
@@ -93,7 +92,7 @@ inline auto open_file_modal::open_file_() -> bool {
 
     gfx::vox_deserializer deserializer{engine_->get_world()};
 
-    fs::path filepath =  //
+    const fs::path filepath =  //
         fs::path{app_state::asset_dir_name} / fs::path{filename_};
     auto result = deserializer.deserialize(filepath);
     if (!result.has_value()) {
@@ -107,11 +106,12 @@ inline auto open_file_modal::open_file_() -> bool {
 
     state_->filename       = filename_;
     state_->root_name      = result->root_name;
+    state_->selected_name  = result->root_name;
     state_->name_to_entity = std::move(result->name_to_entity);
     state_->entity_to_name = std::move(result->entity_to_name);
     state_->entities       = std::move(result->entities);
 
-    auto title = std::format("Sculptor {} | {}", version_string, state_->filename);
+    const auto title = std::format("Sculptor {} | {}", version_string, state_->filename);
     engine_->get_window().set_title(title);
 
     return true;

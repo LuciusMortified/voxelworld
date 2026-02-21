@@ -8,13 +8,11 @@ namespace vw::gfx {
 
 template <typename... Cs>
 animation_system<Cs...>::animation_system(
-    world_type& world,
     registry_type& registry,
     transform_system_type& transform_sys,
     animation_clip_registry& clip_registry
 )
-    : world_(&world),
-      registry_(&registry),
+    : registry_(&registry),
       transform_system_(&transform_sys),
       clip_registry_(&clip_registry) {}
 
