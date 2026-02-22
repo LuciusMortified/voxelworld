@@ -9,7 +9,10 @@
       "WebFetch(domain:launchpad.net)",
       "Bash(echo:*)",
       "Bash(where:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(build/tests/tests/Debug/ecs_tests.exe:*)",
+      "Bash(build/tests/tests/Debug/core_tests.exe)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

@@ -5,6 +5,7 @@
 
 #include <deque>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -12,6 +13,7 @@
 #include "vw/core/transform.h"
 #include "vw/gfx/animation/animation_clip.h"
 #include "vw/gfx/animation/animation_clip_registry.h"
+#include "vw/gfx/animation/animation_layer.h"
 #include "vw/gfx/world/components/animation_player_component.h"
 #include "vw/gfx/world/components/animation_target_component.h"
 #include "vw/gfx/world/components/hierarchy_component.h"
@@ -42,19 +44,40 @@ public:
     [[nodiscard]] auto get_target_fps() const -> float32;
     void set_target_fps(float32 fps);
 
-    class player_modifier {
+    class layer_modifier {
     public:
         void play();
+        void play(const transition& fade_in);
         void pause();
         void stop();
+        void stop(const transition& fade_out);
         void resume();
-        void set_clip(std::shared_ptr<animation_clip> clip);
-        void set_clip_by_name(std::string_view name);
         void set_time(float32 time);
         void set_playback_speed(float32 speed);
         void set_loop_mode(animation_loop_mode mode);
-        void blend_to(std::shared_ptr<animation_clip> clip, float32 blend_duration);
-        void blend_to_by_name(std::string_view name, float32 blend_duration);
+        void set_fade_in(const transition& t);
+        void set_fade_out(const transition& t);
+        void blend_to(
+            std::shared_ptr<animation_clip> clip,
+            std::optional<transition> t = std::nullopt
+        );
+        void blend_to_by_name(
+            std::string_view name,
+            std::optional<transition> t = std::nullopt
+        );
+
+    private:
+        friend class animation_system;
+        layer_modifier(animation_system* system, entity ent, animation_layer* layer);
+
+        animation_system* system_;
+        entity entity_;
+        animation_layer* layer_;
+    };
+
+    class player_modifier {
+    public:
+        auto layer(size_t index) -> layer_modifier;
 
     private:
         friend class animation_system;
@@ -94,15 +117,19 @@ private:
     [[nodiscard]] auto get_cached_target_map(entity root_ent) const
         -> const std::unordered_map<std::string, entity>*;
     void process_animation(entity ent, animation_player_component& anim_comp, float32 delta_time);
-    void update_anim_time(animation_player_component& anim_comp, float32 delta_time);
+    void update_layer_time(animation_layer& layer, float32 delta_time);
+    void process_layer(animation_layer& layer, float32 delta_time, bool is_base);
     void apply_animation(entity root_ent, const animation_player_component& anim_comp);
+    auto compute_layer_transform(
+        const animation_layer& layer,
+        const std::string& target_name
+    ) const -> std::optional<transform>;
 
     registry_type* registry_;
     transform_system_type* transform_system_;
     animation_clip_registry* clip_registry_;
 };
 
-// Template specialization для tuple
 template <typename... Cs>
 struct animation_system_from_tuple;
 

@@ -3,6 +3,7 @@
 #ifndef VW_GFX_ANIMATION_TYPES_H
 #define VW_GFX_ANIMATION_TYPES_H
 
+#include "vw/core/math.h"
 #include "vw/core/quat.h"
 #include "vw/core/types.h"
 #include "vw/core/vec3.h"
@@ -26,6 +27,13 @@ enum class animation_property : uint8 {
     rotation,
     scale,
     origin
+};
+
+struct transition {
+    float32 duration = 0.0f;
+    math::interpolation_type interp = math::interpolation_type::linear;
+    float32 tangent_in = 0.0f;
+    float32 tangent_out = 1.0f;
 };
 
 template <animation_property Prop>

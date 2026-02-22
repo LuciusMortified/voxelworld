@@ -76,4 +76,12 @@ inline auto animation_clip::get_name() const -> const std::string& {
     return name_;
 }
 
+inline auto animation_clip::get_target_names() const -> std::unordered_set<std::string> {
+    std::unordered_set<std::string> names;
+    for (const auto& track : tracks_) {
+        names.insert(track.get_target_name());
+    }
+    return names;
+}
+
 }  // namespace vw::gfx

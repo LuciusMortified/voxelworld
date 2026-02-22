@@ -346,7 +346,7 @@ inline void app::handle_toggle_playback() {
 
     if (state_.is_previewing) {
         if (world.has_component<gfx::animation_player_component>(root_ent)) {
-            world.get_animation_system().modify_player(root_ent).pause();
+            world.get_animation_system().modify_player(root_ent).layer(0).pause();
         }
         state_.is_previewing = false;
         return;
@@ -367,11 +367,11 @@ inline void app::handle_toggle_playback() {
     auto& anim_sys = world.get_animation_system();
     auto& player   = world.get_component<gfx::animation_player_component>(root_ent);
 
-    if (player.is_paused()) {
-        anim_sys.modify_player(root_ent).resume();
+    if (player.has_layer(0) && player.get_layer(0).state == gfx::animation_state::paused) {
+        anim_sys.modify_player(root_ent).layer(0).resume();
     } else {
-        anim_sys.modify_player(root_ent).set_clip(clip);
-        anim_sys.modify_player(root_ent).play();
+        anim_sys.modify_player(root_ent).layer(0).blend_to(clip);
+        anim_sys.modify_player(root_ent).layer(0).play();
     }
     state_.is_previewing = true;
 }
@@ -381,7 +381,7 @@ inline void app::handle_stop_playback() {
         auto& world   = get_engine().get_world();
         auto root_ent = state_.name_to_entity[state_.root_name];
         if (world.has_component<gfx::animation_player_component>(root_ent)) {
-            world.get_animation_system().modify_player(root_ent).stop();
+            world.get_animation_system().modify_player(root_ent).layer(0).stop();
         }
     }
     state_.is_previewing   = false;

@@ -62,19 +62,19 @@ private:
         float area_top,
         float area_bottom,
         float scroll_offset
-    );
+    ) const;
 
     void render_playback_controls(const std::shared_ptr<gfx::animation_clip>& clip);
     void handle_play(gfx::entity root, const std::shared_ptr<gfx::animation_clip>& clip);
-    void handle_pause(gfx::entity root);
-    void handle_stop(gfx::entity root);
-    auto try_get_root_entity() -> std::optional<gfx::entity>;
+    void handle_pause(gfx::entity root) const;
+    void handle_stop(gfx::entity root) const;
+    auto try_get_root_entity() const -> std::optional<gfx::entity>;
 
     void delete_selected_keyframe();
 
-    void save_transforms();
-    void restore_transforms();
-    void apply_scrub(float time);
+    void save_transforms() const;
+    void restore_transforms() const;
+    void apply_scrub(float time) const;
 
     engine_type* engine_;
     app_state* state_;

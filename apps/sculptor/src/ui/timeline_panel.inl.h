@@ -22,8 +22,8 @@ inline void timeline_panel::render(
 ) {
     keyframe_clicked_ = false;
 
-    auto& clip_registry = engine_->get_world().get_animation_clip_registry();
-    auto clip           = clip_registry.get(state_->selected_clip_name);
+    const auto& clip_registry = engine_->get_world().get_animation_clip_registry();
+    const auto clip           = clip_registry.get(state_->selected_clip_name);
     if (!clip) {
         if (state_->has_saved_transforms) {
             restore_transforms();
@@ -50,8 +50,8 @@ inline void timeline_panel::render(
         ImGuiWindowFlags_NoResize |         //
         ImGuiWindowFlags_NoBringToFrontOnFocus;
 
-    auto title      = std::format("Timeline - {}###Timeline", state_->selected_clip_name);
-    bool still_open = state_->ui.show_timeline;
+    const auto title = std::format("Timeline - {}###Timeline", state_->selected_clip_name);
+    bool still_open  = state_->ui.show_timeline;
     ImGui::Begin(title.c_str(), &still_open, window_flags);
 
     if (!still_open && state_->ui.show_timeline) {
@@ -66,11 +66,12 @@ inline void timeline_panel::render(
     if (state_->is_previewing) {
         auto& world = engine_->get_world();
         if (!state_->root_name.empty() && state_->name_to_entity.contains(state_->root_name)) {
-            auto root_ent = state_->name_to_entity[state_->root_name];
+            const auto root_ent = state_->name_to_entity[state_->root_name];
             if (world.has_component<gfx::animation_player_component>(root_ent)) {
-                auto& player = world.get_component<gfx::animation_player_component>(root_ent);
-                if (player.is_playing()) {
-                    state_->timeline_cursor = player.get_current_time();
+                const auto& player = world.get_component<gfx::animation_player_component>(root_ent);
+                if (player.has_layer(0) &&
+                    player.get_layer(0).state == gfx::animation_state::playing) {
+                    state_->timeline_cursor = player.get_layer(0).time;
                 } else {
                     state_->is_previewing = false;
                 }
@@ -85,12 +86,12 @@ inline void timeline_panel::render(
 
     if (state_->need_step_forward) {
         state_->need_step_forward = false;
-        float step                = clip_duration * 0.01f;
+        const float step          = clip_duration * 0.01f;
         state_->timeline_cursor   = std::min(state_->timeline_cursor + step, clip_duration);
     }
     if (state_->need_step_backward) {
         state_->need_step_backward = false;
-        float step                 = clip_duration * 0.01f;
+        const float step           = clip_duration * 0.01f;
         state_->timeline_cursor    = std::max(state_->timeline_cursor - step, 0.f);
     }
 
@@ -114,16 +115,16 @@ inline void timeline_panel::render(
 inline void timeline_panel::render_toolbar(
     float clip_duration
 ) {
-    auto& registry = engine_->get_world().get_animation_clip_registry();
-    auto clip      = registry.get(state_->selected_clip_name);
+    const auto& registry = engine_->get_world().get_animation_clip_registry();
+    const auto clip      = registry.get(state_->selected_clip_name);
     if (!clip) {
         return;
     }
 
-    bool can_add_track =
+    const bool can_add_track =
         !state_->selected_name.empty() && clip && !clip->has_track(state_->selected_name);
     if (can_add_track) {
-        if (ImGui::Button("+ Track")) {
+        if (ImGui::Button("Add Track")) {
             add_track_params params = {
                 .clip_name  = state_->selected_clip_name,
                 .track_name = state_->selected_name,
@@ -140,7 +141,7 @@ inline void timeline_panel::render_toolbar(
     bool can_add_kf = !state_->selected_track_name.empty() && !state_->selected_clip_name.empty() &&
         clip->has_track(state_->selected_track_name);
     if (can_add_kf) {
-        if (ImGui::Button("+ Keyframe")) {
+        if (ImGui::Button("Add Keyframe")) {
             create_kf_modal_.open(state_->selected_track_name);
         }
         ImGui::SameLine();
@@ -161,7 +162,8 @@ inline void timeline_panel::render_toolbar(
     ImGui::Text("Speed");
     ImGui::SameLine();
     ImGui::PushItemWidth(60.f);
-    const bool speed_changed = ImGui::DragFloat("##Speed", &playback_speed_, 0.01f, 0.1f, 5.0f, "%.2f");
+    const bool speed_changed =
+        ImGui::DragFloat("##Speed", &playback_speed_, 0.01f, 0.1f, 5.0f, "%.2f");
     ImGui::PopItemWidth();
 
     ImGui::SameLine();
@@ -170,21 +172,23 @@ inline void timeline_panel::render_toolbar(
     ImGui::SameLine();
     ImGui::PushItemWidth(80.f);
     constexpr std::array loop_modes = {"Once", "Loop", "Ping-Pong"};
-    const bool loop_changed = ImGui::Combo("##Loop", &loop_mode_index_, loop_modes.data(), 3);
+    const bool loop_changed =
+        ImGui::Combo("##Loop", &loop_mode_index_, loop_modes.data(), loop_modes.size());
     ImGui::PopItemWidth();
 
-    if ((speed_changed || loop_changed) && state_->is_previewing &&
-        !state_->root_name.empty()) {
-        auto root_ent = state_->name_to_entity[state_->root_name];
-        auto& world   = engine_->get_world();
+    const bool is_root_valid =
+        !state_->root_name.empty() && state_->name_to_entity.contains(state_->root_name);
+    if ((speed_changed || loop_changed) && is_root_valid) {
+        const auto root_ent = state_->name_to_entity[state_->root_name];
+        auto& world         = engine_->get_world();
         if (world.has_component<gfx::animation_player_component>(root_ent)) {
             auto& anim_sys = world.get_animation_system();
             if (speed_changed) {
-                anim_sys.modify_player(root_ent).set_playback_speed(playback_speed_);
+                anim_sys.modify_player(root_ent).layer(0).set_playback_speed(playback_speed_);
             }
             if (loop_changed) {
-                auto loop = static_cast<gfx::animation_loop_mode>(loop_mode_index_);
-                anim_sys.modify_player(root_ent).set_loop_mode(loop);
+                const auto loop = static_cast<gfx::animation_loop_mode>(loop_mode_index_);
+                anim_sys.modify_player(root_ent).layer(0).set_loop_mode(loop);
             }
         }
     }
@@ -193,8 +197,8 @@ inline void timeline_panel::render_toolbar(
     ImGui::Text("%.2f / %.2fs", state_->timeline_cursor, clip_duration);
 
     ImGui::SameLine();
-    float avail  = ImGui::GetContentRegionAvail().x;
-    float zoom_w = 120.f;
+    const float avail      = ImGui::GetContentRegionAvail().x;
+    constexpr float zoom_w = 120.f;
     if (avail > zoom_w) {
         ImGui::SetCursorPosX(ImGui::GetCursorPosX() + avail - zoom_w);
     }
@@ -368,7 +372,7 @@ inline void timeline_panel::render_track_row(
     }
 }
 
-inline auto timeline_panel::try_get_root_entity() -> std::optional<gfx::entity> {
+inline auto timeline_panel::try_get_root_entity() const -> std::optional<gfx::entity> {
     if (state_->root_name.empty() || !state_->name_to_entity.contains(state_->root_name)) {
         return std::nullopt;
     }
@@ -377,10 +381,10 @@ inline auto timeline_panel::try_get_root_entity() -> std::optional<gfx::entity> 
 
 inline void timeline_panel::handle_pause(
     gfx::entity root
-) {
+) const {
     auto& world = engine_->get_world();
     if (world.has_component<gfx::animation_player_component>(root)) {
-        world.get_animation_system().modify_player(root).pause();
+        world.get_animation_system().modify_player(root).layer(0).pause();
         state_->is_previewing = false;
     }
 }
@@ -399,28 +403,26 @@ inline void timeline_panel::handle_play(
     auto& anim_sys = world.get_animation_system();
     auto& player   = world.get_component<gfx::animation_player_component>(root);
 
-    if (player.is_paused()) {
-        anim_sys.modify_player(root).set_playback_speed(playback_speed_);
-        auto loop = static_cast<gfx::animation_loop_mode>(loop_mode_index_);
-        anim_sys.modify_player(root).set_loop_mode(loop);
-        anim_sys.modify_player(root).resume();
+    auto layer = anim_sys.modify_player(root).layer(0);
+    if (player.has_layer(0) && player.get_layer(0).state == gfx::animation_state::paused) {
+        layer.set_playback_speed(playback_speed_);
+        layer.set_loop_mode(static_cast<gfx::animation_loop_mode>(loop_mode_index_));
+        layer.resume();
     } else {
-        anim_sys.modify_player(root).set_clip(clip);
-        anim_sys.modify_player(root).set_playback_speed(playback_speed_);
-
-        auto loop = static_cast<gfx::animation_loop_mode>(loop_mode_index_);
-        anim_sys.modify_player(root).set_loop_mode(loop);
-        anim_sys.modify_player(root).play();
+        layer.blend_to(clip);
+        layer.set_playback_speed(playback_speed_);
+        layer.set_loop_mode(static_cast<gfx::animation_loop_mode>(loop_mode_index_));
+        layer.play();
     }
     state_->is_previewing = true;
 }
 
 inline void timeline_panel::handle_stop(
     gfx::entity root
-) {
+) const {
     auto& world = engine_->get_world();
     if (world.has_component<gfx::animation_player_component>(root)) {
-        world.get_animation_system().modify_player(root).stop();
+        world.get_animation_system().modify_player(root).layer(0).stop();
     }
     state_->is_previewing   = false;
     state_->timeline_cursor = 0.f;
@@ -696,7 +698,7 @@ inline void timeline_panel::render_playhead(
     float area_top,
     float area_bottom,
     float scroll_offset
-) {
+) const {
     if (clip_duration <= 0.f) {
         return;
     }
@@ -782,7 +784,7 @@ inline void timeline_panel::delete_selected_keyframe() {
     );
 }
 
-inline void timeline_panel::save_transforms() {
+inline void timeline_panel::save_transforms() const {
     if (state_->has_saved_transforms) {
         return;
     }
@@ -800,7 +802,7 @@ inline void timeline_panel::save_transforms() {
     state_->has_saved_transforms = true;
 }
 
-inline void timeline_panel::restore_transforms() {
+inline void timeline_panel::restore_transforms() const {
     if (!state_->has_saved_transforms) {
         return;
     }
@@ -810,7 +812,7 @@ inline void timeline_panel::restore_transforms() {
 
     for (const auto& [name, t] : state_->saved_transforms) {
         if (state_->name_to_entity.contains(name)) {
-            auto ent = state_->name_to_entity[name];
+            const auto ent = state_->name_to_entity[name];
             if (world.has_component<gfx::transform_component>(ent)) {
                 transform_system.modify(ent).set_transform(t);
             }
@@ -823,9 +825,9 @@ inline void timeline_panel::restore_transforms() {
 
 inline void timeline_panel::apply_scrub(
     float time
-) {
-    auto& clip_registry = engine_->get_world().get_animation_clip_registry();
-    auto clip           = clip_registry.get(state_->selected_clip_name);
+) const {
+    const auto& clip_registry = engine_->get_world().get_animation_clip_registry();
+    const auto clip           = clip_registry.get(state_->selected_clip_name);
     if (!clip) {
         return;
     }
@@ -842,7 +844,7 @@ inline void timeline_panel::apply_scrub(
             continue;
         }
 
-        auto ent = state_->name_to_entity[target];
+        const auto ent = state_->name_to_entity[target];
         if (!world.has_component<gfx::transform_component>(ent)) {
             continue;
         }

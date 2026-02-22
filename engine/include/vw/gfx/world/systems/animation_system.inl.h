@@ -52,7 +52,7 @@ void animation_system<Cs...>::update(float32 delta_time) {
 
         process_animation(ent, anim_comp, effective_delta);
 
-        if (anim_comp.state_ == animation_state::stopped) {
+        if (!anim_comp.is_any_playing()) {
             to_remove_.push_back(ent);
         }
     }
@@ -74,7 +74,6 @@ void animation_system<Cs...>::add_active_entity(entity root_ent) {
 template <typename... Cs>
 void animation_system<Cs...>::remove_active_entity(entity root_ent) {
     active_entities_.erase(root_ent);
-
     target_maps_.erase(root_ent);
 }
 
@@ -90,7 +89,8 @@ void animation_system<Cs...>::build_and_cache_target_map(entity root_ent) {
         to_visit_.pop_front();
 
         if (registry_->template has<animation_target_component>(current)) {
-            const auto& target_comp = registry_->template get<animation_target_component>(current);
+            const auto& target_comp =
+                registry_->template get<animation_target_component>(current);
             target_map[target_comp.get_name()] = current;
         }
 
@@ -116,39 +116,171 @@ auto animation_system<Cs...>::get_cached_target_map(entity root_ent) const
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::update_anim_time(
-    animation_player_component& anim_comp,
+void animation_system<Cs...>::update_layer_time(
+    animation_layer& layer,
     float32 delta_time
 ) {
-    anim_comp.current_time_ += delta_time * anim_comp.playback_speed_ * anim_comp.direction_;
+    layer.time += delta_time * layer.playback_speed * layer.direction;
 
-    float32 duration = anim_comp.clip_->get_duration();
+    float32 duration = layer.clip->get_duration();
 
-    if (anim_comp.loop_mode_ == animation_loop_mode::once) {
-        if (anim_comp.current_time_ >= duration) {
-            anim_comp.current_time_ = duration;
-            anim_comp.state_ = animation_state::stopped;
-        } else if (anim_comp.current_time_ < 0.0f) {
-            anim_comp.current_time_ = 0.0f;
-            anim_comp.state_ = animation_state::stopped;
+    if (layer.loop_mode == animation_loop_mode::once) {
+        if (layer.time >= duration) {
+            layer.time = duration;
+            layer.state = animation_state::stopped;
+        } else if (layer.time < 0.0f) {
+            layer.time = 0.0f;
+            layer.state = animation_state::stopped;
         }
-    } else if (anim_comp.loop_mode_ == animation_loop_mode::loop) {
+    } else if (layer.loop_mode == animation_loop_mode::loop) {
         if (duration > 0.0f) {
-            if (anim_comp.direction_ > 0.0f && anim_comp.current_time_ >= duration) {
-                anim_comp.current_time_ = 0.0f;
-            } else if (anim_comp.direction_ < 0.0f && anim_comp.current_time_ < 0.0f) {
-                anim_comp.current_time_ = duration;
+            if (layer.direction > 0.0f && layer.time >= duration) {
+                layer.time = 0.0f;
+            } else if (layer.direction < 0.0f && layer.time < 0.0f) {
+                layer.time = duration;
             }
         }
-    } else if (anim_comp.loop_mode_ == animation_loop_mode::ping_pong) {
-        if (anim_comp.current_time_ >= duration) {
-            anim_comp.direction_ = -1.0f;
-            anim_comp.current_time_ = duration;
-        } else if (anim_comp.current_time_ <= 0.0f) {
-            anim_comp.direction_ = 1.0f;
-            anim_comp.current_time_ = 0.0f;
+    } else if (layer.loop_mode == animation_loop_mode::ping_pong) {
+        if (layer.time >= duration) {
+            layer.direction = -1.0f;
+            layer.time = duration;
+        } else if (layer.time <= 0.0f) {
+            layer.direction = 1.0f;
+            layer.time = 0.0f;
         }
     }
+}
+
+template <typename... Cs>
+void animation_system<Cs...>::process_layer(
+    animation_layer& layer,
+    float32 delta_time,
+    bool is_base
+) {
+    if (!layer.clip) {
+        return;
+    }
+
+    if (layer.fade_is_out) {
+        layer.fade_elapsed += delta_time;
+        if (layer.fade_out.duration > 0.0f &&
+            layer.fade_elapsed < layer.fade_out.duration) {
+            float32 t = layer.fade_elapsed / layer.fade_out.duration;
+            t = math::apply_easing_bezier(
+                t, layer.fade_out.interp,
+                layer.fade_out.tangent_in, layer.fade_out.tangent_out
+            );
+            layer.fade_influence = 1.0f - t;
+        } else {
+            layer.fade_influence = 0.0f;
+            layer.fade_is_out = false;
+            layer.state = animation_state::stopped;
+        }
+        if (layer.state == animation_state::playing) {
+            update_layer_time(layer, delta_time);
+        }
+        return;
+    }
+
+    if (layer.state != animation_state::playing) {
+        return;
+    }
+
+    if (!is_base && layer.fade_in.duration > 0.0f && layer.fade_influence < 1.0f) {
+        layer.fade_elapsed += delta_time;
+        if (layer.fade_elapsed < layer.fade_in.duration) {
+            float32 t = layer.fade_elapsed / layer.fade_in.duration;
+            t = math::apply_easing_bezier(
+                t, layer.fade_in.interp,
+                layer.fade_in.tangent_in, layer.fade_in.tangent_out
+            );
+            layer.fade_influence = t;
+        } else {
+            layer.fade_influence = 1.0f;
+        }
+    }
+
+    update_layer_time(layer, delta_time);
+
+    if (layer.blend_transition.duration > 0.0f && layer.blend_elapsed < layer.blend_transition.duration) {
+        layer.blend_elapsed += delta_time;
+
+        if (layer.blend_prev_clip) {
+            layer.blend_prev_time +=
+                delta_time * layer.blend_prev_playback_speed * layer.blend_prev_direction;
+            float32 prev_duration = layer.blend_prev_clip->get_duration();
+            if (layer.blend_prev_time > prev_duration) {
+                layer.blend_prev_time = prev_duration;
+            } else if (layer.blend_prev_time < 0.0f) {
+                layer.blend_prev_time = 0.0f;
+            }
+        }
+
+        if (layer.blend_elapsed >= layer.blend_transition.duration) {
+            layer.blend_prev_clip = nullptr;
+            layer.blend_elapsed = 0.0f;
+            layer.blend_transition = {};
+            layer.blend_snapshot.clear();
+        }
+    }
+
+    if (!is_base && layer.state == animation_state::stopped) {
+        if (layer.fade_out.duration > 0.0f) {
+            layer.fade_is_out = true;
+            layer.fade_elapsed = 0.0f;
+        } else {
+            layer.fade_influence = 0.0f;
+        }
+    }
+}
+
+template <typename... Cs>
+auto animation_system<Cs...>::compute_layer_transform(
+    const animation_layer& layer,
+    const std::string& target_name
+) const -> std::optional<transform> {
+    if (!layer.clip) {
+        return std::nullopt;
+    }
+
+    const auto* track = layer.clip->get_track(target_name);
+    if (!track) {
+        return std::nullopt;
+    }
+
+    auto transform_result = track->get_transform(layer.time);
+    if (!transform_result) {
+        return std::nullopt;
+    }
+
+    transform t = *transform_result;
+
+    bool is_blending = layer.blend_transition.duration > 0.0f &&
+                       (layer.blend_prev_clip || !layer.blend_snapshot.empty());
+    if (is_blending) {
+        float32 blend_factor = math::clamp(
+            layer.blend_elapsed / layer.blend_transition.duration, 0.0f, 1.0f
+        );
+        blend_factor = math::apply_easing_bezier(
+            blend_factor, layer.blend_transition.interp,
+            layer.blend_transition.tangent_in, layer.blend_transition.tangent_out
+        );
+
+        auto snapshot_it = layer.blend_snapshot.find(target_name);
+        if (snapshot_it != layer.blend_snapshot.end()) {
+            t = math::lerp(snapshot_it->second, t, blend_factor);
+        } else if (layer.blend_prev_clip) {
+            auto* prev_track = layer.blend_prev_clip->get_track(target_name);
+            if (prev_track) {
+                auto prev_result = prev_track->get_transform(layer.blend_prev_time);
+                if (prev_result) {
+                    t = math::lerp(*prev_result, t, blend_factor);
+                }
+            }
+        }
+    }
+
+    return t;
 }
 
 template <typename... Cs>
@@ -157,32 +289,8 @@ void animation_system<Cs...>::process_animation(
     animation_player_component& anim_comp,
     float32 delta_time
 ) {
-    if (!anim_comp.clip_ || anim_comp.state_ != animation_state::playing) {
-        return;
-    }
-
-    update_anim_time(anim_comp, delta_time);
-
-    if (anim_comp.blend_duration_ > 0.0f) {
-        anim_comp.blend_time_ += delta_time;
-
-        if (anim_comp.previous_clip_) {
-            anim_comp.previous_time_ +=
-                delta_time * anim_comp.previous_playback_speed_ * anim_comp.previous_direction_;
-            float32 prev_duration = anim_comp.previous_clip_->get_duration();
-            if (anim_comp.previous_time_ > prev_duration) {
-                anim_comp.previous_time_ = prev_duration;
-            } else if (anim_comp.previous_time_ < 0.0f) {
-                anim_comp.previous_time_ = 0.0f;
-            }
-        }
-
-        if (anim_comp.blend_time_ >= anim_comp.blend_duration_) {
-            anim_comp.previous_clip_ = nullptr;
-            anim_comp.blend_time_ = 0.0f;
-            anim_comp.blend_duration_ = 0.0f;
-            anim_comp.blend_snapshot_.clear();
-        }
+    for (size_t i = 0; i < anim_comp.layers_.size(); ++i) {
+        process_layer(anim_comp.layers_[i], delta_time, i == 0);
     }
 
     apply_animation(ent, anim_comp);
@@ -193,30 +301,84 @@ void animation_system<Cs...>::apply_animation(
     entity root_ent,
     const animation_player_component& anim_comp
 ) {
-    if (!anim_comp.clip_) {
-        return;
-    }
-
     const auto* target_map = get_cached_target_map(root_ent);
     if (!target_map) {
         return;
     }
 
-    bool is_blending = anim_comp.blend_duration_ > 0.0f &&
-                       (anim_comp.previous_clip_ || !anim_comp.blend_snapshot_.empty());
-    float32 blend_factor = 0.0f;
-    if (is_blending) {
-        blend_factor = math::clamp(
-            anim_comp.blend_time_ / anim_comp.blend_duration_, 0.0f, 1.0f
-        );
-        blend_factor = math::apply_easing(blend_factor, math::interpolation_type::ease_in_out);
+    std::unordered_map<std::string, transform> final_transforms;
+
+    if (!anim_comp.layers_.empty()) {
+        const auto& base = anim_comp.layers_[0];
+        if (base.clip && (base.state == animation_state::playing ||
+                          base.state == animation_state::stopped)) {
+            for (const auto& track : base.clip->get_tracks()) {
+                const auto& name = track.get_target_name();
+                auto t = compute_layer_transform(base, name);
+                if (t) {
+                    final_transforms[name] = *t;
+                }
+            }
+
+            if (base.blend_transition.duration > 0.0f && base.blend_prev_clip) {
+                float32 blend_factor = math::clamp(
+                    base.blend_elapsed / base.blend_transition.duration, 0.0f, 1.0f
+                );
+                blend_factor = math::apply_easing_bezier(
+                    blend_factor, base.blend_transition.interp,
+                    base.blend_transition.tangent_in, base.blend_transition.tangent_out
+                );
+
+                for (const auto& prev_track : base.blend_prev_clip->get_tracks()) {
+                    const auto& name = prev_track.get_target_name();
+                    if (final_transforms.contains(name)) {
+                        continue;
+                    }
+
+                    auto snapshot_it = base.blend_snapshot.find(name);
+                    if (snapshot_it != base.blend_snapshot.end()) {
+                        transform identity;
+                        final_transforms[name] =
+                            math::lerp(snapshot_it->second, identity, blend_factor);
+                    } else {
+                        auto prev_result = prev_track.get_transform(base.blend_prev_time);
+                        if (prev_result) {
+                            transform identity;
+                            final_transforms[name] =
+                                math::lerp(*prev_result, identity, blend_factor);
+                        }
+                    }
+                }
+            }
+        }
     }
 
-    std::unordered_set<std::string> processed_targets;
+    for (size_t i = 1; i < anim_comp.layers_.size(); ++i) {
+        const auto& layer = anim_comp.layers_[i];
+        if (!layer.clip || layer.fade_influence <= 0.0f) {
+            continue;
+        }
 
-    for (const auto& track : anim_comp.clip_->get_tracks()) {
-        const auto& target_name = track.get_target_name();
-        auto it = target_map->find(target_name);
+        for (const auto& target_name : layer.mask) {
+            auto t = compute_layer_transform(layer, target_name);
+            if (!t) {
+                continue;
+            }
+
+            auto base_it = final_transforms.find(target_name);
+            if (base_it != final_transforms.end()) {
+                base_it->second =
+                    math::lerp(base_it->second, *t, layer.fade_influence);
+            } else {
+                transform identity;
+                final_transforms[target_name] =
+                    math::lerp(identity, *t, layer.fade_influence);
+            }
+        }
+    }
+
+    for (const auto& [name, t] : final_transforms) {
+        auto it = target_map->find(name);
         if (it == target_map->end()) {
             continue;
         }
@@ -226,71 +388,12 @@ void animation_system<Cs...>::apply_animation(
             continue;
         }
 
-        auto transform_result = track.get_transform(anim_comp.current_time_);
-        if (!transform_result) {
-            continue;
-        }
-
-        transform t = *transform_result;
-
-        if (is_blending) {
-            processed_targets.insert(target_name);
-
-            auto snapshot_it = anim_comp.blend_snapshot_.find(target_name);
-            if (snapshot_it != anim_comp.blend_snapshot_.end()) {
-                t = math::lerp(snapshot_it->second, t, blend_factor);
-            } else if (anim_comp.previous_clip_) {
-                auto* prev_track = anim_comp.previous_clip_->get_track(target_name);
-                if (prev_track) {
-                    auto prev_result = prev_track->get_transform(anim_comp.previous_time_);
-                    if (prev_result) {
-                        t = math::lerp(*prev_result, t, blend_factor);
-                    }
-                }
-            }
-        }
-
         auto modifier = transform_system_->modify(target_ent);
         modifier.set_transform_with_matrix(t, t.calc_matrix());
     }
-
-    if (is_blending && anim_comp.previous_clip_) {
-        for (const auto& prev_track : anim_comp.previous_clip_->get_tracks()) {
-            const auto& target_name = prev_track.get_target_name();
-            if (processed_targets.contains(target_name)) {
-                continue;
-            }
-
-            auto it = target_map->find(target_name);
-            if (it == target_map->end()) {
-                continue;
-            }
-
-            entity target_ent = it->second;
-            if (!registry_->template has<transform_component>(target_ent)) {
-                continue;
-            }
-
-            transform prev_t;
-            auto snapshot_it = anim_comp.blend_snapshot_.find(target_name);
-            if (snapshot_it != anim_comp.blend_snapshot_.end()) {
-                prev_t = snapshot_it->second;
-            } else {
-                auto prev_result = prev_track.get_transform(anim_comp.previous_time_);
-                if (!prev_result) {
-                    continue;
-                }
-                prev_t = *prev_result;
-            }
-
-            transform identity;
-            transform t = math::lerp(prev_t, identity, blend_factor);
-
-            auto modifier = transform_system_->modify(target_ent);
-            modifier.set_transform_with_matrix(t, t.calc_matrix());
-        }
-    }
 }
+
+// --- player_modifier ---
 
 template <typename... Cs>
 animation_system<Cs...>::player_modifier::player_modifier(
@@ -307,135 +410,198 @@ auto animation_system<Cs...>::modify_player(entity ent) -> player_modifier {
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::player_modifier::play() {
-    if (component_->state_ != animation_state::playing) {
-        component_->state_ = animation_state::playing;
-        component_->current_time_ = 0.0f;
-        component_->direction_ = 1.0f;
+auto animation_system<Cs...>::player_modifier::layer(size_t index) -> layer_modifier {
+    if (index >= component_->layers_.size()) {
+        component_->layers_.resize(index + 1);
+    }
+    return layer_modifier(system_, entity_, &component_->layers_[index]);
+}
+
+// --- layer_modifier ---
+
+template <typename... Cs>
+animation_system<Cs...>::layer_modifier::layer_modifier(
+    animation_system* system,
+    entity ent,
+    animation_layer* layer
+)
+    : system_(system), entity_(ent), layer_(layer) {}
+
+template <typename... Cs>
+void animation_system<Cs...>::layer_modifier::play() {
+    if (layer_->state != animation_state::playing) {
+        layer_->state = animation_state::playing;
+        layer_->time = 0.0f;
+        layer_->direction = 1.0f;
+        layer_->fade_influence = 1.0f;
+        layer_->fade_is_out = false;
+        layer_->fade_elapsed = 0.0f;
 
         system_->add_active_entity(entity_);
     }
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::player_modifier::pause() {
-    if (component_->state_ == animation_state::playing) {
-        component_->state_ = animation_state::paused;
+void animation_system<Cs...>::layer_modifier::play(const transition& fade_in) {
+    layer_->fade_in = fade_in;
+    if (layer_->state != animation_state::playing) {
+        layer_->state = animation_state::playing;
+        layer_->time = 0.0f;
+        layer_->direction = 1.0f;
+        layer_->fade_influence = 0.0f;
+        layer_->fade_is_out = false;
+        layer_->fade_elapsed = 0.0f;
+
+        system_->add_active_entity(entity_);
     }
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::player_modifier::stop() {
-    component_->state_ = animation_state::stopped;
-    component_->current_time_ = 0.0f;
-
-    system_->remove_active_entity(entity_);
-}
-
-template <typename... Cs>
-void animation_system<Cs...>::player_modifier::resume() {
-    if (component_->state_ == animation_state::paused) {
-        component_->state_ = animation_state::playing;
+void animation_system<Cs...>::layer_modifier::pause() {
+    if (layer_->state == animation_state::playing) {
+        layer_->state = animation_state::paused;
     }
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::player_modifier::set_clip(std::shared_ptr<animation_clip> clip
-) {
-    component_->clip_ = std::move(clip);
+void animation_system<Cs...>::layer_modifier::stop() {
+    layer_->state = animation_state::stopped;
+    layer_->time = 0.0f;
+    layer_->fade_influence = 0.0f;
+    layer_->fade_is_out = false;
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::player_modifier::set_clip_by_name(std::string_view name) {
-    auto clip = system_->clip_registry_->get(name);
-    if (clip) {
-        set_clip(clip);
+void animation_system<Cs...>::layer_modifier::stop(const transition& fade_out) {
+    layer_->fade_out = fade_out;
+    layer_->fade_is_out = true;
+    layer_->fade_elapsed = 0.0f;
+}
+
+template <typename... Cs>
+void animation_system<Cs...>::layer_modifier::resume() {
+    if (layer_->state == animation_state::paused) {
+        layer_->state = animation_state::playing;
+        system_->add_active_entity(entity_);
     }
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::player_modifier::set_time(float32 time) {
-    component_->current_time_ = time;
+void animation_system<Cs...>::layer_modifier::set_time(float32 time) {
+    layer_->time = time;
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::player_modifier::set_playback_speed(float32 speed) {
-    component_->playback_speed_ = speed;
+void animation_system<Cs...>::layer_modifier::set_playback_speed(float32 speed) {
+    layer_->playback_speed = speed;
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::player_modifier::set_loop_mode(animation_loop_mode mode) {
-    component_->loop_mode_ = mode;
+void animation_system<Cs...>::layer_modifier::set_loop_mode(animation_loop_mode mode) {
+    layer_->loop_mode = mode;
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::player_modifier::blend_to(
+void animation_system<Cs...>::layer_modifier::set_fade_in(const transition& t) {
+    layer_->fade_in = t;
+}
+
+template <typename... Cs>
+void animation_system<Cs...>::layer_modifier::set_fade_out(const transition& t) {
+    layer_->fade_out = t;
+}
+
+template <typename... Cs>
+void animation_system<Cs...>::layer_modifier::blend_to(
     std::shared_ptr<animation_clip> clip,
-    float32 blend_duration
+    std::optional<transition> t
 ) {
-    if (component_->blend_duration_ > 0.0f && component_->clip_) {
-        float32 bf = math::clamp(
-            component_->blend_time_ / component_->blend_duration_, 0.0f, 1.0f
-        );
-        bf = math::apply_easing(bf, math::interpolation_type::ease_in_out);
+    transition trans = t.value_or(layer_->blend_transition);
 
-        auto old_snapshot = std::move(component_->blend_snapshot_);
-        component_->blend_snapshot_.clear();
+    if (trans.duration > 0.0f && layer_->clip) {
+        if (layer_->blend_transition.duration > 0.0f && layer_->clip) {
+            float32 bf = math::clamp(
+                layer_->blend_elapsed / layer_->blend_transition.duration, 0.0f, 1.0f
+            );
+            bf = math::apply_easing_bezier(
+                bf, layer_->blend_transition.interp,
+                layer_->blend_transition.tangent_in, layer_->blend_transition.tangent_out
+            );
 
-        for (const auto& track : component_->clip_->get_tracks()) {
-            const auto& name = track.get_target_name();
-            auto cur_result = track.get_transform(component_->current_time_);
-            if (!cur_result) {
-                continue;
-            }
+            auto old_snapshot = std::move(layer_->blend_snapshot);
+            layer_->blend_snapshot.clear();
 
-            transform blended = *cur_result;
+            for (const auto& track : layer_->clip->get_tracks()) {
+                const auto& name = track.get_target_name();
+                auto cur_result = track.get_transform(layer_->time);
+                if (!cur_result) {
+                    continue;
+                }
 
-            auto snapshot_it = old_snapshot.find(name);
-            if (snapshot_it != old_snapshot.end()) {
-                blended = math::lerp(snapshot_it->second, blended, bf);
-            } else if (component_->previous_clip_) {
-                auto* prev_track = component_->previous_clip_->get_track(name);
-                if (prev_track) {
-                    auto prev_result = prev_track->get_transform(component_->previous_time_);
-                    if (prev_result) {
-                        blended = math::lerp(*prev_result, blended, bf);
+                transform blended = *cur_result;
+
+                auto snapshot_it = old_snapshot.find(name);
+                if (snapshot_it != old_snapshot.end()) {
+                    blended = math::lerp(snapshot_it->second, blended, bf);
+                } else if (layer_->blend_prev_clip) {
+                    auto* prev_track = layer_->blend_prev_clip->get_track(name);
+                    if (prev_track) {
+                        auto prev_result =
+                            prev_track->get_transform(layer_->blend_prev_time);
+                        if (prev_result) {
+                            blended = math::lerp(*prev_result, blended, bf);
+                        }
                     }
                 }
-            }
 
-            component_->blend_snapshot_[name] = blended;
+                layer_->blend_snapshot[name] = blended;
+            }
+        } else {
+            layer_->blend_snapshot.clear();
         }
+
+        layer_->blend_prev_clip = layer_->clip;
+        layer_->blend_prev_time = layer_->time;
+        layer_->blend_prev_playback_speed = layer_->playback_speed;
+        layer_->blend_prev_direction = layer_->direction;
     } else {
-        component_->blend_snapshot_.clear();
+        layer_->blend_prev_clip = nullptr;
+        layer_->blend_snapshot.clear();
     }
 
-    component_->previous_clip_ = component_->clip_;
-    component_->previous_time_ = component_->current_time_;
-    component_->previous_playback_speed_ = component_->playback_speed_;
-    component_->previous_direction_ = component_->direction_;
-    component_->clip_ = std::move(clip);
-    component_->current_time_ = 0.0f;
-    component_->blend_time_ = 0.0f;
-    component_->blend_duration_ = blend_duration;
+    layer_->clip = std::move(clip);
+    layer_->time = 0.0f;
+    layer_->blend_elapsed = 0.0f;
+    layer_->blend_transition = trans;
 
-    if (component_->state_ != animation_state::playing) {
-        component_->state_ = animation_state::playing;
-        component_->direction_ = 1.0f;
+    if (layer_->clip) {
+        layer_->mask = layer_->clip->get_target_names();
+    } else {
+        layer_->mask.clear();
+    }
+
+    if (layer_->state != animation_state::playing) {
+        layer_->state = animation_state::playing;
+        layer_->direction = 1.0f;
+        layer_->fade_is_out = false;
+        layer_->fade_influence = 1.0f;
+        layer_->fade_elapsed = 0.0f;
     }
     system_->add_active_entity(entity_);
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::player_modifier::blend_to_by_name(
+void animation_system<Cs...>::layer_modifier::blend_to_by_name(
     std::string_view name,
-    float32 blend_duration
+    std::optional<transition> t
 ) {
     auto clip = system_->clip_registry_->get(name);
     if (clip) {
-        blend_to(clip, blend_duration);
+        blend_to(std::move(clip), t);
     }
 }
+
+// --- target_modifier ---
 
 template <typename... Cs>
 animation_system<Cs...>::target_modifier::target_modifier(
