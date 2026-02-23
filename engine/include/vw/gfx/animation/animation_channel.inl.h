@@ -7,7 +7,7 @@ namespace vw::gfx {
 template <typename T>
 void animation_channel<T>::add(const keyframe<T>& kf) {
     keyframes_.push_back(kf);
-    if (keyframes_.back().id_ == keyframe<T>::invalid_id) {
+    if (keyframes_.back().id_ == invalid_keyframe_id) {
         keyframes_.back().id_ = next_id_++;
     }
     std::sort(keyframes_.begin(), keyframes_.end());

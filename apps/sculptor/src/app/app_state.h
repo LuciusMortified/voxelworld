@@ -73,7 +73,7 @@ struct app_state {
     std::string selected_track_name;
     gfx::animation_property selected_property = gfx::animation_property::position;
 
-    uint32 selected_keyframe_id = gfx::keyframe_vec3f::invalid_id;
+    uint32 selected_keyframe_id = gfx::invalid_keyframe_id;
     float32 timeline_cursor        = 0.f;
     std::unordered_set<std::string> expanded_tracks;
     bool animation_mode = false;

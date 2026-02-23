@@ -156,7 +156,7 @@ inline void clip_manager_panel::render(
                     state_->selected_clip_name = name;
                     state_->ui.show_timeline   = true;
                     state_->selected_track_name.clear();
-                    state_->selected_keyframe_id = gfx::keyframe_vec3f::invalid_id;
+                    state_->selected_keyframe_id = gfx::invalid_keyframe_id;
                 }
             }
 
@@ -366,7 +366,7 @@ inline auto clip_manager_panel::load_clip_(
     state_->selected_clip_name = clip->get_name();
     state_->ui.show_timeline   = true;
     state_->selected_track_name.clear();
-    state_->selected_keyframe_id = gfx::keyframe_vec3f::invalid_id;
+    state_->selected_keyframe_id = gfx::invalid_keyframe_id;
 
     return true;
 }

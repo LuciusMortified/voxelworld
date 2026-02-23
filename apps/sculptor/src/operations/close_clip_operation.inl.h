@@ -18,7 +18,7 @@ inline void close_clip_operation::execute() {
     if (state_->selected_clip_name == params_.name) {
         state_->selected_clip_name.clear();
         state_->selected_track_name.clear();
-        state_->selected_keyframe_id = gfx::keyframe_vec3f::invalid_id;
+        state_->selected_keyframe_id = gfx::invalid_keyframe_id;
     }
     state_->unsaved_clips.erase(params_.name);
 }

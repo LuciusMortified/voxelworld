@@ -125,7 +125,7 @@ inline void menu_bar::render(
                 "Delete Keyframe",
                 nullptr,
                 false,
-                state_->selected_keyframe_id != gfx::keyframe_vec3f::invalid_id
+                state_->selected_keyframe_id != gfx::invalid_keyframe_id
             )) {
             state_->need_delete_keyframe = true;
         }

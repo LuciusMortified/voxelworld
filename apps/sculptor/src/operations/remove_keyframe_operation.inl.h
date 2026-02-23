@@ -39,7 +39,7 @@ inline void remove_keyframe_operation::execute() {
     );
 
     track->mark_dirty();
-    state_->selected_keyframe_id              = gfx::keyframe_vec3f::invalid_id;
+    state_->selected_keyframe_id              = gfx::invalid_keyframe_id;
     state_->has_unsaved_changes               = true;
     state_->unsaved_clips[params_.clip_name] = true;
 }

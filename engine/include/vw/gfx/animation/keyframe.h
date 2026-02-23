@@ -11,12 +11,13 @@
 
 namespace vw::gfx {
 
+inline constexpr uint32 invalid_keyframe_id = std::numeric_limits<uint32>::max();
+
 template <typename T>
 class animation_channel;
 
 template <typename T>
 struct keyframe {
-    static constexpr uint32 invalid_id = std::numeric_limits<uint32>::max();
 
     keyframe() = default;
     keyframe(float32 time, T value)
@@ -35,7 +36,7 @@ struct keyframe {
 
 private:
     friend class animation_channel<T>;
-    uint32 id_ = invalid_id;
+    uint32 id_ = invalid_keyframe_id;
 };
 
 using keyframe_vec3f = keyframe<vec3f>;

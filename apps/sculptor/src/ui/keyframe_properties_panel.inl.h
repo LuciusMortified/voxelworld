@@ -16,7 +16,7 @@ inline keyframe_properties_panel::keyframe_properties_panel(
 inline void keyframe_properties_panel::render(
     float /*delta_time*/
 ) {
-    if (state_->selected_keyframe_id == gfx::keyframe_vec3f::invalid_id ||
+    if (state_->selected_keyframe_id == gfx::invalid_keyframe_id ||
         state_->selected_clip_name.empty() || state_->selected_track_name.empty()) {
         return;
     }

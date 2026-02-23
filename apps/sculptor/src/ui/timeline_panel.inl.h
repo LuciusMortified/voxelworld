@@ -56,7 +56,7 @@ inline void timeline_panel::render(
 
     if (!still_open && state_->ui.show_timeline) {
         state_->selected_track_name.clear();
-        state_->selected_keyframe_id = gfx::keyframe_vec3f::invalid_id;
+        state_->selected_keyframe_id = gfx::invalid_keyframe_id;
         state_->ui.show_timeline     = false;
     }
 
