@@ -28,8 +28,8 @@ private:
     void render_load_popup_();
     void close_clip_() const;
     void load_voxa_filenames_();
-    auto [[maybe_unused]] save_clip_() const -> bool;
-    auto [[maybe_unused]] load_clip_(const std::string& filename) const -> bool;
+    auto save_clip_() const -> bool;
+    auto load_clip_(const std::string& filename) const -> bool;
     void stop_layer_for_clip_(const std::string& clip_name) const;
     void stop_all_layers_() const;
     void enter_animation_mode_() const;
