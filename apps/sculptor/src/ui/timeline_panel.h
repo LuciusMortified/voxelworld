@@ -27,7 +27,6 @@ private:
     void render_tracks();
     void render_track_row(
         const gfx::animation_track& track,
-        const std::shared_ptr<gfx::animation_clip>& clip,
         float track_area_width,
         float clip_duration,
         float scroll_offset
@@ -65,16 +64,19 @@ private:
     ) const;
 
     void render_playback_controls(const std::shared_ptr<gfx::animation_clip>& clip);
-    void handle_play(gfx::entity root, const std::shared_ptr<gfx::animation_clip>& clip);
+    void render_clip_blend_controls_() const;
+    void handle_play(gfx::entity root, const std::shared_ptr<gfx::animation_clip>& clip) const;
     void handle_pause(gfx::entity root) const;
     void handle_stop(gfx::entity root) const;
     auto try_get_root_entity() const -> std::optional<gfx::entity>;
 
+    [[nodiscard]] auto is_current_layer_playing() const -> bool;
+    [[nodiscard]] auto is_clip_on_layer() const -> bool;
+    void ensure_clip_on_layer(gfx::entity root) const;
     void delete_selected_keyframe();
 
     void save_transforms() const;
     void restore_transforms() const;
-    void apply_scrub(float time) const;
 
     engine_type* engine_;
     app_state* state_;
@@ -83,17 +85,16 @@ private:
     create_keyframe_modal create_kf_modal_;
     delete_track_modal delete_track_modal_;
 
-    float playback_speed_ = 1.0f;
-    int loop_mode_index_  = 0;
-    float zoom_percent_   = 100.f;
-    float scroll_offset_  = 0.f;
+    float zoom_percent_  = 100.f;
+    float scroll_offset_ = 0.f;
 
     bool scrollbar_dragging_      = false;
     float scrollbar_drag_start_   = 0.f;
     float scrollbar_scroll_start_ = 0.f;
 
-    float prev_cursor_time_  = -1.f;
-    bool keyframe_clicked_   = false;
+    float prev_cursor_time_     = -1.f;
+    bool keyframe_clicked_      = false;
+    std::string prev_clip_name_;
 };
 
 }  // namespace vw::sculptor

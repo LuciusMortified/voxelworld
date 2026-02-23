@@ -30,7 +30,7 @@ class transform_system;
 template <typename... Cs>
 class animation_system final {
 public:
-    using registry_type = registry<Cs...>;
+    using registry_type         = registry<Cs...>;
     using transform_system_type = transform_system<Cs...>;
 
     explicit animation_system(
@@ -40,31 +40,29 @@ public:
     );
 
     void update(float32 delta_time);
+    void apply_pose(entity root_ent);
 
     [[nodiscard]] auto get_target_fps() const -> float32;
     void set_target_fps(float32 fps);
 
     class layer_modifier {
     public:
-        void play();
-        void play(const transition& fade_in);
-        void pause();
-        void stop();
-        void stop(const transition& fade_out);
-        void resume();
-        void set_time(float32 time);
-        void set_playback_speed(float32 speed);
-        void set_loop_mode(animation_loop_mode mode);
-        void set_fade_in(const transition& t);
-        void set_fade_out(const transition& t);
+        void play() const;
+        void play(const transition& fade_in) const;
+        void pause() const;
+        void stop() const;
+        void stop(const transition& fade_out) const;
+        void clear() const;
+        void resume() const;
+        void set_time(float32 time) const;
+        void set_playback_speed(float32 speed) const;
+        void set_loop_mode(animation_loop_mode mode) const;
+        void set_fade_in(const transition& t) const;
+        void set_fade_out(const transition& t) const;
         void blend_to(
-            std::shared_ptr<animation_clip> clip,
-            std::optional<transition> t = std::nullopt
-        );
-        void blend_to_by_name(
-            std::string_view name,
-            std::optional<transition> t = std::nullopt
-        );
+            std::shared_ptr<animation_clip> clip, std::optional<transition> t = std::nullopt
+        ) const;
+        void blend_to_by_name(std::string_view name, std::optional<transition> t = std::nullopt);
 
     private:
         friend class animation_system;
@@ -81,7 +79,9 @@ public:
 
     private:
         friend class animation_system;
-        player_modifier(animation_system* system, entity ent, animation_player_component* component);
+        player_modifier(
+            animation_system* system, entity ent, animation_player_component* component
+        );
 
         animation_system* system_;
         entity entity_;
@@ -90,7 +90,7 @@ public:
 
     class target_modifier {
     public:
-        void set_target_name(std::string name);
+        void set_target_name(std::string name) const;
 
     private:
         friend class animation_system;
@@ -109,20 +109,27 @@ private:
     std::vector<entity> to_remove_;
     std::deque<entity> to_visit_;
     float32 accumulated_delta_time_ = 0.0f;
-    float32 target_frame_time_ = 1.0f / 120.0f;
+    float32 target_frame_time_      = 1.0f / 120.0f;
 
     void add_active_entity(entity root_ent);
+
     void remove_active_entity(entity root_ent);
+
     void build_and_cache_target_map(entity root_ent);
+
     [[nodiscard]] auto get_cached_target_map(entity root_ent) const
         -> const std::unordered_map<std::string, entity>*;
+
     void process_animation(entity ent, animation_player_component& anim_comp, float32 delta_time);
-    void update_layer_time(animation_layer& layer, float32 delta_time);
+
+    static void update_layer_time(animation_layer& layer, float32 delta_time);
+
     void process_layer(animation_layer& layer, float32 delta_time, bool is_base);
+
     void apply_animation(entity root_ent, const animation_player_component& anim_comp);
-    auto compute_layer_transform(
-        const animation_layer& layer,
-        const std::string& target_name
+
+    [[nodiscard]] auto compute_layer_transform(
+        const animation_layer& layer, const std::string& target_name
     ) const -> std::optional<transform>;
 
     registry_type* registry_;

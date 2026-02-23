@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cmath>
 #include <unordered_set>
 #include <vector>
 
@@ -12,9 +11,7 @@ animation_system<Cs...>::animation_system(
     transform_system_type& transform_sys,
     animation_clip_registry& clip_registry
 )
-    : registry_(&registry),
-      transform_system_(&transform_sys),
-      clip_registry_(&clip_registry) {}
+    : registry_(&registry), transform_system_(&transform_sys), clip_registry_(&clip_registry) {}
 
 template <typename... Cs>
 auto animation_system<Cs...>::get_target_fps() const -> float32 {
@@ -22,12 +19,30 @@ auto animation_system<Cs...>::get_target_fps() const -> float32 {
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::set_target_fps(float32 fps) {
+void animation_system<Cs...>::set_target_fps(
+    float32 fps
+) {
     target_frame_time_ = 1.0f / fps;
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::update(float32 delta_time) {
+void animation_system<Cs...>::apply_pose(
+    entity root_ent
+) {
+    if (!registry_->template has<animation_player_component>(root_ent)) {
+        return;
+    }
+    if (!get_cached_target_map(root_ent)) {
+        build_and_cache_target_map(root_ent);
+    }
+    const auto& anim_comp = registry_->template get<animation_player_component>(root_ent);
+    apply_animation(root_ent, anim_comp);
+}
+
+template <typename... Cs>
+void animation_system<Cs...>::update(
+    float32 delta_time
+) {
     accumulated_delta_time_ += delta_time;
 
     if (accumulated_delta_time_ < target_frame_time_) {
@@ -63,7 +78,9 @@ void animation_system<Cs...>::update(float32 delta_time) {
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::add_active_entity(entity root_ent) {
+void animation_system<Cs...>::add_active_entity(
+    entity root_ent
+) {
     auto [it, inserted] = active_entities_.insert(root_ent);
 
     if (inserted) {
@@ -72,13 +89,17 @@ void animation_system<Cs...>::add_active_entity(entity root_ent) {
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::remove_active_entity(entity root_ent) {
+void animation_system<Cs...>::remove_active_entity(
+    entity root_ent
+) {
     active_entities_.erase(root_ent);
     target_maps_.erase(root_ent);
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::build_and_cache_target_map(entity root_ent) {
+void animation_system<Cs...>::build_and_cache_target_map(
+    entity root_ent
+) {
     std::unordered_map<std::string, entity> target_map;
 
     to_visit_.clear();
@@ -89,8 +110,7 @@ void animation_system<Cs...>::build_and_cache_target_map(entity root_ent) {
         to_visit_.pop_front();
 
         if (registry_->template has<animation_target_component>(current)) {
-            const auto& target_comp =
-                registry_->template get<animation_target_component>(current);
+            const auto& target_comp = registry_->template get<animation_target_component>(current);
             target_map[target_comp.get_name()] = current;
         }
 
@@ -106,8 +126,9 @@ void animation_system<Cs...>::build_and_cache_target_map(entity root_ent) {
 }
 
 template <typename... Cs>
-auto animation_system<Cs...>::get_cached_target_map(entity root_ent) const
-    -> const std::unordered_map<std::string, entity>* {
+auto animation_system<Cs...>::get_cached_target_map(
+    entity root_ent
+) const -> const std::unordered_map<std::string, entity>* {
     auto it = target_maps_.find(root_ent);
     if (it != target_maps_.end()) {
         return &it->second;
@@ -117,8 +138,7 @@ auto animation_system<Cs...>::get_cached_target_map(entity root_ent) const
 
 template <typename... Cs>
 void animation_system<Cs...>::update_layer_time(
-    animation_layer& layer,
-    float32 delta_time
+    animation_layer& layer, float32 delta_time
 ) {
     layer.time += delta_time * layer.playback_speed * layer.direction;
 
@@ -126,10 +146,10 @@ void animation_system<Cs...>::update_layer_time(
 
     if (layer.loop_mode == animation_loop_mode::once) {
         if (layer.time >= duration) {
-            layer.time = duration;
+            layer.time  = duration;
             layer.state = animation_state::stopped;
         } else if (layer.time < 0.0f) {
-            layer.time = 0.0f;
+            layer.time  = 0.0f;
             layer.state = animation_state::stopped;
         }
     } else if (layer.loop_mode == animation_loop_mode::loop) {
@@ -143,19 +163,17 @@ void animation_system<Cs...>::update_layer_time(
     } else if (layer.loop_mode == animation_loop_mode::ping_pong) {
         if (layer.time >= duration) {
             layer.direction = -1.0f;
-            layer.time = duration;
+            layer.time      = duration;
         } else if (layer.time <= 0.0f) {
             layer.direction = 1.0f;
-            layer.time = 0.0f;
+            layer.time      = 0.0f;
         }
     }
 }
 
 template <typename... Cs>
 void animation_system<Cs...>::process_layer(
-    animation_layer& layer,
-    float32 delta_time,
-    bool is_base
+    animation_layer& layer, float32 delta_time, bool is_base
 ) {
     if (!layer.clip) {
         return;
@@ -163,18 +181,16 @@ void animation_system<Cs...>::process_layer(
 
     if (layer.fade_is_out) {
         layer.fade_elapsed += delta_time;
-        if (layer.fade_out.duration > 0.0f &&
-            layer.fade_elapsed < layer.fade_out.duration) {
+        if (layer.fade_out.duration > 0.0f && layer.fade_elapsed < layer.fade_out.duration) {
             float32 t = layer.fade_elapsed / layer.fade_out.duration;
-            t = math::apply_easing_bezier(
-                t, layer.fade_out.interp,
-                layer.fade_out.tangent_in, layer.fade_out.tangent_out
+            t         = math::apply_easing_bezier(
+                t, layer.fade_out.interp, layer.fade_out.tangent_in, layer.fade_out.tangent_out
             );
             layer.fade_influence = 1.0f - t;
         } else {
             layer.fade_influence = 0.0f;
-            layer.fade_is_out = false;
-            layer.state = animation_state::stopped;
+            layer.fade_is_out    = false;
+            layer.state          = animation_state::stopped;
         }
         if (layer.state == animation_state::playing) {
             update_layer_time(layer, delta_time);
@@ -186,15 +202,18 @@ void animation_system<Cs...>::process_layer(
         return;
     }
 
-    if (!is_base && layer.fade_in.duration > 0.0f && layer.fade_influence < 1.0f) {
-        layer.fade_elapsed += delta_time;
-        if (layer.fade_elapsed < layer.fade_in.duration) {
-            float32 t = layer.fade_elapsed / layer.fade_in.duration;
-            t = math::apply_easing_bezier(
-                t, layer.fade_in.interp,
-                layer.fade_in.tangent_in, layer.fade_in.tangent_out
-            );
-            layer.fade_influence = t;
+    if (!is_base && layer.fade_influence < 1.0f) {
+        if (layer.fade_in.duration > 0.0f) {
+            layer.fade_elapsed += delta_time;
+            if (layer.fade_elapsed < layer.fade_in.duration) {
+                float32 t = layer.fade_elapsed / layer.fade_in.duration;
+                t         = math::apply_easing_bezier(
+                    t, layer.fade_in.interp, layer.fade_in.tangent_in, layer.fade_in.tangent_out
+                );
+                layer.fade_influence = t;
+            } else {
+                layer.fade_influence = 1.0f;
+            }
         } else {
             layer.fade_influence = 1.0f;
         }
@@ -202,7 +221,8 @@ void animation_system<Cs...>::process_layer(
 
     update_layer_time(layer, delta_time);
 
-    if (layer.blend_transition.duration > 0.0f && layer.blend_elapsed < layer.blend_transition.duration) {
+    if (layer.blend_transition.duration > 0.0f &&
+        layer.blend_elapsed < layer.blend_transition.duration) {
         layer.blend_elapsed += delta_time;
 
         if (layer.blend_prev_clip) {
@@ -217,8 +237,8 @@ void animation_system<Cs...>::process_layer(
         }
 
         if (layer.blend_elapsed >= layer.blend_transition.duration) {
-            layer.blend_prev_clip = nullptr;
-            layer.blend_elapsed = 0.0f;
+            layer.blend_prev_clip  = nullptr;
+            layer.blend_elapsed    = 0.0f;
             layer.blend_transition = {};
             layer.blend_snapshot.clear();
         }
@@ -226,7 +246,7 @@ void animation_system<Cs...>::process_layer(
 
     if (!is_base && layer.state == animation_state::stopped) {
         if (layer.fade_out.duration > 0.0f) {
-            layer.fade_is_out = true;
+            layer.fade_is_out  = true;
             layer.fade_elapsed = 0.0f;
         } else {
             layer.fade_influence = 0.0f;
@@ -236,8 +256,7 @@ void animation_system<Cs...>::process_layer(
 
 template <typename... Cs>
 auto animation_system<Cs...>::compute_layer_transform(
-    const animation_layer& layer,
-    const std::string& target_name
+    const animation_layer& layer, const std::string& target_name
 ) const -> std::optional<transform> {
     if (!layer.clip) {
         return std::nullopt;
@@ -256,14 +275,15 @@ auto animation_system<Cs...>::compute_layer_transform(
     transform t = *transform_result;
 
     bool is_blending = layer.blend_transition.duration > 0.0f &&
-                       (layer.blend_prev_clip || !layer.blend_snapshot.empty());
+        (layer.blend_prev_clip || !layer.blend_snapshot.empty());
     if (is_blending) {
-        float32 blend_factor = math::clamp(
-            layer.blend_elapsed / layer.blend_transition.duration, 0.0f, 1.0f
-        );
+        float32 blend_factor =
+            math::clamp(layer.blend_elapsed / layer.blend_transition.duration, 0.0f, 1.0f);
         blend_factor = math::apply_easing_bezier(
-            blend_factor, layer.blend_transition.interp,
-            layer.blend_transition.tangent_in, layer.blend_transition.tangent_out
+            blend_factor,
+            layer.blend_transition.interp,
+            layer.blend_transition.tangent_in,
+            layer.blend_transition.tangent_out
         );
 
         auto snapshot_it = layer.blend_snapshot.find(target_name);
@@ -285,9 +305,7 @@ auto animation_system<Cs...>::compute_layer_transform(
 
 template <typename... Cs>
 void animation_system<Cs...>::process_animation(
-    entity ent,
-    animation_player_component& anim_comp,
-    float32 delta_time
+    entity ent, animation_player_component& anim_comp, float32 delta_time
 ) {
     for (size_t i = 0; i < anim_comp.layers_.size(); ++i) {
         process_layer(anim_comp.layers_[i], delta_time, i == 0);
@@ -298,8 +316,7 @@ void animation_system<Cs...>::process_animation(
 
 template <typename... Cs>
 void animation_system<Cs...>::apply_animation(
-    entity root_ent,
-    const animation_player_component& anim_comp
+    entity root_ent, const animation_player_component& anim_comp
 ) {
     const auto* target_map = get_cached_target_map(root_ent);
     if (!target_map) {
@@ -310,23 +327,23 @@ void animation_system<Cs...>::apply_animation(
 
     if (!anim_comp.layers_.empty()) {
         const auto& base = anim_comp.layers_[0];
-        if (base.clip && (base.state == animation_state::playing ||
-                          base.state == animation_state::stopped)) {
+        if (base.clip) {
             for (const auto& track : base.clip->get_tracks()) {
                 const auto& name = track.get_target_name();
-                auto t = compute_layer_transform(base, name);
+                auto t           = compute_layer_transform(base, name);
                 if (t) {
                     final_transforms[name] = *t;
                 }
             }
 
             if (base.blend_transition.duration > 0.0f && base.blend_prev_clip) {
-                float32 blend_factor = math::clamp(
-                    base.blend_elapsed / base.blend_transition.duration, 0.0f, 1.0f
-                );
+                float32 blend_factor =
+                    math::clamp(base.blend_elapsed / base.blend_transition.duration, 0.0f, 1.0f);
                 blend_factor = math::apply_easing_bezier(
-                    blend_factor, base.blend_transition.interp,
-                    base.blend_transition.tangent_in, base.blend_transition.tangent_out
+                    blend_factor,
+                    base.blend_transition.interp,
+                    base.blend_transition.tangent_in,
+                    base.blend_transition.tangent_out
                 );
 
                 for (const auto& prev_track : base.blend_prev_clip->get_tracks()) {
@@ -367,12 +384,10 @@ void animation_system<Cs...>::apply_animation(
 
             auto base_it = final_transforms.find(target_name);
             if (base_it != final_transforms.end()) {
-                base_it->second =
-                    math::lerp(base_it->second, *t, layer.fade_influence);
+                base_it->second = math::lerp(base_it->second, *t, layer.fade_influence);
             } else {
                 transform identity;
-                final_transforms[target_name] =
-                    math::lerp(identity, *t, layer.fade_influence);
+                final_transforms[target_name] = math::lerp(identity, *t, layer.fade_influence);
             }
         }
     }
@@ -397,20 +412,22 @@ void animation_system<Cs...>::apply_animation(
 
 template <typename... Cs>
 animation_system<Cs...>::player_modifier::player_modifier(
-    animation_system* system,
-    entity ent,
-    animation_player_component* component
+    animation_system* system, entity ent, animation_player_component* component
 )
     : system_(system), entity_(ent), component_(component) {}
 
 template <typename... Cs>
-auto animation_system<Cs...>::modify_player(entity ent) -> player_modifier {
+auto animation_system<Cs...>::modify_player(
+    entity ent
+) -> player_modifier {
     auto& comp = registry_->template get<animation_player_component>(ent);
     return player_modifier(this, ent, &comp);
 }
 
 template <typename... Cs>
-auto animation_system<Cs...>::player_modifier::layer(size_t index) -> layer_modifier {
+auto animation_system<Cs...>::player_modifier::layer(
+    size_t index
+) -> layer_modifier {
     if (index >= component_->layers_.size()) {
         component_->layers_.resize(index + 1);
     }
@@ -421,65 +438,73 @@ auto animation_system<Cs...>::player_modifier::layer(size_t index) -> layer_modi
 
 template <typename... Cs>
 animation_system<Cs...>::layer_modifier::layer_modifier(
-    animation_system* system,
-    entity ent,
-    animation_layer* layer
+    animation_system* system, entity ent, animation_layer* layer
 )
     : system_(system), entity_(ent), layer_(layer) {}
 
 template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::play() {
+void animation_system<Cs...>::layer_modifier::play() const {
     if (layer_->state != animation_state::playing) {
-        layer_->state = animation_state::playing;
-        layer_->time = 0.0f;
-        layer_->direction = 1.0f;
+        layer_->state          = animation_state::playing;
+        layer_->time           = 0.0f;
+        layer_->direction      = 1.0f;
         layer_->fade_influence = 1.0f;
-        layer_->fade_is_out = false;
-        layer_->fade_elapsed = 0.0f;
+        layer_->fade_is_out    = false;
+        layer_->fade_elapsed   = 0.0f;
 
         system_->add_active_entity(entity_);
     }
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::play(const transition& fade_in) {
-    layer_->fade_in = fade_in;
+void animation_system<Cs...>::layer_modifier::play(
+    const transition& fade_in
+) const {
+    layer_->fade_in        = fade_in;
+    layer_->fade_influence = 0.0f;
+    layer_->fade_is_out    = false;
+    layer_->fade_elapsed   = 0.0f;
+
     if (layer_->state != animation_state::playing) {
-        layer_->state = animation_state::playing;
-        layer_->time = 0.0f;
+        layer_->state     = animation_state::playing;
+        layer_->time      = 0.0f;
         layer_->direction = 1.0f;
-        layer_->fade_influence = 0.0f;
-        layer_->fade_is_out = false;
-        layer_->fade_elapsed = 0.0f;
 
         system_->add_active_entity(entity_);
     }
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::pause() {
+void animation_system<Cs...>::layer_modifier::pause() const {
     if (layer_->state == animation_state::playing) {
         layer_->state = animation_state::paused;
     }
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::stop() {
-    layer_->state = animation_state::stopped;
-    layer_->time = 0.0f;
+void animation_system<Cs...>::layer_modifier::stop() const {
+    layer_->state          = animation_state::stopped;
+    layer_->time           = 0.0f;
     layer_->fade_influence = 0.0f;
-    layer_->fade_is_out = false;
+    layer_->fade_is_out    = false;
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::stop(const transition& fade_out) {
-    layer_->fade_out = fade_out;
-    layer_->fade_is_out = true;
+void animation_system<Cs...>::layer_modifier::clear() const {
+    *layer_ = animation_layer{};
+}
+
+template <typename... Cs>
+void animation_system<Cs...>::layer_modifier::stop(
+    const transition& fade_out
+) const {
+    layer_->fade_out     = fade_out;
+    layer_->fade_is_out  = true;
     layer_->fade_elapsed = 0.0f;
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::resume() {
+void animation_system<Cs...>::layer_modifier::resume() const {
     if (layer_->state == animation_state::paused) {
         layer_->state = animation_state::playing;
         system_->add_active_entity(entity_);
@@ -487,45 +512,55 @@ void animation_system<Cs...>::layer_modifier::resume() {
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::set_time(float32 time) {
+void animation_system<Cs...>::layer_modifier::set_time(
+    float32 time
+) const {
     layer_->time = time;
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::set_playback_speed(float32 speed) {
+void animation_system<Cs...>::layer_modifier::set_playback_speed(
+    float32 speed
+) const {
     layer_->playback_speed = speed;
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::set_loop_mode(animation_loop_mode mode) {
+void animation_system<Cs...>::layer_modifier::set_loop_mode(
+    animation_loop_mode mode
+) const {
     layer_->loop_mode = mode;
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::set_fade_in(const transition& t) {
+void animation_system<Cs...>::layer_modifier::set_fade_in(
+    const transition& t
+) const {
     layer_->fade_in = t;
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::set_fade_out(const transition& t) {
+void animation_system<Cs...>::layer_modifier::set_fade_out(
+    const transition& t
+) const {
     layer_->fade_out = t;
 }
 
 template <typename... Cs>
 void animation_system<Cs...>::layer_modifier::blend_to(
-    std::shared_ptr<animation_clip> clip,
-    std::optional<transition> t
-) {
+    std::shared_ptr<animation_clip> clip, std::optional<transition> t
+) const {
     transition trans = t.value_or(layer_->blend_transition);
 
     if (trans.duration > 0.0f && layer_->clip) {
         if (layer_->blend_transition.duration > 0.0f && layer_->clip) {
-            float32 bf = math::clamp(
-                layer_->blend_elapsed / layer_->blend_transition.duration, 0.0f, 1.0f
-            );
+            float32 bf =
+                math::clamp(layer_->blend_elapsed / layer_->blend_transition.duration, 0.0f, 1.0f);
             bf = math::apply_easing_bezier(
-                bf, layer_->blend_transition.interp,
-                layer_->blend_transition.tangent_in, layer_->blend_transition.tangent_out
+                bf,
+                layer_->blend_transition.interp,
+                layer_->blend_transition.tangent_in,
+                layer_->blend_transition.tangent_out
             );
 
             auto old_snapshot = std::move(layer_->blend_snapshot);
@@ -533,7 +568,7 @@ void animation_system<Cs...>::layer_modifier::blend_to(
 
             for (const auto& track : layer_->clip->get_tracks()) {
                 const auto& name = track.get_target_name();
-                auto cur_result = track.get_transform(layer_->time);
+                auto cur_result  = track.get_transform(layer_->time);
                 if (!cur_result) {
                     continue;
                 }
@@ -546,8 +581,7 @@ void animation_system<Cs...>::layer_modifier::blend_to(
                 } else if (layer_->blend_prev_clip) {
                     auto* prev_track = layer_->blend_prev_clip->get_track(name);
                     if (prev_track) {
-                        auto prev_result =
-                            prev_track->get_transform(layer_->blend_prev_time);
+                        auto prev_result = prev_track->get_transform(layer_->blend_prev_time);
                         if (prev_result) {
                             blended = math::lerp(*prev_result, blended, bf);
                         }
@@ -560,18 +594,18 @@ void animation_system<Cs...>::layer_modifier::blend_to(
             layer_->blend_snapshot.clear();
         }
 
-        layer_->blend_prev_clip = layer_->clip;
-        layer_->blend_prev_time = layer_->time;
+        layer_->blend_prev_clip           = layer_->clip;
+        layer_->blend_prev_time           = layer_->time;
         layer_->blend_prev_playback_speed = layer_->playback_speed;
-        layer_->blend_prev_direction = layer_->direction;
+        layer_->blend_prev_direction      = layer_->direction;
     } else {
         layer_->blend_prev_clip = nullptr;
         layer_->blend_snapshot.clear();
     }
 
-    layer_->clip = std::move(clip);
-    layer_->time = 0.0f;
-    layer_->blend_elapsed = 0.0f;
+    layer_->clip             = std::move(clip);
+    layer_->time             = 0.0f;
+    layer_->blend_elapsed    = 0.0f;
     layer_->blend_transition = trans;
 
     if (layer_->clip) {
@@ -581,19 +615,18 @@ void animation_system<Cs...>::layer_modifier::blend_to(
     }
 
     if (layer_->state != animation_state::playing) {
-        layer_->state = animation_state::playing;
-        layer_->direction = 1.0f;
-        layer_->fade_is_out = false;
+        layer_->state          = animation_state::playing;
+        layer_->direction      = 1.0f;
+        layer_->fade_is_out    = false;
         layer_->fade_influence = 1.0f;
-        layer_->fade_elapsed = 0.0f;
+        layer_->fade_elapsed   = 0.0f;
     }
     system_->add_active_entity(entity_);
 }
 
 template <typename... Cs>
 void animation_system<Cs...>::layer_modifier::blend_to_by_name(
-    std::string_view name,
-    std::optional<transition> t
+    std::string_view name, std::optional<transition> t
 ) {
     auto clip = system_->clip_registry_->get(name);
     if (clip) {
@@ -605,19 +638,22 @@ void animation_system<Cs...>::layer_modifier::blend_to_by_name(
 
 template <typename... Cs>
 animation_system<Cs...>::target_modifier::target_modifier(
-    entity ent,
-    animation_target_component* component
+    entity ent, animation_target_component* component
 )
     : entity_(ent), component_(component) {}
 
 template <typename... Cs>
-auto animation_system<Cs...>::modify_target(entity ent) -> target_modifier {
+auto animation_system<Cs...>::modify_target(
+    entity ent
+) -> target_modifier {
     auto& comp = registry_->template get<animation_target_component>(ent);
     return target_modifier(ent, &comp);
 }
 
 template <typename... Cs>
-void animation_system<Cs...>::target_modifier::set_target_name(std::string name) {
+void animation_system<Cs...>::target_modifier::set_target_name(
+    std::string name
+) const {
     component_->target_name_ = std::move(name);
 }
 

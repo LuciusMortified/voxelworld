@@ -67,7 +67,7 @@ struct app_state {
 
     std::vector<std::unique_ptr<entity_guard_type>> entities;
 
-    auto find_guard(gfx::entity ent) -> entity_guard_type*;
+    [[nodiscard]] auto find_guard(gfx::entity ent) const -> entity_guard_type*;
 
     std::string selected_clip_name;
     std::string selected_track_name;
@@ -76,7 +76,7 @@ struct app_state {
     float32 selected_keyframe_time = -1.f;
     float32 timeline_cursor        = 0.f;
     std::unordered_set<std::string> expanded_tracks;
-    bool is_previewing = false;
+    bool animation_mode = false;
 
     bool need_toggle_playback = false;
     bool need_stop_playback   = false;
@@ -84,6 +84,21 @@ struct app_state {
     bool need_delete_keyframe = false;
     bool need_step_forward    = false;
     bool need_step_backward   = false;
+
+    std::unordered_map<std::string, size_t> clip_to_layer;
+    [[nodiscard]] auto get_layer_for_clip(const std::string& name) const -> size_t;
+
+    struct clip_settings {
+        float32 playback_speed                = 1.0f;
+        gfx::animation_loop_mode loop_mode    = gfx::animation_loop_mode::once;
+        gfx::transition blend_transition      = {};
+        gfx::transition fade_in               = {};
+        gfx::transition fade_out              = {};
+    };
+
+    std::unordered_map<std::string, clip_settings> clip_settings_map;
+    [[nodiscard]] auto get_clip_settings(const std::string& name) const -> clip_settings;
+    [[nodiscard]] auto get_clip_settings_mut(const std::string& name) -> clip_settings&;
 
     std::unordered_map<std::string, transform> saved_transforms;
     bool has_saved_transforms = false;

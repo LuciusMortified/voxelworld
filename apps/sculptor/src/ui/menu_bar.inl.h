@@ -55,7 +55,6 @@ inline void menu_bar::render(
             const fs::path assets_dir_path{app_state::asset_dir_name};
             const fs::path filepath{assets_dir_path / state_->filename};
             auto result = serializer.serialize(filepath);
-
             // TODO: handle serialization errors
 
             state_->has_unsaved_changes = false;
@@ -115,7 +114,7 @@ inline void menu_bar::render(
         if (ImGui::MenuItem("Play/Pause", "Space", false, has_clip)) {
             state_->need_toggle_playback = true;
         }
-        if (ImGui::MenuItem("Stop", nullptr, false, state_->is_previewing)) {
+        if (ImGui::MenuItem("Stop", nullptr, false, state_->animation_mode)) {
             state_->need_stop_playback = true;
         }
         ImGui::Separator();

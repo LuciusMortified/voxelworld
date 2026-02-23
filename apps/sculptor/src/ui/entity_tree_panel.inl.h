@@ -17,8 +17,8 @@ inline entity_tree_panel::entity_tree_panel(
 inline void entity_tree_panel::render(
     float delta_time
 ) {
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImVec2 window_pos       = ImVec2(
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const auto window_pos         = ImVec2(
         viewport->WorkPos.x + viewport->WorkSize.x - 10,
         viewport->WorkPos.y + state_->ui.right_top_voffset + 10
     );
@@ -31,7 +31,8 @@ inline void entity_tree_panel::render(
 
     ImGui::Begin("Entity Tree", nullptr, window_flags);
 
-    const bool can_add = state_->root_name.empty() || !state_->selected_name.empty();
+    const bool can_add =
+        !state_->animation_mode && (state_->root_name.empty() || !state_->selected_name.empty());
     if (!can_add) {
         ImGui::BeginDisabled();
     }
@@ -44,8 +45,8 @@ inline void entity_tree_panel::render(
 
     ImGui::SameLine();
 
-    const bool can_remove = !state_->selected_name.empty() &&
-                            state_->name_to_entity.contains(state_->selected_name);
+    const bool can_remove = !state_->animation_mode && !state_->selected_name.empty() &&
+        state_->name_to_entity.contains(state_->selected_name);
     if (!can_remove) {
         ImGui::BeginDisabled();
     }
@@ -117,16 +118,19 @@ inline void entity_tree_panel::render_entity_node(
         state_->selected_name = name;
     }
 
-    const auto context_menu_id = std::format("EntityContextMenu_{}_{}", ent.index, ent.generation);
-    if (ImGui::BeginPopupContextItem(context_menu_id.c_str())) {
-        state_->selected_name = name;
-        if (ImGui::MenuItem("Create child")) {
-            creation_modal_.open();
+    if (!state_->animation_mode) {
+        const auto context_menu_id =
+            std::format("EntityContextMenu_{}_{}", ent.index, ent.generation);
+        if (ImGui::BeginPopupContextItem(context_menu_id.c_str())) {
+            state_->selected_name = name;
+            if (ImGui::MenuItem("Create child")) {
+                creation_modal_.open();
+            }
+            if (!has_children && ImGui::MenuItem("Delete entity")) {
+                deletion_modal_.open(name);
+            }
+            ImGui::EndPopup();
         }
-        if (!has_children && ImGui::MenuItem("Delete entity")) {
-            deletion_modal_.open(name);
-        }
-        ImGui::EndPopup();
     }
 
     if (is_open && has_children) {

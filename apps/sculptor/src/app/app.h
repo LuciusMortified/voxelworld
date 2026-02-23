@@ -51,6 +51,7 @@ private:
     bool camera_movement_enabled_ = false;
     bool prev_unsaved_state_      = false;
     bool prev_clip_unsaved_state_ = false;
+    bool prev_animation_mode_     = false;
     std::string prev_clip_name_;
 
     app_state state_;
