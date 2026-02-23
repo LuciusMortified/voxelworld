@@ -7,6 +7,7 @@
 
 #include "app/app_state.h"
 #include "operations/operation_manager.h"
+#include "services/file_service.h"
 
 namespace vw::sculptor {
 
@@ -14,7 +15,8 @@ class menu_bar final {
 public:
     using engine_type = gfx::engine<>;
 
-    menu_bar(engine_type& eng, app_state& state, operation_manager& op_manager);
+    menu_bar(engine_type& eng, app_state& state, operation_manager& op_manager,
+             file_service& file_svc);
 
     void render(float delta_time) const;
 
@@ -22,6 +24,7 @@ private:
     engine_type* engine_;
     app_state* state_;
     operation_manager* op_manager_;
+    file_service* file_service_;
 };
 
 }  // namespace vw::sculptor

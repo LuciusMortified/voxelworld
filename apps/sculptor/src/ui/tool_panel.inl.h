@@ -41,7 +41,7 @@ inline void tool_panel::render(
 inline void tool_panel::render_tool_button(
     tools tool, std::string_view label, std::string_view shortcut
 ) {
-    const bool is_selected        = state_->selected_tool == tool;
+    const bool is_selected        = state_->tool.selected_tool == tool;
     const auto button_color       = is_selected ? ImGuiCol_ButtonActive : ImGuiCol_Button;
     const auto button_hover_color = is_selected ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered;
 
@@ -49,7 +49,7 @@ inline void tool_panel::render_tool_button(
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImGui::GetStyle().Colors[button_hover_color]);
 
     if (ImGui::Button(label.data(), ImVec2(100, 0))) {
-        state_->selected_tool = tool;
+        state_->tool.selected_tool = tool;
     }
     ImGui::PopStyleColor(2);
 

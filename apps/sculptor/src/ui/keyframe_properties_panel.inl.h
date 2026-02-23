@@ -16,23 +16,23 @@ inline keyframe_properties_panel::keyframe_properties_panel(
 inline void keyframe_properties_panel::render(
     float /*delta_time*/
 ) {
-    if (state_->selected_keyframe_id == gfx::invalid_keyframe_id ||
-        state_->selected_clip_name.empty() || state_->selected_track_name.empty()) {
+    if (state_->anim.selected_keyframe_id == gfx::invalid_keyframe_id ||
+        state_->anim.selected_clip_name.empty() || state_->anim.selected_track_name.empty()) {
         return;
     }
 
     const auto& clip_registry = engine_->get_world().get_animation_clip_registry();
-    const auto clip           = clip_registry.get(state_->selected_clip_name);
+    const auto clip           = clip_registry.get(state_->anim.selected_clip_name);
     if (!clip) {
         return;
     }
 
-    auto* track = clip->get_track(state_->selected_track_name);
+    auto* track = clip->get_track(state_->anim.selected_track_name);
     if (!track) {
         return;
     }
 
-    auto* channel_var = track->get_channel(state_->selected_property);
+    auto* channel_var = track->get_channel(state_->anim.selected_property);
     if (!channel_var) {
         return;
     }
@@ -52,18 +52,18 @@ inline void keyframe_properties_panel::render(
     ImGui::Begin("Keyframe Properties", nullptr, window_flags);
 
     const char* prop_names[] = {"Position", "Rotation", "Scale", "Origin"};
-    const int prop_idx       = static_cast<int>(state_->selected_property);
+    const int prop_idx       = static_cast<int>(state_->anim.selected_property);
     std::visit(
         [&](const auto& channel) {
             const auto& keyframes = channel.get_keyframes();
             for (const auto& kf : keyframes) {
-                if (kf.id() != state_->selected_keyframe_id) {
+                if (kf.id() != state_->anim.selected_keyframe_id) {
                     continue;
                 }
 
                 ImGui::TextDisabled(
                     "Track: %s, %s, T: %.3f, ID: %u",
-                    state_->selected_track_name.c_str(),
+                    state_->anim.selected_track_name.c_str(),
                     prop_names[prop_idx],
                     kf.time,
                     kf.id()
@@ -150,9 +150,9 @@ inline void keyframe_properties_panel::render(
                     new_kf.tangent_out = new_tangent_out;
 
                     modify_keyframe_params mod_params;
-                    mod_params.clip_name    = state_->selected_clip_name;
-                    mod_params.track_name   = state_->selected_track_name;
-                    mod_params.property     = state_->selected_property;
+                    mod_params.clip_name    = state_->anim.selected_clip_name;
+                    mod_params.track_name   = state_->anim.selected_track_name;
+                    mod_params.property     = state_->anim.selected_property;
                     mod_params.old_keyframe = keyframe_value(old_kf);
                     mod_params.new_keyframe = keyframe_value(new_kf);
                     auto op =
@@ -164,9 +164,9 @@ inline void keyframe_properties_panel::render(
 
                 if (ImGui::Button("Delete Keyframe")) {
                     remove_keyframe_params rm_params;
-                    rm_params.clip_name  = state_->selected_clip_name;
-                    rm_params.track_name = state_->selected_track_name;
-                    rm_params.property   = state_->selected_property;
+                    rm_params.clip_name  = state_->anim.selected_clip_name;
+                    rm_params.track_name = state_->anim.selected_track_name;
+                    rm_params.property   = state_->anim.selected_property;
                     rm_params.keyframe   = keyframe_value(old_kf);
                     auto op =
                         std::make_unique<remove_keyframe_operation>(*engine_, *state_, rm_params);

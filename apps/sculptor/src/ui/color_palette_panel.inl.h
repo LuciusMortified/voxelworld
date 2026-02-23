@@ -29,7 +29,7 @@ inline void color_palette_panel::render(
 
     ImGui::Begin("Color Palette", nullptr, window_flags);
 
-    const ImVec4 selected_color_imvec4 = to_imvec4(state_->selected_color);
+    const ImVec4 selected_color_imvec4 = to_imvec4(state_->tool.selected_color);
     ImGui::ColorButton(
         "##current_color",
         selected_color_imvec4,
@@ -44,9 +44,9 @@ inline void color_palette_panel::render(
     );
     ImGui::Text(
         "HEX: #%02X%02X%02X",
-        state_->selected_color.r(),
-        state_->selected_color.g(),
-        state_->selected_color.b()
+        state_->tool.selected_color.r(),
+        state_->tool.selected_color.g(),
+        state_->tool.selected_color.b()
     );
 
     ImGui::Spacing();
@@ -71,7 +71,7 @@ inline void color_palette_panel::render(
         auto color_picked =
             ImGui::ColorButton("##color_button", clr_imvec4, btn_flags, ImVec2(30.0f, 30.0f));
         if (color_picked) {
-            state_->selected_color = clr;
+            state_->tool.selected_color = clr;
         }
 
         ImGui::PopID();

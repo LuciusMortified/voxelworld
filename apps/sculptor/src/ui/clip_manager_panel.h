@@ -9,6 +9,7 @@
 #include "create_clip_modal.h"
 #include "layer_blend_modal.h"
 #include "operations/operation_manager.h"
+#include "services/clip_service.h"
 
 namespace vw::sculptor {
 
@@ -16,30 +17,20 @@ class clip_manager_panel final {
 public:
     using engine_type = gfx::engine<>;
 
-    clip_manager_panel(engine_type& eng, app_state& st, operation_manager& op_manager);
+    clip_manager_panel(engine_type& eng, app_state& st, operation_manager& op_manager,
+                       clip_service& clip_svc);
 
     void render(float delta_time);
-
-    void save_all_clips() const;
-    void force_exit_animation_mode() const;
 
 private:
     void render_close_confirm_popup_() const;
     void render_load_popup_();
-    void close_clip_() const;
     void load_voxa_filenames_();
-    auto save_clip_() const -> bool;
-    auto load_clip_(const std::string& filename) const -> bool;
-    void stop_layer_for_clip_(const std::string& clip_name) const;
-    void stop_all_layers_() const;
-    void enter_animation_mode_() const;
-    void exit_animation_mode_() const;
-    void reset_all_() const;
-    void restore_transforms_() const;
 
     engine_type* engine_;
     app_state* state_;
     operation_manager* op_manager_;
+    clip_service* clip_service_;
 
     create_clip_modal create_modal_;
     layer_blend_modal layer_blend_modal_;

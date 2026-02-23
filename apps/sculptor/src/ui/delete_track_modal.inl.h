@@ -36,7 +36,7 @@ inline void delete_track_modal::render(
 
         if (ImGui::Button("Delete")) {
             remove_track_params params = {
-                .clip_name  = state_->selected_clip_name,
+                .clip_name  = state_->anim.selected_clip_name,
                 .track_name = track_name_,
             };
             auto op = std::make_unique<remove_track_operation>(*engine_, *state_, params);

@@ -3,6 +3,7 @@
 #ifndef VW_SCULPTOR_SAVE_AS_MODAL_H
 #define VW_SCULPTOR_SAVE_AS_MODAL_H
 #include "app/app_state.h"
+#include "services/file_service.h"
 #include "vw/gfx/engine/engine.h"
 
 namespace vw::sculptor {
@@ -11,7 +12,7 @@ class save_as_modal final {
 public:
     using engine_type = gfx::engine<>;
 
-    save_as_modal(engine_type& eng, app_state& st);
+    save_as_modal(engine_type& eng, app_state& st, file_service& file_svc);
 
     void render(float delta_time);
 
@@ -22,6 +23,7 @@ private:
 
     engine_type* engine_;
     app_state* state_;
+    file_service* file_service_;
 
     std::string filename_;
     std::string error_;

@@ -11,7 +11,7 @@ inline delete_entity_operation::delete_entity_operation(
     : engine_(&engine), state_(&state), params_(params) {}
 
 inline void delete_entity_operation::execute() {
-    auto ent = state_->name_to_entity[params_.name];
+    auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world          = engine_->get_world();
     auto& hierarchy_comp = world.get_component<gfx::hierarchy_component>(ent);
@@ -19,7 +19,7 @@ inline void delete_entity_operation::execute() {
 
     bool has_parent = hierarchy_comp.has_parent();
     if (has_parent) {
-        parent_name_ = state_->entity_to_name[hierarchy_comp.get_parent()];
+        parent_name_ = state_->scene.entity_to_name[hierarchy_comp.get_parent()];
     }
 
     transform_ = transform_comp.get_transform();
@@ -34,22 +34,22 @@ inline void delete_entity_operation::execute() {
         }
     }
 
-    state_->entity_to_name.erase(ent);
-    state_->name_to_entity.erase(params_.name);
+    state_->scene.entity_to_name.erase(ent);
+    state_->scene.name_to_entity.erase(params_.name);
 
-    if (state_->root_name == params_.name) {
-        state_->root_name = "";
+    if (state_->scene.root_name == params_.name) {
+        state_->scene.root_name = "";
     }
     if (has_parent) {
-        state_->selected_name = parent_name_;
+        state_->scene.selected_name = parent_name_;
     } else {
-        state_->selected_name = "";
+        state_->scene.selected_name = "";
     }
 
-    std::erase_if(state_->entities, [ent](const auto& guard) {
+    std::erase_if(state_->scene.entities, [ent](const auto& guard) {
         return guard->get_entity() == ent;
     });
-    state_->has_unsaved_changes = true;
+    state_->file.has_unsaved_changes = true;
 }
 
 inline void delete_entity_operation::undo() {
@@ -78,20 +78,20 @@ inline void delete_entity_operation::undo() {
     }
 
     if (!parent_name_.empty()) {
-        auto parent_ent = state_->name_to_entity[parent_name_];
+        auto parent_ent = state_->scene.name_to_entity[parent_name_];
         hierarchy_system.modify(ent).set_parent(parent_ent);
     }
 
-    state_->name_to_entity[params_.name] = ent;
-    state_->entity_to_name[ent]          = params_.name;
+    state_->scene.name_to_entity[params_.name] = ent;
+    state_->scene.entity_to_name[ent]          = params_.name;
 
-    if (state_->root_name.empty()) {
-        state_->root_name = params_.name;
+    if (state_->scene.root_name.empty()) {
+        state_->scene.root_name = params_.name;
     }
-    state_->selected_name       = params_.name;
-    state_->has_unsaved_changes = true;
+    state_->scene.selected_name       = params_.name;
+    state_->file.has_unsaved_changes = true;
 
-    state_->entities.push_back(std::move(ent_guard));
+    state_->scene.entities.push_back(std::move(ent_guard));
 }
 
 }  // namespace vw::sculptor

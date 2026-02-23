@@ -6,14 +6,13 @@
 #include <filesystem>
 
 #include "ui_utils.h"
-#include "vw/gfx/world/serializers/vox_serializer.h"
 
 namespace vw::sculptor {
 
 inline save_as_modal::save_as_modal(
-    engine_type& eng, app_state& st
+    engine_type& eng, app_state& st, file_service& file_svc
 )
-    : engine_(&eng), state_(&st) {}
+    : engine_(&eng), state_(&st), file_service_(&file_svc) {}
 
 inline void save_as_modal::render(
     float /*delta_time*/
@@ -22,9 +21,8 @@ inline void save_as_modal::render(
         ImGui::OpenPopup("Save As");
         state_->ui.need_save_as_modal = false;
 
-        // Pre-fill with current filename (without extension)
         namespace fs = std::filesystem;
-        fs::path current_path(state_->filename);
+        fs::path current_path(state_->file.filename);
         filename_ = current_path.stem().string();
 
         error_.clear();
@@ -103,29 +101,10 @@ inline auto save_as_modal::save_file_() -> bool {
         return false;
     }
 
-    // Check if we have a valid model to save
-    if (state_->root_name.empty() || !state_->name_to_entity.contains(state_->root_name)) {
-        error_ = "No model to save.";
-        return false;
-    }
-
-    gfx::vox_serializer serializer{
-        engine_->get_world(),
-        state_->name_to_entity.at(state_->root_name),
-        {.entity_names = state_->entity_to_name, .excluded = state_->get_preview_entities()}
-    };
-
-    if (!serializer.serialize(filepath)) {
+    if (!file_service_->save_as(filepath)) {
         error_ = "Failed to save file.";
         return false;
     }
-
-    // Update state with new filename
-    state_->filename            = filepath.filename().string();
-    state_->has_unsaved_changes = false;
-
-    auto title = std::format("Sculptor {} | {}", version_string, state_->filename);
-    engine_->get_window().set_title(title);
 
     return true;
 }

@@ -13,17 +13,16 @@ inline create_clip_operation::create_clip_operation(
 inline void create_clip_operation::execute() {
     auto& registry = engine_->get_world().get_animation_clip_registry();
     (void)registry.create(params_.name);
-    state_->selected_clip_name       = params_.name;
-    state_->ui.show_timeline         = true;
-    state_->has_unsaved_changes          = true;
-    state_->unsaved_clips[params_.name] = true;
+    state_->anim.selected_clip_name          = params_.name;
+    state_->ui.show_timeline                 = true;
+    state_->anim.unsaved_clips[params_.name] = true;
 }
 
 inline void create_clip_operation::undo() {
     auto& registry = engine_->get_world().get_animation_clip_registry();
     registry.remove(params_.name);
-    state_->selected_clip_name.clear();
-    state_->has_unsaved_changes = true;
+    state_->anim.selected_clip_name.clear();
+    state_->anim.unsaved_clips.erase(params_.name);
 }
 
 }  // namespace vw::sculptor

@@ -18,11 +18,11 @@ inline void paint_tool::render(
         return;
     }
 
-    if (!state_->name_to_entity.contains(state_->selected_name)) {
+    if (!state_->scene.name_to_entity.contains(state_->scene.selected_name)) {
         return;
     }
 
-    auto ent = state_->name_to_entity[state_->selected_name];
+    auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
 
     auto& world        = engine_->get_world();
     bool is_renderable =  //
@@ -68,11 +68,11 @@ inline void paint_tool::on_mouse_press(
             return;
         }
 
-        if (!state_->name_to_entity.contains(state_->selected_name)) {
+        if (!state_->scene.name_to_entity.contains(state_->scene.selected_name)) {
             return;
         }
 
-        auto ent = state_->name_to_entity[state_->selected_name];
+        auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
 
         auto& world        = engine_->get_world();
         bool is_renderable =  //
@@ -83,9 +83,9 @@ inline void paint_tool::on_mouse_press(
         }
 
         paint_voxel_params params;
-        params.name     = state_->selected_name;
+        params.name     = state_->scene.selected_name;
         params.position = hovered_voxel_;
-        params.new_color = state_->selected_color;
+        params.new_color = state_->tool.selected_color;
 
         auto op = std::make_unique<paint_voxel_operation>(
             *engine_, *state_, params
@@ -115,8 +115,8 @@ inline void paint_tool::update_hovered_voxel_() {
     }
 
     const bool is_selected_entity =  //
-        state_->name_to_entity.contains(state_->selected_name) &&
-        hit->ent == state_->name_to_entity[state_->selected_name];
+        state_->scene.name_to_entity.contains(state_->scene.selected_name) &&
+        hit->ent == state_->scene.name_to_entity[state_->scene.selected_name];
     if (is_selected_entity) {
         hovered_voxel_ = hit->voxel_pos;
     }

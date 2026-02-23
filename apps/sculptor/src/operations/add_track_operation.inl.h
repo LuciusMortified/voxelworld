@@ -44,9 +44,9 @@ inline void add_track_operation::execute() {
 
     clip->add_track(std::move(track));
 
-    if (state_->name_to_entity.contains(params_.track_name)) {
-        const auto ent = state_->name_to_entity[params_.track_name];
-        auto* guard    = state_->find_guard(ent);
+    if (state_->scene.name_to_entity.contains(params_.track_name)) {
+        const auto ent = state_->scene.name_to_entity[params_.track_name];
+        auto* guard    = state_->scene.find_guard(ent);
         if (guard && !guard->has<gfx::animation_target_component>()) {
             added_target_component_ = true;
             guard->with<gfx::animation_target_component>();
@@ -56,8 +56,7 @@ inline void add_track_operation::execute() {
         }
     }
 
-    state_->has_unsaved_changes              = true;
-    state_->unsaved_clips[params_.clip_name] = true;
+    state_->anim.unsaved_clips[params_.clip_name] = true;
 }
 
 inline void add_track_operation::undo() {
@@ -68,8 +67,7 @@ inline void add_track_operation::undo() {
     }
 
     clip->remove_track(params_.track_name);
-    state_->has_unsaved_changes              = true;
-    state_->unsaved_clips[params_.clip_name] = true;
+    state_->anim.unsaved_clips[params_.clip_name] = true;
 }
 
 }  // namespace vw::sculptor

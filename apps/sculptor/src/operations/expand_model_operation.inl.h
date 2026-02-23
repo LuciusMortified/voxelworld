@@ -10,7 +10,7 @@ inline expand_model_operation::expand_model_operation(
 ) : engine_(&eng), state_(&st), params_(params) {}
 
 inline void expand_model_operation::execute() {
-    auto ent = state_->name_to_entity[params_.name];
+    auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
     auto& model_registry = world.get_model_registry();
@@ -57,11 +57,11 @@ inline void expand_model_operation::execute() {
         static_cast<float>(zeroed_dir.z)
     };
     transform_system.modify(ent).set_origin(new_origin);
-    state_->has_unsaved_changes = true;
+    state_->file.has_unsaved_changes = true;
 }
 
 inline void expand_model_operation::undo() {
-    auto ent = state_->name_to_entity[params_.name];
+    auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
     auto& model_registry = world.get_model_registry();
@@ -118,7 +118,7 @@ inline void expand_model_operation::undo() {
         static_cast<float>(zeroed_dir.z)
     };
     transform_system.modify(ent).set_origin(new_origin);
-    state_->has_unsaved_changes = true;
+    state_->file.has_unsaved_changes = true;
 }
 
 }  // namespace vw::sculptor
