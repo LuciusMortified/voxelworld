@@ -107,8 +107,9 @@ inline void timeline_panel::render(
             ensure_clip_on_layer(*root);
             auto& anim_sys       = engine_->get_world().get_animation_system();
             const auto layer_idx = state_->get_layer_for_clip(state_->selected_clip_name);
-            anim_sys.modify_player(*root).layer(layer_idx).set_time(state_->timeline_cursor);
-            anim_sys.apply_pose(*root);
+            auto player          = anim_sys.modify_player(*root);
+            player.layer(layer_idx).set_time(state_->timeline_cursor);
+            player.apply_pose();
         }
         prev_cursor_time_ = state_->timeline_cursor;
     }

@@ -40,7 +40,6 @@ public:
     );
 
     void update(float32 delta_time);
-    void apply_pose(entity root_ent);
 
     [[nodiscard]] auto get_target_fps() const -> float32;
     void set_target_fps(float32 fps);
@@ -76,6 +75,7 @@ public:
     class player_modifier {
     public:
         auto layer(size_t index) -> layer_modifier;
+        void apply_pose();
 
     private:
         friend class animation_system;

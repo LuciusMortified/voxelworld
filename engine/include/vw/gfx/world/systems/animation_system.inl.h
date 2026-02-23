@@ -25,19 +25,6 @@ void animation_system<Cs...>::set_target_fps(
     target_frame_time_ = 1.0f / fps;
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::apply_pose(
-    entity root_ent
-) {
-    if (!registry_->template has<animation_player_component>(root_ent)) {
-        return;
-    }
-    if (!get_cached_target_map(root_ent)) {
-        build_and_cache_target_map(root_ent);
-    }
-    const auto& anim_comp = registry_->template get<animation_player_component>(root_ent);
-    apply_animation(root_ent, anim_comp);
-}
 
 template <typename... Cs>
 void animation_system<Cs...>::update(
@@ -432,6 +419,14 @@ auto animation_system<Cs...>::player_modifier::layer(
         component_->layers_.resize(index + 1);
     }
     return layer_modifier(system_, entity_, &component_->layers_[index]);
+}
+
+template <typename... Cs>
+void animation_system<Cs...>::player_modifier::apply_pose() {
+    if (!system_->get_cached_target_map(entity_)) {
+        system_->build_and_cache_target_map(entity_);
+    }
+    system_->apply_animation(entity_, *component_);
 }
 
 // --- layer_modifier ---
