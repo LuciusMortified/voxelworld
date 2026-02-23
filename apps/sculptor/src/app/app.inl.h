@@ -118,6 +118,8 @@ inline void app::render(
     }
     if (state_.ui.show_clip_manager) {
         clip_manager_panel_.render(delta_time);
+    } else if (state_.animation_mode) {
+        clip_manager_panel_.force_exit_animation_mode();
     }
     keyframe_properties_panel_.render(delta_time);
 
@@ -133,10 +135,12 @@ inline void app::render(
 
     if (state_.has_unsaved_changes != prev_unsaved_state_ ||
         state_.selected_clip_name != prev_clip_name_ ||
-        state_.has_any_unsaved_clip() != prev_clip_unsaved_state_) {
+        state_.has_any_unsaved_clip() != prev_clip_unsaved_state_ ||
+        state_.animation_mode != prev_animation_mode_) {
         prev_unsaved_state_      = state_.has_unsaved_changes;
         prev_clip_name_          = state_.selected_clip_name;
         prev_clip_unsaved_state_ = state_.has_any_unsaved_clip();
+        prev_animation_mode_     = state_.animation_mode;
         update_title_();
     }
 
@@ -231,22 +235,24 @@ inline void app::handle_file_shortcuts(
         state_.ui.need_open_file_modal = true;
     }
     if (ev.key == keys::S && ev.with(mods::CTRL) && !ev.with(mods::SHIFT)) {
-        gfx::vox_serializer serializer{
-            get_engine().get_world(),
-            state_.name_to_entity[state_.root_name],
-            {.entity_names = state_.entity_to_name, .excluded = state_.get_preview_entities()}
-        };
+        if (state_.animation_mode && !state_.selected_clip_name.empty()) {
+            state_.ui.need_save_clip = true;
+        } else {
+            gfx::vox_serializer serializer{
+                get_engine().get_world(),
+                state_.name_to_entity[state_.root_name],
+                {.entity_names = state_.entity_to_name, .excluded = state_.get_preview_entities()}
+            };
 
-        namespace fs = std::filesystem;
-        const fs::path assets_dir_path{app_state::asset_dir_name};
-        const fs::path filepath{assets_dir_path / state_.filename};
+            namespace fs = std::filesystem;
+            const fs::path assets_dir_path{app_state::asset_dir_name};
+            const fs::path filepath{assets_dir_path / state_.filename};
 
-        auto result = serializer.serialize(filepath);
-        // TODO: handle serialize errors
+            auto result = serializer.serialize(filepath);
+            // TODO: handle serialize errors
 
-        clip_manager_panel_.save_all_clips();
-
-        state_.has_unsaved_changes = false;
+            state_.has_unsaved_changes = false;
+        }
     }
     if (ev.key == keys::S && ev.with(mods::CTRL) && ev.with(mods::SHIFT)) {
         state_.ui.need_save_as_modal = true;
@@ -341,22 +347,9 @@ inline void app::handle_toggle_playback() {
         return;
     }
 
-    auto& world   = get_engine().get_world();
-    auto root_ent = state_.name_to_entity[state_.root_name];
-
-    if (state_.is_previewing) {
-        if (world.has_component<gfx::animation_player_component>(root_ent)) {
-            world.get_animation_system().modify_player(root_ent).pause();
-        }
-        state_.is_previewing = false;
-        return;
-    }
-
-    auto& clip_reg = world.get_animation_clip_registry();
-    auto clip      = clip_reg.get(state_.selected_clip_name);
-    if (!clip) {
-        return;
-    }
+    auto& world          = get_engine().get_world();
+    const auto root_ent  = state_.name_to_entity[state_.root_name];
+    const auto layer_idx = state_.get_layer_for_clip(state_.selected_clip_name);
 
     if (!world.has_component<gfx::animation_player_component>(root_ent)) {
         if (auto* guard = state_.find_guard(root_ent)) {
@@ -364,27 +357,59 @@ inline void app::handle_toggle_playback() {
         }
     }
 
-    auto& anim_sys = world.get_animation_system();
-    auto& player   = world.get_component<gfx::animation_player_component>(root_ent);
+    auto& anim_sys     = world.get_animation_system();
+    const auto& player = world.get_component<gfx::animation_player_component>(root_ent);
 
-    if (player.is_paused()) {
-        anim_sys.modify_player(root_ent).resume();
-    } else {
-        anim_sys.modify_player(root_ent).set_clip(clip);
-        anim_sys.modify_player(root_ent).play();
+    const bool is_same_clip = player.has_layer(layer_idx) && player.get_layer(layer_idx).clip &&
+        player.get_layer(layer_idx).clip->get_name() == state_.selected_clip_name;
+
+    if (is_same_clip && player.get_layer(layer_idx).state == gfx::animation_state::playing) {
+        anim_sys.modify_player(root_ent).layer(layer_idx).pause();
+        return;
     }
-    state_.is_previewing = true;
+
+    const auto& clip_reg = world.get_animation_clip_registry();
+    const auto clip      = clip_reg.get(state_.selected_clip_name);
+    if (!clip) {
+        return;
+    }
+
+    if (is_same_clip && player.get_layer(layer_idx).state == gfx::animation_state::paused) {
+        anim_sys.modify_player(root_ent).layer(layer_idx).resume();
+    } else {
+        const auto& cs      = state_.get_clip_settings(state_.selected_clip_name);
+        const auto& bt      = cs.blend_transition;
+        const auto modifier = anim_sys.modify_player(root_ent).layer(layer_idx);
+
+        modifier.blend_to(clip, bt.duration > 0.f ? std::optional{bt} : std::nullopt);
+        modifier.set_playback_speed(cs.playback_speed);
+        modifier.set_loop_mode(cs.loop_mode);
+        modifier.set_fade_in(cs.fade_in);
+        modifier.set_fade_out(cs.fade_out);
+        if (cs.fade_in.duration > 0.f) {
+            modifier.play(cs.fade_in);
+        } else {
+            modifier.play();
+        }
+    }
 }
 
 inline void app::handle_stop_playback() {
     if (!state_.root_name.empty() && state_.name_to_entity.contains(state_.root_name)) {
-        auto& world   = get_engine().get_world();
-        auto root_ent = state_.name_to_entity[state_.root_name];
+        auto& world          = get_engine().get_world();
+        const auto root_ent  = state_.name_to_entity[state_.root_name];
+        const auto layer_idx = state_.get_layer_for_clip(state_.selected_clip_name);
         if (world.has_component<gfx::animation_player_component>(root_ent)) {
-            world.get_animation_system().modify_player(root_ent).stop();
+            auto& anim_sys      = world.get_animation_system();
+            const auto& cs      = state_.get_clip_settings(state_.selected_clip_name);
+            const auto modifier = anim_sys.modify_player(root_ent).layer(layer_idx);
+            if (cs.fade_out.duration > 0.f) {
+                modifier.stop(cs.fade_out);
+            } else {
+                modifier.stop();
+            }
         }
     }
-    state_.is_previewing   = false;
     state_.timeline_cursor = 0.f;
 }
 
@@ -413,13 +438,13 @@ inline void app::handle_add_keyframe() {
 
     keyframe_value kf_val;
     if (prop == gfx::animation_property::rotation) {
-        kf_val = gfx::keyframe_quat{time, math::euler_to_quat(tc.get_rotation())};
+        kf_val = gfx::keyframe_quat(time, math::euler_to_quat(tc.get_rotation()));
     } else if (prop == gfx::animation_property::position) {
-        kf_val = gfx::keyframe_vec3f{time, tc.get_position()};
+        kf_val = gfx::keyframe_vec3f(time, tc.get_position());
     } else if (prop == gfx::animation_property::scale) {
-        kf_val = gfx::keyframe_vec3f{time, tc.get_scale()};
+        kf_val = gfx::keyframe_vec3f(time, tc.get_scale());
     } else {
-        kf_val = gfx::keyframe_vec3f{time, tc.get_origin()};
+        kf_val = gfx::keyframe_vec3f(time, tc.get_origin());
     }
 
     if (!clip->has_track(entity_name)) {
@@ -444,8 +469,8 @@ inline void app::handle_add_keyframe() {
 }
 
 inline void app::handle_delete_keyframe() {
-    if (state_.selected_keyframe_time < 0.f || state_.selected_clip_name.empty() ||
-        state_.selected_track_name.empty()) {
+    if (state_.selected_keyframe_id == gfx::invalid_keyframe_id ||
+        state_.selected_clip_name.empty() || state_.selected_track_name.empty()) {
         return;
     }
 
@@ -469,7 +494,7 @@ inline void app::handle_delete_keyframe() {
     std::visit(
         [&](const auto& channel) {
             for (const auto& kf : channel.get_keyframes()) {
-                if (std::abs(kf.time - state_.selected_keyframe_time) < 0.0001f) {
+                if (kf.id() == state_.selected_keyframe_id) {
                     remove_keyframe_params params;
                     params.clip_name  = state_.selected_clip_name;
                     params.track_name = state_.selected_track_name;
@@ -499,6 +524,9 @@ inline void app::update_title_() {
             title += std::format(" | {}.voxa{}", state_.selected_clip_name, clip_suffix);
         }
 
+        if (state_.animation_mode) {
+            title += " | ANIMATION";
+        }
         if (state_.has_unsaved_changes) {
             title += " | UNSAVED CHANGES";
         }

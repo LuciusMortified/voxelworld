@@ -37,7 +37,7 @@ inline void open_file_modal::render(
             ImGuiChildFlags_Borders;
         if (ImGui::BeginChild("##file_list", ImVec2(400.f, list_height), child_flags)) {
             for (const auto& f : existing_filenames_) {
-                bool is_selected = filename_ == f;
+                const bool is_selected = filename_ == f;
                 if (ImGui::Selectable(f.c_str(), is_selected)) {
                     filename_ = f;
                 }

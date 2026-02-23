@@ -16,13 +16,13 @@ inline keyframe_properties_panel::keyframe_properties_panel(
 inline void keyframe_properties_panel::render(
     float /*delta_time*/
 ) {
-    if (state_->selected_keyframe_time < 0.f || state_->selected_clip_name.empty() ||
-        state_->selected_track_name.empty()) {
+    if (state_->selected_keyframe_id == gfx::invalid_keyframe_id ||
+        state_->selected_clip_name.empty() || state_->selected_track_name.empty()) {
         return;
     }
 
-    auto& clip_registry = engine_->get_world().get_animation_clip_registry();
-    auto clip           = clip_registry.get(state_->selected_clip_name);
+    const auto& clip_registry = engine_->get_world().get_animation_clip_registry();
+    const auto clip           = clip_registry.get(state_->selected_clip_name);
     if (!clip) {
         return;
     }
@@ -37,36 +37,37 @@ inline void keyframe_properties_panel::render(
         return;
     }
 
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
-    ImVec2 window_pos       = ImVec2(
+    const ImGuiViewport* viewport = ImGui::GetMainViewport();
+    const auto window_pos         = ImVec2(
         viewport->WorkPos.x + viewport->WorkSize.x - 10,
         viewport->WorkPos.y + state_->ui.right_top_voffset + 10
     );
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(1.0f, 0.0f));
 
-    ImGuiWindowFlags window_flags =         //
-        ImGuiWindowFlags_NoSavedSettings |  //
-        ImGuiWindowFlags_NoMove |           //
+    constexpr ImGuiWindowFlags window_flags =  //
+        ImGuiWindowFlags_NoSavedSettings |     //
+        ImGuiWindowFlags_NoMove |              //
         ImGuiWindowFlags_AlwaysAutoResize;
 
     ImGui::Begin("Keyframe Properties", nullptr, window_flags);
 
     const char* prop_names[] = {"Position", "Rotation", "Scale", "Origin"};
-    int prop_idx             = static_cast<int>(state_->selected_property);
-    ImGui::TextDisabled(
-        "Track: %s, %s, T: %.3f",
-        state_->selected_track_name.c_str(),
-        prop_names[prop_idx],
-        state_->selected_keyframe_time
-    );
-
+    const int prop_idx       = static_cast<int>(state_->selected_property);
     std::visit(
         [&](const auto& channel) {
             const auto& keyframes = channel.get_keyframes();
             for (const auto& kf : keyframes) {
-                if (std::abs(kf.time - state_->selected_keyframe_time) >= 0.0001f) {
+                if (kf.id() != state_->selected_keyframe_id) {
                     continue;
                 }
+
+                ImGui::TextDisabled(
+                    "Track: %s, %s, T: %.3f, ID: %u",
+                    state_->selected_track_name.c_str(),
+                    prop_names[prop_idx],
+                    kf.time,
+                    kf.id()
+                );
 
                 using kf_type    = std::decay_t<decltype(kf)>;
                 using value_type = decltype(kf.value);
@@ -115,8 +116,7 @@ inline void keyframe_properties_panel::render(
                 ImGui::Text("Interpolation");
                 ImGui::SameLine(110.f);
                 ImGui::PushItemWidth(120.f);
-                bool interp_changed =
-                    ImGui::Combo("##Interp_kf", &interp_idx, interp_names, 5);
+                bool interp_changed = ImGui::Combo("##Interp_kf", &interp_idx, interp_names, 5);
                 ImGui::PopItemWidth();
 
                 float new_tangent_in  = kf.tangent_in;
@@ -135,9 +135,8 @@ inline void keyframe_properties_panel::render(
                 ImGui::Text("Tangent Out");
                 ImGui::SameLine(110.f);
                 ImGui::PushItemWidth(80.f);
-                tangent_changed |= ImGui::DragFloat(
-                    "##TangentOut_kf", &new_tangent_out, 0.01f, 0.f, 1.f, "%.2f"
-                );
+                tangent_changed |=
+                    ImGui::DragFloat("##TangentOut_kf", &new_tangent_out, 0.01f, 0.f, 1.f, "%.2f");
                 ImGui::PopItemWidth();
 
                 bool time_changed = std::abs(new_time - kf.time) > 0.0001f;
@@ -159,7 +158,6 @@ inline void keyframe_properties_panel::render(
                     auto op =
                         std::make_unique<modify_keyframe_operation>(*engine_, *state_, mod_params);
                     op_manager_->execute(std::move(op));
-                    state_->selected_keyframe_time = new_time;
                 }
 
                 ImGui::Spacing();
@@ -197,42 +195,24 @@ inline auto keyframe_properties_panel::render_vec3f_field(
     ImGui::PushID(field_id.c_str());
 
     ImGui::AlignTextToFramePadding();
-    auto text = std::format("{}", label);
+    const auto text = std::format("{}", label);
     ImGui::Text("%s", text.c_str());
     ImGui::SameLine(110.f);
 
-    /*
-    ImGui::AlignTextToFramePadding();
-    ImGui::Text("X");
-    ImGui::SameLine();
-    */
-
     ImGui::PushItemWidth(80.0f);
-    auto drag_x_id = std::format("##{}X", label);
+    const auto drag_x_id = std::format("##{}X", label);
     vec_changed |= ImGui::DragFloat(drag_x_id.c_str(), &vec.x, 0.1f, 0, 0, "%.4f");
     ImGui::PopItemWidth();
     ImGui::SameLine();
 
-    /*
-    ImGui::AlignTextToFramePadding();
-    ImGui::Text("Y");
-    ImGui::SameLine();
-    */
-
     ImGui::PushItemWidth(80.0f);
-    auto drag_y_id = std::format("##{}Y", label);
+    const auto drag_y_id = std::format("##{}Y", label);
     vec_changed |= ImGui::DragFloat(drag_y_id.c_str(), &vec.y, 0.1f, 0, 0, "%.4f");
     ImGui::PopItemWidth();
     ImGui::SameLine();
 
-    /*
-    ImGui::AlignTextToFramePadding();
-    ImGui::Text("Z");
-    ImGui::SameLine();
-    */
-
     ImGui::PushItemWidth(80.0f);
-    auto drag_z_id = std::format("##{}Z", label);
+    const auto drag_z_id = std::format("##{}Z", label);
     vec_changed |= ImGui::DragFloat(drag_z_id.c_str(), &vec.z, 0.1f, 0, 0, "%.4f");
     ImGui::PopItemWidth();
 

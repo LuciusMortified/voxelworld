@@ -20,9 +20,9 @@ inline void entity_properties_panel::render(
     );
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(1.0f, 0.0f));
 
-    ImGuiWindowFlags window_flags =         //
-        ImGuiWindowFlags_NoSavedSettings |  //
-        ImGuiWindowFlags_NoMove |           //
+    constexpr ImGuiWindowFlags window_flags =  //
+        ImGuiWindowFlags_NoSavedSettings |     //
+        ImGuiWindowFlags_NoMove |              //
         ImGuiWindowFlags_AlwaysAutoResize;
 
     ImGui::Begin("Entity Properties", nullptr, window_flags);
@@ -42,10 +42,12 @@ inline void entity_properties_panel::render(
         if (!world.has_component<gfx::transform_component>(ent)) {
             ImGui::TextColored(ImVec4(1.f, 1.f, 0.f, 1.f), "Entity has no transform component");
         } else {
+            ImGui::BeginDisabled(state_->animation_mode);
             render_position();
             render_rotation();
             render_scale();
             render_origin();
+            ImGui::EndDisabled();
         }
     }
 

@@ -32,6 +32,7 @@ add_executable(ecs_tests
     ecs/component_pool.test.cpp
     ecs/registry.test.cpp
     ecs/socket.test.cpp
+    ecs/animation_layer.test.cpp
 )
 
 target_link_libraries(ecs_tests PRIVATE

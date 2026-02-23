@@ -78,16 +78,13 @@ inline void add_keyframe_operation::undo() {
             return;
         }
 
-        float32 time = std::visit(
-            [](const auto& kf) -> float32 { return kf.time; }, params_.keyframe
+        uint32 remove_id = std::visit(
+            [](const auto& kf) -> uint32 { return kf.id(); }, params_.keyframe
         );
 
         std::visit(
-            [time](auto& channel) {
-                auto& kfs = channel.get_keyframes_mut();
-                std::erase_if(kfs, [time](const auto& kf) {
-                    return std::abs(kf.time - time) < 0.0001f;
-                });
+            [remove_id](auto& channel) {
+                channel.remove(remove_id);
             },
             *channel_var
         );

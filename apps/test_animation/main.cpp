@@ -205,10 +205,10 @@ private:
         }
 
         auto& animation_system = world.get_animation_system();
-        auto player_modifier   = animation_system.modify_player(root_->get_entity());
-        player_modifier.set_clip_by_name("bounce");
-        player_modifier.set_loop_mode(gfx::animation_loop_mode::loop);
-        player_modifier.play();
+        auto layer_mod = animation_system.modify_player(root_->get_entity()).layer(0);
+        layer_mod.blend_to_by_name("bounce");
+        layer_mod.set_loop_mode(gfx::animation_loop_mode::loop);
+        layer_mod.play();
     }
 
     void create_rotation_animation() {
@@ -437,32 +437,34 @@ private:
 
         auto& world            = get_engine().get_world();
         auto& animation_system = world.get_animation_system();
-        auto modifier          = animation_system.modify_player(root_->get_entity());
+        auto modifier = animation_system.modify_player(root_->get_entity()).layer(0);
         auto& animation_comp =
             world.get_component<gfx::animation_player_component>(root_->get_entity());
+
+        gfx::transition blend_t{.duration = 0.5f};
 
         ImGui::Text("Animation: ");
 
         if (ImGui::Button("Bounce")) {
-            modifier.blend_to_by_name("bounce", 0.5f);
+            modifier.blend_to_by_name("bounce", blend_t);
             current_animation_ = "bounce";
         }
         ImGui::SameLine();
 
         if (ImGui::Button("Rotation")) {
-            modifier.blend_to_by_name("rotation", 0.5f);
+            modifier.blend_to_by_name("rotation", blend_t);
             current_animation_ = "rotation";
         }
         ImGui::SameLine();
 
         if (ImGui::Button("Wave")) {
-            modifier.blend_to_by_name("wave", 0.5f);
+            modifier.blend_to_by_name("wave", blend_t);
             current_animation_ = "wave";
         }
         ImGui::SameLine();
 
         if (ImGui::Button("Scale")) {
-            modifier.blend_to_by_name("scale", 0.5f);
+            modifier.blend_to_by_name("scale", blend_t);
             current_animation_ = "scale";
         }
 
@@ -502,7 +504,9 @@ private:
 
         ImGui::Separator();
 
-        float32 speed = animation_comp.get_playback_speed();
+        float32 speed = animation_comp.layer_count() > 0
+                            ? animation_comp.get_layer(0).playback_speed
+                            : 1.0f;
 
         if (ImGui::SliderFloat("Speed", &speed, 0.1f, 3.0f)) {
             modifier.set_playback_speed(speed);
@@ -522,31 +526,34 @@ private:
             ImGui::Separator();
             ImGui::Text("Animation State:");
 
-            const char* state_str = "Unknown";
-            if (comp.is_playing()) {
-                state_str = "Playing";
-            } else if (comp.is_paused()) {
-                state_str = "Paused";
-            } else if (comp.is_stopped()) {
-                state_str = "Stopped";
-            }
-            ImGui::Text("State: %s", state_str);
+            if (comp.layer_count() > 0) {
+                const auto& layer = comp.get_layer(0);
 
-            const char* loop_str = "Unknown";
-            auto loop_mode       = comp.get_loop_mode();
-            if (loop_mode == gfx::animation_loop_mode::once) {
-                loop_str = "Once";
-            } else if (loop_mode == gfx::animation_loop_mode::loop) {
-                loop_str = "Loop";
-            } else if (loop_mode == gfx::animation_loop_mode::ping_pong) {
-                loop_str = "Ping Pong";
-            }
-            ImGui::Text("Loop Mode: %s", loop_str);
+                const char* state_str = "Unknown";
+                if (layer.state == gfx::animation_state::playing) {
+                    state_str = "Playing";
+                } else if (layer.state == gfx::animation_state::paused) {
+                    state_str = "Paused";
+                } else if (layer.state == gfx::animation_state::stopped) {
+                    state_str = "Stopped";
+                }
+                ImGui::Text("State: %s", state_str);
 
-            float32 current_time = comp.get_current_time();
-            float32 duration     = comp.get_duration();
-            ImGui::Text("Time: %.2f / %.2f s", current_time, duration);
-            ImGui::ProgressBar(duration > 0.0f ? current_time / duration : 0.0f);
+                const char* loop_str = "Unknown";
+                if (layer.loop_mode == gfx::animation_loop_mode::once) {
+                    loop_str = "Once";
+                } else if (layer.loop_mode == gfx::animation_loop_mode::loop) {
+                    loop_str = "Loop";
+                } else if (layer.loop_mode == gfx::animation_loop_mode::ping_pong) {
+                    loop_str = "Ping Pong";
+                }
+                ImGui::Text("Loop Mode: %s", loop_str);
+
+                float32 current_time = layer.time;
+                float32 duration = layer.clip ? layer.clip->get_duration() : 0.0f;
+                ImGui::Text("Time: %.2f / %.2f s", current_time, duration);
+                ImGui::ProgressBar(duration > 0.0f ? current_time / duration : 0.0f);
+            }
         }
 
         ImGui::End();

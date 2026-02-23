@@ -23,10 +23,8 @@ inline void color_palette_panel::render(
     ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.0f, 1.0f));
 
     ImGuiWindowFlags window_flags =         //
-                                            // ImGuiWindowFlags_NoCollapse |       //
         ImGuiWindowFlags_NoSavedSettings |  //
-        // ImGuiWindowFlags_NoTitleBar |       //
-        ImGuiWindowFlags_NoMove |  //
+        ImGuiWindowFlags_NoMove |           //
         ImGuiWindowFlags_AlwaysAutoResize;
 
     ImGui::Begin("Color Palette", nullptr, window_flags);
