@@ -5,14 +5,41 @@
 namespace vw::gfx {
 
 template <typename T>
-void animation_channel<T>::add(const keyframe<T>& keyframe) {
-    keyframes_.push_back(keyframe);
+void animation_channel<T>::add(const keyframe<T>& kf) {
+    keyframes_.push_back(kf);
+    if (keyframes_.back().id_ == keyframe<T>::invalid_id) {
+        keyframes_.back().id_ = next_id_++;
+    }
     std::sort(keyframes_.begin(), keyframes_.end());
+}
+
+template <typename T>
+void animation_channel<T>::replace(uint32 id, const keyframe<T>& new_kf) {
+    auto it = std::find_if(keyframes_.begin(), keyframes_.end(), [id](const auto& kf) {
+        return kf.id_ == id;
+    });
+    if (it != keyframes_.end()) {
+        uint32 preserved_id = it->id_;
+        *it = new_kf;
+        it->id_ = preserved_id;
+        std::sort(keyframes_.begin(), keyframes_.end());
+    }
+}
+
+template <typename T>
+void animation_channel<T>::remove(uint32 id) {
+    std::erase_if(keyframes_, [id](const auto& kf) {
+        return kf.id_ == id;
+    });
 }
 
 template <typename T>
 void animation_channel<T>::set_keyframes(std::vector<keyframe<T>> keyframes) {
     keyframes_ = std::move(keyframes);
+    next_id_ = 0;
+    for (auto& kf : keyframes_) {
+        kf.id_ = next_id_++;
+    }
     std::sort(keyframes_.begin(), keyframes_.end());
 }
 

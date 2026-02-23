@@ -26,7 +26,7 @@ inline void remove_track_operation::execute() {
 
     if (state_->selected_track_name == params_.track_name) {
         state_->selected_track_name.clear();
-        state_->selected_keyframe_time = -1.f;
+        state_->selected_keyframe_id = gfx::keyframe_vec3f::invalid_id;
     }
     state_->expanded_tracks.erase(params_.track_name);
 }

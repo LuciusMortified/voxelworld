@@ -122,7 +122,10 @@ inline void menu_bar::render(
             state_->need_add_keyframe = true;
         }
         if (ImGui::MenuItem(
-                "Delete Keyframe", nullptr, false, state_->selected_keyframe_time >= 0.f
+                "Delete Keyframe",
+                nullptr,
+                false,
+                state_->selected_keyframe_id != gfx::keyframe_vec3f::invalid_id
             )) {
             state_->need_delete_keyframe = true;
         }

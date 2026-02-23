@@ -30,7 +30,7 @@ public:
     void undo() override;
 
 private:
-    void apply(const keyframe_value& remove, const keyframe_value& add);
+    void apply(const keyframe_value& replacement) const;
 
     engine_type* engine_;
     app_state* state_;

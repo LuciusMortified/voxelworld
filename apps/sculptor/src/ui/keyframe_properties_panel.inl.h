@@ -16,8 +16,8 @@ inline keyframe_properties_panel::keyframe_properties_panel(
 inline void keyframe_properties_panel::render(
     float /*delta_time*/
 ) {
-    if (state_->selected_keyframe_time < 0.f || state_->selected_clip_name.empty() ||
-        state_->selected_track_name.empty()) {
+    if (state_->selected_keyframe_id == gfx::keyframe_vec3f::invalid_id ||
+        state_->selected_clip_name.empty() || state_->selected_track_name.empty()) {
         return;
     }
 
@@ -53,20 +53,21 @@ inline void keyframe_properties_panel::render(
 
     const char* prop_names[] = {"Position", "Rotation", "Scale", "Origin"};
     const int prop_idx       = static_cast<int>(state_->selected_property);
-    ImGui::TextDisabled(
-        "Track: %s, %s, T: %.3f",
-        state_->selected_track_name.c_str(),
-        prop_names[prop_idx],
-        state_->selected_keyframe_time
-    );
-
     std::visit(
         [&](const auto& channel) {
             const auto& keyframes = channel.get_keyframes();
             for (const auto& kf : keyframes) {
-                if (std::abs(kf.time - state_->selected_keyframe_time) >= 0.0001f) {
+                if (kf.id() != state_->selected_keyframe_id) {
                     continue;
                 }
+
+                ImGui::TextDisabled(
+                    "Track: %s, %s, T: %.3f, ID: %u",
+                    state_->selected_track_name.c_str(),
+                    prop_names[prop_idx],
+                    kf.time,
+                    kf.id()
+                );
 
                 using kf_type    = std::decay_t<decltype(kf)>;
                 using value_type = decltype(kf.value);
@@ -157,7 +158,6 @@ inline void keyframe_properties_panel::render(
                     auto op =
                         std::make_unique<modify_keyframe_operation>(*engine_, *state_, mod_params);
                     op_manager_->execute(std::move(op));
-                    state_->selected_keyframe_time = new_time;
                 }
 
                 ImGui::Spacing();

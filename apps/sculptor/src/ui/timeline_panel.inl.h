@@ -56,8 +56,8 @@ inline void timeline_panel::render(
 
     if (!still_open && state_->ui.show_timeline) {
         state_->selected_track_name.clear();
-        state_->selected_keyframe_time = -1.f;
-        state_->ui.show_timeline       = false;
+        state_->selected_keyframe_id = gfx::keyframe_vec3f::invalid_id;
+        state_->ui.show_timeline     = false;
     }
 
     const bool clip_changed = prev_clip_name_ != state_->selected_clip_name;
@@ -731,7 +731,7 @@ inline void timeline_panel::render_keyframe_markers(
 
                 bool is_selected = (state_->selected_track_name == track_name) &&
                     (state_->selected_property == prop) &&
-                    (std::abs(state_->selected_keyframe_time - kf.time) < 0.0001f);
+                    (kf.id() == state_->selected_keyframe_id);
 
                 ImU32 color =
                     is_selected ? IM_COL32(255, 200, 50, 255) : IM_COL32(200, 200, 200, 255);
@@ -749,16 +749,16 @@ inline void timeline_panel::render_keyframe_markers(
                 if (std::abs(mouse.x - x) < diamond_size + 2.f &&
                     std::abs(mouse.y - y) < diamond_size + 2.f) {
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                        state_->selected_track_name    = track_name;
-                        state_->selected_property      = prop;
-                        state_->selected_keyframe_time = kf.time;
-                        keyframe_clicked_              = true;
+                        state_->selected_track_name  = track_name;
+                        state_->selected_property    = prop;
+                        state_->selected_keyframe_id = kf.id();
+                        keyframe_clicked_            = true;
                     }
 
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
-                        state_->selected_track_name    = track_name;
-                        state_->selected_property      = prop;
-                        state_->selected_keyframe_time = kf.time;
+                        state_->selected_track_name  = track_name;
+                        state_->selected_property    = prop;
+                        state_->selected_keyframe_id = kf.id();
                         ImGui::OpenPopup("KeyframeContextMenu");
                     }
                 }
@@ -851,7 +851,7 @@ inline void timeline_panel::delete_selected_keyframe() {
     std::visit(
         [&](const auto& channel) {
             for (const auto& kf : channel.get_keyframes()) {
-                if (std::abs(kf.time - state_->selected_keyframe_time) < 0.0001f) {
+                if (kf.id() == state_->selected_keyframe_id) {
                     remove_keyframe_params params;
                     params.clip_name  = state_->selected_clip_name;
                     params.track_name = state_->selected_track_name;

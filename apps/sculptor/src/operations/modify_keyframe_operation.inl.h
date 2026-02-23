@@ -11,18 +11,16 @@ inline modify_keyframe_operation::modify_keyframe_operation(
     : base_operation(), engine_(&engine), state_(&state), params_(params) {}
 
 inline void modify_keyframe_operation::execute() {
-    apply(params_.old_keyframe, params_.new_keyframe);
+    apply(params_.new_keyframe);
 }
 
 inline void modify_keyframe_operation::undo() {
-    apply(params_.new_keyframe, params_.old_keyframe);
+    apply(params_.old_keyframe);
 }
 
-inline void modify_keyframe_operation::apply(
-    const keyframe_value& remove, const keyframe_value& add
-) {
-    auto& registry = engine_->get_world().get_animation_clip_registry();
-    auto clip      = registry.get(params_.clip_name);
+inline void modify_keyframe_operation::apply(const keyframe_value& replacement) const {
+    const auto& registry = engine_->get_world().get_animation_clip_registry();
+    const auto clip      = registry.get(params_.clip_name);
     if (!clip) {
         return;
     }
@@ -37,33 +35,19 @@ inline void modify_keyframe_operation::apply(
         return;
     }
 
-    float32 remove_time = std::visit(
-        [](const auto& kf) -> float32 { return kf.time; }, remove
-    );
-
-    std::visit(
-        [remove_time](auto& channel) {
-            auto& kfs = channel.get_keyframes_mut();
-            auto it   = std::find_if(kfs.begin(), kfs.end(), [remove_time](const auto& kf) {
-                return std::abs(kf.time - remove_time) < 0.0001f;
-            });
-            if (it != kfs.end()) {
-                kfs.erase(it);
-            }
-        },
-        *channel_var
-    );
+    const uint32 id =
+        std::visit([](const auto& kf) -> uint32 { return kf.id(); }, params_.old_keyframe);
 
     if (params_.property == gfx::animation_property::rotation) {
         auto& channel = std::get<gfx::animation_channel<quat>>(*channel_var);
-        channel.add(std::get<gfx::keyframe_quat>(add));
+        channel.replace(id, std::get<gfx::keyframe_quat>(replacement));
     } else {
         auto& channel = std::get<gfx::animation_channel<vec3f>>(*channel_var);
-        channel.add(std::get<gfx::keyframe_vec3f>(add));
+        channel.replace(id, std::get<gfx::keyframe_vec3f>(replacement));
     }
 
     track->mark_dirty();
-    state_->has_unsaved_changes               = true;
+    state_->has_unsaved_changes              = true;
     state_->unsaved_clips[params_.clip_name] = true;
 }
 

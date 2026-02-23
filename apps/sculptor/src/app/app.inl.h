@@ -438,13 +438,13 @@ inline void app::handle_add_keyframe() {
 
     keyframe_value kf_val;
     if (prop == gfx::animation_property::rotation) {
-        kf_val = gfx::keyframe_quat{time, math::euler_to_quat(tc.get_rotation())};
+        kf_val = gfx::keyframe_quat(time, math::euler_to_quat(tc.get_rotation()));
     } else if (prop == gfx::animation_property::position) {
-        kf_val = gfx::keyframe_vec3f{time, tc.get_position()};
+        kf_val = gfx::keyframe_vec3f(time, tc.get_position());
     } else if (prop == gfx::animation_property::scale) {
-        kf_val = gfx::keyframe_vec3f{time, tc.get_scale()};
+        kf_val = gfx::keyframe_vec3f(time, tc.get_scale());
     } else {
-        kf_val = gfx::keyframe_vec3f{time, tc.get_origin()};
+        kf_val = gfx::keyframe_vec3f(time, tc.get_origin());
     }
 
     if (!clip->has_track(entity_name)) {
@@ -469,8 +469,8 @@ inline void app::handle_add_keyframe() {
 }
 
 inline void app::handle_delete_keyframe() {
-    if (state_.selected_keyframe_time < 0.f || state_.selected_clip_name.empty() ||
-        state_.selected_track_name.empty()) {
+    if (state_.selected_keyframe_id == gfx::keyframe_vec3f::invalid_id ||
+        state_.selected_clip_name.empty() || state_.selected_track_name.empty()) {
         return;
     }
 
@@ -494,7 +494,7 @@ inline void app::handle_delete_keyframe() {
     std::visit(
         [&](const auto& channel) {
             for (const auto& kf : channel.get_keyframes()) {
-                if (std::abs(kf.time - state_.selected_keyframe_time) < 0.0001f) {
+                if (kf.id() == state_.selected_keyframe_id) {
                     remove_keyframe_params params;
                     params.clip_name  = state_.selected_clip_name;
                     params.track_name = state_.selected_track_name;
