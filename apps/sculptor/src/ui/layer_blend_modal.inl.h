@@ -13,7 +13,7 @@ inline layer_blend_modal::layer_blend_modal(
 inline void layer_blend_modal::open() {
     need_open_ = true;
 
-    const auto& cs     = state_->get_clip_settings(state_->selected_clip_name);
+    const auto& cs     = state_->anim.get_clip_settings(state_->anim.selected_clip_name);
     fade_in_duration_  = cs.fade_in.duration;
     fade_in_interp_    = static_cast<int>(cs.fade_in.interp);
     fade_out_duration_ = cs.fade_out.duration;
@@ -60,7 +60,7 @@ inline void layer_blend_modal::render(
         ImGui::Spacing();
 
         if (ImGui::Button("Apply")) {
-            auto& cs         = state_->get_clip_settings_mut(state_->selected_clip_name);
+            auto& cs         = state_->anim.get_clip_settings_mut(state_->anim.selected_clip_name);
             cs.fade_in.duration  = fade_in_duration_;
             cs.fade_in.interp    = static_cast<math::interpolation_type>(fade_in_interp_);
             cs.fade_out.duration = fade_out_duration_;

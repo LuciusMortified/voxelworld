@@ -63,7 +63,7 @@ inline void open_file_modal::render(
         ImGui::SameLine();
         if (ImGui::Button("Cancel")) {
             ImGui::CloseCurrentPopup();
-            if (state_->filename.empty()) {
+            if (state_->file.filename.empty()) {
                 state_->ui.need_startup_modal = true;
             }
         }
@@ -104,15 +104,12 @@ inline auto open_file_modal::open_file_() -> bool {
 
     state_->ui.need_startup_modal = false;
 
-    state_->filename       = filename_;
-    state_->root_name      = result->root_name;
-    state_->selected_name  = result->root_name;
-    state_->name_to_entity = std::move(result->name_to_entity);
-    state_->entity_to_name = std::move(result->entity_to_name);
-    state_->entities       = std::move(result->entities);
-
-    const auto title = std::format("Sculptor {} | {}", version_string, state_->filename);
-    engine_->get_window().set_title(title);
+    state_->file.filename       = filename_;
+    state_->scene.root_name      = result->root_name;
+    state_->scene.selected_name  = result->root_name;
+    state_->scene.name_to_entity = std::move(result->name_to_entity);
+    state_->scene.entity_to_name = std::move(result->entity_to_name);
+    state_->scene.entities       = std::move(result->entities);
 
     return true;
 }

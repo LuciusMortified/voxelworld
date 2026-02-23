@@ -24,11 +24,11 @@ inline void remove_track_operation::execute() {
 
     clip->remove_track(params_.track_name);
 
-    if (state_->selected_track_name == params_.track_name) {
-        state_->selected_track_name.clear();
-        state_->selected_keyframe_id = gfx::invalid_keyframe_id;
+    if (state_->anim.selected_track_name == params_.track_name) {
+        state_->anim.selected_track_name.clear();
+        state_->anim.selected_keyframe_id = gfx::invalid_keyframe_id;
     }
-    state_->expanded_tracks.erase(params_.track_name);
+    state_->anim.expanded_tracks.erase(params_.track_name);
 }
 
 inline void remove_track_operation::undo() {

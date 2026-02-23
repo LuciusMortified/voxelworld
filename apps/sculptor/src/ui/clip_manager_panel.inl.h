@@ -5,18 +5,16 @@
 
 #include <filesystem>
 
-#include "operations/close_clip_operation.h"
-#include "vw/gfx/world/serializers/voxa_deserializer.h"
-#include "vw/gfx/world/serializers/voxa_serializer.h"
-
 namespace vw::sculptor {
 
 inline clip_manager_panel::clip_manager_panel(
-    engine_type& eng, app_state& st, operation_manager& op_manager
+    engine_type& eng, app_state& st, operation_manager& op_manager,
+    clip_service& clip_svc
 )
     : engine_(&eng)
     , state_(&st)
     , op_manager_(&op_manager)
+    , clip_service_(&clip_svc)
     , create_modal_(eng, st, op_manager)
     , layer_blend_modal_(st) {}
 
@@ -38,13 +36,13 @@ inline void clip_manager_panel::render(
     bool still_open = true;
     ImGui::Begin("Animation Clips", &still_open, window_flags);
     if (!still_open) {
-        if (state_->animation_mode) {
-            exit_animation_mode_();
+        if (state_->anim.animation_mode) {
+            clip_service_->exit_animation_mode();
         }
         state_->ui.show_clip_manager = false;
         state_->ui.show_timeline     = false;
-    } else if (!state_->animation_mode) {
-        enter_animation_mode_();
+    } else if (!state_->anim.animation_mode) {
+        clip_service_->enter_animation_mode();
     }
 
     if (state_->ui.need_create_clip_modal) {
@@ -54,7 +52,7 @@ inline void clip_manager_panel::render(
 
     if (state_->ui.need_save_clip) {
         state_->ui.need_save_clip = false;
-        save_clip_();
+        clip_service_->save_clip(state_->anim.selected_clip_name);
     }
 
     if (state_->ui.need_load_clip_modal) {
@@ -66,15 +64,15 @@ inline void clip_manager_panel::render(
 
     if (state_->ui.need_close_clip) {
         state_->ui.need_close_clip = false;
-        if (state_->has_unsaved_clip(state_->selected_clip_name)) {
+        if (state_->anim.has_unsaved_clip(state_->anim.selected_clip_name)) {
             need_close_confirm_popup_ = true;
         } else {
-            close_clip_();
+            clip_service_->close_clip(state_->anim.selected_clip_name);
         }
     }
 
-    const bool has_selected = !state_->selected_clip_name.empty() &&
-        engine_->get_world().get_animation_clip_registry().has(state_->selected_clip_name);
+    const bool has_selected = !state_->anim.selected_clip_name.empty() &&
+        engine_->get_world().get_animation_clip_registry().has(state_->anim.selected_clip_name);
 
     if (ImGui::Button("New")) {
         create_modal_.open();
@@ -90,25 +88,25 @@ inline void clip_manager_panel::render(
     ImGui::SameLine();
     ImGui::BeginDisabled(!has_selected);
     if (ImGui::Button("Save")) {
-        save_clip_();
+        clip_service_->save_clip(state_->anim.selected_clip_name);
     }
     ImGui::EndDisabled();
 
     ImGui::SameLine();
     ImGui::BeginDisabled(!has_selected);
     if (ImGui::Button("Close")) {
-        if (state_->has_unsaved_clip(state_->selected_clip_name)) {
+        if (state_->anim.has_unsaved_clip(state_->anim.selected_clip_name)) {
             need_close_confirm_popup_ = true;
         } else {
-            close_clip_();
+            clip_service_->close_clip(state_->anim.selected_clip_name);
         }
     }
     ImGui::EndDisabled();
 
-    if (state_->animation_mode) {
+    if (state_->anim.animation_mode) {
         ImGui::SameLine();
         if (ImGui::Button("Reset All")) {
-            reset_all_();
+            clip_service_->reset_all();
         }
     }
 
@@ -138,11 +136,11 @@ inline void clip_manager_panel::render(
     if (ImGui::BeginChild("##clip_list", ImVec2(0.f, list_height), child_flags)) {
         const auto& registry = engine_->get_world().get_animation_clip_registry();
         for (const auto& [name, clip] : registry.all()) {
-            const bool is_selected = (state_->selected_clip_name == name);
-            const bool is_unsaved  = state_->has_unsaved_clip(name);
+            const bool is_selected = (state_->anim.selected_clip_name == name);
+            const bool is_unsaved  = state_->anim.has_unsaved_clip(name);
 
             if (clip) {
-                ImGui::TextDisabled("[%zu]", state_->get_layer_for_clip(name));
+                ImGui::TextDisabled("[%zu]", state_->anim.get_layer_for_clip(name));
                 ImGui::SameLine();
             }
 
@@ -153,10 +151,10 @@ inline void clip_manager_panel::render(
             auto display_name = is_unsaved ? std::format("{}*", name) : name;
             if (ImGui::Selectable(display_name.c_str(), is_selected, false)) {
                 if (!is_selected) {
-                    state_->selected_clip_name = name;
+                    state_->anim.selected_clip_name = name;
                     state_->ui.show_timeline   = true;
-                    state_->selected_track_name.clear();
-                    state_->selected_keyframe_id = gfx::invalid_keyframe_id;
+                    state_->anim.selected_track_name.clear();
+                    state_->anim.selected_keyframe_id = gfx::invalid_keyframe_id;
                 }
             }
 
@@ -171,7 +169,7 @@ inline void clip_manager_panel::render(
         ImGui::Spacing();
         ImGui::Text("Layer");
         ImGui::SameLine();
-        const auto current_layer = state_->get_layer_for_clip(state_->selected_clip_name);
+        const auto current_layer = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
         for (int i = 0; i < 5; ++i) {
             if (i > 0) {
                 ImGui::SameLine();
@@ -184,15 +182,15 @@ inline void clip_manager_panel::render(
             }
             auto btn_id = std::format("{}##layer_btn", i);
             if (ImGui::SmallButton(btn_id.c_str())) {
-                stop_layer_for_clip_(state_->selected_clip_name);
-                state_->clip_to_layer[state_->selected_clip_name] = static_cast<size_t>(i);
+                clip_service_->stop_layer_for_clip(state_->anim.selected_clip_name);
+                state_->anim.clip_to_layer[state_->anim.selected_clip_name] = static_cast<size_t>(i);
             }
             if (is_active) {
                 ImGui::PopStyleColor();
             }
         }
 
-        const auto layer_idx = state_->get_layer_for_clip(state_->selected_clip_name);
+        const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
         if (layer_idx > 0) {
             ImGui::SameLine();
             if (ImGui::SmallButton("Blend")) {
@@ -215,18 +213,18 @@ inline void clip_manager_panel::render_close_confirm_popup_() const {
     if (ImGui::BeginPopupModal("Close Animation?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text(
             "Animation \"%s\" has unsaved changes. Close anyway?",
-            state_->selected_clip_name.c_str()
+            state_->anim.selected_clip_name.c_str()
         );
         ImGui::Spacing();
 
         if (ImGui::Button("Save & Close")) {
-            save_clip_();
-            close_clip_();
+            clip_service_->save_clip(state_->anim.selected_clip_name);
+            clip_service_->close_clip(state_->anim.selected_clip_name);
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
         if (ImGui::Button("Close")) {
-            close_clip_();
+            clip_service_->close_clip(state_->anim.selected_clip_name);
             ImGui::CloseCurrentPopup();
         }
         ImGui::SameLine();
@@ -236,12 +234,6 @@ inline void clip_manager_panel::render_close_confirm_popup_() const {
 
         ImGui::EndPopup();
     }
-}
-
-inline void clip_manager_panel::close_clip_() const {
-    close_clip_params params = {.name = state_->selected_clip_name};
-    auto op                  = std::make_unique<close_clip_operation>(*engine_, *state_, params);
-    op_manager_->execute(std::move(op));
 }
 
 inline void clip_manager_panel::render_load_popup_() {
@@ -276,7 +268,7 @@ inline void clip_manager_panel::render_load_popup_() {
             ImGui::BeginDisabled();
         }
         if (ImGui::Button("Open")) {
-            if (load_clip_(selected_load_filename_)) {
+            if (clip_service_->load_clip(selected_load_filename_)) {
                 ImGui::CloseCurrentPopup();
             }
         }
@@ -307,183 +299,6 @@ inline void clip_manager_panel::load_voxa_filenames_() {
             voxa_filenames_.emplace_back(entry.path().filename().string());
         }
     }
-}
-
-inline auto clip_manager_panel::save_clip_() const -> bool {
-    namespace fs = std::filesystem;
-
-    const auto& registry = engine_->get_world().get_animation_clip_registry();
-    const auto clip      = registry.get(state_->selected_clip_name);
-    if (!clip) {
-        return false;
-    }
-
-    const fs::path asset_dir_path{app_state::asset_dir_name};
-    const fs::path filepath = asset_dir_path / std::format("{}.voxa", clip->get_name());
-    gfx::voxa_serializer serializer(*clip);
-    const auto result = serializer.serialize(filepath);
-    if (result.has_value()) {
-        state_->unsaved_clips[state_->selected_clip_name] = false;
-    }
-    return result.has_value();
-}
-
-inline void clip_manager_panel::save_all_clips() const {
-    namespace fs = std::filesystem;
-
-    const auto& registry = engine_->get_world().get_animation_clip_registry();
-    const fs::path asset_dir_path{app_state::asset_dir_name};
-
-    for (const auto& [name, clip] : registry.all()) {
-        if (!clip) {
-            continue;
-        }
-
-        fs::path filepath = asset_dir_path / std::format("{}.voxa", name);
-        gfx::voxa_serializer serializer(*clip);
-        if (serializer.serialize(filepath).has_value()) {
-            state_->unsaved_clips[name] = false;
-        }
-    }
-}
-
-inline auto clip_manager_panel::load_clip_(
-    const std::string& filename
-) const -> bool {
-    namespace fs = std::filesystem;
-
-    const fs::path filepath = fs::path{app_state::asset_dir_name} / fs::path{filename};
-    gfx::voxa_deserializer deserializer;
-    const auto result = deserializer.deserialize(filepath);
-    if (!result) {
-        return false;
-    }
-
-    const auto& clip = *result;
-    auto& registry   = engine_->get_world().get_animation_clip_registry();
-    registry.add(clip->get_name(), clip);
-
-    state_->selected_clip_name = clip->get_name();
-    state_->ui.show_timeline   = true;
-    state_->selected_track_name.clear();
-    state_->selected_keyframe_id = gfx::invalid_keyframe_id;
-
-    return true;
-}
-
-inline void clip_manager_panel::stop_layer_for_clip_(
-    const std::string& clip_name
-) const {
-    if (state_->root_name.empty() || !state_->name_to_entity.contains(state_->root_name)) {
-        return;
-    }
-
-    auto root   = state_->name_to_entity[state_->root_name];
-    auto& world = engine_->get_world();
-    if (!world.has_component<gfx::animation_player_component>(root)) {
-        return;
-    }
-
-    const auto layer_idx = state_->get_layer_for_clip(clip_name);
-    const auto& player   = world.get_component<gfx::animation_player_component>(root);
-    if (player.has_layer(layer_idx) && player.get_layer(layer_idx).clip &&
-        player.get_layer(layer_idx).clip->get_name() == clip_name) {
-        world.get_animation_system().modify_player(root).layer(layer_idx).stop();
-    }
-}
-
-inline void clip_manager_panel::force_exit_animation_mode() const {
-    if (state_->animation_mode) {
-        exit_animation_mode_();
-    }
-    state_->ui.show_timeline = false;
-}
-
-inline void clip_manager_panel::stop_all_layers_() const {
-    if (state_->root_name.empty() || !state_->name_to_entity.contains(state_->root_name)) {
-        return;
-    }
-
-    const auto root = state_->name_to_entity[state_->root_name];
-    auto& world     = engine_->get_world();
-    if (!world.has_component<gfx::animation_player_component>(root)) {
-        return;
-    }
-
-    const auto& player = world.get_component<gfx::animation_player_component>(root);
-    auto& anim_sys     = world.get_animation_system();
-    for (size_t i = 0; i < player.layer_count(); ++i) {
-        if (player.has_layer(i)) {
-            anim_sys.modify_player(root).layer(i).clear();
-        }
-    }
-}
-
-inline void clip_manager_panel::enter_animation_mode_() const {
-    if (state_->animation_mode) {
-        return;
-    }
-
-    if (!state_->has_saved_transforms) {
-        auto& world = engine_->get_world();
-        state_->saved_transforms.clear();
-        for (const auto& [name, ent] : state_->name_to_entity) {
-            if (world.has_component<gfx::transform_component>(ent)) {
-                auto& tc                       = world.get_component<gfx::transform_component>(ent);
-                state_->saved_transforms[name] = tc.get_transform();
-            }
-        }
-        state_->has_saved_transforms = true;
-    }
-
-    state_->animation_mode = true;
-}
-
-inline void clip_manager_panel::exit_animation_mode_() const {
-    stop_all_layers_();
-    restore_transforms_();
-    state_->animation_mode  = false;
-    state_->timeline_cursor = 0.f;
-}
-
-inline void clip_manager_panel::reset_all_() const {
-    stop_all_layers_();
-
-    if (state_->has_saved_transforms) {
-        auto& world            = engine_->get_world();
-        auto& transform_system = world.get_transform_system();
-        for (const auto& [name, t] : state_->saved_transforms) {
-            if (state_->name_to_entity.contains(name)) {
-                const auto ent = state_->name_to_entity[name];
-                if (world.has_component<gfx::transform_component>(ent)) {
-                    transform_system.modify(ent).set_transform(t);
-                }
-            }
-        }
-    }
-
-    state_->timeline_cursor = 0.f;
-}
-
-inline void clip_manager_panel::restore_transforms_() const {
-    if (!state_->has_saved_transforms) {
-        return;
-    }
-
-    auto& world            = engine_->get_world();
-    auto& transform_system = world.get_transform_system();
-
-    for (const auto& [name, t] : state_->saved_transforms) {
-        if (state_->name_to_entity.contains(name)) {
-            const auto ent = state_->name_to_entity[name];
-            if (world.has_component<gfx::transform_component>(ent)) {
-                transform_system.modify(ent).set_transform(t);
-            }
-        }
-    }
-
-    state_->saved_transforms.clear();
-    state_->has_saved_transforms = false;
 }
 
 }  // namespace vw::sculptor

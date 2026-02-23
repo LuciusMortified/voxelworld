@@ -81,7 +81,7 @@ inline void new_file_modal::render_create_form() {
     ImGui::SameLine();
     if (ImGui::Button("Cancel")) {
         ImGui::CloseCurrentPopup();
-        if (state_->filename.empty()) {
+        if (state_->file.filename.empty()) {
             state_->ui.need_startup_modal = true;
         }
     }
@@ -111,10 +111,7 @@ inline auto new_file_modal::create_file_() -> bool {
 
     state_->ui.need_startup_modal = false;
 
-    state_->filename = filepath.filename().string();
-
-    auto title = std::format("Sculptor {} | {}", version_string, state_->filename);
-    engine_->get_window().set_title(title);
+    state_->file.filename = filepath.filename().string();
 
     return true;
 }

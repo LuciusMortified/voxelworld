@@ -7,6 +7,10 @@
 
 #include "app_state.h"
 #include "operations/operation_manager.h"
+#include "services/clip_service.h"
+#include "services/file_service.h"
+#include "services/keyframe_service.h"
+#include "services/playback_service.h"
 #include "tools/base_tool.h"
 #include "ui/color_palette_panel.h"
 #include "ui/entity_properties_panel.h"
@@ -40,10 +44,6 @@ private:
     void handle_mouse_release(const gfx::mouse_release_event& ev);
 
     void handle_animation_actions_();
-    void handle_toggle_playback();
-    void handle_stop_playback();
-    void handle_add_keyframe();
-    void handle_delete_keyframe();
     void update_title_();
     static void init_asset_dir_();
 
@@ -53,9 +53,14 @@ private:
     bool prev_clip_unsaved_state_ = false;
     bool prev_animation_mode_     = false;
     std::string prev_clip_name_;
+    std::string prev_filename_;
 
     app_state state_;
     operation_manager op_manager_;
+    file_service file_service_;
+    clip_service clip_service_;
+    playback_service playback_service_;
+    keyframe_service keyframe_service_;
 
     tools active_tool_ = tools::add_voxel;
     std::unordered_map<tools, std::unique_ptr<base_tool>> tools_;

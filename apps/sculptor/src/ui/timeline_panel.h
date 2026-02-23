@@ -11,6 +11,8 @@
 #include "create_keyframe_modal.h"
 #include "delete_track_modal.h"
 #include "operations/operation_manager.h"
+#include "services/clip_service.h"
+#include "services/keyframe_service.h"
 
 namespace vw::sculptor {
 
@@ -18,7 +20,8 @@ class timeline_panel final {
 public:
     using engine_type = gfx::engine<>;
 
-    timeline_panel(engine_type& eng, app_state& st, operation_manager& op_manager);
+    timeline_panel(engine_type& eng, app_state& st, operation_manager& op_manager,
+                   clip_service& clip_svc, keyframe_service& kf_svc);
 
     void render(float delta_time);
 
@@ -73,14 +76,11 @@ private:
     [[nodiscard]] auto is_current_layer_playing() const -> bool;
     [[nodiscard]] auto is_clip_on_layer() const -> bool;
     void ensure_clip_on_layer(gfx::entity root) const;
-    void delete_selected_keyframe();
-
-    void save_transforms() const;
-    void restore_transforms() const;
-
     engine_type* engine_;
     app_state* state_;
     operation_manager* op_manager_;
+    clip_service* clip_service_;
+    keyframe_service* keyframe_service_;
 
     create_keyframe_modal create_kf_modal_;
     delete_track_modal delete_track_modal_;

@@ -14,6 +14,7 @@
 namespace vw::sculptor {
 
 using keyframe_value = std::variant<gfx::keyframe_vec3f, gfx::keyframe_quat>;
+using entity_guard_type = gfx::entity_guard<>;
 
 enum class tools : uint8 {
     invalid,
@@ -42,39 +43,41 @@ struct ui_state {
     bool need_close_clip        = false;
 };
 
-struct app_state {
-    static constexpr std::string_view asset_dir_name = "models";
-
-    using entity_guard_type = gfx::entity_guard<>;
-
-    ui_state ui;
-
-    bool has_unsaved_changes = false;
-    std::unordered_map<std::string, bool> unsaved_clips;
-
-    [[nodiscard]] auto has_unsaved_clip(const std::string& name) const -> bool;
-    [[nodiscard]] auto has_any_unsaved_clip() const -> bool;
-
+struct file_state {
     std::string filename;
+    bool has_unsaved_changes = false;
+};
 
-    tools selected_tool  = tools::add_voxel;
-    color selected_color = colors::white;
-
+struct scene_state {
     std::string selected_name;
     std::string root_name;
     std::unordered_map<std::string, gfx::entity> name_to_entity;
     std::unordered_map<gfx::entity, std::string> entity_to_name;
-
     std::vector<std::unique_ptr<entity_guard_type>> entities;
 
     [[nodiscard]] auto find_guard(gfx::entity ent) const -> entity_guard_type*;
+};
 
+struct tool_state {
+    tools selected_tool  = tools::add_voxel;
+    color selected_color = colors::white;
+};
+
+struct clip_settings {
+    float32 playback_speed                = 1.0f;
+    gfx::animation_loop_mode loop_mode    = gfx::animation_loop_mode::once;
+    gfx::transition blend_transition      = {};
+    gfx::transition fade_in               = {};
+    gfx::transition fade_out              = {};
+};
+
+struct animation_state {
     std::string selected_clip_name;
     std::string selected_track_name;
     gfx::animation_property selected_property = gfx::animation_property::position;
 
     uint32 selected_keyframe_id = gfx::invalid_keyframe_id;
-    float32 timeline_cursor        = 0.f;
+    float32 timeline_cursor     = 0.f;
     std::unordered_set<std::string> expanded_tracks;
     bool animation_mode = false;
 
@@ -85,24 +88,20 @@ struct app_state {
     bool need_step_forward    = false;
     bool need_step_backward   = false;
 
+    std::unordered_map<std::string, bool> unsaved_clips;
     std::unordered_map<std::string, size_t> clip_to_layer;
-    [[nodiscard]] auto get_layer_for_clip(const std::string& name) const -> size_t;
-
-    struct clip_settings {
-        float32 playback_speed                = 1.0f;
-        gfx::animation_loop_mode loop_mode    = gfx::animation_loop_mode::once;
-        gfx::transition blend_transition      = {};
-        gfx::transition fade_in               = {};
-        gfx::transition fade_out              = {};
-    };
-
     std::unordered_map<std::string, clip_settings> clip_settings_map;
-    [[nodiscard]] auto get_clip_settings(const std::string& name) const -> clip_settings;
-    [[nodiscard]] auto get_clip_settings_mut(const std::string& name) -> clip_settings&;
-
     std::unordered_map<std::string, transform> saved_transforms;
     bool has_saved_transforms = false;
 
+    [[nodiscard]] auto has_unsaved_clip(const std::string& name) const -> bool;
+    [[nodiscard]] auto has_any_unsaved_clip() const -> bool;
+    [[nodiscard]] auto get_layer_for_clip(const std::string& name) const -> size_t;
+    [[nodiscard]] auto get_clip_settings(const std::string& name) const -> clip_settings;
+    [[nodiscard]] auto get_clip_settings_mut(const std::string& name) -> clip_settings&;
+};
+
+struct socket_state {
     struct socket_preview {
         std::string filename;
         std::string preview_root_name;
@@ -126,6 +125,17 @@ struct app_state {
         }
         return result;
     }
+};
+
+struct app_state {
+    static constexpr std::string_view asset_dir_name = "models";
+
+    ui_state ui;
+    file_state file;
+    scene_state scene;
+    tool_state tool;
+    animation_state anim;
+    socket_state sockets;
 };
 
 }  // namespace vw::sculptor

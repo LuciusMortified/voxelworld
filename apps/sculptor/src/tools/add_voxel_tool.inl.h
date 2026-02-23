@@ -16,14 +16,14 @@ inline void add_voxel_tool::render(
     float /*delta_time*/
 ) {
     const bool is_hovered          = hovered_voxel_ != vec3i{-1, -1, -1};
-    const bool has_selected_entity = state_->name_to_entity.contains(state_->selected_name);
+    const bool has_selected_entity = state_->scene.name_to_entity.contains(state_->scene.selected_name);
 
     if (!is_hovered || !has_selected_entity) {
         return;
     }
 
     auto& world    = engine_->get_world();
-    const auto ent = state_->name_to_entity[state_->selected_name];
+    const auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
 
     const bool is_renderable =  //
         world.has_component<gfx::transform_component>(ent) &&
@@ -76,11 +76,11 @@ inline void add_voxel_tool::on_mouse_press(
             return;
         }
 
-        if (!state_->name_to_entity.contains(state_->selected_name)) {
+        if (!state_->scene.name_to_entity.contains(state_->scene.selected_name)) {
             return;
         }
 
-        auto ent = state_->name_to_entity[state_->selected_name];
+        auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
 
         auto& world        = engine_->get_world();
         bool is_renderable =  //
@@ -111,7 +111,7 @@ inline void add_voxel_tool::on_mouse_press(
             const auto expand_dir = vec3i{x, y, z};
 
             expand_model_params expand_params = {
-                .name = state_->selected_name,
+                .name = state_->scene.selected_name,
                 .dir  = expand_dir,
             };
             auto expand_op =
@@ -123,9 +123,9 @@ inline void add_voxel_tool::on_mouse_press(
         }
 
         add_voxel_params params;
-        params.name      = state_->selected_name;
+        params.name      = state_->scene.selected_name;
         params.position  = hovered_voxel_;
-        params.new_color = state_->selected_color;
+        params.new_color = state_->tool.selected_color;
 
         auto op = std::make_unique<add_voxel_operation>(*engine_, *state_, params);
         op_manager_->execute(std::move(op));
@@ -155,8 +155,8 @@ inline void add_voxel_tool::update_hovered_voxel_() {
     }
 
     const bool is_selected_entity =  //
-        state_->name_to_entity.contains(state_->selected_name) &&
-        hit->ent == state_->name_to_entity[state_->selected_name];
+        state_->scene.name_to_entity.contains(state_->scene.selected_name) &&
+        hit->ent == state_->scene.name_to_entity[state_->scene.selected_name];
     if (is_selected_entity) {
         hovered_voxel_ = hit->empty_pos;
     }

@@ -27,13 +27,13 @@ inline void entity_properties_panel::render(
 
     ImGui::Begin("Entity Properties", nullptr, window_flags);
 
-    if (state_->selected_name.empty()) {
+    if (state_->scene.selected_name.empty()) {
         ImGui::TextDisabled("No entity selected");
     } else {
-        const auto ent    = state_->name_to_entity[state_->selected_name];
+        const auto ent    = state_->scene.name_to_entity[state_->scene.selected_name];
         const auto& world = engine_->get_world();
 
-        ImGui::Text("Selected: %s %u.%u", state_->selected_name.c_str(), ent.index, ent.generation);
+        ImGui::Text("Selected: %s %u.%u", state_->scene.selected_name.c_str(), ent.index, ent.generation);
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -42,7 +42,7 @@ inline void entity_properties_panel::render(
         if (!world.has_component<gfx::transform_component>(ent)) {
             ImGui::TextColored(ImVec4(1.f, 1.f, 0.f, 1.f), "Entity has no transform component");
         } else {
-            ImGui::BeginDisabled(state_->animation_mode);
+            ImGui::BeginDisabled(state_->anim.animation_mode);
             render_position();
             render_rotation();
             render_scale();
@@ -59,7 +59,7 @@ inline void entity_properties_panel::render(
 }
 
 inline void entity_properties_panel::render_position() const {
-    const auto ent = state_->name_to_entity[state_->selected_name];
+    const auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
 
     auto& world                = engine_->get_world();
     const auto& transform_comp = world.get_component<gfx::transform_component>(ent);
@@ -69,7 +69,7 @@ inline void entity_properties_panel::render_position() const {
         new_transform.set_position(position);
 
         set_transform_params params = {
-            .name          = state_->selected_name,
+            .name          = state_->scene.selected_name,
             .new_transform = new_transform,
         };
         auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
@@ -78,7 +78,7 @@ inline void entity_properties_panel::render_position() const {
 }
 
 inline void entity_properties_panel::render_rotation() const {
-    const auto ent = state_->name_to_entity[state_->selected_name];
+    const auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
 
     auto& world                = engine_->get_world();
     const auto& transform_comp = world.get_component<gfx::transform_component>(ent);
@@ -99,7 +99,7 @@ inline void entity_properties_panel::render_rotation() const {
         new_transform.set_rotation(rotation_rad);
 
         set_transform_params params = {
-            .name          = state_->selected_name,
+            .name          = state_->scene.selected_name,
             .new_transform = new_transform,
         };
         auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
@@ -108,7 +108,7 @@ inline void entity_properties_panel::render_rotation() const {
 }
 
 inline void entity_properties_panel::render_scale() const {
-    auto ent = state_->name_to_entity[state_->selected_name];
+    auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
 
     auto& world          = engine_->get_world();
     auto& transform_comp = world.get_component<gfx::transform_component>(ent);
@@ -118,7 +118,7 @@ inline void entity_properties_panel::render_scale() const {
         new_transform.set_scale(scale);
 
         set_transform_params params = {
-            .name          = state_->selected_name,
+            .name          = state_->scene.selected_name,
             .new_transform = new_transform,
         };
         auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
@@ -127,7 +127,7 @@ inline void entity_properties_panel::render_scale() const {
 }
 
 inline void entity_properties_panel::render_origin() const {
-    const auto ent = state_->name_to_entity[state_->selected_name];
+    const auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
 
     auto& world                = engine_->get_world();
     const auto& transform_comp = world.get_component<gfx::transform_component>(ent);
@@ -137,7 +137,7 @@ inline void entity_properties_panel::render_origin() const {
         new_transform.set_origin(origin);
 
         set_transform_params params = {
-            .name          = state_->selected_name,
+            .name          = state_->scene.selected_name,
             .new_transform = new_transform,
         };
         auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);

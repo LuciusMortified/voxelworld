@@ -27,26 +27,19 @@ inline void remove_keyframe_operation::execute() {
         return;
     }
 
-    uint32 remove_id = std::visit(
-        [](const auto& kf) -> uint32 { return kf.id(); }, params_.keyframe
-    );
+    uint32 remove_id =
+        std::visit([](const auto& kf) -> uint32 { return kf.id(); }, params_.keyframe);
 
-    std::visit(
-        [remove_id](auto& channel) {
-            channel.remove(remove_id);
-        },
-        *channel_var
-    );
+    std::visit([remove_id](auto& channel) { channel.remove(remove_id); }, *channel_var);
 
     track->mark_dirty();
-    state_->selected_keyframe_id              = gfx::invalid_keyframe_id;
-    state_->has_unsaved_changes               = true;
-    state_->unsaved_clips[params_.clip_name] = true;
+    state_->anim.selected_keyframe_id             = gfx::invalid_keyframe_id;
+    state_->anim.unsaved_clips[params_.clip_name] = true;
 }
 
 inline void remove_keyframe_operation::undo() {
-    auto& registry = engine_->get_world().get_animation_clip_registry();
-    auto clip      = registry.get(params_.clip_name);
+    const auto& registry = engine_->get_world().get_animation_clip_registry();
+    const auto clip      = registry.get(params_.clip_name);
     if (!clip) {
         return;
     }
@@ -70,8 +63,7 @@ inline void remove_keyframe_operation::undo() {
     }
 
     track->mark_dirty();
-    state_->has_unsaved_changes               = true;
-    state_->unsaved_clips[params_.clip_name] = true;
+    state_->anim.unsaved_clips[params_.clip_name] = true;
 }
 
 }  // namespace vw::sculptor

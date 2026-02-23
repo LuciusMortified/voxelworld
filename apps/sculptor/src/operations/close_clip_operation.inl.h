@@ -15,18 +15,18 @@ inline void close_clip_operation::execute() {
     saved_clip_    = registry.get(params_.name);
     registry.remove(params_.name);
 
-    if (state_->selected_clip_name == params_.name) {
-        state_->selected_clip_name.clear();
-        state_->selected_track_name.clear();
-        state_->selected_keyframe_id = gfx::invalid_keyframe_id;
+    if (state_->anim.selected_clip_name == params_.name) {
+        state_->anim.selected_clip_name.clear();
+        state_->anim.selected_track_name.clear();
+        state_->anim.selected_keyframe_id = gfx::invalid_keyframe_id;
     }
-    state_->unsaved_clips.erase(params_.name);
+    state_->anim.unsaved_clips.erase(params_.name);
 }
 
 inline void close_clip_operation::undo() {
     auto& registry = engine_->get_world().get_animation_clip_registry();
     registry.add(params_.name, saved_clip_);
-    state_->selected_clip_name = params_.name;
+    state_->anim.selected_clip_name = params_.name;
 }
 
 }  // namespace vw::sculptor

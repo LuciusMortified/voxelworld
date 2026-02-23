@@ -17,12 +17,12 @@ inline socket_panel::socket_panel(
 inline void socket_panel::render(
     float /*delta_time*/
 ) {
-    if (state_->selected_name.empty()) {
+    if (state_->scene.selected_name.empty()) {
         return;
     }
 
     auto& world    = engine_->get_world();
-    const auto ent = state_->name_to_entity[state_->selected_name];
+    const auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
 
     if (!world.has_component<gfx::socket_component>(ent)) {
         return;
@@ -81,13 +81,13 @@ inline void socket_panel::render(
 
         if (ImGui::Button("Remove")) {
             remove_socket_params params = {
-                .entity_name = state_->selected_name,
+                .entity_name = state_->scene.selected_name,
                 .socket_name = pending_remove_socket_,
             };
             auto op = std::make_unique<remove_socket_operation>(*engine_, *state_, params);
             op_manager_->execute(std::move(op));
             const auto pkey =
-                app_state::socket_preview_key(state_->selected_name, pending_remove_socket_);
+                socket_state::socket_preview_key(state_->scene.selected_name, pending_remove_socket_);
             unload_preview_(pkey);
             pending_remove_socket_.clear();
             ImGui::CloseCurrentPopup();
@@ -165,7 +165,7 @@ inline void socket_panel::render_socket_(
             };
 
             set_socket_transform_params params = {
-                .entity_name = state_->selected_name,
+                .entity_name = state_->scene.selected_name,
                 .socket_name = sp.name,
                 .position    = position,
                 .rotation    = new_rotation,
@@ -174,14 +174,14 @@ inline void socket_panel::render_socket_(
             auto op = std::make_unique<set_socket_transform_operation>(*engine_, *state_, params);
             op_manager_->execute(std::move(op));
 
-            const auto pkey = app_state::socket_preview_key(state_->selected_name, sp.name);
+            const auto pkey = socket_state::socket_preview_key(state_->scene.selected_name, sp.name);
             update_preview_transform_(pkey, position, new_rotation, scale);
         }
 
-        const auto pkey        = app_state::socket_preview_key(state_->selected_name, sp.name);
-        const bool has_preview = state_->socket_previews.contains(pkey);
+        const auto pkey        = socket_state::socket_preview_key(state_->scene.selected_name, sp.name);
+        const bool has_preview = state_->sockets.socket_previews.contains(pkey);
         if (has_preview) {
-            const auto& preview = state_->socket_previews[pkey];
+            const auto& preview = state_->sockets.socket_previews[pkey];
             ImGui::Text("Preview: %s", preview.filename.c_str());
             ImGui::SameLine();
             if (ImGui::SmallButton("Unload")) {
@@ -232,14 +232,14 @@ inline void socket_panel::render_add_socket_modal_() {
             if (new_socket_name_.empty()) {
                 add_socket_error_ = "Name cannot be empty.";
             } else {
-                auto ent = state_->name_to_entity[state_->selected_name];
+                auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
                 const auto& sc =
                     engine_->get_world().template get_component<gfx::socket_component>(ent);
                 if (sc.find(new_socket_name_) != nullptr) {
                     add_socket_error_ = "A socket with this name already exists.";
                 } else {
                     add_socket_params params = {
-                        .entity_name = state_->selected_name,
+                        .entity_name = state_->scene.selected_name,
                         .socket_name = new_socket_name_,
                     };
                     auto op = std::make_unique<add_socket_operation>(*engine_, *state_, params);
@@ -327,7 +327,7 @@ inline void socket_panel::render_preview_file_list_() {
 inline void socket_panel::load_preview_(
     const std::string& socket_name, const std::string& filename
 ) const {
-    const auto pkey = app_state::socket_preview_key(state_->selected_name, socket_name);
+    const auto pkey = socket_state::socket_preview_key(state_->scene.selected_name, socket_name);
     unload_preview_(pkey);
 
     namespace fs = std::filesystem;
@@ -345,7 +345,7 @@ inline void socket_panel::load_preview_(
         return;
     }
 
-    const auto parent_ent   = state_->name_to_entity[state_->selected_name];
+    const auto parent_ent   = state_->scene.name_to_entity[state_->scene.selected_name];
     auto& world             = engine_->get_world();
     const auto& socket_comp = world.template get_component<gfx::socket_component>(parent_ent);
     const auto* sp          = socket_comp.find(socket_name);
@@ -353,7 +353,7 @@ inline void socket_panel::load_preview_(
         return;
     }
 
-    app_state::socket_preview preview;
+    socket_state::socket_preview preview;
     preview.filename          = filename;
     preview.preview_root_name = result->root_name;
     preview.guards            = std::move(result->entities);
@@ -370,20 +370,20 @@ inline void socket_panel::load_preview_(
         hierarchy_system.modify(preview_root).set_parent(parent_ent);
     }
 
-    state_->socket_previews[pkey] = std::move(preview);
+    state_->sockets.socket_previews[pkey] = std::move(preview);
 }
 
 inline void socket_panel::unload_preview_(
     const std::string& key
 ) const {
-    state_->socket_previews.erase(key);
+    state_->sockets.socket_previews.erase(key);
 }
 
 inline void socket_panel::update_preview_transform_(
     const std::string& key, const vec3f& position, const vec3f& rotation, const vec3f& scale
 ) const {
-    const auto it = state_->socket_previews.find(key);
-    if (it == state_->socket_previews.end()) {
+    const auto it = state_->sockets.socket_previews.find(key);
+    if (it == state_->sockets.socket_previews.end()) {
         return;
     }
 

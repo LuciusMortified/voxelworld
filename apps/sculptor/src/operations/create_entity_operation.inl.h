@@ -27,7 +27,7 @@ inline void create_entity_operation::execute() {
         ent_guard->with<gfx::model_component>();
 
         model = model_registry.create(params_.name, params_.size);
-        model->fill(voxel{state_->selected_color});
+        model->fill(voxel{state_->tool.selected_color});
     }
 
     if (params_.with_socket) {
@@ -43,43 +43,43 @@ inline void create_entity_operation::execute() {
         model_system.modify(ent).set_model(model);
     }
 
-    if (!params_.parent_name.empty() && state_->name_to_entity.contains(params_.parent_name)) {
-        auto parent_ent = state_->name_to_entity[params_.parent_name];
+    if (!params_.parent_name.empty() && state_->scene.name_to_entity.contains(params_.parent_name)) {
+        auto parent_ent = state_->scene.name_to_entity[params_.parent_name];
         hierarchy_system.modify(ent).set_parent(parent_ent);
     }
 
-    state_->name_to_entity[params_.name] = ent;
-    state_->entity_to_name[ent]          = params_.name;
+    state_->scene.name_to_entity[params_.name] = ent;
+    state_->scene.entity_to_name[ent]          = params_.name;
 
-    if (state_->root_name.empty()) {
-        state_->root_name = params_.name;
+    if (state_->scene.root_name.empty()) {
+        state_->scene.root_name = params_.name;
     }
-    state_->selected_name = params_.name;
+    state_->scene.selected_name = params_.name;
 
-    state_->entities.push_back(std::move(ent_guard));
-    state_->has_unsaved_changes = true;
+    state_->scene.entities.push_back(std::move(ent_guard));
+    state_->file.has_unsaved_changes = true;
 }
 
 inline void create_entity_operation::undo() {
-    auto ent = state_->name_to_entity[params_.name];
+    auto ent = state_->scene.name_to_entity[params_.name];
 
-    state_->entity_to_name.erase(ent);
-    state_->name_to_entity.erase(params_.name);
+    state_->scene.entity_to_name.erase(ent);
+    state_->scene.name_to_entity.erase(params_.name);
 
-    state_->entities.erase(
+    state_->scene.entities.erase(
         std::remove_if(
-            state_->entities.begin(),
-            state_->entities.end(),
+            state_->scene.entities.begin(),
+            state_->scene.entities.end(),
             [ent](const auto& guard) { return guard->get_entity() == ent; }
         ),
-        state_->entities.end()
+        state_->scene.entities.end()
     );
 
-    if (state_->root_name == params_.name) {
-        state_->root_name = "";
+    if (state_->scene.root_name == params_.name) {
+        state_->scene.root_name = "";
     }
-    state_->selected_name       = "";
-    state_->has_unsaved_changes = true;
+    state_->scene.selected_name       = "";
+    state_->file.has_unsaved_changes = true;
 }
 
 }  // namespace vw::sculptor

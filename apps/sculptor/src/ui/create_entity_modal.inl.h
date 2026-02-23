@@ -13,7 +13,7 @@ inline create_entity_modal::create_entity_modal(
 
 inline void create_entity_modal::open() {
     need_open_ = true;
-    name_        = std::format("new entity {}", state_->name_to_entity.size());
+    name_        = std::format("new entity {}", state_->scene.name_to_entity.size());
     with_model_  = false;
     with_socket_ = false;
 }
@@ -70,14 +70,14 @@ inline auto create_entity_modal::create_entity() -> bool {
         error_ = "Size dimensions must be greater than zero.";
         return false;
     }
-    if (state_->name_to_entity.contains(name_)) {
+    if (state_->scene.name_to_entity.contains(name_)) {
         error_ = "An entity with this name already exists.";
         return false;
     }
 
     create_entity_params params = {
         .name        = name_,
-        .parent_name = state_->selected_name,
+        .parent_name = state_->scene.selected_name,
         .with_model  = with_model_,
         .with_socket = with_socket_,
         .size        = size_,

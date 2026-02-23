@@ -20,14 +20,14 @@ inline void create_keyframe_modal::open(
     track_name_ = track_name;
     error_.clear();
 
-    time_          = state_->timeline_cursor;
+    time_          = state_->anim.timeline_cursor;
     interp_index_  = 0;
     tangent_in_    = 0.f;
     tangent_out_   = 1.f;
-    property_index_ = static_cast<int>(state_->selected_property);
+    property_index_ = static_cast<int>(state_->anim.selected_property);
 
-    if (state_->name_to_entity.contains(track_name)) {
-        auto ent    = state_->name_to_entity[track_name];
+    if (state_->scene.name_to_entity.contains(track_name)) {
+        auto ent    = state_->scene.name_to_entity[track_name];
         auto& world = engine_->get_world();
         if (world.has_component<gfx::transform_component>(ent)) {
             auto& tc = world.get_component<gfx::transform_component>(ent);
@@ -76,8 +76,8 @@ inline void create_keyframe_modal::render(
         ImGui::Combo("##Property", &property_index_, prop_names, 4);
         ImGui::PopItemWidth();
 
-        if (prev_prop != property_index_ && state_->name_to_entity.contains(track_name_)) {
-            auto ent    = state_->name_to_entity[track_name_];
+        if (prev_prop != property_index_ && state_->scene.name_to_entity.contains(track_name_)) {
+            auto ent    = state_->scene.name_to_entity[track_name_];
             auto& world = engine_->get_world();
             if (world.has_component<gfx::transform_component>(ent)) {
                 auto& tc  = world.get_component<gfx::transform_component>(ent);
@@ -170,13 +170,13 @@ inline bool create_keyframe_modal::create_keyframe() {
         return false;
     }
 
-    if (state_->selected_clip_name.empty()) {
+    if (state_->anim.selected_clip_name.empty()) {
         error_ = "No clip selected.";
         return false;
     }
 
     auto& clip_registry = engine_->get_world().get_animation_clip_registry();
-    auto clip           = clip_registry.get(state_->selected_clip_name);
+    auto clip           = clip_registry.get(state_->anim.selected_clip_name);
     if (!clip) {
         error_ = "Clip not found.";
         return false;
@@ -211,7 +211,7 @@ inline bool create_keyframe_modal::create_keyframe() {
 
     if (!clip->has_track(track_name_)) {
         add_track_params params = {
-            .clip_name  = state_->selected_clip_name,
+            .clip_name  = state_->anim.selected_clip_name,
             .track_name = track_name_,
             .property   = prop,
             .keyframe   = kf_val,
@@ -220,7 +220,7 @@ inline bool create_keyframe_modal::create_keyframe() {
         op_manager_->execute(std::move(op));
     } else {
         add_keyframe_params params = {
-            .clip_name  = state_->selected_clip_name,
+            .clip_name  = state_->anim.selected_clip_name,
             .track_name = track_name_,
             .property   = prop,
             .keyframe   = kf_val,
@@ -229,8 +229,8 @@ inline bool create_keyframe_modal::create_keyframe() {
         op_manager_->execute(std::move(op));
     }
 
-    state_->selected_track_name = track_name_;
-    state_->selected_property   = prop;
+    state_->anim.selected_track_name = track_name_;
+    state_->anim.selected_property   = prop;
 
     return true;
 }

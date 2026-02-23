@@ -14,21 +14,21 @@ inline void set_transform_operation::execute() {
     auto& world            = engine_->get_world();
     auto& transform_system = world.get_transform_system();
 
-    auto ent = state_->name_to_entity[params_.name];
+    auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& transform_comp = world.template get_component<gfx::transform_component>(ent);
     previous_transform_  = transform_comp.get_transform();
     transform_system.modify(ent).set_transform(params_.new_transform);
-    state_->has_unsaved_changes = true;
+    state_->file.has_unsaved_changes = true;
 }
 
 inline void set_transform_operation::undo() {
     auto& world            = engine_->get_world();
     auto& transform_system = world.get_transform_system();
 
-    auto ent = state_->name_to_entity[params_.name];
+    auto ent = state_->scene.name_to_entity[params_.name];
     transform_system.modify(ent).set_transform(previous_transform_);
-    state_->has_unsaved_changes = true;
+    state_->file.has_unsaved_changes = true;
 }
 
 }  // namespace vw::sculptor

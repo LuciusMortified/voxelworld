@@ -12,7 +12,7 @@ inline set_socket_transform_operation::set_socket_transform_operation(
 
 inline void set_socket_transform_operation::execute() {
     auto& world = engine_->get_world();
-    auto ent    = state_->name_to_entity[params_.entity_name];
+    auto ent    = state_->scene.name_to_entity[params_.entity_name];
 
     auto& socket_comp = world.template get_component<gfx::socket_component>(ent);
     const auto* sp    = socket_comp.find(params_.socket_name);
@@ -36,12 +36,12 @@ inline void set_socket_transform_operation::execute() {
 
     update_attached_(params_.position, params_.rotation, params_.scale);
     update_preview_(params_.position, params_.rotation, params_.scale);
-    state_->has_unsaved_changes = true;
+    state_->file.has_unsaved_changes = true;
 }
 
 inline void set_socket_transform_operation::undo() {
     auto& world = engine_->get_world();
-    auto ent    = state_->name_to_entity[params_.entity_name];
+    auto ent    = state_->scene.name_to_entity[params_.entity_name];
 
     auto& socket_comp = world.template get_component<gfx::socket_component>(ent);
     auto& sockets     = const_cast<std::vector<gfx::socket_point>&>(socket_comp.get_sockets());
@@ -56,14 +56,14 @@ inline void set_socket_transform_operation::undo() {
 
     update_attached_(previous_position_, previous_rotation_, previous_scale_);
     update_preview_(previous_position_, previous_rotation_, previous_scale_);
-    state_->has_unsaved_changes = true;
+    state_->file.has_unsaved_changes = true;
 }
 
 inline void set_socket_transform_operation::update_attached_(
     const vec3f& position, const vec3f& rotation, const vec3f& scale
 ) {
     auto& world = engine_->get_world();
-    auto ent    = state_->name_to_entity[params_.entity_name];
+    auto ent    = state_->scene.name_to_entity[params_.entity_name];
 
     auto& socket_comp = world.template get_component<gfx::socket_component>(ent);
     const auto* sp    = socket_comp.find(params_.socket_name);
@@ -81,9 +81,9 @@ inline void set_socket_transform_operation::update_attached_(
 inline void set_socket_transform_operation::update_preview_(
     const vec3f& position, const vec3f& rotation, const vec3f& scale
 ) {
-    const auto pkey = app_state::socket_preview_key(params_.entity_name, params_.socket_name);
-    const auto it   = state_->socket_previews.find(pkey);
-    if (it == state_->socket_previews.end()) {
+    const auto pkey = socket_state::socket_preview_key(params_.entity_name, params_.socket_name);
+    const auto it   = state_->sockets.socket_previews.find(pkey);
+    if (it == state_->sockets.socket_previews.end()) {
         return;
     }
 
