@@ -32,11 +32,6 @@ inline void fps_camera_controller::setup(
 
     mouse_initialized_ = true;
 
-    key_press_sub_ = window_->sub<key_press_event>([this](const key_press_event& event) -> bool {
-        handle_key_pressed_(event.key);
-        return false;
-    });
-
     mouse_move_sub_ = window_->sub<mouse_move_event>([this](const mouse_move_event& event) -> bool {
         if (mouse_captured_) {
             handle_mouse_moved_(event.x, event.y);
@@ -47,7 +42,7 @@ inline void fps_camera_controller::setup(
 
 inline void fps_camera_controller::update(
     float delta_time
-) {
+) const {
     if (!camera_ || !window_)
         return;
 
@@ -76,18 +71,6 @@ inline float fps_camera_controller::get_camera_speed() const {
 
 inline bool fps_camera_controller::is_mouse_captured() const {
     return mouse_captured_;
-}
-
-inline void fps_camera_controller::handle_key_pressed_(
-    keyboard::keys key
-) {
-    switch (key) {
-        case keyboard::keys::TAB:
-            //toggle_mouse_captured();
-            break;
-        default:
-            break;
-    }
 }
 
 inline void fps_camera_controller::handle_mouse_moved_(
@@ -157,6 +140,7 @@ inline void fps_camera_controller::set_mouse_captured(
     mouse_captured_ = captured;
 
     window_->set_cursor_mode(mouse_captured_ ? cursor_modes::DISABLED : cursor_modes::NORMAL);
+    window_->set_input_mode(input_modes::RAW_MOUSE_MOTION, mouse_captured_);
 
     mouse_initialized_ = false;
 }

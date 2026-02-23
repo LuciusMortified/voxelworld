@@ -16,7 +16,7 @@ public:
     virtual ~fps_camera_controller() = default;
 
     void setup(window& window, camera& camera);
-    void update(float delta_time);
+    void update(float delta_time) const;
 
     void set_mouse_sensitivity(float sensitivity);
     [[nodiscard]] float get_mouse_sensitivity() const;
@@ -34,7 +34,6 @@ public:
 
 private:
     void update_camera_movement_(float delta_time) const;
-    void handle_key_pressed_(keyboard::keys key);
     void handle_mouse_moved_(double x, double y);
 
     float mouse_sensitivity_;
