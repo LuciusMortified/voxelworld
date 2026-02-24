@@ -19,8 +19,6 @@ public:
     void render(float delta_time);
 
 private:
-    static auto render_vec3f_field(std::string_view label, vec3f& vec) -> bool;
-
     engine_type* engine_;
     app_state* state_;
     operation_manager* op_manager_;

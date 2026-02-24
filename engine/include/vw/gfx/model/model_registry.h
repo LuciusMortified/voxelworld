@@ -23,6 +23,7 @@ public:
     [[nodiscard]] auto create_unnamed(int width, int height, int depth) -> std::shared_ptr<model>;
     [[nodiscard]] auto create_unnamed(vec3i size) -> std::shared_ptr<model>;
     [[nodiscard]] auto create_clone(std::string_view name) -> std::shared_ptr<model>;
+    void erase(std::string_view name);
 
 private:
     model_identity_pool identity_pool_;

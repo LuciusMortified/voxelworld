@@ -429,6 +429,11 @@ void animation_system<Cs...>::player_modifier::apply_pose() {
     system_->apply_animation(entity_, *component_);
 }
 
+template <typename... Cs>
+void animation_system<Cs...>::player_modifier::rebuild_target_map() {
+    system_->build_and_cache_target_map(entity_);
+}
+
 // --- layer_modifier ---
 
 template <typename... Cs>

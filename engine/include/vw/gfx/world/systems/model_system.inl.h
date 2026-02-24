@@ -8,7 +8,6 @@
 
 #include "vw/gfx/model/model.h"
 #include "vw/gfx/world/components/spatial_component.h"
-#include "vw/gfx/world/systems/model_system.h"
 
 namespace vw::gfx {
 
@@ -91,7 +90,7 @@ model_system<Cs...>::model_modifier::model_modifier(
     : system_(&system), component_(component), entity_(entity_id) {}
 
 template <typename... Cs>
-std::shared_ptr<model> model_system<Cs...>::model_modifier::get_model() const {
+auto model_system<Cs...>::model_modifier::get_model() const -> std::shared_ptr<model> {
     return component_->model_;
 }
 

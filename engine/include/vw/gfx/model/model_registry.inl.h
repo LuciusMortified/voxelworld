@@ -67,6 +67,10 @@ inline auto model_registry::create_unnamed(
     return cloned_model;
 }
 
+inline void model_registry::erase(std::string_view name) {
+    models_.erase(std::string(name));
+}
+
 }  // namespace vw::gfx
 
 #endif  // VW_GFX_MODEL_REGISTRY_INL_H

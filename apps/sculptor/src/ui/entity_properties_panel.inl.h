@@ -8,11 +8,12 @@ namespace vw::sculptor {
 inline entity_properties_panel::entity_properties_panel(
     engine_type& eng, app_state& st, operation_manager& op_manager
 )
-    : engine_(&eng), state_(&st), op_manager_(&op_manager) {}
+    : engine_(&eng)
+    , state_(&st)
+    , op_manager_(&op_manager)
+    , add_model_modal_(eng, st, op_manager) {}
 
-inline void entity_properties_panel::render(
-    float /*delta_time*/
-) const {
+inline void entity_properties_panel::render(float /*delta_time*/) {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const auto window_pos         = ImVec2(
         viewport->WorkPos.x + viewport->WorkSize.x - 10,
@@ -33,7 +34,12 @@ inline void entity_properties_panel::render(
         const auto ent    = state_->scene.name_to_entity[state_->scene.selected_name];
         const auto& world = engine_->get_world();
 
-        ImGui::Text("Selected: %s %u.%u", state_->scene.selected_name.c_str(), ent.index, ent.generation);
+        ImGui::Text(
+            "Selected: %s %u.%u",
+            state_->scene.selected_name.c_str(),
+            ent.index,
+            ent.generation
+        );
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -49,37 +55,38 @@ inline void entity_properties_panel::render(
             render_origin();
             ImGui::EndDisabled();
         }
+
+        ImGui::Spacing();
+        render_components_section();
     }
 
     ImGui::Dummy({200.0f, 0.0f});
 
     state_->ui.right_top_voffset += ImGui::GetWindowHeight() + 10.0f;
 
+    add_model_modal_.render();
+
     ImGui::End();
 }
 
 inline void entity_properties_panel::render_position() const {
-    const auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
-
+    const auto ent             = state_->scene.name_to_entity[state_->scene.selected_name];
     auto& world                = engine_->get_world();
     const auto& transform_comp = world.get_component<gfx::transform_component>(ent);
     vec3f position             = transform_comp.get_position();
-    if (render_vec3f_field("Pos", position)) {
+    if (imgui_drag_vec3f("Pos", position)) {
         transform new_transform = transform_comp.get_transform();
         new_transform.set_position(position);
-
         set_transform_params params = {
             .name          = state_->scene.selected_name,
             .new_transform = new_transform,
         };
-        auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
-        op_manager_->execute(std::move(op));
+        op_manager_->execute(std::make_unique<set_transform_operation>(*engine_, *state_, params));
     }
 }
 
 inline void entity_properties_panel::render_rotation() const {
-    const auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
-
+    const auto ent             = state_->scene.name_to_entity[state_->scene.selected_name];
     auto& world                = engine_->get_world();
     const auto& transform_comp = world.get_component<gfx::transform_component>(ent);
     const vec3f rotation       = transform_comp.get_rotation();
@@ -88,8 +95,7 @@ inline void entity_properties_panel::render_rotation() const {
         math::degrees(rotation.y),
         math::degrees(rotation.z),
     };
-
-    if (render_vec3f_field("Rot", rotation_deg)) {
+    if (imgui_drag_vec3f("Rot", rotation_deg)) {
         const vec3f rotation_rad = {
             math::radians(rotation_deg.x),
             math::radians(rotation_deg.y),
@@ -97,87 +103,114 @@ inline void entity_properties_panel::render_rotation() const {
         };
         transform new_transform = transform_comp.get_transform();
         new_transform.set_rotation(rotation_rad);
-
         set_transform_params params = {
             .name          = state_->scene.selected_name,
             .new_transform = new_transform,
         };
-        auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
-        op_manager_->execute(std::move(op));
+        op_manager_->execute(std::make_unique<set_transform_operation>(*engine_, *state_, params));
     }
 }
 
 inline void entity_properties_panel::render_scale() const {
-    auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
-
+    const auto ent       = state_->scene.name_to_entity[state_->scene.selected_name];
     auto& world          = engine_->get_world();
     auto& transform_comp = world.get_component<gfx::transform_component>(ent);
     vec3f scale          = transform_comp.get_scale();
-    if (render_vec3f_field("Scale", scale)) {
+    if (imgui_drag_vec3f("Scale", scale)) {
         transform new_transform = transform_comp.get_transform();
         new_transform.set_scale(scale);
-
         set_transform_params params = {
             .name          = state_->scene.selected_name,
             .new_transform = new_transform,
         };
-        auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
-        op_manager_->execute(std::move(op));
+        op_manager_->execute(std::make_unique<set_transform_operation>(*engine_, *state_, params));
     }
 }
 
 inline void entity_properties_panel::render_origin() const {
-    const auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
-
+    const auto ent             = state_->scene.name_to_entity[state_->scene.selected_name];
     auto& world                = engine_->get_world();
     const auto& transform_comp = world.get_component<gfx::transform_component>(ent);
     vec3f origin               = transform_comp.get_origin();
-    if (render_vec3f_field("Origin", origin)) {
+    if (imgui_drag_vec3f("Origin", origin)) {
         transform new_transform = transform_comp.get_transform();
         new_transform.set_origin(origin);
-
         set_transform_params params = {
             .name          = state_->scene.selected_name,
             .new_transform = new_transform,
         };
-        auto op = std::make_unique<set_transform_operation>(*engine_, *state_, params);
-        op_manager_->execute(std::move(op));
+        op_manager_->execute(std::make_unique<set_transform_operation>(*engine_, *state_, params));
     }
 }
 
-inline bool entity_properties_panel::render_vec3f_field(
-    std::string_view label, vec3f& vec
-) {
-    bool vec_changed = false;
+inline void entity_properties_panel::render_components_section() {
+    if (!ImGui::CollapsingHeader("Components")) {
+        return;
+    }
 
-    const auto field_id = std::format("##entity_properties_{}", label);
-    ImGui::PushID(field_id.c_str());
+    const auto& name = state_->scene.selected_name;
+    const auto ent   = state_->scene.name_to_entity.at(name);
+    auto& world      = engine_->get_world();
 
+    ImGui::BeginDisabled(state_->anim.animation_mode);
+
+    const bool has_model = world.has_component<gfx::model_component>(ent);
     ImGui::AlignTextToFramePadding();
-    const std::string text = std::format("{}", label);
-    ImGui::Text("%s", text.c_str());
-    ImGui::SameLine(60.f);
+    ImGui::TextUnformatted("Model");
+    ImGui::SameLine(100.f);
+    if (has_model) {
+        if (ImGui::Button("Remove##model")) {
+            op_manager_->execute(std::make_unique<remove_model_component_operation>(
+                *engine_, *state_, remove_model_component_params{.name = name}
+            ));
+        }
+    } else {
+        if (ImGui::Button("Add##model")) {
+            add_model_modal_.open(name);
+        }
+    }
 
-    ImGui::PushItemWidth(80.0f);
-    std::string drag_x_id = std::format("##{}X", label);
-    vec_changed |= ImGui::DragFloat(drag_x_id.c_str(), &vec.x, 0.1f, 0, 0, "%.4f");
-    ImGui::PopItemWidth();
-    ImGui::SameLine();
+    const bool has_socket = world.has_component<gfx::socket_component>(ent);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Socket");
+    ImGui::SameLine(100.f);
+    if (has_socket) {
+        if (ImGui::Button("Remove##socket")) {
+            op_manager_->execute(std::make_unique<remove_socket_component_operation>(
+                *engine_, *state_, remove_socket_component_params{.name = name}
+            ));
+        }
+    } else {
+        if (ImGui::Button("Add##socket")) {
+            op_manager_->execute(std::make_unique<add_socket_component_operation>(
+                *engine_, *state_, add_socket_component_params{.name = name}
+            ));
+        }
+    }
 
-    ImGui::PushItemWidth(80.0f);
-    std::string drag_y_id = std::format("##{}Y", label);
-    vec_changed |= ImGui::DragFloat(drag_y_id.c_str(), &vec.y, 0.1f, 0, 0, "%.4f");
-    ImGui::PopItemWidth();
-    ImGui::SameLine();
+    const bool has_anim_target = world.has_component<gfx::animation_target_component>(ent);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted("Anim. Target");
+    ImGui::SameLine(100.f);
+    if (has_anim_target) {
+        const auto& target_comp = world.get_component<gfx::animation_target_component>(ent);
+        ImGui::TextDisabled("(%s)", target_comp.get_name().c_str());
+        ImGui::SameLine();
+        if (ImGui::Button("Remove##anim_target")) {
+            op_manager_->execute(std::make_unique<remove_animation_target_operation>(
+                *engine_, *state_, remove_animation_target_params{.entity_name = name}
+            ));
+        }
+    } else {
+        if (ImGui::Button("Add##anim_target")) {
+            op_manager_->execute(std::make_unique<add_animation_target_operation>(
+                *engine_, *state_,
+                add_animation_target_params{.entity_name = name, .target_name = name}
+            ));
+        }
+    }
 
-    ImGui::PushItemWidth(80.0f);
-    std::string drag_z_id = std::format("##{}Z", label);
-    vec_changed |= ImGui::DragFloat(drag_z_id.c_str(), &vec.z, 0.1f, 0, 0, "%.4f");
-    ImGui::PopItemWidth();
-
-    ImGui::PopID();
-
-    return vec_changed;
+    ImGui::EndDisabled();
 }
 
 }  // namespace vw::sculptor

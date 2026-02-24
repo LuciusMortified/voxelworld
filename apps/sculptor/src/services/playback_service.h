@@ -14,8 +14,8 @@ public:
 
     playback_service(engine_type& eng, app_state& state);
 
-    void toggle_playback();
-    void stop_playback();
+    void toggle_playback() const;
+    void stop_playback() const;
 
 private:
     engine_type* engine_;

@@ -76,6 +76,7 @@ public:
     public:
         auto layer(size_t index) -> layer_modifier;
         void apply_pose();
+        void rebuild_target_map();
 
     private:
         friend class animation_system;

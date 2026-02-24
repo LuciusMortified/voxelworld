@@ -60,6 +60,35 @@ inline void imgui_clamp_window_pos_to_viewport() {
     }
 }
 
+inline auto imgui_drag_vec3f(std::string_view label, vec3f& vec, float label_offset = 60.f) -> bool {
+    bool changed = false;
+
+    const auto field_id = std::format("##drag_vec3f_{}", label);
+    ImGui::PushID(field_id.c_str());
+
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextUnformatted(label.data(), label.data() + label.size());
+    ImGui::SameLine(label_offset);
+
+    ImGui::PushItemWidth(80.0f);
+    changed |= ImGui::DragFloat(std::format("##{}X", label).c_str(), &vec.x, 0.1f, 0, 0, "%.4f");
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+
+    ImGui::PushItemWidth(80.0f);
+    changed |= ImGui::DragFloat(std::format("##{}Y", label).c_str(), &vec.y, 0.1f, 0, 0, "%.4f");
+    ImGui::PopItemWidth();
+    ImGui::SameLine();
+
+    ImGui::PushItemWidth(80.0f);
+    changed |= ImGui::DragFloat(std::format("##{}Z", label).c_str(), &vec.z, 0.1f, 0, 0, "%.4f");
+    ImGui::PopItemWidth();
+
+    ImGui::PopID();
+
+    return changed;
+}
+
 }  // namespace vw::sculptor
 
 #endif  // VW_SCULPTOR_UI_UTILS_H
