@@ -86,7 +86,7 @@ inline void keyframe_properties_panel::render(
                 auto new_value     = kf.value;
 
                 if constexpr (std::is_same_v<value_type, vec3f>) {
-                    value_changed = render_vec3f_field("Value", new_value);
+                    value_changed = imgui_drag_vec3f("Value", new_value, 110.f);
                 } else if constexpr (std::is_same_v<value_type, quat>) {
                     vec3f euler = math::quat_to_euler(kf.value);
                     vec3f euler_deg{
@@ -94,7 +94,7 @@ inline void keyframe_properties_panel::render(
                         math::degrees(euler.y),
                         math::degrees(euler.z),
                     };
-                    if (render_vec3f_field("Value", euler_deg)) {
+                    if (imgui_drag_vec3f("Value", euler_deg, 110.f)) {
                         vec3f euler_rad{
                             math::radians(euler_deg.x),
                             math::radians(euler_deg.y),
@@ -186,40 +186,6 @@ inline void keyframe_properties_panel::render(
     ImGui::End();
 }
 
-inline auto keyframe_properties_panel::render_vec3f_field(
-    std::string_view label, vec3f& vec
-) -> bool {
-    bool vec_changed = false;
-
-    const auto field_id = std::format("##keyframe_properties_{}", label);
-    ImGui::PushID(field_id.c_str());
-
-    ImGui::AlignTextToFramePadding();
-    const auto text = std::format("{}", label);
-    ImGui::Text("%s", text.c_str());
-    ImGui::SameLine(110.f);
-
-    ImGui::PushItemWidth(80.0f);
-    const auto drag_x_id = std::format("##{}X", label);
-    vec_changed |= ImGui::DragFloat(drag_x_id.c_str(), &vec.x, 0.1f, 0, 0, "%.4f");
-    ImGui::PopItemWidth();
-    ImGui::SameLine();
-
-    ImGui::PushItemWidth(80.0f);
-    const auto drag_y_id = std::format("##{}Y", label);
-    vec_changed |= ImGui::DragFloat(drag_y_id.c_str(), &vec.y, 0.1f, 0, 0, "%.4f");
-    ImGui::PopItemWidth();
-    ImGui::SameLine();
-
-    ImGui::PushItemWidth(80.0f);
-    const auto drag_z_id = std::format("##{}Z", label);
-    vec_changed |= ImGui::DragFloat(drag_z_id.c_str(), &vec.z, 0.1f, 0, 0, "%.4f");
-    ImGui::PopItemWidth();
-
-    ImGui::PopID();
-
-    return vec_changed;
-}
 
 }  // namespace vw::sculptor
 
