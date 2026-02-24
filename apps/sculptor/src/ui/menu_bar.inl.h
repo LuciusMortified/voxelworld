@@ -2,6 +2,18 @@
 
 #ifndef VW_SCULPTOR_MENU_BAR_INL_H
 #define VW_SCULPTOR_MENU_BAR_INL_H
+
+#include <filesystem>
+#include <string>
+
+#ifdef _WIN32
+#define WIN32_LEAN_AND_MEAN
+#include <shellapi.h>
+#include <windows.h>
+#else
+#include <cstdlib>
+#endif
+
 namespace vw::sculptor {
 
 inline menu_bar::menu_bar(
@@ -48,6 +60,20 @@ inline void menu_bar::render(
         }
         if (ImGui::MenuItem("Save As", "Ctrl+Shift+S")) {
             state_->ui.need_save_as_modal = true;
+        }
+
+        ImGui::Separator();
+
+        if (ImGui::MenuItem("Open Models Folder")) {
+            namespace fs = std::filesystem;
+            const std::string models_dir = fs::absolute(app_state::asset_dir_name).string();
+#ifdef _WIN32
+            ShellExecuteA(nullptr, "open", models_dir.c_str(), nullptr, nullptr, SW_SHOWNORMAL);
+#elifdef __APPLE__
+            std::system(("open \"" + models_dir + "\"").c_str());
+#else
+            std::system(("xdg-open \"" + models_dir + "\"").c_str());
+#endif
         }
 
         ImGui::Separator();
