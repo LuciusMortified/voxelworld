@@ -7,6 +7,7 @@
 
 #include "sculptor_version.h"
 #include "tools/add_voxel_tool.h"
+#include "tools/color_picker_tool.h"
 #include "tools/paint_tool.h"
 #include "tools/remove_voxel_tool.h"
 
@@ -45,9 +46,10 @@ inline app::app(
     tools_[tools::add_voxel]    = std::make_unique<add_voxel_tool>(eng, state_, op_manager_);
     tools_[tools::remove_voxel] = std::make_unique<remove_voxel_tool>(eng, state_, op_manager_);
     tools_[tools::paint_voxel]  = std::make_unique<paint_tool>(eng, state_, op_manager_);
+    tools_[tools::color_picker] = std::make_unique<color_picker_tool>(eng, state_, op_manager_);
 
     camera_controller_.setup(window, camera);
-    camera_controller_.set_camera_speed(15.f);
+    camera_controller_.set_camera_speed(20.f);
 
     window.sub<gfx::key_press_event>([this](const gfx::key_press_event& ev) -> bool {
         handle_key_press(ev);
@@ -78,7 +80,7 @@ inline app::app(
     renderer.set_clear_color(vec4f{0.15f, 0.27f, 0.45f, 1.0f});
 
     auto& dir_light_settings     = renderer.get_directional_light_settings();
-    dir_light_settings.direction = math::normalize(vec3f{+0.3f, -1.0f, +0.3f});
+    dir_light_settings.direction = math::normalize(vec3f{+0.4f, -1.0f, +0.4f});
 }
 
 inline void app::render(
@@ -201,6 +203,9 @@ inline void app::handle_key_press(
     }
     if (ev.key == keys::KEY_3) {
         state_.tool.selected_tool = tools::paint_voxel;
+    }
+    if (ev.key == keys::KEY_4) {
+        state_.tool.selected_tool = tools::color_picker;
     }
 
     tools_[active_tool_]->on_key_press(ev);
@@ -333,15 +338,13 @@ inline void app::handle_animation_actions_() {
     }
 }
 
-
-
 inline void app::update_title_() {
     std::string title;
     if (state_.file.filename.empty()) {
         title = std::format("Sculptor {}", version_string);
     } else {
         auto filename_suffix = state_.file.has_unsaved_changes ? "*" : "";
-        title = std::format(
+        title                = std::format(
             "Sculptor {} | {}{}", version_string, state_.file.filename, filename_suffix
         );
 

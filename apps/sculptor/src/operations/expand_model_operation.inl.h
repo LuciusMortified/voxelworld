@@ -17,18 +17,18 @@ inline void expand_model_operation::execute() {
     auto& model_system = world.get_model_system();
     auto& transform_system = world.get_transform_system();
 
-    auto& model_comp = world.get_component<gfx::model_component>(ent);
-    auto model = model_comp.get_model();
+    const auto& model_comp = world.get_component<gfx::model_component>(ent);
+    const auto model = model_comp.get_model();
 
-    auto size = model->size();
-    auto new_size = vec3i{
+    const auto size = model->size();
+    const auto new_size = vec3i{
         size.x + std::abs(params_.dir.x),
         size.y + std::abs(params_.dir.y),
         size.z + std::abs(params_.dir.z)
     };
-    auto new_model = model_registry.create_unnamed(new_size);
+    const auto new_model = model_registry.create_unnamed(new_size);
 
-    auto zeroed_dir = vec3i{
+    const auto zeroed_dir = vec3i{
         params_.dir.x < 0 ? 1 : 0,
         params_.dir.y < 0 ? 1 : 0,
         params_.dir.z < 0 ? 1 : 0

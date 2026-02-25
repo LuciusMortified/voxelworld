@@ -211,7 +211,7 @@ void main() {
     float shadow = mix(1.0, calculateShadow(normal, viewDepth), shadowReliability);
 
     // Ambient lighting
-    float ambientStrength = 0.15;
+    float ambientStrength = 0.25;
     vec3 baseAmbient = ambientStrength * ubo.directional_light.color * ubo.directional_light.intensity;
 
     // Hemisphere ambient для более выразительного объёма

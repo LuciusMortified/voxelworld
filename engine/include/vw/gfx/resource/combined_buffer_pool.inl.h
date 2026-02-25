@@ -81,12 +81,12 @@ void combined_buffer_pool<C>::update_meshes_(
     entities_to_process_.insert(dirty_entities.begin(), dirty_entities.end());
 
     for (entity ent : entities_to_process_) {
-        bool has_spatial = world.template has_component<spatial_component>(ent);
-        bool is_visible  = visibility_cache_.visible.contains(ent);
+        const bool has_spatial = world.template has_component<spatial_component>(ent);
+        const bool is_visible  = visibility_cache_.visible.contains(ent);
         if (has_spatial && !is_visible) {
             if (entity_buffer_infos_.contains(ent)) {
-                auto& buffer_info = entity_buffer_infos_[ent];
-                buffers_[buffer_info.buffer_index]->free(ent);
+                const auto& [chunk_size, buffer_index] = entity_buffer_infos_[ent];
+                buffers_[buffer_index]->free(ent);
                 entity_buffer_infos_.erase(ent);
             }
             dirty_entities.erase(ent);
@@ -123,22 +123,28 @@ void combined_buffer_pool<C>::update_meshes_(
 
         buffer_chunk_size required_chunk_size = get_chunk_size_for_mesh(vertex_count, index_count);
 
-        if (entity_buffer_infos_.contains(ent)) {
-            auto& buffer_info = entity_buffer_infos_[ent];
-            if (buffer_info.chunk_size == required_chunk_size) {
-                buffers_[buffer_info.buffer_index]->write_mesh(model_id, *mesh_ptr);
-                dirty_entities.erase(ent);
-                continue;
-            }
-
-            buffers_[buffer_info.buffer_index]->free(ent);
-        }
-
-        combined_buffer* buffer = get_or_create_buffer(required_chunk_size);
-        auto buffer_index       = chunk_size_to_buffer_index_[required_chunk_size];
-
         const auto& transform_comp    = world.template get_component<transform_component>(ent);
         const mat4f& transform_matrix = transform_comp.get_world_matrix();
+
+        if (entity_buffer_infos_.contains(ent)) {
+            auto& buffer_info = entity_buffer_infos_[ent];
+            auto& buffer      = buffers_[buffer_info.buffer_index];
+
+            if (buffer_info.chunk_size == required_chunk_size) {
+                const auto& ent_alloc = buffer->get_entity_allocation(ent);
+                if (ent_alloc.model_index == model_id.index) {
+                    buffer->write_mesh(model_id, *mesh_ptr);
+                    dirty_entities.erase(ent);
+                    continue;
+                }
+            }
+
+            buffer->free(ent);
+        }
+
+        auto* buffer            = get_or_create_buffer(required_chunk_size);
+        const auto buffer_index = chunk_size_to_buffer_index_[required_chunk_size];
+
         buffer->allocate(ent, model_id, *mesh_ptr, transform_matrix);
 
         entity_buffer_infos_[ent] = entity_buffer_info{required_chunk_size, buffer_index};
@@ -183,9 +189,7 @@ void combined_buffer_pool<C>::update_transforms_(
 
 template <typename C>
 void combined_buffer_pool<C>::update_visibility_cache_(
-    world_type& world,
-    const frustum& view_frustum,
-    std::span<const frustum> shadow_frustums
+    world_type& world, const frustum& view_frustum, std::span<const frustum> shadow_frustums
 ) {
     auto& spatial_system = world.get_spatial_system();
 
@@ -195,10 +199,9 @@ void combined_buffer_pool<C>::update_visibility_cache_(
     auto& render_dirty_entities = spatial_system.get_render_dirty_entities();
     const bool has_render_dirty = !render_dirty_entities.empty();
 
-    const bool frustum_changed =
-        !visibility_cache_.view_frustum.approximately_equal(
-            view_frustum, angle_threshold, distance_threshold
-        );
+    const bool frustum_changed = !visibility_cache_.view_frustum.approximately_equal(
+        view_frustum, angle_threshold, distance_threshold
+    );
 
     visibility_cache_.changed.clear();
     if (frustum_changed || has_render_dirty) {
@@ -206,7 +209,9 @@ void combined_buffer_pool<C>::update_visibility_cache_(
 
         for (const auto& shadow_frustum : shadow_frustums) {
             spatial_system.query_all(shadow_frustum, shadow_query_tmp_);
-            visibility_cache_.tmp_visible.insert(shadow_query_tmp_.begin(), shadow_query_tmp_.end());
+            visibility_cache_.tmp_visible.insert(
+                shadow_query_tmp_.begin(), shadow_query_tmp_.end()
+            );
         }
 
         for (auto ent : visibility_cache_.visible) {
@@ -220,7 +225,7 @@ void combined_buffer_pool<C>::update_visibility_cache_(
             }
         }
 
-        visibility_cache_.visible = visibility_cache_.tmp_visible;
+        visibility_cache_.visible      = visibility_cache_.tmp_visible;
         visibility_cache_.view_frustum = view_frustum;
 
         if (has_render_dirty) {

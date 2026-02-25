@@ -21,6 +21,7 @@ enum class tools : uint8 {
     add_voxel,
     remove_voxel,
     paint_voxel,
+    color_picker,
 };
 
 struct ui_state {
