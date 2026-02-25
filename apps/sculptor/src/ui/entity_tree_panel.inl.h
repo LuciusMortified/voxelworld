@@ -61,7 +61,8 @@ inline void entity_tree_panel::render(
         ImGui::Spacing();
         ImGui::Separator();
         ImGui::Spacing();
-        render_entity_node(state_->scene.root_name);
+        const auto preview_entities = state_->sockets.get_preview_entities();
+        render_entity_node(state_->scene.root_name, preview_entities);
     }
 
     creation_modal_.render(delta_time);
@@ -75,7 +76,7 @@ inline void entity_tree_panel::render(
 }
 
 inline void entity_tree_panel::render_entity_node(
-    const std::string& name
+    const std::string& name, const std::unordered_set<gfx::entity>& preview_entities
 ) {
     if (name.empty()) {
         return;
@@ -89,7 +90,9 @@ inline void entity_tree_panel::render_entity_node(
 
     if (has_hierarchy) {
         const auto& hierarchy_comp = world.get_component<gfx::hierarchy_component>(ent);
-        has_children               = !hierarchy_comp.get_children().empty();
+        has_children = std::ranges::any_of(hierarchy_comp.get_children(), [&](auto child) {
+            return !preview_entities.contains(child);
+        });
     }
 
     const bool is_selected = state_->scene.selected_name == name;
@@ -138,8 +141,11 @@ inline void entity_tree_panel::render_entity_node(
         const auto& children       = hierarchy_comp.get_children();
 
         for (auto child : children) {
+            if (preview_entities.contains(child)) {
+                continue;
+            }
             auto child_name = state_->scene.entity_to_name[child];
-            render_entity_node(child_name);
+            render_entity_node(child_name, preview_entities);
         }
 
         ImGui::TreePop();
