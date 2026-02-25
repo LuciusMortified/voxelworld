@@ -5,6 +5,8 @@
 
 namespace vw::gfx {
 
+// ==================== vertex ====================
+
 inline auto vertex::get_binding_descriptions() -> std::vector<VkVertexInputBindingDescription> {
     std::vector binding_descriptions = {
         VkVertexInputBindingDescription{
@@ -47,13 +49,80 @@ inline auto vertex::get_attribute_descriptions() -> std::vector<VkVertexInputAtt
             .format   = VK_FORMAT_R32_UINT,
             .offset   = 0,
         },
+        VkVertexInputAttributeDescription{
+            .location = 4,
+            .binding  = 0,
+            .format   = VK_FORMAT_R32_SFLOAT,
+            .offset   = offsetof(vertex, ao),
+        },
     };
     return attribute_descriptions;
 }
 
-inline mesh simple_mesh_generator::generate_mesh_data(
-    std::shared_ptr<model> model
-) {
+// ==================== AO helpers ====================
+
+static constexpr int ao_normal[6][3] = {
+    {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
+};
+
+static constexpr int ao_tangent_u[6][3] = {
+    {0, 0, 1}, {0, 0, 1}, {1, 0, 0}, {1, 0, 0}, {1, 0, 0}, {1, 0, 0}
+};
+
+static constexpr int ao_tangent_v[6][3] = {
+    {0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, 1}, {0, 1, 0}, {0, 1, 0}
+};
+
+inline auto compute_vertex_ao(
+    const std::shared_ptr<model>& mdl,
+    int x, int y, int z,
+    int face, int su, int sv
+) -> float32 {
+    int nx = x + ao_normal[face][0];
+    int ny = y + ao_normal[face][1];
+    int nz = z + ao_normal[face][2];
+
+    auto is_solid = [&](int px, int py, int pz) -> bool {
+        if (px < 0 || px >= mdl->width() ||
+            py < 0 || py >= mdl->height() ||
+            pz < 0 || pz >= mdl->depth())
+            return false;
+        return !mdl->is_empty(px, py, pz);
+    };
+
+    int ux = ao_tangent_u[face][0], uy = ao_tangent_u[face][1], uz = ao_tangent_u[face][2];
+    int vx = ao_tangent_v[face][0], vy = ao_tangent_v[face][1], vz = ao_tangent_v[face][2];
+
+    bool side1 = is_solid(nx + su * ux, ny + su * uy, nz + su * uz);
+    bool side2 = is_solid(nx + sv * vx, ny + sv * vy, nz + sv * vz);
+
+    if (side1 && side2) return 0.0f;
+
+    bool corner = is_solid(
+        nx + su * ux + sv * vx,
+        ny + su * uy + sv * vy,
+        nz + su * uz + sv * vz
+    );
+
+    int ao_val = 3 - static_cast<int>(side1) - static_cast<int>(side2) - static_cast<int>(corner);
+    return static_cast<float32>(ao_val) / 3.0f;
+}
+
+// ==================== simple_mesh_generator ====================
+
+// Per-vertex (su, sv) signs for each face direction, matching face_vertices winding
+static constexpr int ao_winding_signs[6][4][2] = {
+    {{-1, -1}, { 1, -1}, { 1,  1}, {-1,  1}},  // +X
+    {{-1, -1}, {-1,  1}, { 1,  1}, { 1, -1}},  // -X
+    {{-1, -1}, { 1, -1}, { 1,  1}, {-1,  1}},  // +Y
+    {{-1, -1}, {-1,  1}, { 1,  1}, { 1, -1}},  // -Y
+    {{-1, -1}, {-1,  1}, { 1,  1}, { 1, -1}},  // +Z
+    {{ 1, -1}, { 1,  1}, {-1,  1}, {-1, -1}},  // -Z
+};
+
+inline auto simple_mesh_generator::generate_mesh_data(
+    const std::shared_ptr<model>& model
+) -> mesh {
     if (!model) {
         return mesh{};
     }
@@ -61,19 +130,13 @@ inline mesh simple_mesh_generator::generate_mesh_data(
     std::vector<vertex> vertices;
     std::vector<uint32> indices;
 
-    // Проходим по всем векселям в модели
     for (int x = 0; x < model->width(); x++) {
         for (int y = 0; y < model->height(); y++) {
             for (int z = 0; z < model->depth(); z++) {
-                if (voxel voxel_obj = model->get_voxel(x, y, z);
-                    !voxel_obj.is_empty()) {  // Если воксел существует (не прозрачный)
-
-                    vec3f position(x, y, z);
-
-                    // Проверяем каждую грань куба
+                if (voxel voxel_obj = model->get_voxel(x, y, z); !voxel_obj.is_empty()) {
                     for (int face = 0; face < 6; face++) {
                         if (is_face_visible(model, x, y, z, face)) {
-                            add_cube_face(vertices, indices, position, face, voxel_obj.value);
+                            add_cube_face(vertices, indices, model, x, y, z, face, voxel_obj.value);
                         }
                     }
                 }
@@ -87,85 +150,150 @@ inline mesh simple_mesh_generator::generate_mesh_data(
 inline void simple_mesh_generator::add_cube_face(
     std::vector<vertex>& vertices,
     std::vector<uint32>& indices,
-    const vec3f& position,
+    const std::shared_ptr<model>& model,
+    int x, int y, int z,
     int face_direction,
     color color
 ) {
-    // Направления граней: 0=+X, 1=-X, 2=+Y, 3=-Y, 4=+Z, 5=-Z
-    static const vec3f face_normals[6] = {
-        vec3f(1, 0, 0),   // +X
-        vec3f(-1, 0, 0),  // -X
-        vec3f(0, 1, 0),   // +Y
-        vec3f(0, -1, 0),  // -Y
-        vec3f(0, 0, 1),   // +Z
-        vec3f(0, 0, -1)   // -Z
+    static constexpr vec3f face_normals[6] = {
+        vec3f(1, 0, 0),  vec3f(-1, 0, 0),
+        vec3f(0, 1, 0),  vec3f(0, -1, 0),
+        vec3f(0, 0, 1),  vec3f(0, 0, -1)
     };
 
-    // Вершины для каждой грани (4 вершины на грань) - против часовой стрелки
-    // относительно нормали
-    static const vec3f face_vertices[6][4] = {
-        // +X face (нормаль +X) - смотрим снаружи на грань x=1
-        {{1, 0, 0}, {1, 0, 1}, {1, 1, 1}, {1, 1, 0}},
-        // -X face (нормаль -X) - смотрим снаружи на грань x=0
-        {{0, 0, 0}, {0, 1, 0}, {0, 1, 1}, {0, 0, 1}},
-        // +Y face (нормаль +Y) - смотрим снаружи на грань y=1
-        {{0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {0, 1, 1}},
-        // -Y face (нормаль -Y) - смотрим снаружи на грань y=0
-        {{0, 0, 0}, {0, 0, 1}, {1, 0, 1}, {1, 0, 0}},
-        // +Z face (нормаль +Z) - смотрим снаружи на грань z=1
-        {{0, 0, 1}, {0, 1, 1}, {1, 1, 1}, {1, 0, 1}},
-        // -Z face (нормаль -Z) - смотрим снаружи на грань z=0
-        {{1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 0}}
+    static constexpr vec3f face_vertices[6][4] = {
+        {{1, 0, 0}, {1, 0, 1}, {1, 1, 1}, {1, 1, 0}},  // +X
+        {{0, 0, 0}, {0, 1, 0}, {0, 1, 1}, {0, 0, 1}},  // -X
+        {{0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {0, 1, 1}},  // +Y
+        {{0, 0, 0}, {0, 0, 1}, {1, 0, 1}, {1, 0, 0}},  // -Y
+        {{0, 0, 1}, {0, 1, 1}, {1, 1, 1}, {1, 0, 1}},  // +Z
+        {{1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 0}}   // -Z
     };
-
-    // Индексы для треугольника (2 треугольника на грань)
-    static const uint32 face_indices[6] = {0, 1, 2, 2, 3, 0};
 
     const auto base_vertex = static_cast<uint32>(vertices.size());
-    vec3f normal           = face_normals[face_direction];
+    vec3f normal = face_normals[face_direction];
+    vec3f position(x, y, z);
 
-    // Добавляем 4 вершины грани
+    std::array<float32, 4> ao_values;
     for (int i = 0; i < 4; i++) {
-        vec3f vertex_pos = position + face_vertices[face_direction][i];
-        vertices.emplace_back(vertex_pos, normal, color.value);
+        ao_values[i] = compute_vertex_ao(
+            model, x, y, z, face_direction,
+            ao_winding_signs[face_direction][i][0],
+            ao_winding_signs[face_direction][i][1]
+        );
     }
 
-    // Добавляем 6 индексов для двух треугольников
-    for (int i = 0; i < 6; i++) {
-        indices.push_back(base_vertex + face_indices[i]);
+    for (int i = 0; i < 4; i++) {
+        vec3f vertex_pos = position + face_vertices[face_direction][i];
+        vertices.emplace_back(vertex_pos, normal, color.value, ao_values[i]);
+    }
+
+    if (ao_values[0] + ao_values[2] > ao_values[1] + ao_values[3]) {
+        indices.push_back(base_vertex + 0);
+        indices.push_back(base_vertex + 1);
+        indices.push_back(base_vertex + 2);
+        indices.push_back(base_vertex + 2);
+        indices.push_back(base_vertex + 3);
+        indices.push_back(base_vertex + 0);
+    } else {
+        indices.push_back(base_vertex + 1);
+        indices.push_back(base_vertex + 2);
+        indices.push_back(base_vertex + 3);
+        indices.push_back(base_vertex + 3);
+        indices.push_back(base_vertex + 0);
+        indices.push_back(base_vertex + 1);
     }
 }
 
-inline bool simple_mesh_generator::is_face_visible(
+inline auto simple_mesh_generator::is_face_visible(
     const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
-) {
-    if (!model)
-        return false;
+) -> bool {
+    if (!model) return false;
 
-    // Смещения для проверки соседних вокселов
-    static const int dx[6] = {1, -1, 0, 0, 0, 0};
-    static const int dy[6] = {0, 0, 1, -1, 0, 0};
-    static const int dz[6] = {0, 0, 0, 0, 1, -1};
+    static constexpr int dx[6] = {1, -1, 0, 0, 0, 0};
+    static constexpr int dy[6] = {0, 0, 1, -1, 0, 0};
+    static constexpr int dz[6] = {0, 0, 0, 0, 1, -1};
 
     int nx = x + dx[face_direction];
     int ny = y + dy[face_direction];
     int nz = z + dz[face_direction];
 
-    // Проверяем границы модели
-    if (nx < 0 || nx >= model->width() || ny < 0 || ny >= model->height() || nz < 0 ||
-        nz >= model->depth()) {
-        return true;  // Грань видна, если выходит за границы модели
+    if (nx < 0 || nx >= model->width() || ny < 0 || ny >= model->height() ||
+        nz < 0 || nz >= model->depth()) {
+        return true;
     }
 
-    // Грань видна, если соседний воксел не существует (прозрачный)
     return model->is_empty(nx, ny, nz);
 }
 
-// ================== greedy_mesh_generator ==================
+// ==================== greedy_mesh_generator ====================
 
-inline mesh greedy_mesh_generator::generate_mesh_data(
-    std::shared_ptr<model> model
-) {
+struct face_axis_mapping {
+    int width, height, depth;
+    int face_direction;
+
+    face_axis_mapping(const std::shared_ptr<model>& mdl, int face_dir)
+        : face_direction(face_dir) {
+        switch (face_dir / 2) {
+            case 0:
+                width = mdl->depth(); height = mdl->height(); depth = mdl->width();
+                break;
+            case 1:
+                width = mdl->width(); height = mdl->depth(); depth = mdl->height();
+                break;
+            default:
+                width = mdl->width(); height = mdl->height(); depth = mdl->depth();
+                break;
+        }
+    }
+
+    [[nodiscard]] auto to_model_coords(int u, int v, int layer) const
+        -> std::tuple<int, int, int> {
+        int d = (face_direction % 2 == 0) ? layer : depth - 1 - layer;
+        switch (face_direction / 2) {
+            case 0: return {d, v, u};
+            case 1: return {u, d, v};
+            default: return {u, v, d};
+        }
+    }
+
+    [[nodiscard]] auto to_world_min_max(int u, int v, int w, int h, int layer) const
+        -> std::pair<vec3f, vec3f> {
+        auto d_lo = static_cast<float32>((face_direction % 2 == 0) ? layer : depth - 1 - layer);
+        auto d_hi = d_lo + 1.0f;
+        auto u_lo = static_cast<float32>(u);
+        auto u_hi = static_cast<float32>(u + w);
+        auto v_lo = static_cast<float32>(v);
+        auto v_hi = static_cast<float32>(v + h);
+
+        switch (face_direction / 2) {
+            case 0: return {{d_lo, v_lo, u_lo}, {d_hi, v_hi, u_hi}};
+            case 1: return {{u_lo, d_lo, v_lo}, {u_hi, d_hi, v_hi}};
+            default: return {{u_lo, v_lo, d_lo}, {u_hi, v_hi, d_hi}};
+        }
+    }
+};
+
+struct face_cell {
+    color col = colors::empty;
+    std::array<float32, 4> ao = {1.0f, 1.0f, 1.0f, 1.0f};
+
+    [[nodiscard]] auto is_empty() const -> bool { return col == colors::empty; }
+};
+
+// Maps canonical AO order (BL, BR, TR, TL) to face winding vertex order
+static constexpr int canonical_to_winding[6][4] = {
+    {0, 1, 2, 3},  // +X
+    {0, 3, 2, 1},  // -X
+    {0, 1, 2, 3},  // +Y
+    {0, 3, 2, 1},  // -Y
+    {0, 3, 2, 1},  // +Z
+    {1, 2, 3, 0},  // -Z
+};
+
+inline auto greedy_mesh_generator::generate_mesh_data(
+    const std::shared_ptr<model>& model
+) -> mesh {
     if (!model) {
         throw std::runtime_error("model is null");
     }
@@ -173,7 +301,6 @@ inline mesh greedy_mesh_generator::generate_mesh_data(
     std::vector<vertex> vertices;
     std::vector<uint32> indices;
 
-    // Генерируем грани для каждого направления
     for (int face_direction = 0; face_direction < 6; face_direction++) {
         generate_face_quads(vertices, indices, model, face_direction);
     }
@@ -187,142 +314,82 @@ inline void greedy_mesh_generator::generate_face_quads(
     const std::shared_ptr<model>& model,
     int face_direction
 ) {
-    int width = 0, height = 0, depth = 0;
+    face_axis_mapping axes(model, face_direction);
 
-    switch (face_direction) {
-        case 0:  // +X
-        case 1:  // -X
-            width  = model->depth();
-            height = model->height();
-            depth  = model->width();
-            break;
-        case 2:  // +Y
-        case 3:  // -Y
-            width  = model->width();
-            height = model->depth();
-            depth  = model->height();
-            break;
-        case 4:  // +Z
-        case 5:  // -Z
-            width  = model->width();
-            height = model->height();
-            depth  = model->depth();
-            break;
-        default:
-            break;
-    }
+    for (int layer = 0; layer < axes.depth; layer++) {
+        std::vector mask(axes.width, std::vector<face_cell>(axes.height));
 
-    for (int layer = 0; layer < depth; layer++) {
-        std::vector mask(width, std::vector(height, colors::empty));
-
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-                int mx = 0, my = 0, mz = 0;
-                switch (face_direction) {
-                    case 0:  // +X
-                        mx = layer;
-                        my = y;
-                        mz = x;
-                        break;
-                    case 1:  // -X
-                        mx = depth - 1 - layer;
-                        my = y;
-                        mz = x;
-                        break;
-                    case 2:  // +Y
-                        mx = x;
-                        my = layer;
-                        mz = y;
-                        break;
-                    case 3:  // -Y
-                        mx = x;
-                        my = depth - 1 - layer;
-                        mz = y;
-                        break;
-                    case 4:  // +Z
-                        mx = x;
-                        my = y;
-                        mz = layer;
-                        break;
-                    case 5:  // -Z
-                        mx = x;
-                        my = y;
-                        mz = depth - 1 - layer;
-                        break;
-                    default:
-                        break;
-                }
-
+        for (int u = 0; u < axes.width; u++) {
+            for (int v = 0; v < axes.height; v++) {
+                auto [mx, my, mz] = axes.to_model_coords(u, v, layer);
                 auto voxel = model->get_voxel(mx, my, mz);
                 if (!voxel.is_empty() && is_face_visible(model, mx, my, mz, face_direction)) {
-                    mask[x][y] = voxel.value;
+                    mask[u][v].col = voxel.value;
+                    mask[u][v].ao[0] = compute_vertex_ao(model, mx, my, mz, face_direction, -1, -1);
+                    mask[u][v].ao[1] = compute_vertex_ao(model, mx, my, mz, face_direction,  1, -1);
+                    mask[u][v].ao[2] = compute_vertex_ao(model, mx, my, mz, face_direction,  1,  1);
+                    mask[u][v].ao[3] = compute_vertex_ao(model, mx, my, mz, face_direction, -1,  1);
                 }
             }
         }
 
-        std::vector visited(width, std::vector(height, false));
-        for (int x = 0; x < width; x++) {
-            for (int y = 0; y < height; y++) {
-                if (!visited[x][y] && mask[x][y] != colors::empty) {
-                    color color = mask[x][y];
+        std::vector visited(axes.width, std::vector(axes.height, false));
+        for (int u = 0; u < axes.width; u++) {
+            for (int v = 0; v < axes.height; v++) {
+                if (visited[u][v] || mask[u][v].is_empty()) continue;
 
-                    int w = 1;
+                auto& origin = mask[u][v];
 
-                    while (x + w < width && mask[x + w][y] == color && !visited[x + w][y]) {
-                        w++;
-                    }
+                int w = 1;
+                while (u + w < axes.width && !visited[u + w][v]
+                    && mask[u + w][v].col == origin.col
+                    && mask[u + w - 1][v].ao[1] == mask[u + w][v].ao[0]
+                    && mask[u + w - 1][v].ao[2] == mask[u + w][v].ao[3]) {
+                    w++;
+                }
 
-                    int h = 1;
-
-                    bool can_extend = true;
-                    while (can_extend && y + h < height) {
-                        for (int i = 0; i < w; i++) {
-                            if (mask[x + i][y + h] != color || visited[x + i][y + h]) {
+                int h = 1;
+                bool can_extend = true;
+                while (can_extend && v + h < axes.height) {
+                    for (int i = 0; i < w; i++) {
+                        auto& cell = mask[u + i][v + h];
+                        auto& below = mask[u + i][v + h - 1];
+                        if (cell.col != origin.col || visited[u + i][v + h]
+                            || below.ao[3] != cell.ao[0]
+                            || below.ao[2] != cell.ao[1]) {
+                            can_extend = false;
+                            break;
+                        }
+                        if (i > 0) {
+                            auto& left = mask[u + i - 1][v + h];
+                            if (left.ao[1] != cell.ao[0] || left.ao[2] != cell.ao[3]) {
                                 can_extend = false;
                                 break;
                             }
                         }
-                        if (can_extend)
-                            h++;
                     }
-
-                    for (int i = 0; i < w; i++) {
-                        for (int j = 0; j < h; j++) {
-                            visited[x + i][y + j] = true;
-                        }
-                    }
-
-                    vec3f min_pos, max_pos;
-                    switch (face_direction) {
-                        case 0:  // +X
-                            min_pos = vec3f(layer, y, x);
-                            max_pos = vec3f(layer + 1, y + h, x + w);
-                            break;
-                        case 1:  // -X
-                            min_pos = vec3f(depth - 1 - layer, y, x);
-                            max_pos = vec3f(depth - layer, y + h, x + w);
-                            break;
-                        case 2:  // +Y
-                            min_pos = vec3f(x, layer, y);
-                            max_pos = vec3f(x + w, layer + 1, y + h);
-                            break;
-                        case 3:  // -Y
-                            min_pos = vec3f(x, depth - 1 - layer, y);
-                            max_pos = vec3f(x + w, depth - layer, y + h);
-                            break;
-                        case 4:  // +Z
-                            min_pos = vec3f(x, y, layer);
-                            max_pos = vec3f(x + w, y + h, layer + 1);
-                            break;
-                        case 5:  // -Z
-                            min_pos = vec3f(x, y, depth - 1 - layer);
-                            max_pos = vec3f(x + w, y + h, depth - layer);
-                            break;
-                        default:;
-                    }
-
-                    add_quad(vertices, indices, min_pos, max_pos, face_direction, color);
+                    if (can_extend) h++;
                 }
+
+                for (int i = 0; i < w; i++)
+                    for (int j = 0; j < h; j++)
+                        visited[u + i][v + j] = true;
+
+                auto [min_pos, max_pos] = axes.to_world_min_max(u, v, w, h, layer);
+
+                std::array<float32, 4> canonical_ao = {
+                    mask[u][v].ao[0],
+                    mask[u + w - 1][v].ao[1],
+                    mask[u + w - 1][v + h - 1].ao[2],
+                    mask[u][v + h - 1].ao[3],
+                };
+
+                std::array<float32, 4> winding_ao;
+                for (int i = 0; i < 4; i++) {
+                    winding_ao[i] = canonical_ao[canonical_to_winding[face_direction][i]];
+                }
+
+                add_quad(vertices, indices, face_direction, min_pos, max_pos, origin.col, winding_ao);
             }
         }
     }
@@ -331,94 +398,62 @@ inline void greedy_mesh_generator::generate_face_quads(
 inline void greedy_mesh_generator::add_quad(
     std::vector<vertex>& vertices,
     std::vector<uint32>& indices,
+    int face_direction,
     const vec3f& min_pos,
     const vec3f& max_pos,
-    int face_direction,
-    color color
+    color color,
+    const std::array<float32, 4>& ao
 ) {
     static const vec3f face_normals[6] = {
-        vec3f(1, 0, 0),   // +X
-        vec3f(-1, 0, 0),  // -X
-        vec3f(0, 1, 0),   // +Y
-        vec3f(0, -1, 0),  // -Y
-        vec3f(0, 0, 1),   // +Z
-        vec3f(0, 0, -1)   // -Z
+        vec3f(1, 0, 0),  vec3f(-1, 0, 0),
+        vec3f(0, 1, 0),  vec3f(0, -1, 0),
+        vec3f(0, 0, 1),  vec3f(0, 0, -1)
     };
 
-    static const int vertex_indices[6][4] = {
-        // +X:
-        // (max.x, min.y, min.z),
-        // (max.x, min.y, max.z),
-        // (max.x, max.y, max.z),
-        // (max.x, max.y, min.z)
-        {1, 5, 6, 2},
-        // -X:
-        // (min.x, min.y, min.z),
-        // (min.x, max.y, min.z),
-        // (min.x, max.y, max.z),
-        // (min.x, min.y, max.z)
-        {0, 3, 7, 4},
-        // +Y:
-        // (min.x, max.y, min.z),
-        // (max.x, max.y, min.z),
-        // (max.x, max.y, max.z),
-        // (min.x, max.y, max.z)
-        {3, 2, 6, 7},
-        // -Y:
-        // (min.x, min.y, min.z),
-        // (min.x, min.y, max.z),
-        // (max.x, min.y, max.z),
-        // (max.x, min.y, min.z)
-        {0, 4, 5, 1},
-        // +Z:
-        // (min.x, min.y, max.z),
-        // (min.x, max.y, max.z),
-        // (max.x, max.y, max.z),
-        // (max.x, min.y, max.z)
-        {4, 7, 6, 5},
-        // -Z:
-        // (max.x, min.y, min.z),
-        // (max.x, max.y, min.z),
-        // (min.x, max.y, min.z),
-        // (min.x, min.y, min.z)
-        {1, 2, 3, 0}
-    };
-
-    vec3f cube_vertices[8] = {
-        vec3f(min_pos.x, min_pos.y, min_pos.z),  // 0: (min, min, min)
-        vec3f(max_pos.x, min_pos.y, min_pos.z),  // 1: (max, min, min)
-        vec3f(max_pos.x, max_pos.y, min_pos.z),  // 2: (max, max, min)
-        vec3f(min_pos.x, max_pos.y, min_pos.z),  // 3: (min, max, min)
-        vec3f(min_pos.x, min_pos.y, max_pos.z),  // 4: (min, min, max)
-        vec3f(max_pos.x, min_pos.y, max_pos.z),  // 5: (max, min, max)
-        vec3f(max_pos.x, max_pos.y, max_pos.z),  // 6: (max, max, max)
-        vec3f(min_pos.x, max_pos.y, max_pos.z)   // 7: (min, max, max)
+    // 0 = use min, 1 = use max for each component (x, y, z)
+    static constexpr int face_verts[6][4][3] = {
+        {{1, 0, 0}, {1, 0, 1}, {1, 1, 1}, {1, 1, 0}},  // +X
+        {{0, 0, 0}, {0, 1, 0}, {0, 1, 1}, {0, 0, 1}},  // -X
+        {{0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {0, 1, 1}},  // +Y
+        {{0, 0, 0}, {0, 0, 1}, {1, 0, 1}, {1, 0, 0}},  // -Y
+        {{0, 0, 1}, {0, 1, 1}, {1, 1, 1}, {1, 0, 1}},  // +Z
+        {{1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 0}},  // -Z
     };
 
     auto base_vertex = static_cast<uint32>(vertices.size());
-    vec3f normal     = face_normals[face_direction];
+    vec3f normal = face_normals[face_direction];
 
     for (int i = 0; i < 4; i++) {
-        int vertex_idx = vertex_indices[face_direction][i];
-        vertices.emplace_back(cube_vertices[vertex_idx], normal, color.value);
+        vec3f pos{
+            face_verts[face_direction][i][0] ? max_pos.x : min_pos.x,
+            face_verts[face_direction][i][1] ? max_pos.y : min_pos.y,
+            face_verts[face_direction][i][2] ? max_pos.z : min_pos.z,
+        };
+        vertices.emplace_back(pos, normal, color.value, ao[i]);
     }
 
-    indices.push_back(base_vertex + 0);
-    indices.push_back(base_vertex + 1);
-    indices.push_back(base_vertex + 2);
-    indices.push_back(base_vertex + 2);
-    indices.push_back(base_vertex + 3);
-    indices.push_back(base_vertex + 0);
+    if (ao[0] + ao[2] > ao[1] + ao[3]) {
+        indices.push_back(base_vertex + 0);
+        indices.push_back(base_vertex + 1);
+        indices.push_back(base_vertex + 2);
+        indices.push_back(base_vertex + 2);
+        indices.push_back(base_vertex + 3);
+        indices.push_back(base_vertex + 0);
+    } else {
+        indices.push_back(base_vertex + 1);
+        indices.push_back(base_vertex + 2);
+        indices.push_back(base_vertex + 3);
+        indices.push_back(base_vertex + 3);
+        indices.push_back(base_vertex + 0);
+        indices.push_back(base_vertex + 1);
+    }
 }
 
-inline bool greedy_mesh_generator::is_face_visible(
+inline auto greedy_mesh_generator::is_face_visible(
     const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
-) {
-    if (!model) {
-        return false;
-    }
+) -> bool {
+    if (!model) return false;
 
-    // Смещения для проверки соседних вокселей
     static constexpr int dx[6] = {1, -1, 0, 0, 0, 0};
     static constexpr int dy[6] = {0, 0, 1, -1, 0, 0};
     static constexpr int dz[6] = {0, 0, 0, 0, 1, -1};
@@ -427,8 +462,8 @@ inline bool greedy_mesh_generator::is_face_visible(
     int ny = y + dy[face_direction];
     int nz = z + dz[face_direction];
 
-    if (nx < 0 || nx >= model->width() || ny < 0 || ny >= model->height() || nz < 0 ||
-        nz >= model->depth()) {
+    if (nx < 0 || nx >= model->width() || ny < 0 || ny >= model->height() ||
+        nz < 0 || nz >= model->depth()) {
         return true;
     }
 

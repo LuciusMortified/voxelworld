@@ -4,6 +4,7 @@ layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
 layout(location = 2) in uint inColor;
 layout(location = 3) in uint inInstanceIndex;
+layout(location = 4) in float inAo;
 
 // Uniform buffer object для shadow pass (set 0, binding 0)
 layout(set = 0, binding = 0) uniform ShadowUniformBufferObject {

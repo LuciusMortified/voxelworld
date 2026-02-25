@@ -1,10 +1,10 @@
 #version 460 core
 
-// Входные данные от вертексов
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
 layout(location = 2) in uint inColor;
 layout(location = 3) in uint inInstanceIndex;
+layout(location = 4) in float inAo;
 
 // Структура directional light данных (соответствует directional_light_data в C++)
 struct DirectionalLightData {
@@ -31,10 +31,10 @@ layout(set = 1, binding = 0, std430) readonly buffer ModelMatrices {
     mat4 models[];
 } modelMatrices;
 
-// Выходные данные для fragment shader
 layout(location = 0) out vec3 fragPos;
 layout(location = 1) out vec3 fragNormal;
 layout(location = 2) out vec3 fragColor;
+layout(location = 3) out float fragAo;
 layout(location = 4) out float viewDepth;
 
 vec3 unpackColor(uint packedColor) {
@@ -54,10 +54,10 @@ void main() {
     // Трансформация нормали
     fragNormal = normalize(mat3(transpose(inverse(model))) * inNormal);
     
-    // Распаковка цвета
     fragColor = unpackColor(inColor);
+    fragAo = inAo;
 
-    // Вычисление глубины вида
+
     viewDepth = -(ubo.view * worldPos).z;
     
     // Финальная позиция вершины

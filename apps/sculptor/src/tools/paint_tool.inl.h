@@ -41,7 +41,7 @@ inline void paint_tool::render(
 
     auto voxel_world_pos =  //
         world.get_component<gfx::transform_component>(ent).get_world_matrix() *
-        math::translation_matrix(voxel_local_pos) *    //
+        math::translation_matrix(voxel_local_pos) *       //
         math::scale_matrix(vec3f{1.01f, 1.01f, 1.01f}) *  //
         math::translation_matrix(vec3f{-0.005f, -0.005f, -0.005f});
 
@@ -72,24 +72,29 @@ inline void paint_tool::on_mouse_press(
             return;
         }
 
-        auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
-
+        const auto ent           = state_->scene.name_to_entity[state_->scene.selected_name];
         auto& world        = engine_->get_world();
-        bool is_renderable =  //
+        const bool is_renderable =  //
             world.has_component<gfx::transform_component>(ent) &&
             world.has_component<gfx::model_component>(ent);
         if (!is_renderable) {
             return;
         }
 
+        const auto& model_comp = world.get_component<gfx::model_component>(ent);
+        const bool has_model   = model_comp.has_model();
+        const bool is_same_color =
+            has_model && model_comp.get_voxel(hovered_voxel_).value == state_->tool.selected_color;
+        if (is_same_color) {
+            return;
+        }
+
         paint_voxel_params params;
-        params.name     = state_->scene.selected_name;
-        params.position = hovered_voxel_;
+        params.name      = state_->scene.selected_name;
+        params.position  = hovered_voxel_;
         params.new_color = state_->tool.selected_color;
 
-        auto op = std::make_unique<paint_voxel_operation>(
-            *engine_, *state_, params
-        );
+        auto op = std::make_unique<paint_voxel_operation>(*engine_, *state_, params);
         op_manager_->execute(std::move(op));
     }
 }

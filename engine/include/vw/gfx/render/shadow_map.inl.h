@@ -253,8 +253,8 @@ inline void shadow_map::update(
     for (uint32 i = 0; i < cascade_count; ++i) {
         float p            = static_cast<float>(i + 1) / static_cast<float>(cascade_count);
         float log          = cam_near * std::pow(shadow_far / cam_near, p);
-        float uniform      = cam_near + shadow_dist * p;
-        float d            = split_lambda_ * (log - uniform) + uniform;
+        float uniform      = cam_near + (shadow_dist * p);
+        float d            = (split_lambda_ * (log - uniform)) + uniform;
         cascade_splits_[i] = d - cam_near;
     }
 
@@ -368,16 +368,16 @@ inline mat4f shadow_map::get_light_space_matrix(
     return light_space_matrices_[cascade_index];
 }
 
-inline const std::array<mat4f, shadow_map::cascade_count>& shadow_map::
-    get_light_space_matrices() const {
+inline auto shadow_map::
+    get_light_space_matrices() const -> const std::array<mat4f, cascade_count>& {
     return light_space_matrices_;
 }
 
-inline const std::array<float, shadow_map::cascade_count>& shadow_map::get_cascade_splits() const {
+inline auto shadow_map::get_cascade_splits() const -> const std::array<float, cascade_count>& {
     return cascade_splits_;
 }
 
-inline const std::array<frustum, shadow_map::cascade_count>& shadow_map::get_cascade_frustums() const {
+inline auto shadow_map::get_cascade_frustums() const -> const std::array<frustum, cascade_count>& {
     return cascade_frustums_;
 }
 

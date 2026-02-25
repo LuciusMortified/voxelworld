@@ -5,6 +5,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include <array>
 #include <memory>
 #include <vector>
 
@@ -18,12 +19,11 @@ struct vertex {
     vec3f position;
     vec3f normal;
     uint32 color;
+    float32 ao;
 
-    vertex() : color(0) {}
-    vertex(
-        const vec3f& pos, const vec3f& norm, uint32 col
-    )
-        : position(pos), normal(norm), color(col) {}
+    vertex() : color(0), ao(1.0f) {}
+    vertex(const vec3f& pos, const vec3f& norm, uint32 col, float32 ao_ = 1.0f)
+        : position(pos), normal(norm), color(col), ao(ao_) {}
 
     [[nodiscard]] static auto get_binding_descriptions()
         -> std::vector<VkVertexInputBindingDescription>;
@@ -40,27 +40,28 @@ struct mesh {
 class simple_mesh_generator {
 public:
     [[nodiscard]]
-    static mesh generate_mesh_data(std::shared_ptr<model> model);
+    static auto generate_mesh_data(const std::shared_ptr<model>& model) -> mesh;
 
 private:
     static void add_cube_face(
         std::vector<vertex>& vertices,
         std::vector<uint32>& indices,
-        const vec3f& position,
+        const std::shared_ptr<model>& model,
+        int x, int y, int z,
         int face_direction,
         color color
     );
 
     [[nodiscard]]
-    static bool is_face_visible(
+    static auto is_face_visible(
         const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
-    );
+    ) -> bool;
 };
 
 class greedy_mesh_generator {
 public:
     [[nodiscard]]
-    static mesh generate_mesh_data(std::shared_ptr<model> model);
+    static auto generate_mesh_data(const std::shared_ptr<model>& model) -> mesh;
 
 private:
     static void generate_face_quads(
@@ -69,19 +70,21 @@ private:
         const std::shared_ptr<model>& model,
         int face_direction
     );
+
     static void add_quad(
         std::vector<vertex>& vertices,
         std::vector<uint32>& indices,
+        int face_direction,
         const vec3f& min_pos,
         const vec3f& max_pos,
-        int face_direction,
-        color color
+        color color,
+        const std::array<float32, 4>& ao
     );
 
     [[nodiscard]]
-    static bool is_face_visible(
+    static auto is_face_visible(
         const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
-    );
+    ) -> bool;
 };
 }  // namespace vw::gfx
 
