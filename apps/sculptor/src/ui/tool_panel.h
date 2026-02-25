@@ -12,12 +12,12 @@ class tool_panel final {
 public:
     explicit tool_panel(app_state& st);
 
-    void render(float delta_time);
+    void render(float delta_time) const;
 
 private:
     app_state* state_;
 
-    void render_tool_button(tools tool, std::string_view label, std::string_view shortcut);
+    void render_tool_button(tools tool, std::string_view label, std::string_view shortcut) const;
 };
 
 }  // namespace vw::sculptor

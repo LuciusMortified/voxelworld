@@ -110,7 +110,8 @@ void renderer<C>::begin_frame() {
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
         recreate_swapchain();
         return;
-    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+    }
+    if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
         throw std::runtime_error("Failed to acquire swap chain image!");
     }
 
@@ -1477,8 +1478,8 @@ void renderer<WC>::render_world(
         );
 
         // Indirect draw call
-        VkBuffer indirect_buffer = buffer->get_indirect_draw_buffer();
-        uint32_t draw_count      = buffer->get_draw_command_count();
+        const VkBuffer indirect_buffer = buffer->get_indirect_draw_buffer();
+        const uint32_t draw_count      = buffer->get_draw_command_count();
         if (draw_count > 0) {
             vkCmdDrawIndexedIndirect(
                 command_buffers_[current_image_index_],

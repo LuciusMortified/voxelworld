@@ -100,11 +100,13 @@ public:
     void allocate(
         entity e, model_identity model_id, const mesh& mesh_data, const mat4f& transform_matrix
     );
+    void allocate_mesh(model_identity model_id, const mesh& mesh_data);
     void write_mesh(model_identity model_id, const mesh& mesh_data);
     void write_transform(entity ent, const mat4f& transform_matrix);
     void free(entity ent);
 
-    [[nodiscard]] VkBuffer get_vertex_buffer() const;
+    [[nodiscard]] auto get_entity_allocation(entity ent) -> const entity_allocation&;
+    [[nodiscard]] auto get_vertex_buffer() const -> VkBuffer;
     [[nodiscard]] VkBuffer get_index_buffer() const;
     [[nodiscard]] VkBuffer get_instance_index_buffer() const;
     [[nodiscard]] VkBuffer get_indirect_draw_buffer() const;

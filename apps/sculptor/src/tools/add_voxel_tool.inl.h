@@ -2,6 +2,7 @@
 
 #ifndef VW_SCULPTOR_ADD_VOXEL_TOOL_INL_H
 #define VW_SCULPTOR_ADD_VOXEL_TOOL_INL_H
+
 #include "operations/add_voxel_operation.h"
 #include "operations/expand_model_operation.h"
 
@@ -80,10 +81,10 @@ inline void add_voxel_tool::on_mouse_press(
             return;
         }
 
-        auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
+        const auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
 
         auto& world        = engine_->get_world();
-        bool is_renderable =  //
+        const bool is_renderable =  //
             world.has_component<gfx::transform_component>(ent) &&
             world.has_component<gfx::model_component>(ent);
         if (!is_renderable) {

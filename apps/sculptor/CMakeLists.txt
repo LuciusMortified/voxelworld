@@ -51,6 +51,8 @@ add_executable(${PROJECT_NAME}
         src/ui/open_file_modal.inl.h
         src/operations/expand_model_operation.h
         src/operations/expand_model_operation.inl.h
+        src/tools/color_picker_tool.h
+        src/tools/color_picker_tool.inl.h
 )
 
 target_link_libraries(${PROJECT_NAME} vwengine)

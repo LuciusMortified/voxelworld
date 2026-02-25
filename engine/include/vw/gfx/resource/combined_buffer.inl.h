@@ -53,7 +53,6 @@ inline combined_buffer::combined_buffer(
             VK_BUFFER_USAGE_TRANSFER_DST_BIT    //
     );
 
-
     // Выделяем descriptor set из pool
     VkDescriptorSetAllocateInfo alloc_info{};
     alloc_info.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -87,85 +86,15 @@ inline combined_buffer::combined_buffer(
 inline void combined_buffer::allocate(
     entity e, model_identity model_id, const mesh& mesh_data, const mat4f& transform_matrix
 ) {
-    auto vertex_count = mesh_data.vertices.size();
-    auto index_count  = mesh_data.indices.size();
-
-    if (mesh_allocations_.contains(model_id.index)) {
-        auto& mesh_alloc = mesh_allocations_[model_id.index];
-        if (mesh_alloc.generation != model_id.generation) {
-            mesh_alloc.vertex_count = vertex_count;
-            mesh_alloc.index_count  = index_count;
-            mesh_alloc.generation   = model_id.generation;
-
-            vertex_buffer_->copy_from_vector(
-                mesh_data.vertices, mesh_alloc.vertex_offset * sizeof(vertex)
-            );
-            index_buffer_->copy_from_vector(
-                mesh_data.indices, mesh_alloc.index_offset * sizeof(uint32_t)
-            );
-        }
+    if (!mesh_allocations_.contains(model_id.index)) {
+        allocate_mesh(model_id, mesh_data);
     } else {
-        uint32_t vertex_offset = vertex_used_;
-        uint32_t index_offset  = index_used_;
-
-        if (!free_slots_.empty()) {
-            auto& slot    = free_slots_.back();
-            vertex_offset = slot.vertex_offset;
-            index_offset  = slot.index_offset;
-            free_slots_.pop_back();
-        } else {
-            vertex_used_ += chunk_size_.vertex_count;
-            index_used_ += chunk_size_.index_count;
-        }
-
-        bool vertex_out_of_bounds = vertex_used_ > mesh_capacity_ * chunk_size_.vertex_count;
-        bool index_out_of_bounds  = index_used_ > mesh_capacity_ * chunk_size_.index_count;
-        if (vertex_out_of_bounds || index_out_of_bounds) {
-            expand_mesh_buffers_();
-        }
-
-        vertex_buffer_->copy_from_vector(mesh_data.vertices, vertex_offset * sizeof(vertex));
-        auto vertex_free_space_offset =
-            (vertex_offset + mesh_data.vertices.size()) * sizeof(vertex);
-        auto vertex_free_space_size =
-            (chunk_size_.vertex_count - mesh_data.vertices.size()) * sizeof(vertex);
-        if (vertex_free_space_size > 0) {
-            void* vertex_data = vertex_buffer_->map();
-            std::memset(
-                static_cast<std::byte*>(vertex_data) + vertex_free_space_offset,
-                0,
-                vertex_free_space_size
-            );
-        }
-
-        index_buffer_->copy_from_vector(mesh_data.indices, index_offset * sizeof(uint32));
-        auto index_free_space_offset =  //
-            (index_offset + mesh_data.indices.size()) * sizeof(uint32);
-        auto index_free_space_size =
-            (chunk_size_.index_count - mesh_data.indices.size()) * sizeof(uint32);
-        if (index_free_space_size > 0) {
-            void* index_data = index_buffer_->map();
-            std::memset(
-                static_cast<std::byte*>(index_data) + index_free_space_offset,
-                0,
-                index_free_space_size
-            );
-        }
-
-        mesh_allocation new_mesh_alloc{};
-        new_mesh_alloc.vertex_offset = vertex_offset;
-        new_mesh_alloc.index_offset  = index_offset;
-        new_mesh_alloc.vertex_count  = vertex_count;
-        new_mesh_alloc.index_count   = index_count;
-        new_mesh_alloc.generation    = model_id.generation;
-        new_mesh_alloc.ref_count     = 0;  // Будет увеличен ниже
-
-        mesh_allocations_[model_id.index] = new_mesh_alloc;
+        write_mesh(model_id, mesh_data);
     }
 
     auto& mesh_alloc = mesh_allocations_[model_id.index];
 
-    uint32 instance_index = entity_allocations_.size();
+    const uint32 instance_index = entity_allocations_.size();
     if (instance_index >= instance_capacity_) {
         expand_instance_buffers_();
     }
@@ -195,56 +124,108 @@ inline void combined_buffer::allocate(
     mesh_alloc.ref_count++;
 }
 
+inline void combined_buffer::allocate_mesh(
+    model_identity model_id, const mesh& mesh_data
+) {
+    const auto vertex_count = mesh_data.vertices.size();
+    const auto index_count  = mesh_data.indices.size();
+    uint32_t vertex_offset  = vertex_used_;
+    uint32_t index_offset   = index_used_;
+
+    if (!free_slots_.empty()) {
+        const auto& slot = free_slots_.back();
+        vertex_offset    = slot.vertex_offset;
+        index_offset     = slot.index_offset;
+        free_slots_.pop_back();
+    } else {
+        vertex_used_ += chunk_size_.vertex_count;
+        index_used_ += chunk_size_.index_count;
+    }
+
+    const bool vertex_out_of_bounds = vertex_used_ > mesh_capacity_ * chunk_size_.vertex_count;
+    const bool index_out_of_bounds  = index_used_ > mesh_capacity_ * chunk_size_.index_count;
+    if (vertex_out_of_bounds || index_out_of_bounds) {
+        expand_mesh_buffers_();
+    }
+
+    vertex_buffer_->copy_from_vector(mesh_data.vertices, vertex_offset * sizeof(vertex));
+    const auto vertex_free_space_offset = (vertex_offset + vertex_count) * sizeof(vertex);
+    const auto vertex_free_space_size = (chunk_size_.vertex_count - vertex_count) * sizeof(vertex);
+    if (vertex_free_space_size > 0) {
+        void* vertex_data = vertex_buffer_->map();
+        std::memset(
+            static_cast<std::byte*>(vertex_data) + vertex_free_space_offset,
+            0,
+            vertex_free_space_size
+        );
+    }
+
+    index_buffer_->copy_from_vector(mesh_data.indices, index_offset * sizeof(uint32));
+    const auto index_free_space_offset =  //
+        (index_offset + index_count) * sizeof(uint32);
+    const auto index_free_space_size = (chunk_size_.index_count - index_count) * sizeof(uint32);
+    if (index_free_space_size > 0) {
+        void* index_data = index_buffer_->map();
+        std::memset(
+            static_cast<std::byte*>(index_data) + index_free_space_offset, 0, index_free_space_size
+        );
+    }
+
+    mesh_allocation new_mesh_alloc{};
+    new_mesh_alloc.vertex_offset = vertex_offset;
+    new_mesh_alloc.index_offset  = index_offset;
+    new_mesh_alloc.vertex_count  = vertex_count;
+    new_mesh_alloc.index_count   = index_count;
+    new_mesh_alloc.generation    = model_id.generation;
+    new_mesh_alloc.ref_count     = 0;  // Счетчик ссылок будет увеличен в allocate()
+
+    mesh_allocations_[model_id.index] = new_mesh_alloc;
+}
+
 inline void combined_buffer::write_mesh(
     model_identity model_id, const mesh& mesh_data
 ) {
     auto& mesh_alloc = mesh_allocations_[model_id.index];
-    if (mesh_alloc.generation != model_id.generation) {
-        vertex_buffer_->copy_from_vector(
-            mesh_data.vertices, mesh_alloc.vertex_offset * sizeof(vertex)
-        );
-        auto vertex_free_space_offset =
-            (mesh_alloc.vertex_offset + mesh_data.vertices.size()) * sizeof(vertex);
-        auto vertex_free_space_size =
-            (chunk_size_.vertex_count - mesh_data.vertices.size()) * sizeof(vertex);
-        if (vertex_free_space_size > 0) {
-            void* vertex_data = vertex_buffer_->map();
-            std::memset(
-                static_cast<std::byte*>(vertex_data) + vertex_free_space_offset,
-                0,
-                vertex_free_space_size
-            );
-        }
-
-        index_buffer_->copy_from_vector(
-            mesh_data.indices, mesh_alloc.index_offset * sizeof(uint32_t)
-        );
-        auto index_free_space_offset =
-            (mesh_alloc.index_offset + mesh_data.indices.size()) * sizeof(uint32);
-        auto index_free_space_size =
-            (chunk_size_.index_count - mesh_data.indices.size()) * sizeof(uint32);
-        if (index_free_space_size > 0) {
-            void* index_data = index_buffer_->map();
-            std::memset(
-                static_cast<std::byte*>(index_data) + index_free_space_offset,
-                0,
-                index_free_space_size
-            );
-        }
-
-        mesh_alloc.vertex_count = mesh_data.vertices.size();
-        mesh_alloc.index_count  = mesh_data.indices.size();
-        mesh_alloc.generation   = model_id.generation;
+    if (mesh_alloc.generation == model_id.generation) {
+        return;
     }
+
+    const auto vertex_count = mesh_data.vertices.size();
+    const auto index_count  = mesh_data.indices.size();
+
+    vertex_buffer_->copy_from_vector(mesh_data.vertices, mesh_alloc.vertex_offset * sizeof(vertex));
+    const auto vertex_free_space_offset =
+        (mesh_alloc.vertex_offset + vertex_count) * sizeof(vertex);
+    const auto vertex_free_space_size = (chunk_size_.vertex_count - vertex_count) * sizeof(vertex);
+    if (vertex_free_space_size > 0) {
+        void* vertex_data = vertex_buffer_->map();
+        std::memset(
+            static_cast<std::byte*>(vertex_data) + vertex_free_space_offset,
+            0,
+            vertex_free_space_size
+        );
+    }
+
+    index_buffer_->copy_from_vector(mesh_data.indices, mesh_alloc.index_offset * sizeof(uint32_t));
+    const auto index_free_space_offset = (mesh_alloc.index_offset + index_count) * sizeof(uint32);
+    const auto index_free_space_size   = (chunk_size_.index_count - index_count) * sizeof(uint32);
+    if (index_free_space_size > 0) {
+        void* index_data = index_buffer_->map();
+        std::memset(
+            static_cast<std::byte*>(index_data) + index_free_space_offset, 0, index_free_space_size
+        );
+    }
+
+    mesh_alloc.vertex_count = vertex_count;
+    mesh_alloc.index_count  = index_count;
+    mesh_alloc.generation   = model_id.generation;
 }
 
 inline void combined_buffer::write_transform(
     entity ent, const mat4f& transform_matrix
 ) {
-    auto& ent_alloc = entity_allocations_[ent];
-    model_matrix_buffer_->copy_from_struct(
-        transform_matrix, ent_alloc.instance_index * sizeof(mat4f)
-    );
+    auto& [instance_index, model_index] = entity_allocations_[ent];
+    model_matrix_buffer_->copy_from_struct(transform_matrix, instance_index * sizeof(mat4f));
 }
 
 inline void combined_buffer::free(
@@ -294,6 +275,11 @@ inline void combined_buffer::free(
     }
 
     entity_allocations_.erase(ent);
+}
+inline auto combined_buffer::get_entity_allocation(
+    entity ent
+) -> const entity_allocation& {
+    return entity_allocations_[ent];
 }
 
 inline VkBuffer combined_buffer::get_vertex_buffer() const {

@@ -20,18 +20,13 @@
 
 namespace vw::gfx {
 
-enum class render_mode { lit, wireframe };
+enum class render_mode : uint8 { lit, wireframe };
 
 // Настройки directional light (для CPU)
 struct directional_light_settings {
-    vec3f direction;
-    vec3f color;
-    float32 intensity;
-
-    directional_light_settings()
-        : direction(math::normalize(vec3f(0.0f, -1.0f, 0.0f)))
-        , color(vec3f{1.f, 1.f, 1.f})
-        , intensity(0.5f) {}
+    vec3f direction{0.0f, -1.0f, 0.0f};
+    vec3f color{1.f, 1.f, 1.f};
+    float32 intensity{1.0f};
 };
 
 // Для directional light (в UBO)
