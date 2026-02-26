@@ -3,6 +3,8 @@
 #ifndef VW_SCULPTOR_ENTITY_TREE_PANEL_H
 #define VW_SCULPTOR_ENTITY_TREE_PANEL_H
 
+#include <algorithm>
+
 #include "app/app_state.h"
 #include "create_entity_modal.h"
 #include "delete_entity_modal.h"
@@ -25,7 +27,9 @@ private:
     create_entity_modal creation_modal_;
     delete_entity_modal deletion_modal_;
 
-    void render_entity_node(const std::string& name);
+    void render_entity_node(
+        const std::string& name, const std::unordered_set<gfx::entity>& preview_entities
+    );
 };
 
 }  // namespace vw::sculptor

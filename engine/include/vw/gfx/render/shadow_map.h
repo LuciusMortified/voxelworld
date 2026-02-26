@@ -31,17 +31,17 @@ public:
 
     void update(const camera& camera, const vec3f& light_direction);
 
-    [[nodiscard]] mat4f get_light_space_matrix(uint32 cascade_index) const;
-    [[nodiscard]] const std::array<mat4f, cascade_count>& get_light_space_matrices() const;
-    [[nodiscard]] const std::array<float, cascade_count>& get_cascade_splits() const;
-    [[nodiscard]] const std::array<frustum, cascade_count>& get_cascade_frustums() const;
-    [[nodiscard]] VkImage get_image() const;
-    [[nodiscard]] VkImageView get_image_view(uint32 cascade_index) const;
-    [[nodiscard]] VkImageView get_array_image_view() const;
-    [[nodiscard]] VkSampler get_sampler() const;
-    [[nodiscard]] VkSampler get_debug_sampler() const;
-    [[nodiscard]] VkFramebuffer get_framebuffer(uint32 cascade_index) const;
-    [[nodiscard]] VkRenderPass get_render_pass() const;
+    [[nodiscard]] auto get_light_space_matrix(uint32 cascade_index) const -> mat4f;
+    [[nodiscard]] auto get_light_space_matrices() const -> const std::array<mat4f, cascade_count>&;
+    [[nodiscard]] auto get_cascade_splits() const -> const std::array<float, cascade_count>&;
+    [[nodiscard]] auto get_cascade_frustums() const -> const std::array<frustum, cascade_count>&;
+    [[nodiscard]] auto get_image() const -> VkImage;
+    [[nodiscard]] auto get_image_view(uint32 cascade_index) const -> VkImageView;
+    [[nodiscard]] auto get_array_image_view() const -> VkImageView;
+    [[nodiscard]] auto get_sampler() const -> VkSampler;
+    [[nodiscard]] auto get_debug_sampler() const -> VkSampler;
+    [[nodiscard]] auto get_framebuffer(uint32 cascade_index) const -> VkFramebuffer;
+    [[nodiscard]] auto get_render_pass() const -> VkRenderPass;
 
 private:
     void create_shadow_map_image();
@@ -61,12 +61,12 @@ private:
     std::array<VkFramebuffer, cascade_count> shadow_framebuffers_      = {};
     VkRenderPass shadow_render_pass_                                   = VK_NULL_HANDLE;
 
-    std::array<mat4f, cascade_count> light_space_matrices_  = {};
+    std::array<mat4f, cascade_count> light_space_matrices_ = {};
     std::array<frustum, cascade_count> cascade_frustums_   = {};
     std::array<float, cascade_count> cascade_splits_       = {};
 
-    float split_lambda_        = 0.9f;
-    float shadow_far_          = 500.f;
+    float split_lambda_ = 0.5f;
+    float shadow_far_   = 500.f;
 };
 
 }  // namespace vw::gfx

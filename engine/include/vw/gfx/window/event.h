@@ -131,9 +131,9 @@ struct event_sub {
 class event_dispatcher {
 public:
     template <event_type E, event_callback_type<E> F>
-    event_sub<E> sub(
+    auto sub(
         F&& callback
-    ) {
+    ) -> event_sub<E> {
         auto& callbacks     = get_callbacks<E>();
         event_sub<E> id     = {.value = next_id_++};
         callbacks[id.value] = std::forward<F>(callback);

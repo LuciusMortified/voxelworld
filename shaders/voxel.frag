@@ -3,6 +3,7 @@
 layout(location = 0) in vec3 fragPos;
 layout(location = 1) in vec3 fragNormal;
 layout(location = 2) in vec3 fragColor;
+layout(location = 3) in float fragAo;
 layout(location = 4) in float viewDepth;
 
 struct DirectionalLightData {
@@ -218,8 +219,7 @@ void main() {
     float hemisphereStrength = 0.15;
     vec3 hemisphereAmbient = calculateHemisphereAmbient(normal) * hemisphereStrength;
 
-    // Комбинируем ambient освещение
-    vec3 ambient = baseAmbient + hemisphereAmbient;
+    vec3 ambient = (baseAmbient + hemisphereAmbient) * fragAo;
 
     // Directional light с sun_factor
     vec3 directional = calculateDirectionalLight(normal, viewDir, shadow);
