@@ -34,7 +34,7 @@ struct ui_state {
     bool need_open_file_modal = false;
     bool need_save_as_modal   = false;
 
-    float bottom_panel_height   = 200.f;
+    float bottom_panel_height   = 400.f;
     bool show_timeline          = false;
     bool show_clip_manager      = false;
     bool show_sockets           = true;

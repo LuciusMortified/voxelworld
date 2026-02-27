@@ -9,8 +9,11 @@
 namespace vw::sculptor {
 
 inline timeline_panel::timeline_panel(
-    engine_type& eng, app_state& st, operation_manager& op_manager,
-    clip_service& clip_svc, keyframe_service& kf_svc
+    engine_type& eng,
+    app_state& st,
+    operation_manager& op_manager,
+    clip_service& clip_svc,
+    keyframe_service& kf_svc
 )
     : engine_(&eng)
     , state_(&st)
@@ -46,11 +49,11 @@ inline void timeline_panel::render(
     ImGui::SetNextWindowPos(pos, ImGuiCond_Always, ImVec2(0.0f, 1.0f));
     ImGui::SetNextWindowSize(size, ImGuiCond_Always);
 
-    ImGuiWindowFlags window_flags =         //
-        ImGuiWindowFlags_NoCollapse |       //
-        ImGuiWindowFlags_NoSavedSettings |  //
-        ImGuiWindowFlags_NoMove |           //
-        ImGuiWindowFlags_NoResize |         //
+    constexpr ImGuiWindowFlags window_flags =  //
+        ImGuiWindowFlags_NoCollapse |          //
+        ImGuiWindowFlags_NoSavedSettings |     //
+        ImGuiWindowFlags_NoMove |              //
+        ImGuiWindowFlags_NoResize |            //
         ImGuiWindowFlags_NoBringToFrontOnFocus;
 
     const auto title = std::format("Timeline - {}###Timeline", state_->anim.selected_clip_name);
@@ -60,7 +63,7 @@ inline void timeline_panel::render(
     if (!still_open && state_->ui.show_timeline) {
         state_->anim.selected_track_name.clear();
         state_->anim.selected_keyframe_id = gfx::invalid_keyframe_id;
-        state_->ui.show_timeline     = false;
+        state_->ui.show_timeline          = false;
     }
 
     const bool clip_changed = prev_clip_name_ != state_->anim.selected_clip_name;
@@ -74,7 +77,7 @@ inline void timeline_panel::render(
         const auto& player =
             engine_->get_world().get_component<gfx::animation_player_component>(root_ent);
         state_->anim.timeline_cursor = player.get_layer(layer_idx).time;
-        prev_cursor_time_       = state_->anim.timeline_cursor;
+        prev_cursor_time_            = state_->anim.timeline_cursor;
     } else if (clip_changed) {
         if (is_clip_on_layer()) {
             const auto root_ent  = state_->scene.name_to_entity[state_->scene.root_name];
@@ -95,12 +98,12 @@ inline void timeline_panel::render(
 
     if (state_->anim.need_step_forward) {
         state_->anim.need_step_forward = false;
-        const float step          = clip_duration * 0.01f;
-        state_->anim.timeline_cursor   = std::min(state_->anim.timeline_cursor + step, clip_duration);
+        const float step               = clip_duration * 0.01f;
+        state_->anim.timeline_cursor = std::min(state_->anim.timeline_cursor + step, clip_duration);
     }
     if (state_->anim.need_step_backward) {
         state_->anim.need_step_backward = false;
-        const float step           = clip_duration * 0.01f;
+        const float step                = clip_duration * 0.01f;
         state_->anim.timeline_cursor    = std::max(state_->anim.timeline_cursor - step, 0.f);
     }
 
@@ -138,8 +141,8 @@ inline void timeline_panel::render_toolbar(
         return;
     }
 
-    const bool can_add_track =
-        !state_->scene.selected_name.empty() && clip && !clip->has_track(state_->scene.selected_name);
+    const bool can_add_track = !state_->scene.selected_name.empty() && clip &&
+        !clip->has_track(state_->scene.selected_name);
     if (can_add_track) {
         if (ImGui::Button("Add Track")) {
             add_track_params params = {
@@ -155,7 +158,8 @@ inline void timeline_panel::render_toolbar(
         ImGui::SameLine();
     }
 
-    bool can_add_kf = !state_->anim.selected_track_name.empty() && !state_->anim.selected_clip_name.empty() &&
+    bool can_add_kf = !state_->anim.selected_track_name.empty() &&
+        !state_->anim.selected_clip_name.empty() &&
         clip->has_track(state_->anim.selected_track_name);
     if (can_add_kf) {
         if (ImGui::Button("Add Keyframe")) {
@@ -205,8 +209,8 @@ inline void timeline_panel::render_toolbar(
     }
     ImGui::PopItemWidth();
 
-    const bool is_root_valid =
-        !state_->scene.root_name.empty() && state_->scene.name_to_entity.contains(state_->scene.root_name);
+    const bool is_root_valid = !state_->scene.root_name.empty() &&
+        state_->scene.name_to_entity.contains(state_->scene.root_name);
     if ((speed_changed || loop_changed) && is_root_valid) {
         const auto root_ent  = state_->scene.name_to_entity[state_->scene.root_name];
         const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
@@ -422,7 +426,8 @@ inline auto timeline_panel::is_current_layer_playing() const -> bool {
 }
 
 inline auto timeline_panel::try_get_root_entity() const -> std::optional<gfx::entity> {
-    if (state_->scene.root_name.empty() || !state_->scene.name_to_entity.contains(state_->scene.root_name)) {
+    if (state_->scene.root_name.empty() ||
+        !state_->scene.name_to_entity.contains(state_->scene.root_name)) {
         return std::nullopt;
     }
     return state_->scene.name_to_entity[state_->scene.root_name];
@@ -469,8 +474,9 @@ inline void timeline_panel::handle_play(
         const bool has_prev_clip = player.has_layer(layer_idx) && player.get_layer(layer_idx).clip;
 
         if (layer_idx > 0 && cs.fade_in.duration > 0.f) {
-            layer.blend_to(clip, has_prev_clip && bt.duration > 0.f
-                ? std::optional{bt} : std::nullopt);
+            layer.blend_to(
+                clip, has_prev_clip && bt.duration > 0.f ? std::optional{bt} : std::nullopt
+            );
             layer.play(cs.fade_in);
         } else {
             layer.blend_to(clip, bt.duration > 0.f ? std::optional{bt} : std::nullopt);
@@ -756,7 +762,7 @@ inline void timeline_panel::render_keyframe_markers(
                         state_->anim.selected_track_name  = track_name;
                         state_->anim.selected_property    = prop;
                         state_->anim.selected_keyframe_id = kf.id();
-                        keyframe_clicked_            = true;
+                        keyframe_clicked_                 = true;
                     }
 
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Right)) {
@@ -827,15 +833,13 @@ inline void timeline_panel::render_playhead(
         if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) ||
             ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
             if (!ImGui::IsAnyItemActive()) {
-                float local_x           = mouse.x - track_area_x + scroll_offset;
-                float new_time          = (local_x / scale) * clip_duration;
+                float local_x                = mouse.x - track_area_x + scroll_offset;
+                float new_time               = (local_x / scale) * clip_duration;
                 state_->anim.timeline_cursor = std::clamp(new_time, 0.f, clip_duration);
             }
         }
     }
 }
-
-
 
 inline auto timeline_panel::is_clip_on_layer() const -> bool {
     auto root = try_get_root_entity();

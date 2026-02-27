@@ -166,6 +166,29 @@ void animation_system<Cs...>::process_layer(
         return;
     }
 
+    if (layer.blend_transition.duration > 0.0f &&
+        layer.blend_elapsed < layer.blend_transition.duration) {
+        layer.blend_elapsed += delta_time;
+
+        if (layer.blend_prev_clip) {
+            layer.blend_prev_time +=
+                delta_time * layer.blend_prev_playback_speed * layer.blend_prev_direction;
+            float32 prev_duration = layer.blend_prev_clip->get_duration();
+            if (layer.blend_prev_time > prev_duration) {
+                layer.blend_prev_time = prev_duration;
+            } else if (layer.blend_prev_time < 0.0f) {
+                layer.blend_prev_time = 0.0f;
+            }
+        }
+
+        if (layer.blend_elapsed >= layer.blend_transition.duration) {
+            layer.blend_prev_clip  = nullptr;
+            layer.blend_elapsed    = 0.0f;
+            layer.blend_transition = {};
+            layer.blend_snapshot.clear();
+        }
+    }
+
     if (layer.fade_is_out) {
         layer.fade_elapsed += delta_time;
         if (layer.fade_out.duration > 0.0f && layer.fade_elapsed < layer.fade_out.duration) {
@@ -207,29 +230,6 @@ void animation_system<Cs...>::process_layer(
     }
 
     update_layer_time(layer, delta_time);
-
-    if (layer.blend_transition.duration > 0.0f &&
-        layer.blend_elapsed < layer.blend_transition.duration) {
-        layer.blend_elapsed += delta_time;
-
-        if (layer.blend_prev_clip) {
-            layer.blend_prev_time +=
-                delta_time * layer.blend_prev_playback_speed * layer.blend_prev_direction;
-            float32 prev_duration = layer.blend_prev_clip->get_duration();
-            if (layer.blend_prev_time > prev_duration) {
-                layer.blend_prev_time = prev_duration;
-            } else if (layer.blend_prev_time < 0.0f) {
-                layer.blend_prev_time = 0.0f;
-            }
-        }
-
-        if (layer.blend_elapsed >= layer.blend_transition.duration) {
-            layer.blend_prev_clip  = nullptr;
-            layer.blend_elapsed    = 0.0f;
-            layer.blend_transition = {};
-            layer.blend_snapshot.clear();
-        }
-    }
 
     if (!is_base && layer.state == animation_state::stopped) {
         if (layer.fade_out.duration > 0.0f) {
