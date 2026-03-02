@@ -107,8 +107,6 @@ private:
     std::unordered_set<entity> mesh_pending_entities_;
     std::unordered_set<entity> transform_pending_entities_;
 
-    static constexpr uint32 max_mesh_uploads_per_frame_ = 64;
-
     mutable combined_buffer_pool_stats stats_;
 };
 

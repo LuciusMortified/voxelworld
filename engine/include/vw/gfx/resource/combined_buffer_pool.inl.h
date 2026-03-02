@@ -103,8 +103,6 @@ void combined_buffer_pool<C>::update_meshes_(
     entities_to_process_.insert(visibility_cache_.changed.begin(), visibility_cache_.changed.end());
     entities_to_process_.insert(mesh_pending_entities_.begin(), mesh_pending_entities_.end());
 
-    uint32 new_uploads = 0;
-
     for (entity ent : entities_to_process_) {
         const bool has_spatial = world.template has_component<spatial_component>(ent);
         const bool is_visible  = visibility_cache_.visible.contains(ent);
@@ -183,8 +181,7 @@ void combined_buffer_pool<C>::update_meshes_(
                 }
             }
 
-            if (new_uploads >= max_mesh_uploads_per_frame_ ||
-                staging_.available() < mesh_staging_cost) {
+            if (staging_.available() < mesh_staging_cost) {
                 mesh_pending_entities_.insert(ent);
                 continue;
             }
@@ -194,8 +191,7 @@ void combined_buffer_pool<C>::update_meshes_(
                 auto& tc = world.template get_component<transform_component>(*swapped);
                 buffer->write_transform(*swapped, tc.get_world_matrix());
             }
-        } else if (new_uploads >= max_mesh_uploads_per_frame_ ||
-                   staging_.available() < mesh_staging_cost) {
+        } else if (staging_.available() < mesh_staging_cost) {
             mesh_pending_entities_.insert(ent);
             continue;
         }
@@ -207,7 +203,6 @@ void combined_buffer_pool<C>::update_meshes_(
 
         entity_buffer_infos_[ent] = entity_buffer_info{required_chunk_size, buffer_index};
         mesh_pending_entities_.erase(ent);
-        ++new_uploads;
     }
 }
 

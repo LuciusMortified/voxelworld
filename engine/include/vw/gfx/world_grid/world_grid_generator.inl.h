@@ -64,7 +64,7 @@ inline auto flat_world_grid_generator::generate_region(
                 }
             }
 
-            data.model = std::move(mdl);
+            data.chunk_model = std::move(mdl);
             result.chunks.push_back(std::move(data));
         }
     }

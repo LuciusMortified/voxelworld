@@ -85,8 +85,6 @@ private:
         region_id id;
     };
 
-    static constexpr uint32 chunks_per_frame_ = 16;
-
     std::vector<std::thread> gen_threads_;
     std::queue<gen_task> gen_queue_;
     std::queue<region_gen_result> completed_queue_;

@@ -230,8 +230,7 @@ void world_grid<WC>::process_completed() {
         }
     }
 
-    uint32 processed = 0;
-    while (!pending_chunks_.empty() && processed < chunks_per_frame_) {
+    while (!pending_chunks_.empty()) {
         auto cd = std::move(pending_chunks_.front());
         pending_chunks_.pop_front();
 
@@ -243,11 +242,9 @@ void world_grid<WC>::process_completed() {
         region_chunks_[cd.region].push_back(cd.coord);
         chunks_.emplace(
             cd.coord,
-            std::make_unique<chunk<WC>>(*world_, cd.region, cd.coord, std::move(cd.model),
+            std::make_unique<chunk<WC>>(*world_, cd.region, cd.coord, std::move(cd.chunk_model),
                                        voxel_scale_)
         );
-        ++processed;
-
         auto rem_it = region_remaining_chunks_.find(cd.region);
         if (rem_it != region_remaining_chunks_.end()) {
             --rem_it->second;

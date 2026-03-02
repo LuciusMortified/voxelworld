@@ -22,7 +22,7 @@ class model;
 struct chunk_data {
     region_id region;
     vec3i coord;
-    std::shared_ptr<model> model;
+    std::shared_ptr<model> chunk_model;
 };
 
 struct region_gen_result {
