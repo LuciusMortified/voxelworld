@@ -40,9 +40,9 @@ static constexpr auto invalid_model_identity = model_identity{};
 
 template <>
 struct std::hash<vw::gfx::model_identity> {
-    size_t operator()(
+    auto operator()(
         const vw::gfx::model_identity& id
-    ) const noexcept {
+    ) const noexcept -> size_t {
         size_t x = (size_t{id.generation} << 32) | size_t{id.index};
 
         // splitmix64 finalizer

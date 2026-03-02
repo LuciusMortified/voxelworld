@@ -58,15 +58,35 @@ private:
     ) -> bool;
 };
 
+struct face_cell {
+    color col = colors::empty;
+    std::array<float32, 4> ao = {1.0f, 1.0f, 1.0f, 1.0f};
+
+    [[nodiscard]] auto is_empty() const -> bool { return col == colors::empty; }
+};
+
+struct greedy_mesh_storage {
+    std::vector<vertex> vertices;
+    std::vector<uint32> indices;
+    std::vector<face_cell> mask;
+    std::vector<bool> visited;
+    std::vector<bool> depth_has_pages;
+
+    void clear() {
+        vertices.clear();
+        indices.clear();
+    }
+};
+
 class greedy_mesh_generator {
 public:
     [[nodiscard]]
-    static auto generate_mesh_data(const std::shared_ptr<model>& model) -> mesh;
+    static auto generate_mesh_data(
+        greedy_mesh_storage& storage, const std::shared_ptr<model>& model) -> mesh;
 
 private:
     static void generate_face_quads(
-        std::vector<vertex>& vertices,
-        std::vector<uint32>& indices,
+        greedy_mesh_storage& storage,
         const std::shared_ptr<model>& model,
         int face_direction
     );

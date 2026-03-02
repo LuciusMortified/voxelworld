@@ -274,13 +274,6 @@ struct face_axis_mapping {
     }
 };
 
-struct face_cell {
-    color col = colors::empty;
-    std::array<float32, 4> ao = {1.0f, 1.0f, 1.0f, 1.0f};
-
-    [[nodiscard]] auto is_empty() const -> bool { return col == colors::empty; }
-};
-
 // Maps canonical AO order (BL, BR, TR, TL) to face winding vertex order
 static constexpr int canonical_to_winding[6][4] = {
     {0, 1, 2, 3},  // +X
@@ -292,76 +285,148 @@ static constexpr int canonical_to_winding[6][4] = {
 };
 
 inline auto greedy_mesh_generator::generate_mesh_data(
-    const std::shared_ptr<model>& model
+    greedy_mesh_storage& storage, const std::shared_ptr<model>& model
 ) -> mesh {
     if (!model) {
         throw std::runtime_error("model is null");
     }
 
-    std::vector<vertex> vertices;
-    std::vector<uint32> indices;
+    storage.clear();
 
-    for (int face_direction = 0; face_direction < 6; face_direction++) {
-        generate_face_quads(vertices, indices, model, face_direction);
+    auto total = model->width() * model->height() * model->depth();
+    auto estimate = static_cast<size_t>(total / 4);
+
+    if (storage.vertices.capacity() < estimate) {
+        storage.vertices.reserve(estimate);
+    }
+    if (storage.indices.capacity() < estimate) {
+        storage.indices.reserve(estimate);
     }
 
-    return mesh{.vertices = std::move(vertices), .indices = std::move(indices)};
+    for (int face_direction = 0; face_direction < 6; face_direction++) {
+        generate_face_quads(storage, model, face_direction);
+    }
+
+    return mesh{storage.vertices, storage.indices};
 }
 
 inline void greedy_mesh_generator::generate_face_quads(
-    std::vector<vertex>& vertices,
-    std::vector<uint32>& indices,
+    greedy_mesh_storage& storage,
     const std::shared_ptr<model>& model,
     int face_direction
 ) {
     face_axis_mapping axes(model, face_direction);
+    constexpr int ps = model::page_size;
+
+    auto mask_size = static_cast<size_t>(axes.width) * static_cast<size_t>(axes.height);
+    storage.mask.resize(mask_size);
+    storage.visited.resize(mask_size);
+
+    auto idx = [&](int u, int v) -> size_t {
+        return static_cast<size_t>(u) * static_cast<size_t>(axes.height) + static_cast<size_t>(v);
+    };
+
+    const int depth_pages = (axes.depth + ps - 1) / ps;
+    int u_pages = (axes.width + ps - 1) / ps;
+    int v_pages = (axes.height + ps - 1) / ps;
+
+    storage.depth_has_pages.resize(depth_pages);
+    std::ranges::fill(storage.depth_has_pages, false);
+    for (int pd = 0; pd < depth_pages; pd++) {
+        for (int pu = 0; pu < u_pages && !storage.depth_has_pages[pd]; pu++) {
+            for (int pv = 0; pv < v_pages && !storage.depth_has_pages[pd]; pv++) {
+                auto [mx, my, mz] = axes.to_model_coords(pu * ps, pv * ps, pd * ps);
+                if (model->is_page_allocated(mx / ps, my / ps, mz / ps)) {
+                    storage.depth_has_pages[pd] = true;
+                }
+            }
+        }
+    }
 
     for (int layer = 0; layer < axes.depth; layer++) {
-        std::vector mask(axes.width, std::vector<face_cell>(axes.height));
+        if (!storage.depth_has_pages[layer / ps]) {
+            layer = ((layer / ps) + 1) * ps - 1;
+            continue;
+        }
 
-        for (int u = 0; u < axes.width; u++) {
-            for (int v = 0; v < axes.height; v++) {
-                auto [mx, my, mz] = axes.to_model_coords(u, v, layer);
-                auto voxel = model->get_voxel(mx, my, mz);
-                if (!voxel.is_empty() && is_face_visible(model, mx, my, mz, face_direction)) {
-                    mask[u][v].col = voxel.value;
-                    mask[u][v].ao[0] = compute_vertex_ao(model, mx, my, mz, face_direction, -1, -1);
-                    mask[u][v].ao[1] = compute_vertex_ao(model, mx, my, mz, face_direction,  1, -1);
-                    mask[u][v].ao[2] = compute_vertex_ao(model, mx, my, mz, face_direction,  1,  1);
-                    mask[u][v].ao[3] = compute_vertex_ao(model, mx, my, mz, face_direction, -1,  1);
+        bool has_faces = false;
+
+        for (int u_block = 0; u_block < axes.width; u_block += ps) {
+            int u_end = std::min(u_block + ps, axes.width);
+            for (int v_block = 0; v_block < axes.height; v_block += ps) {
+                int v_end = std::min(v_block + ps, axes.height);
+
+                auto [pmx, pmy, pmz] = axes.to_model_coords(u_block, v_block, layer);
+
+                if (!model->is_page_allocated(pmx / ps, pmy / ps, pmz / ps)) {
+                    for (int u = u_block; u < u_end; u++) {
+                        for (int v = v_block; v < v_end; v++) {
+                            storage.mask[idx(u, v)] = face_cell{};
+                        }
+                    }
+                    continue;
+                }
+
+                for (int u = u_block; u < u_end; u++) {
+                    for (int v = v_block; v < v_end; v++) {
+                        auto [mx, my, mz] = axes.to_model_coords(u, v, layer);
+                        auto voxel = model->get_voxel(mx, my, mz);
+                        auto i = idx(u, v);
+                        if (!voxel.is_empty() &&
+                            is_face_visible(model, mx, my, mz, face_direction)) {
+                            storage.mask[i].col = voxel.value;
+                            storage.mask[i].ao[0] =
+                                compute_vertex_ao(model, mx, my, mz, face_direction, -1, -1);
+                            storage.mask[i].ao[1] =
+                                compute_vertex_ao(model, mx, my, mz, face_direction, 1, -1);
+                            storage.mask[i].ao[2] =
+                                compute_vertex_ao(model, mx, my, mz, face_direction, 1, 1);
+                            storage.mask[i].ao[3] =
+                                compute_vertex_ao(model, mx, my, mz, face_direction, -1, 1);
+                            has_faces = true;
+                        } else {
+                            storage.mask[i] = face_cell{};
+                        }
+                    }
                 }
             }
         }
 
-        std::vector visited(axes.width, std::vector(axes.height, false));
+        if (!has_faces) continue;
+
+        std::fill(storage.visited.begin(), storage.visited.end(), false);
+
         for (int u = 0; u < axes.width; u++) {
             for (int v = 0; v < axes.height; v++) {
-                if (visited[u][v] || mask[u][v].is_empty()) continue;
+                auto i0 = idx(u, v);
+                if (storage.visited[i0] || storage.mask[i0].is_empty()) continue;
 
-                auto& origin = mask[u][v];
+                auto& origin = storage.mask[i0];
 
                 int w = 1;
-                while (u + w < axes.width && !visited[u + w][v]
-                    && mask[u + w][v].col == origin.col
-                    && mask[u + w - 1][v].ao[1] == mask[u + w][v].ao[0]
-                    && mask[u + w - 1][v].ao[2] == mask[u + w][v].ao[3]) {
+                while (u + w < axes.width && !storage.visited[idx(u + w, v)]
+                    && storage.mask[idx(u + w, v)].col == origin.col
+                    && storage.mask[idx(u + w - 1, v)].ao[1] == storage.mask[idx(u + w, v)].ao[0]
+                    && storage.mask[idx(u + w - 1, v)].ao[2] == storage.mask[idx(u + w, v)].ao[3]) {
                     w++;
                 }
 
                 int h = 1;
                 bool can_extend = true;
                 while (can_extend && v + h < axes.height) {
-                    for (int i = 0; i < w; i++) {
-                        auto& cell = mask[u + i][v + h];
-                        auto& below = mask[u + i][v + h - 1];
-                        if (cell.col != origin.col || visited[u + i][v + h]
+                    for (int ii = 0; ii < w; ii++) {
+                        auto ci = idx(u + ii, v + h);
+                        auto bi = idx(u + ii, v + h - 1);
+                        auto& cell = storage.mask[ci];
+                        auto& below = storage.mask[bi];
+                        if (cell.col != origin.col || storage.visited[ci]
                             || below.ao[3] != cell.ao[0]
                             || below.ao[2] != cell.ao[1]) {
                             can_extend = false;
                             break;
                         }
-                        if (i > 0) {
-                            auto& left = mask[u + i - 1][v + h];
+                        if (ii > 0) {
+                            auto& left = storage.mask[idx(u + ii - 1, v + h)];
                             if (left.ao[1] != cell.ao[0] || left.ao[2] != cell.ao[3]) {
                                 can_extend = false;
                                 break;
@@ -371,25 +436,25 @@ inline void greedy_mesh_generator::generate_face_quads(
                     if (can_extend) h++;
                 }
 
-                for (int i = 0; i < w; i++)
+                for (int ii = 0; ii < w; ii++)
                     for (int j = 0; j < h; j++)
-                        visited[u + i][v + j] = true;
+                        storage.visited[idx(u + ii, v + j)] = true;
 
                 auto [min_pos, max_pos] = axes.to_world_min_max(u, v, w, h, layer);
 
                 std::array<float32, 4> canonical_ao = {
-                    mask[u][v].ao[0],
-                    mask[u + w - 1][v].ao[1],
-                    mask[u + w - 1][v + h - 1].ao[2],
-                    mask[u][v + h - 1].ao[3],
+                    storage.mask[idx(u, v)].ao[0],
+                    storage.mask[idx(u + w - 1, v)].ao[1],
+                    storage.mask[idx(u + w - 1, v + h - 1)].ao[2],
+                    storage.mask[idx(u, v + h - 1)].ao[3],
                 };
 
                 std::array<float32, 4> winding_ao;
-                for (int i = 0; i < 4; i++) {
-                    winding_ao[i] = canonical_ao[canonical_to_winding[face_direction][i]];
+                for (int k = 0; k < 4; k++) {
+                    winding_ao[k] = canonical_ao[canonical_to_winding[face_direction][k]];
                 }
 
-                add_quad(vertices, indices, face_direction, min_pos, max_pos, origin.col, winding_ao);
+                add_quad(storage.vertices, storage.indices, face_direction, min_pos, max_pos, origin.col, winding_ao);
             }
         }
     }

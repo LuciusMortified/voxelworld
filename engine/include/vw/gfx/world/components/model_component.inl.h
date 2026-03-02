@@ -17,7 +17,7 @@ inline auto model_component::get_voxel(
     return model_->get_voxel(pos);
 }
 
-inline auto model_component::get_voxels() const -> const std::vector<voxel>& {
+inline auto model_component::get_voxels() const -> std::vector<voxel> {
     return model_->get_voxels();
 }
 

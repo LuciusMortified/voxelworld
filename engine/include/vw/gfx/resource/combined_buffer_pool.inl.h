@@ -23,10 +23,21 @@ template <typename C>
 void combined_buffer_pool<C>::update(
     world_type& world, const camera& camera, std::span<const frustum> shadow_frustums
 ) {
+    for (auto ent : world.destroyed()) {
+        if (entity_buffer_infos_.contains(ent)) {
+            auto& info = entity_buffer_infos_[ent];
+            buffers_[info.buffer_index]->free(ent);
+            entity_buffer_infos_.erase(ent);
+        }
+        mesh_pending_entities_.erase(ent);
+        transform_pending_entities_.erase(ent);
+        visibility_cache_.visible.erase(ent);
+    }
+
     const frustum& view_frustum = camera.get_frustum();
     update_visibility_cache_(world, view_frustum, shadow_frustums);
-    update_meshes_(world, view_frustum);
-    update_transforms_(world, view_frustum);
+    update_meshes_(world);
+    update_transforms_(world);
 }
 
 template <typename C>
@@ -71,14 +82,16 @@ combined_buffer* combined_buffer_pool<C>::get_or_create_buffer(
 
 template <typename C>
 void combined_buffer_pool<C>::update_meshes_(
-    world_type& world, const frustum& view_frustum
+    world_type& world
 ) {
-    auto& model_system   = world.get_model_system();
-    auto& dirty_entities = model_system.get_render_dirty_entities();
+    auto& model_changed = world.template changed<model_component>();
+    mesh_pending_entities_.insert(model_changed.begin(), model_changed.end());
 
     entities_to_process_.clear();
     entities_to_process_.insert(visibility_cache_.changed.begin(), visibility_cache_.changed.end());
-    entities_to_process_.insert(dirty_entities.begin(), dirty_entities.end());
+    entities_to_process_.insert(mesh_pending_entities_.begin(), mesh_pending_entities_.end());
+
+    uint32 new_uploads = 0;
 
     for (entity ent : entities_to_process_) {
         const bool has_spatial = world.template has_component<spatial_component>(ent);
@@ -89,7 +102,7 @@ void combined_buffer_pool<C>::update_meshes_(
                 buffers_[buffer_index]->free(ent);
                 entity_buffer_infos_.erase(ent);
             }
-            dirty_entities.erase(ent);
+            mesh_pending_entities_.erase(ent);
             continue;
         }
 
@@ -103,7 +116,7 @@ void combined_buffer_pool<C>::update_meshes_(
                 buffers_[buffer_info.buffer_index]->free(ent);
                 entity_buffer_infos_.erase(ent);
             }
-            dirty_entities.erase(ent);
+            mesh_pending_entities_.erase(ent);
             continue;
         }
 
@@ -134,12 +147,20 @@ void combined_buffer_pool<C>::update_meshes_(
                 const auto& ent_alloc = buffer->get_entity_allocation(ent);
                 if (ent_alloc.model_index == model_id.index) {
                     buffer->write_mesh(model_id, *mesh_ptr);
-                    dirty_entities.erase(ent);
+                    mesh_pending_entities_.erase(ent);
                     continue;
                 }
             }
 
+            if (new_uploads >= max_mesh_uploads_per_frame_) {
+                mesh_pending_entities_.insert(ent);
+                continue;
+            }
+
             buffer->free(ent);
+        } else if (new_uploads >= max_mesh_uploads_per_frame_) {
+            mesh_pending_entities_.insert(ent);
+            continue;
         }
 
         auto* buffer            = get_or_create_buffer(required_chunk_size);
@@ -148,26 +169,29 @@ void combined_buffer_pool<C>::update_meshes_(
         buffer->allocate(ent, model_id, *mesh_ptr, transform_matrix);
 
         entity_buffer_infos_[ent] = entity_buffer_info{required_chunk_size, buffer_index};
-        dirty_entities.erase(ent);
+        mesh_pending_entities_.erase(ent);
+        ++new_uploads;
     }
 }
 
 template <typename C>
 void combined_buffer_pool<C>::update_transforms_(
-    world_type& world, const frustum& view_frustum
+    world_type& world
 ) {
-    auto& transform_system = world.get_transform_system();
-    auto& dirty_entities   = transform_system.get_render_dirty_entities();
+    auto& transform_changed = world.template changed<transform_component>();
+    transform_pending_entities_.insert(transform_changed.begin(), transform_changed.end());
 
     entities_to_process_.clear();
     entities_to_process_.insert(visibility_cache_.changed.begin(), visibility_cache_.changed.end());
-    entities_to_process_.insert(dirty_entities.begin(), dirty_entities.end());
+    entities_to_process_.insert(
+        transform_pending_entities_.begin(), transform_pending_entities_.end()
+    );
 
     for (entity ent : entities_to_process_) {
         bool has_spatial = world.template has_component<spatial_component>(ent);
         bool is_visible  = visibility_cache_.visible.contains(ent);
         if (has_spatial && !is_visible) {
-            dirty_entities.erase(ent);
+            transform_pending_entities_.erase(ent);
             continue;
         }
 
@@ -182,7 +206,7 @@ void combined_buffer_pool<C>::update_transforms_(
             const mat4f& transform_matrix = transform_comp.get_world_matrix();
             buffers_[info.buffer_index]->write_transform(ent, transform_matrix);
 
-            dirty_entities.erase(ent);
+            transform_pending_entities_.erase(ent);
         }
     }
 }
@@ -196,15 +220,14 @@ void combined_buffer_pool<C>::update_visibility_cache_(
     constexpr float angle_threshold    = math::radians(2.f);
     constexpr float distance_threshold = 0.5f;
 
-    auto& render_dirty_entities = spatial_system.get_render_dirty_entities();
-    const bool has_render_dirty = !render_dirty_entities.empty();
+    const bool has_spatial_changed = !world.template changed<spatial_component>().empty();
 
     const bool frustum_changed = !visibility_cache_.view_frustum.approximately_equal(
         view_frustum, angle_threshold, distance_threshold
     );
 
     visibility_cache_.changed.clear();
-    if (frustum_changed || has_render_dirty) {
+    if (frustum_changed || has_spatial_changed) {
         spatial_system.query_all(view_frustum, visibility_cache_.tmp_visible);
 
         for (const auto& shadow_frustum : shadow_frustums) {
@@ -227,10 +250,6 @@ void combined_buffer_pool<C>::update_visibility_cache_(
 
         visibility_cache_.visible      = visibility_cache_.tmp_visible;
         visibility_cache_.view_frustum = view_frustum;
-
-        if (has_render_dirty) {
-            render_dirty_entities.clear();
-        }
     }
 }
 

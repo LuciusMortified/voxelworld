@@ -3,6 +3,8 @@
 #ifndef VW_GFX_MODEL_MODEL_H
 #define VW_GFX_MODEL_MODEL_H
 
+#include <array>
+#include <memory>
 #include <vector>
 
 #include "vw/core.h"
@@ -52,17 +54,26 @@ public:
     [[nodiscard]] auto get_identity() const -> model_identity;
 
     void set_voxels(const std::vector<voxel>& voxels);
+    void set_voxels(std::vector<voxel>&& voxels);
 
-    [[nodiscard]] auto get_voxels() const -> const std::vector<voxel>&;
+    [[nodiscard]] auto get_voxels() const -> std::vector<voxel>;
+
+    static constexpr int page_size = 8;
+    static constexpr int page_volume = page_size * page_size * page_size;
+    using page_type = std::array<voxel, page_volume>;
+
+    [[nodiscard]] auto is_page_allocated(int px, int py, int pz) const -> bool;
 
 private:
     model_identity_pool* identity_pool_;
     int width_{0}, height_{0}, depth_{0};
-    std::vector<voxel> voxels_;
+    int pages_x_{0}, pages_y_{0}, pages_z_{0};
+    std::vector<std::unique_ptr<page_type>> pages_;
     model_identity identity_;
 
-    [[nodiscard]] auto index_at(int x, int y, int z) const -> int;
-    [[nodiscard]] auto index_at(vec3i pos) const -> int;
+    [[nodiscard]] auto page_index(int px, int py, int pz) const -> int;
+    [[nodiscard]] static auto local_index(int lx, int ly, int lz) -> int;
+    [[nodiscard]] auto ensure_page(int px, int py, int pz) -> page_type&;
 
     void increment_generation_();
 };

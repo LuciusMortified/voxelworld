@@ -287,23 +287,30 @@ inline VkBuffer combined_buffer::get_vertex_buffer() const {
 }
 
 inline void combined_buffer::expand_mesh_buffers_() {
+    const auto old_vertex_bytes =
+        (mesh_capacity_ * chunk_size_.vertex_count) * sizeof(vertex);
+    const auto old_index_bytes =
+        (mesh_capacity_ * chunk_size_.index_count) * sizeof(uint32);
+
     mesh_capacity_ *= 2;
 
     auto new_vertex_buffer = std::make_unique<vertex_buffer>(
         *context_, mesh_capacity_ * chunk_size_.vertex_count * sizeof(vertex)
     );
-    vertex_buffer_->copy_to_buffer(*new_vertex_buffer, vertex_used_ * sizeof(vertex));
+    vertex_buffer_->copy_to_buffer(*new_vertex_buffer, old_vertex_bytes);
 
     auto new_index_buffer = std::make_unique<index_buffer>(
         *context_, mesh_capacity_ * chunk_size_.index_count * sizeof(uint32)
     );
-    index_buffer_->copy_to_buffer(*new_index_buffer, index_used_ * sizeof(uint32));
+    index_buffer_->copy_to_buffer(*new_index_buffer, old_index_bytes);
 
     vertex_buffer_ = std::move(new_vertex_buffer);
     index_buffer_  = std::move(new_index_buffer);
 }
 
 inline void combined_buffer::expand_instance_buffers_() {
+    auto instance_count = entity_allocations_.size();
+
     instance_capacity_ *= 2;
 
     auto new_model_matrix_buffer = std::make_unique<storage_buffer>(
@@ -319,15 +326,25 @@ inline void combined_buffer::expand_instance_buffers_() {
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT |  //
             VK_BUFFER_USAGE_TRANSFER_DST_BIT    //
     );
+    auto new_instance_index_buffer = std::make_unique<storage_buffer>(
+        *context_,
+        instance_capacity_ * sizeof(uint32),
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |     //
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT |  //
+            VK_BUFFER_USAGE_TRANSFER_DST_BIT
+    );
 
-    auto instance_count = entity_allocations_.size();
     model_matrix_buffer_->copy_to_buffer(*new_model_matrix_buffer, instance_count * sizeof(mat4f));
     indirect_draw_buffer_->copy_to_buffer(
         *new_indirect_draw_buffer, instance_count * sizeof(draw_command)
     );
+    instance_index_buffer_->copy_to_buffer(
+        *new_instance_index_buffer, instance_count * sizeof(uint32)
+    );
 
-    model_matrix_buffer_  = std::move(new_model_matrix_buffer);
-    indirect_draw_buffer_ = std::move(new_indirect_draw_buffer);
+    model_matrix_buffer_    = std::move(new_model_matrix_buffer);
+    indirect_draw_buffer_   = std::move(new_indirect_draw_buffer);
+    instance_index_buffer_  = std::move(new_instance_index_buffer);
 
     // Обновляем descriptor set с новым storage buffer
     VkDescriptorBufferInfo storage_buffer_info{};

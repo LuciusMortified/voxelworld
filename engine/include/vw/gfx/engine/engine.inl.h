@@ -141,6 +141,7 @@ void engine<WC>::render(
     stats_.world_update_ms =
         std::chrono::duration<float32>(world_update_end - world_update_start_time_).count() *
         1000.0f;
+    stats_.systems = world_->get_update_stats();
 
     renderer_->begin_frame();
     app_->render(delta_time);
@@ -178,7 +179,7 @@ void engine<WC>::update_stats() {
 }
 
 template <typename WC>
-uint64 engine<WC>::calculate_ram_usage() const {
+auto engine<WC>::calculate_ram_usage() -> uint64 {
 #ifdef _WIN32
     PROCESS_MEMORY_COUNTERS_EX pmc{};
     if (GetProcessMemoryInfo(
@@ -191,9 +192,9 @@ uint64 engine<WC>::calculate_ram_usage() const {
 }
 
 template <typename WC>
-uint64 engine<WC>::calculate_vram_usage() const {
-    auto& vk_context                 = *vulkan_context_;
-    VkPhysicalDevice physical_device = vk_context.get_physical_device();
+auto engine<WC>::calculate_vram_usage() const -> uint64 {
+    const auto& vk_context                 = *vulkan_context_;
+    const VkPhysicalDevice physical_device = vk_context.get_physical_device();
 
     VkPhysicalDeviceMemoryBudgetPropertiesEXT budget_props{};
     budget_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT;
@@ -203,9 +204,15 @@ uint64 engine<WC>::calculate_vram_usage() const {
     mem_props.pNext = &budget_props;
 
     auto vkGetPhysicalDeviceMemoryProperties2 =
-        reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties2KHR>(vkGetInstanceProcAddr(
-            vk_context.get_instance(), "vkGetPhysicalDeviceMemoryProperties2KHR"
-        ));
+        reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties2KHR>(
+            vkGetInstanceProcAddr(vk_context.get_instance(), "vkGetPhysicalDeviceMemoryProperties2")
+        );
+    if (vkGetPhysicalDeviceMemoryProperties2 == nullptr) {
+        vkGetPhysicalDeviceMemoryProperties2 =
+            reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties2KHR>(vkGetInstanceProcAddr(
+                vk_context.get_instance(), "vkGetPhysicalDeviceMemoryProperties2KHR"
+            ));
+    }
 
     if (vkGetPhysicalDeviceMemoryProperties2 != nullptr) {
         vkGetPhysicalDeviceMemoryProperties2(physical_device, &mem_props);

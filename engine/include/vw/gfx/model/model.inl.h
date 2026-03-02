@@ -12,9 +12,16 @@ namespace vw::gfx {
 inline model::model(
     model_identity_pool& identity_pool, int width, int height, int depth
 )
-    : identity_pool_(&identity_pool), width_(width), height_(height), depth_(depth) {
-    voxels_.resize(
-        static_cast<size_t>(width_) * static_cast<size_t>(height_) * static_cast<size_t>(depth_)
+    : identity_pool_(&identity_pool),
+      width_(width),
+      height_(height),
+      depth_(depth),
+      pages_x_((width + page_size - 1) / page_size),
+      pages_y_((height + page_size - 1) / page_size),
+      pages_z_((depth + page_size - 1) / page_size) {
+    pages_.resize(
+        static_cast<size_t>(pages_x_) * static_cast<size_t>(pages_y_) *
+        static_cast<size_t>(pages_z_)
     );
     identity_ = identity_pool_->create();
 }
@@ -26,71 +33,100 @@ inline model::~model() {
 inline auto model::operator[](
     vec3i pos
 ) -> voxel& {
-    return voxels_[index_at(pos)];
+    int px = pos.x / page_size;
+    int py = pos.y / page_size;
+    int pz = pos.z / page_size;
+    auto& page = ensure_page(px, py, pz);
+    return page[local_index(pos.x % page_size, pos.y % page_size, pos.z % page_size)];
 }
 
 inline auto model::operator[](
     vec3i pos
 ) const -> const voxel& {
-    return voxels_[index_at(pos)];
+    int px = pos.x / page_size;
+    int py = pos.y / page_size;
+    int pz = pos.z / page_size;
+    auto& ptr = pages_[page_index(px, py, pz)];
+    if (!ptr) {
+        static const voxel empty{};
+        return empty;
+    }
+    return (*ptr)[local_index(pos.x % page_size, pos.y % page_size, pos.z % page_size)];
 }
 
 inline auto model::operator[](
     int x, int y, int z
 ) -> voxel& {
-    return voxels_[index_at(x, y, z)];
+    return (*this)[vec3i{x, y, z}];
 }
 
 inline auto model::operator[](
     int x, int y, int z
 ) const -> const voxel& {
-    return voxels_[index_at(x, y, z)];
+    return (*this)[vec3i{x, y, z}];
 }
 
 inline void model::set_voxel(
     int x, int y, int z, const voxel& voxel
 ) {
-    voxels_[index_at(x, y, z)] = voxel;
+    int px = x / page_size;
+    int py = y / page_size;
+    int pz = z / page_size;
+    if (voxel.is_empty()) {
+        auto& ptr = pages_[page_index(px, py, pz)];
+        if (!ptr) return;
+        (*ptr)[local_index(x % page_size, y % page_size, z % page_size)] = voxel;
+    } else {
+        auto& page = ensure_page(px, py, pz);
+        page[local_index(x % page_size, y % page_size, z % page_size)] = voxel;
+    }
     increment_generation_();
 }
 
 inline void model::set_voxel(
     int x, int y, int z, color color
 ) {
-    voxels_[index_at(x, y, z)] = voxel{color};
-    increment_generation_();
+    set_voxel(x, y, z, voxel{color});
 }
 
 inline void model::set_voxel(
     vec3i pos, const voxel& voxel
 ) {
-    voxels_[index_at(pos)] = voxel;
-    increment_generation_();
+    set_voxel(pos.x, pos.y, pos.z, voxel);
 }
 
 inline void model::set_voxel(
     vec3i pos, color color
 ) {
-    voxels_[index_at(pos)] = voxel{color};
-    increment_generation_();
+    set_voxel(pos.x, pos.y, pos.z, voxel{color});
 }
 
 inline auto model::get_voxel(
     int x, int y, int z
 ) const -> voxel {
-    return voxels_[index_at(x, y, z)];
+    int px = x / page_size;
+    int py = y / page_size;
+    int pz = z / page_size;
+    auto& ptr = pages_[page_index(px, py, pz)];
+    if (!ptr) return voxel{};
+    return (*ptr)[local_index(x % page_size, y % page_size, z % page_size)];
 }
 
 inline auto model::get_voxel(
     vec3i pos
 ) const -> voxel {
-    return voxels_[index_at(pos)];
+    return get_voxel(pos.x, pos.y, pos.z);
 }
 
 inline auto model::is_empty(
     int x, int y, int z
 ) const -> bool {
-    return voxels_[index_at(x, y, z)].is_empty();
+    int px = x / page_size;
+    int py = y / page_size;
+    int pz = z / page_size;
+    auto& ptr = pages_[page_index(px, py, pz)];
+    if (!ptr) return true;
+    return (*ptr)[local_index(x % page_size, y % page_size, z % page_size)].is_empty();
 }
 
 inline auto model::is_empty(
@@ -118,7 +154,18 @@ inline auto model::size() const -> vec3i {
 inline void model::fill(
     const voxel& voxel
 ) {
-    std::ranges::fill(voxels_, voxel);
+    if (voxel.is_empty()) {
+        for (auto& ptr : pages_) {
+            ptr.reset();
+        }
+    } else {
+        for (auto& ptr : pages_) {
+            if (!ptr) {
+                ptr = std::make_unique<page_type>();
+            }
+            ptr->fill(voxel);
+        }
+    }
     increment_generation_();
 }
 
@@ -126,16 +173,33 @@ inline auto model::get_identity() const -> model_identity {
     return identity_;
 }
 
-inline auto model::index_at(
-    int x, int y, int z
-) const -> int {
-    return x + (y * width_) + (z * width_ * height_);
+inline auto model::is_page_allocated(
+    int px, int py, int pz
+) const -> bool {
+    return pages_[page_index(px, py, pz)] != nullptr;
 }
 
-inline auto model::index_at(
-    vec3i pos
+inline auto model::page_index(
+    int px, int py, int pz
 ) const -> int {
-    return index_at(pos.x, pos.y, pos.z);
+    return px + (py * pages_x_) + (pz * pages_x_ * pages_y_);
+}
+
+inline auto model::local_index(
+    int lx, int ly, int lz
+) -> int {
+    return lx + (ly * page_size) + (lz * page_size * page_size);
+}
+
+inline auto model::ensure_page(
+    int px, int py, int pz
+) -> page_type& {
+    auto& ptr = pages_[page_index(px, py, pz)];
+    if (!ptr) {
+        ptr = std::make_unique<page_type>();
+        ptr->fill(voxel{});
+    }
+    return *ptr;
 }
 
 inline void model::increment_generation_() {
@@ -145,15 +209,56 @@ inline void model::increment_generation_() {
 inline void model::set_voxels(
     const std::vector<voxel>& voxels
 ) {
-    if (voxels.size() != voxels_.size()) {
+    auto expected = static_cast<size_t>(width_) * static_cast<size_t>(height_) *
+                    static_cast<size_t>(depth_);
+    if (voxels.size() != expected) {
         throw std::runtime_error("Voxels container size does not match model size.");
     }
-    voxels_ = voxels;
+    for (auto& ptr : pages_) {
+        ptr.reset();
+    }
+    for (int z = 0; z < depth_; ++z) {
+        for (int y = 0; y < height_; ++y) {
+            for (int x = 0; x < width_; ++x) {
+                auto& v = voxels[x + (y * width_) + (z * width_ * height_)];
+                if (!v.is_empty()) {
+                    int px = x / page_size;
+                    int py = y / page_size;
+                    int pz = z / page_size;
+                    auto& page = ensure_page(px, py, pz);
+                    page[local_index(x % page_size, y % page_size, z % page_size)] = v;
+                }
+            }
+        }
+    }
     increment_generation_();
 }
 
-inline auto model::get_voxels() const -> const std::vector<voxel>& {
-    return voxels_;
+inline void model::set_voxels(
+    std::vector<voxel>&& voxels
+) {
+    set_voxels(static_cast<const std::vector<voxel>&>(voxels));
+}
+
+inline auto model::get_voxels() const -> std::vector<voxel> {
+    auto total =
+        static_cast<size_t>(width_) * static_cast<size_t>(height_) * static_cast<size_t>(depth_);
+    std::vector<voxel> result(total);
+    for (int z = 0; z < depth_; ++z) {
+        for (int y = 0; y < height_; ++y) {
+            for (int x = 0; x < width_; ++x) {
+                int px = x / page_size;
+                int py = y / page_size;
+                int pz = z / page_size;
+                auto& ptr = pages_[page_index(px, py, pz)];
+                if (ptr) {
+                    result[x + (y * width_) + (z * width_ * height_)] =
+                        (*ptr)[local_index(x % page_size, y % page_size, z % page_size)];
+                }
+            }
+        }
+    }
+    return result;
 }
 
 }  // namespace vw::gfx

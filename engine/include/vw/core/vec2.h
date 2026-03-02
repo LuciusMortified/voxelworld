@@ -54,4 +54,13 @@ using vec2d = vec2<float64>;
 
 }  // namespace vw
 
+template <>
+struct std::hash<vw::vec2<vw::int32>> {
+    auto operator()(const vw::vec2<vw::int32>& v) const noexcept -> size_t {
+        size_t seed = std::hash<vw::int32>{}(v.x);
+        seed ^= std::hash<vw::int32>{}(v.y) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        return seed;
+    }
+};
+
 #endif  // VW_CORE_VEC2_H

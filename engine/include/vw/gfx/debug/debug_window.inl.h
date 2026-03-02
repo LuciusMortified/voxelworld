@@ -25,6 +25,9 @@ void debug_window<WC>::render(
     }
 
     render_fps_window();
+    if (show_systems_detail_) {
+        render_systems_detail();
+    }
     if (show_combined_buffers_detail_) {
         render_combined_buffers_detail();
     }
@@ -96,7 +99,11 @@ void debug_window<WC>::render_fps_window() {
             cb_stats.instance_capacity
         );
         ImGui::Spacing();
-        if (ImGui::Button("buffer details")) {
+        if (ImGui::Button("systems")) {
+            show_systems_detail_ = !show_systems_detail_;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("buffers")) {
             show_combined_buffers_detail_ = !show_combined_buffers_detail_;
         }
         ImGui::Spacing();
@@ -117,6 +124,45 @@ void debug_window<WC>::render_render_mode_controls() const {
     if (ImGui::Button("wire")) {
         engine_->get_renderer().set_render_mode(render_mode::wireframe);
     }
+}
+
+template <typename WC>
+void debug_window<WC>::render_systems_detail() {
+    ImGuiWindowFlags window_flags =          //
+        ImGuiWindowFlags_NoCollapse |        //
+        ImGuiWindowFlags_NoSavedSettings |   //
+        ImGuiWindowFlags_AlwaysAutoResize |  //
+        ImGuiWindowFlags_NoFocusOnAppearing;
+
+    bool show = show_systems_detail_;
+    if (ImGui::Begin("Debug Tool - Systems", &show, window_flags)) {
+        show_systems_detail_ = show;
+        const auto& s = engine_->get_stats().systems;
+
+        auto row = [](const char* name, float32 ms) {
+            ImVec4 color = {1.0f, 1.0f, 1.0f, 1.0f};
+            if (ms > 5.0f) color = {1.0f, 0.3f, 0.3f, 1.0f};
+            else if (ms > 1.0f) color = {1.0f, 0.8f, 0.2f, 1.0f};
+            ImGui::TextColored(color, "%-14s %6.2f ms", name, ms);
+        };
+
+        row("transform", s.transform_ms);
+        row("model", s.model_ms);
+
+        const auto& ms = engine_->get_world().get_model_system().get_stats();
+        ImGui::Indent();
+        row("process_done", ms.process_completed_ms);
+        row("update_done", ms.update_completed_ms);
+        row("process_dirty", ms.process_dirty_ms);
+        ImGui::Text("pending ent:%u mesh:%u", ms.pending_entities_count, ms.pending_meshes_count);
+        ImGui::Unindent();
+
+        row("spatial", s.spatial_ms);
+        row("light", s.light_ms);
+        row("world_grid", s.world_grid_ms);
+        row("animation", s.animation_ms);
+    }
+    ImGui::End();
 }
 
 template <typename WC>

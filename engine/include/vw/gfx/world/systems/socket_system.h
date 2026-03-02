@@ -27,17 +27,16 @@ public:
         transform_system_type& transform_system
     );
 
-    void update();
-
-    void cleanup(entity ent);
-
     class socket_modifier {
     public:
         auto attach(const std::string& socket_name, entity child) -> socket_modifier&;
         auto detach(const std::string& socket_name) -> socket_modifier&;
-        auto add_socket(const std::string& name, const vec3f& position = {},
-                        const vec3f& rotation = {}, const vec3f& scale = vec3f{1, 1, 1})
-            -> socket_modifier&;
+        auto add_socket(
+            const std::string& name,
+            const vec3f& position = {},
+            const vec3f& rotation = {},
+            const vec3f& scale    = vec3f{1, 1, 1}
+        ) -> socket_modifier&;
         auto remove_socket(const std::string& name) -> socket_modifier&;
 
     private:
@@ -49,6 +48,8 @@ public:
     };
 
     auto modify(entity ent) -> socket_modifier;
+    void cleanup(entity ent);
+    void update();
 
 private:
     registry_type* registry_;

@@ -25,6 +25,7 @@ struct engine_stats {
     float32 world_render_ms = 0.0f;
     uint64 ram_usage_bytes  = 0;
     uint64 vram_usage_bytes = 0;
+    world_update_stats systems;
 };
 
 template <typename WC = base_world_components>
@@ -79,7 +80,7 @@ private:
     static constexpr float MEMORY_UPDATE_INTERVAL_SEC = 1.0f;
 
     void update_stats();
-    [[nodiscard]] uint64 calculate_ram_usage() const;
+    [[nodiscard]] static uint64 calculate_ram_usage();
     [[nodiscard]] uint64 calculate_vram_usage() const;
 
     event_sub<window_resize_event> window_resize_sub_;

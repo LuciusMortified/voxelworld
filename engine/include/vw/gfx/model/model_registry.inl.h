@@ -49,25 +49,22 @@ inline auto model_registry::create_unnamed(
 [[nodiscard]] inline auto model_registry::create_clone(
     std::string_view name
 ) -> std::shared_ptr<model> {
-    auto original = get(name);
+    const auto original = get(name);
     if (!original) {
         return nullptr;
     }
+
     auto cloned_model = std::make_shared<model>(
         identity_pool_, original->width(), original->height(), original->depth()
     );
-    // Manually copy voxel data
-    for (int z = 0; z < original->depth(); ++z) {
-        for (int y = 0; y < original->height(); ++y) {
-            for (int x = 0; x < original->width(); ++x) {
-                cloned_model->set_voxel(x, y, z, original->get_voxel(x, y, z));
-            }
-        }
-    }
+    cloned_model->set_voxels(original->get_voxels());
+
     return cloned_model;
 }
 
-inline void model_registry::erase(std::string_view name) {
+inline void model_registry::erase(
+    std::string_view name
+) {
     models_.erase(std::string(name));
 }
 

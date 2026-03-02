@@ -3,8 +3,6 @@
 #ifndef VW_GFX_TRANSFORM_SYSTEM_H
 #define VW_GFX_TRANSFORM_SYSTEM_H
 
-#include <set>
-#include <unordered_set>
 #include <vector>
 
 #include "vw/gfx/world/registry.h"
@@ -18,9 +16,6 @@ namespace vw::gfx {
 struct transform_component;
 
 template <typename... Cs>
-class spatial_system;
-
-template <typename... Cs>
 class hierarchy_system;
 
 template <typename... Cs>
@@ -28,29 +23,23 @@ class transform_system final {
 public:
     using registry_type = registry<Cs...>;
 
-    explicit transform_system(
-        registry_type& registry,
-        spatial_system<Cs...>& spatial_sys,
-        hierarchy_system<Cs...>& hierarchy_sys
-    );
+    explicit transform_system(registry_type& registry, hierarchy_system<Cs...>& hierarchy_sys);
 
     void update();
 
-    void mark_world_dirty(entity ent);
-
-    void mark_dirty(entity ent);
-
     class transform_modifier {
     public:
-        transform_modifier& set_transform(const transform& transform);
-        transform_modifier& set_transform_with_matrix(const transform& transform, const mat4f& local_matrix);
-        transform_modifier& set_position(const vec3f& position);
-        transform_modifier& set_rotation(const vec3f& rotation);
-        transform_modifier& set_scale(const vec3f& scale);
-        transform_modifier& set_origin(const vec3f& origin);
-        transform_modifier& translate(const vec3f& offset);
-        transform_modifier& rotate(const vec3f& angles);
-        transform_modifier& scale(const vec3f& factor);
+        auto set_transform(const transform& transform) -> transform_modifier&;
+        auto set_transform_with_matrix(const transform& transform, const mat4f& local_matrix)
+            -> transform_modifier&;
+        auto set_position(const vec3f& position) -> transform_modifier&;
+        auto set_rotation(const vec3f& rotation) -> transform_modifier&;
+        auto set_scale(const vec3f& scale) -> transform_modifier&;
+        auto set_origin(const vec3f& origin) -> transform_modifier&;
+        auto translate(const vec3f& offset) -> transform_modifier&;
+        auto rotate(const vec3f& angles) -> transform_modifier&;
+        auto scale(const vec3f& factor) -> transform_modifier&;
+        auto mark_world_dirty() -> transform_modifier&;
 
     private:
         friend class transform_system;
@@ -62,23 +51,15 @@ public:
 
     transform_modifier modify(entity ent);
 
-    [[nodiscard]] auto get_render_dirty_entities() -> std::unordered_set<entity>&;
-
-    void mark_render_dirty(entity ent);
-
 private:
     void mark_children_world_dirty(entity ent);
 
     void update_entity_world_matrix(entity ent, const transform_component& transform_comp);
 
     registry_type* registry_;
-    spatial_system<Cs...>* spatial_system_;
     hierarchy_system<Cs...>* hierarchy_system_;
 
-    std::unordered_set<entity> dirty_entities_;
-    std::vector<entity> sorted_dirty_entities_;
-
-    std::unordered_set<entity> render_dirty_entities_;
+    std::vector<entity> sorted_entities_;
 };
 
 template <typename... Cs>

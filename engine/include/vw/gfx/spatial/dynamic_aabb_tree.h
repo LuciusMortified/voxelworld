@@ -57,7 +57,7 @@ private:
     };
     
     static constexpr uint32 invalid_node_index = std::numeric_limits<uint32>::max();
-    static constexpr size_t max_stack_size = 64;  // Максимальный размер стека для итеративного обхода
+    static constexpr size_t max_stack_size = 256;  // Максимальный размер стека для итеративного обхода
     
     std::vector<node> nodes_;
     std::vector<uint32> free_nodes_;  // Пул свободных узлов для переиспользования

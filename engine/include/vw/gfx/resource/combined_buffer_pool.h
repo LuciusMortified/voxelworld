@@ -60,9 +60,9 @@ public:
     ~combined_buffer_pool() = default;
 
     combined_buffer_pool(const combined_buffer_pool&)            = delete;
-    combined_buffer_pool& operator=(const combined_buffer_pool&) = delete;
+    auto operator=(const combined_buffer_pool&) -> combined_buffer_pool& = delete;
     combined_buffer_pool(combined_buffer_pool&&)                 = delete;
-    combined_buffer_pool& operator=(combined_buffer_pool&&)      = delete;
+    auto operator=(combined_buffer_pool&&) -> combined_buffer_pool&      = delete;
 
     void update(
         world_type& world,
@@ -72,17 +72,17 @@ public:
 
     [[nodiscard]] auto get_buffers() const -> const std::vector<std::unique_ptr<combined_buffer>>&;
 
-    [[nodiscard]] static buffer_chunk_size get_chunk_size_for_mesh(
+    [[nodiscard]] static auto get_chunk_size_for_mesh(
         uint32 vertex_count, uint32 index_count
-    );
+    ) -> buffer_chunk_size;
 
-    [[nodiscard]] const combined_buffer_pool_stats& get_stats() const;
+    [[nodiscard]] auto get_stats() const -> const combined_buffer_pool_stats&;
 
 private:
-    combined_buffer* get_or_create_buffer(const buffer_chunk_size& chunk_size);
+    auto get_or_create_buffer(const buffer_chunk_size& chunk_size) -> combined_buffer*;
 
-    void update_meshes_(world_type& world, const frustum& view_frustum);
-    void update_transforms_(world_type& world, const frustum& view_frustum);
+    void update_meshes_(world_type& world);
+    void update_transforms_(world_type& world);
     void update_visibility_cache_(
         world_type& world,
         const frustum& view_frustum,
@@ -100,6 +100,11 @@ private:
     visibility_cache visibility_cache_{};
     std::unordered_set<entity> entities_to_process_;
     std::unordered_set<entity> shadow_query_tmp_;
+
+    std::unordered_set<entity> mesh_pending_entities_;
+    std::unordered_set<entity> transform_pending_entities_;
+
+    static constexpr uint32 max_mesh_uploads_per_frame_ = 64;
 
     mutable combined_buffer_pool_stats stats_;
 };

@@ -3,6 +3,7 @@
 #ifndef VW_GFX_MESH_POOL_H
 #define VW_GFX_MESH_POOL_H
 
+#include <algorithm>
 #include <condition_variable>
 #include <future>
 #include <memory>
@@ -10,6 +11,7 @@
 #include <queue>
 #include <thread>
 #include <unordered_map>
+#include <vector>
 
 #include "vw/gfx/model/model_identity.h"
 #include "vw/gfx/resource/mesh.h"
@@ -44,20 +46,24 @@ public:
     [[nodiscard]] auto is_pending(const model_identity& identity) const -> bool;
     void request_mesh(const std::shared_ptr<model>& model_ptr);
     [[nodiscard]] auto get(const model_identity& identity) const -> std::shared_ptr<mesh>;
+    void remove(const model_identity& identity);
     void process_completed();
+    [[nodiscard]] auto get_pending_count() const -> uint32;
 
 private:
     void gen_thread_function();
+    void sweep_orphaned_();
 
     vulkan_context* context_;
     std::unordered_map<model_identity, std::shared_ptr<mesh>> meshes_;
+    std::unordered_map<model_identity, std::weak_ptr<model>> model_refs_;
     std::unordered_map<model_identity, std::future<mesh>> pending_meshes_;
 
-    std::thread gen_thread_;
+    std::vector<std::thread> gen_threads_;
     std::queue<std::unique_ptr<mesh_generation_task>> gen_queue_;
     std::mutex gen_mutex_;
     std::condition_variable gen_cv_;
-    bool gen_running_;
+    bool gen_running_ = true;
 
     static constexpr log::log_category lc_{"mesh_pool"};
 };

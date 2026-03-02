@@ -11,21 +11,38 @@ world<Cs>::world(
 )
     : mesh_pool_{context}
     , spatial_system_(registry_)
-    , transform_system_(registry_, spatial_system_, hierarchy_system_)
+    , transform_system_(registry_, hierarchy_system_)
     , hierarchy_system_(registry_, transform_system_)
-    , model_system_(registry_, mesh_pool_, spatial_system_)
+    , model_system_(registry_, mesh_pool_)
     , light_system_(registry_)
     , socket_system_(registry_, hierarchy_system_, transform_system_)
-    , animation_system_(registry_, transform_system_, animation_clip_registry_) {}
+    , animation_system_(registry_, transform_system_, animation_clip_registry_)
+    , world_grid_system_(registry_) {}
 
 template <typename Cs>
 void world<Cs>::update(
     float32 delta_time
 ) {
-    transform_system_.update();
-    model_system_.update();
-    spatial_system_.update();
-    animation_system_.update(delta_time);
+    using clock = std::chrono::high_resolution_clock;
+    auto measure = [](auto&& system_fn) -> float32 {
+        auto start = clock::now();
+        system_fn();
+        auto end = clock::now();
+        return std::chrono::duration<float32>(end - start).count() * 1000.0f;
+    };
+
+    registry_.clear_changed();
+    update_stats_.transform_ms = measure([&] { transform_system_.update(); });
+    update_stats_.model_ms = measure([&] { model_system_.update(); });
+    update_stats_.spatial_ms = measure([&] { spatial_system_.update(); });
+    update_stats_.light_ms = measure([&] { light_system_.update(); });
+    update_stats_.world_grid_ms = measure([&] { world_grid_system_.update(); });
+    update_stats_.animation_ms = measure([&] { animation_system_.update(delta_time); });
+}
+
+template <typename Cs>
+auto world<Cs>::get_update_stats() const -> const world_update_stats& {
+    return update_stats_;
 }
 
 template <typename Cs>
@@ -100,6 +117,27 @@ auto world<C>::get_animation_clip_registry() -> animation_clip_registry& {
     return animation_clip_registry_;
 }
 
+template <typename C>
+auto world<C>::get_world_grid_system() -> world_grid_system_type& {
+    return world_grid_system_;
+}
+
+template <typename C>
+auto world<C>::get_registry() -> registry_type& {
+    return registry_;
+}
+
+template <typename C>
+template <typename T>
+auto world<C>::changed() -> std::unordered_set<entity>& {
+    return registry_.template changed<T>();
+}
+
+template <typename C>
+auto world<C>::destroyed() const -> const std::vector<entity>& {
+    return registry_.destroyed();
+}
+
 template <typename WC>
 auto world<WC>::voxel_ray_cast(
     const ray& r, std::unordered_set<entity>& candidates
@@ -115,18 +153,16 @@ void world<Cs>::add_component(
     registry_.add(ent, std::forward<T>(value));
 
     if constexpr (std::same_as<T, transform_component>) {
-        transform_system_.mark_dirty(ent);
-        transform_system_.mark_render_dirty(ent);
+        registry_.template request_change<transform_component>(ent);
     }
     if constexpr (std::same_as<T, model_component>) {
-        model_system_.mark_dirty(ent);
-        model_system_.mark_render_dirty(ent);
+        registry_.template request_change<model_component>(ent);
     }
     if constexpr (std::same_as<T, spatial_component>) {
-        spatial_system_.mark_dirty(ent);
+        registry_.template request_change<transform_component>(ent);
     }
     if constexpr (std::same_as<T, light_component>) {
-        light_system_.mark_render_dirty(ent);
+        registry_.template request_change<light_component>(ent);
     }
 }
 
@@ -138,17 +174,8 @@ void world<Cs>::remove_component(
     if constexpr (std::same_as<T, hierarchy_component>) {
         hierarchy_system_.cleanup(ent);
     }
-    if constexpr (std::same_as<T, transform_component>) {
-        transform_system_.mark_render_dirty(ent);
-    }
-    if constexpr (std::same_as<T, model_component>) {
-        model_system_.mark_render_dirty(ent);
-    }
     if constexpr (std::same_as<T, spatial_component>) {
         spatial_system_.cleanup(ent);
-    }
-    if constexpr (std::same_as<T, light_component>) {
-        light_system_.mark_render_dirty(ent);
     }
     if constexpr (std::same_as<T, socket_component>) {
         socket_system_.cleanup(ent);
