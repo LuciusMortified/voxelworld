@@ -14,12 +14,11 @@ inline void remove_model_component_operation::execute() {
     auto& world          = engine_->get_world();
     auto& model_registry = world.get_model_registry();
 
-    const auto ent      = state_->scene.name_to_entity[params_.name];
+    const auto ent         = state_->scene.name_to_entity[params_.name];
     const auto& model_comp = world.get_component<gfx::model_component>(ent);
 
     if (model_comp.has_model()) {
-        saved_size_   = model_comp.size();
-        saved_voxels_ = model_comp.get_voxels();
+        saved_model_ = model_comp.get_model();
     }
 
     auto* guard = state_->scene.find_guard(ent);
@@ -33,9 +32,8 @@ inline void remove_model_component_operation::execute() {
 }
 
 inline void remove_model_component_operation::undo() {
-    auto& world          = engine_->get_world();
-    auto& model_registry = world.get_model_registry();
-    auto& model_system   = world.get_model_system();
+    auto& world        = engine_->get_world();
+    auto& model_system = world.get_model_system();
 
     const auto ent = state_->scene.name_to_entity[params_.name];
     auto* guard    = state_->scene.find_guard(ent);
@@ -44,10 +42,7 @@ inline void remove_model_component_operation::undo() {
     }
 
     guard->with<gfx::model_component>();
-
-    const auto model = model_registry.create(params_.name, saved_size_);
-    model->set_voxels(saved_voxels_);
-    model_system.modify(ent).set_model(model);
+    model_system.modify(ent).set_model(saved_model_);
     state_->file.has_unsaved_changes = true;
 }
 

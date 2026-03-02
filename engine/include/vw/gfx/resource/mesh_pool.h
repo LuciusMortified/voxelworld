@@ -64,6 +64,8 @@ private:
     std::mutex gen_mutex_;
     std::condition_variable gen_cv_;
     bool gen_running_ = true;
+    uint32 sweep_counter_ = 0;
+    static constexpr uint32 sweep_interval_ = 60;
 
     static constexpr log::log_category lc_{"mesh_pool"};
 };

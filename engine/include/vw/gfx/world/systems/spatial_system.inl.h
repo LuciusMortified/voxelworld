@@ -113,9 +113,10 @@ aabb spatial_system<Cs...>::calculate_aabb_from_model(
         return aabb{{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}};
     }
 
-    int width  = model_comp.width();
-    int height = model_comp.height();
-    int depth  = model_comp.depth();
+    auto scale = model_comp.get_model()->voxel_scale();
+    int width  = model_comp.width() * scale;
+    int height = model_comp.height() * scale;
+    int depth  = model_comp.depth() * scale;
 
     vec3f local_min{0.0f, 0.0f, 0.0f};
     vec3f local_max{

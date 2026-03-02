@@ -16,7 +16,7 @@ struct world_view_component final {
 
 private:
     vec3i chunk_coord_{0, 0, 0};
-    uint32 view_distance_{10};
+    uint32 view_distance_{20};
 
     template <typename, typename...>
     friend class world_grid_system;

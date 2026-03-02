@@ -112,7 +112,10 @@ inline void mesh_pool::sweep_orphaned_() {
 }
 
 inline void mesh_pool::process_completed() {
-    sweep_orphaned_();
+    if (++sweep_counter_ >= sweep_interval_) {
+        sweep_orphaned_();
+        sweep_counter_ = 0;
+    }
 
     for (auto iter = pending_meshes_.begin(); iter != pending_meshes_.end();) {
         const auto status = iter->second.wait_for(std::chrono::seconds(0));
@@ -164,7 +167,7 @@ inline void mesh_pool::gen_thread_function() {
 
         if (task) {
             try {
-                mesh data = greedy_mesh_generator::generate_mesh_data(storage, task->model_ptr);
+                mesh data = greedy_mesh_generator::generate_mesh_data(storage, *task->model_ptr);
                 task->promise.set_value(std::move(data));
             } catch (const std::exception& e) {
                 task->promise.set_exception(std::current_exception());

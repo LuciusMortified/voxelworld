@@ -31,8 +31,7 @@ private:
     app_state* state_;
     remove_model_component_params params_;
 
-    vec3i saved_size_;
-    std::vector<voxel> saved_voxels_;
+    std::shared_ptr<gfx::model> saved_model_;
 };
 
 }  // namespace vw::sculptor

@@ -10,12 +10,13 @@
 namespace vw::gfx {
 
 inline model::model(
-    model_identity_pool& identity_pool, int width, int height, int depth
+    model_identity_pool& identity_pool, int width, int height, int depth, int32 voxel_scale
 )
     : identity_pool_(&identity_pool),
       width_(width),
       height_(height),
       depth_(depth),
+      voxel_scale_(voxel_scale),
       pages_x_((width + page_size - 1) / page_size),
       pages_y_((height + page_size - 1) / page_size),
       pages_z_((depth + page_size - 1) / page_size) {
@@ -27,7 +28,47 @@ inline model::model(
 }
 
 inline model::~model() {
-    identity_pool_->destroy(identity_);
+    if (identity_pool_) {
+        identity_pool_->destroy(identity_);
+    }
+}
+
+inline model::model(
+    model&& other
+) noexcept
+    : identity_pool_(other.identity_pool_),
+      width_(other.width_),
+      height_(other.height_),
+      depth_(other.depth_),
+      voxel_scale_(other.voxel_scale_),
+      pages_x_(other.pages_x_),
+      pages_y_(other.pages_y_),
+      pages_z_(other.pages_z_),
+      pages_(std::move(other.pages_)),
+      identity_(other.identity_) {
+    other.identity_pool_ = nullptr;
+}
+
+inline auto model::operator=(
+    model&& other
+) noexcept -> model& {
+    if (this != &other) {
+        if (identity_pool_) {
+            identity_pool_->destroy(identity_);
+        }
+        identity_pool_ = other.identity_pool_;
+        width_ = other.width_;
+        height_ = other.height_;
+        depth_ = other.depth_;
+        voxel_scale_ = other.voxel_scale_;
+        pages_x_ = other.pages_x_;
+        pages_y_ = other.pages_y_;
+        pages_z_ = other.pages_z_;
+        pages_ = std::move(other.pages_);
+        identity_ = other.identity_;
+        other.identity_pool_ = nullptr;
+    }
+    return *this;
 }
 
 inline auto model::operator[](
@@ -151,6 +192,10 @@ inline auto model::size() const -> vec3i {
     return vec3i{width_, height_, depth_};
 }
 
+inline auto model::voxel_scale() const -> int32 {
+    return voxel_scale_;
+}
+
 inline void model::fill(
     const voxel& voxel
 ) {
@@ -177,6 +222,25 @@ inline auto model::is_page_allocated(
     int px, int py, int pz
 ) const -> bool {
     return pages_[page_index(px, py, pz)] != nullptr;
+}
+
+inline auto model::get_page(
+    int px, int py, int pz
+) const -> const page_type* {
+    auto& ptr = pages_[page_index(px, py, pz)];
+    return ptr ? ptr.get() : nullptr;
+}
+
+inline auto model::pages_x() const -> int {
+    return pages_x_;
+}
+
+inline auto model::pages_y() const -> int {
+    return pages_y_;
+}
+
+inline auto model::pages_z() const -> int {
+    return pages_z_;
 }
 
 inline auto model::page_index(
@@ -206,60 +270,21 @@ inline void model::increment_generation_() {
     identity_ = identity_pool_->next_generation(identity_);
 }
 
-inline void model::set_voxels(
-    const std::vector<voxel>& voxels
+inline void model::clone_pages_from(
+    const model& source
 ) {
-    auto expected = static_cast<size_t>(width_) * static_cast<size_t>(height_) *
-                    static_cast<size_t>(depth_);
-    if (voxels.size() != expected) {
-        throw std::runtime_error("Voxels container size does not match model size.");
-    }
-    for (auto& ptr : pages_) {
-        ptr.reset();
-    }
-    for (int z = 0; z < depth_; ++z) {
-        for (int y = 0; y < height_; ++y) {
-            for (int x = 0; x < width_; ++x) {
-                auto& v = voxels[x + (y * width_) + (z * width_ * height_)];
-                if (!v.is_empty()) {
-                    int px = x / page_size;
-                    int py = y / page_size;
-                    int pz = z / page_size;
-                    auto& page = ensure_page(px, py, pz);
-                    page[local_index(x % page_size, y % page_size, z % page_size)] = v;
-                }
-            }
+    auto count = static_cast<size_t>(pages_x_) * static_cast<size_t>(pages_y_) *
+                 static_cast<size_t>(pages_z_);
+    for (size_t i = 0; i < count; ++i) {
+        if (source.pages_[i]) {
+            pages_[i] = std::make_unique<page_type>(*source.pages_[i]);
+        } else {
+            pages_[i].reset();
         }
     }
     increment_generation_();
 }
 
-inline void model::set_voxels(
-    std::vector<voxel>&& voxels
-) {
-    set_voxels(static_cast<const std::vector<voxel>&>(voxels));
-}
-
-inline auto model::get_voxels() const -> std::vector<voxel> {
-    auto total =
-        static_cast<size_t>(width_) * static_cast<size_t>(height_) * static_cast<size_t>(depth_);
-    std::vector<voxel> result(total);
-    for (int z = 0; z < depth_; ++z) {
-        for (int y = 0; y < height_; ++y) {
-            for (int x = 0; x < width_; ++x) {
-                int px = x / page_size;
-                int py = y / page_size;
-                int pz = z / page_size;
-                auto& ptr = pages_[page_index(px, py, pz)];
-                if (ptr) {
-                    result[x + (y * width_) + (z * width_ * height_)] =
-                        (*ptr)[local_index(x % page_size, y % page_size, z % page_size)];
-                }
-            }
-        }
-    }
-    return result;
-}
 
 }  // namespace vw::gfx
 

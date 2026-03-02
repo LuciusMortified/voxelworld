@@ -25,6 +25,8 @@ public:
     [[nodiscard]] auto create_clone(std::string_view name) -> std::shared_ptr<model>;
     void erase(std::string_view name);
 
+    [[nodiscard]] auto get_identity_pool() -> model_identity_pool& { return identity_pool_; }
+
 private:
     model_identity_pool identity_pool_;
     std::unordered_map<std::string, std::shared_ptr<model>> models_;

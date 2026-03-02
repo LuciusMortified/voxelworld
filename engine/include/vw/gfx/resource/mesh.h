@@ -58,18 +58,10 @@ private:
     ) -> bool;
 };
 
-struct face_cell {
-    color col = colors::empty;
-    std::array<float32, 4> ao = {1.0f, 1.0f, 1.0f, 1.0f};
-
-    [[nodiscard]] auto is_empty() const -> bool { return col == colors::empty; }
-};
-
 struct greedy_mesh_storage {
     std::vector<vertex> vertices;
     std::vector<uint32> indices;
-    std::vector<face_cell> mask;
-    std::vector<bool> visited;
+    std::vector<color> mask;
     std::vector<bool> depth_has_pages;
 
     void clear() {
@@ -82,12 +74,30 @@ class greedy_mesh_generator {
 public:
     [[nodiscard]]
     static auto generate_mesh_data(
-        greedy_mesh_storage& storage, const std::shared_ptr<model>& model) -> mesh;
+        greedy_mesh_storage& storage, const model& mdl) -> mesh;
 
 private:
+    struct face_axis_mapping;
+
+    static void build_face_mask(
+        greedy_mesh_storage& storage,
+        const model& mdl,
+        const face_axis_mapping& axes,
+        int face_direction,
+        int layer
+    );
+
+    static void merge_and_emit_strips(
+        greedy_mesh_storage& storage,
+        const model& mdl,
+        const face_axis_mapping& axes,
+        int face_direction,
+        int layer
+    );
+
     static void generate_face_quads(
         greedy_mesh_storage& storage,
-        const std::shared_ptr<model>& model,
+        const model& mdl,
         int face_direction
     );
 
@@ -103,8 +113,13 @@ private:
 
     [[nodiscard]]
     static auto is_face_visible(
-        const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
+        const model& mdl, int x, int y, int z, int face_direction
     ) -> bool;
+
+    [[nodiscard]]
+    static auto compute_vertex_ao(
+        const model& mdl, int x, int y, int z, int face, int su, int sv
+    ) -> float32;
 };
 }  // namespace vw::gfx
 

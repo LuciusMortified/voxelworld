@@ -57,7 +57,7 @@ inline auto model_registry::create_unnamed(
     auto cloned_model = std::make_shared<model>(
         identity_pool_, original->width(), original->height(), original->depth()
     );
-    cloned_model->set_voxels(original->get_voxels());
+    cloned_model->clone_pages_from(*original);
 
     return cloned_model;
 }

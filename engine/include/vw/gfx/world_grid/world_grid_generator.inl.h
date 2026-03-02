@@ -4,13 +4,14 @@
 #define VW_GFX_WORLD_GRID_GENERATOR_INL_H
 
 #include "vw/core/color.h"
+#include "vw/gfx/model/model.h"
 
 namespace vw::gfx {
 
 inline flat_world_grid_generator::flat_world_grid_generator(
-    int32 height, int32 region_size
+    int32 height, int32 region_size, int32 voxel_scale
 )
-    : height_(height), region_size_(region_size) {}
+    : height_(height), region_size_(region_size), voxel_scale_(voxel_scale) {}
 
 inline auto flat_world_grid_generator::get_region_id(
     int32 cx, int32 cz
@@ -38,29 +39,32 @@ inline auto flat_world_grid_generator::generate_region(
     result.meta.aabb_min = {cx_min, cz_min};
     result.meta.aabb_max = {cx_max, cz_max};
 
+    constexpr int32 s = chunk<>::size;
+
     for (int32 cx = cx_min; cx <= cx_max; ++cx) {
         for (int32 cz = cz_min; cz <= cz_max; ++cz) {
             chunk_data data;
             data.region = id;
             data.coord = {cx, 0, cz};
-            data.voxels.resize(chunk<>::volume);
+
+            auto mdl = std::make_shared<model>(*pool_, s, s, s, voxel_scale_);
 
             bool checker = ((cx + cz) & 1) == 0;
             auto grass = checker ? color{60, 140, 50, 255} : color{80, 170, 60, 255};
 
-            for (int32 x = 0; x < chunk<>::size; ++x) {
-                for (int32 z = 0; z < chunk<>::size; ++z) {
+            for (int32 x = 0; x < s; ++x) {
+                for (int32 z = 0; z < s; ++z) {
                     for (int32 y = 0; y < height_; ++y) {
-                        const int32 idx = x + y * chunk<>::size + z * chunk<>::size * chunk<>::size;
                         if (y == height_ - 1) {
-                            data.voxels[idx] = voxel{grass};
+                            mdl->set_voxel(x, y, z, grass);
                         } else {
-                            data.voxels[idx] = voxel{colors::brown};
+                            mdl->set_voxel(x, y, z, colors::brown);
                         }
                     }
                 }
             }
 
+            data.model = std::move(mdl);
             result.chunks.push_back(std::move(data));
         }
     }

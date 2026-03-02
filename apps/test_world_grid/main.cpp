@@ -47,7 +47,7 @@ public:
         const auto& camera = get_engine().get_camera();
         const auto cam_pos = camera.get_position();
 
-        auto& world = get_engine().get_world();
+        auto& world            = get_engine().get_world();
         auto& transform_system = world.get_transform_system();
         transform_system.modify(viewer_->get_entity()).set_position(cam_pos);
 
@@ -61,11 +61,12 @@ public:
 
 private:
     void setup_world_grid() {
-        auto& world = get_engine().get_world();
+        auto& world       = get_engine().get_world();
         auto& grid_system = world.get_world_grid_system();
 
-        auto generator = std::make_unique<gfx::flat_world_grid_generator>(2, 2);
-        world_grid_ = std::make_shared<gfx::world_grid<>>(world, std::move(generator));
+        constexpr int32 voxel_scale = 8;
+        auto generator = std::make_unique<gfx::flat_world_grid_generator>(2, 2, voxel_scale);
+        world_grid_ = std::make_shared<gfx::world_grid<>>(world, std::move(generator), voxel_scale);
         grid_system.set_world_grid(world_grid_);
 
         viewer_ = std::make_unique<gfx::entity_guard<>>(world);
@@ -75,16 +76,12 @@ private:
 
     void render_ui() const {
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImVec2 window_pos = ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
+        ImVec2 window_pos             = ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
         ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.0f, 0.0f));
 
-        ImGuiWindowFlags window_flags =
-            ImGuiWindowFlags_NoCollapse |
-            ImGuiWindowFlags_NoResize |
-            ImGuiWindowFlags_NoScrollbar |
-            ImGuiWindowFlags_AlwaysAutoResize |
-            ImGuiWindowFlags_NoSavedSettings |
-            ImGuiWindowFlags_NoNav |
+        ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize |
+            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_AlwaysAutoResize |
+            ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNav |
             ImGuiWindowFlags_NoFocusOnAppearing;
 
         ImGui::Begin("World Grid Test", nullptr, window_flags);
@@ -94,24 +91,21 @@ private:
         ImGui::Text("ESC - exit");
         ImGui::Separator();
 
-        auto& camera = get_engine().get_camera();
-        auto pos = camera.get_position();
+        const auto& camera = get_engine().get_camera();
+        const auto pos     = camera.get_position();
         ImGui::Text("Camera: (%.1f, %.1f, %.1f)", pos.x, pos.y, pos.z);
 
         if (world_grid_) {
-            auto chunk_coord = gfx::world_grid<>::world_to_chunk_coord({
-                static_cast<int32>(pos.x),
-                static_cast<int32>(pos.y),
-                static_cast<int32>(pos.z)
-            });
+            auto chunk_coord = world_grid_->world_to_chunk_coord(
+                {static_cast<int32>(pos.x), static_cast<int32>(pos.y), static_cast<int32>(pos.z)}
+            );
             ImGui::Text("Chunk: (%d, %d, %d)", chunk_coord.x, chunk_coord.y, chunk_coord.z);
             ImGui::Text("Loaded chunks: %u", world_grid_->get_loaded_chunk_count());
             ImGui::Text("Loaded regions: %u", world_grid_->get_loaded_region_count());
             ImGui::Text("Pending regions: %u", world_grid_->get_pending_region_count());
             ImGui::Text("Pending chunks: %u", world_grid_->get_pending_chunk_count());
             ImGui::Text(
-                "Pending meshes: %u",
-                get_engine().get_world().get_mesh_pool().get_pending_count()
+                "Pending meshes: %u", get_engine().get_world().get_mesh_pool().get_pending_count()
             );
         }
 

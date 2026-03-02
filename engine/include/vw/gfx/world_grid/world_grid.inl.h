@@ -9,10 +9,12 @@ namespace vw::gfx {
 
 template <typename WC>
 world_grid<WC>::world_grid(
-    world_type& world, std::unique_ptr<world_grid_generator> generator
+    world_type& world, std::unique_ptr<world_grid_generator> generator, int32 voxel_scale
 )
     : world_(&world)
+    , voxel_scale_(voxel_scale)
     , generator_(std::move(generator)) {
+    generator_->set_identity_pool(world.get_model_registry().get_identity_pool());
     auto count = std::min(std::thread::hardware_concurrency(), 4u);
     if (count == 0) {
         count = 1;
@@ -132,10 +134,15 @@ auto world_grid<WC>::get_pending_chunk_count() const -> uint32 {
 }
 
 template <typename WC>
+auto world_grid<WC>::voxel_scale() const -> int32 {
+    return voxel_scale_;
+}
+
+template <typename WC>
 auto world_grid<WC>::world_to_chunk_coord(
     vec3i world_pos
-) -> vec3i {
-    constexpr int32 s = chunk<WC>::size;
+) const -> vec3i {
+    const int32 s = chunk<WC>::size * voxel_scale_;
     return {
         world_pos.x >= 0 ? world_pos.x / s : (world_pos.x - s + 1) / s,
         world_pos.y >= 0 ? world_pos.y / s : (world_pos.y - s + 1) / s,
@@ -146,8 +153,8 @@ auto world_grid<WC>::world_to_chunk_coord(
 template <typename WC>
 auto world_grid<WC>::world_to_local_coord(
     vec3i world_pos
-) -> vec3i {
-    constexpr int32 s = chunk<WC>::size;
+) const -> vec3i {
+    const int32 s = chunk<WC>::size * voxel_scale_;
     return {
         ((world_pos.x % s) + s) % s,
         ((world_pos.y % s) + s) % s,
@@ -158,8 +165,8 @@ auto world_grid<WC>::world_to_local_coord(
 template <typename WC>
 auto world_grid<WC>::chunk_to_world_coord(
     vec3i chunk_coord
-) -> vec3i {
-    constexpr int32 s = chunk<WC>::size;
+) const -> vec3i {
+    const int32 s = chunk<WC>::size * voxel_scale_;
     return {chunk_coord.x * s, chunk_coord.y * s, chunk_coord.z * s};
 }
 
@@ -236,7 +243,8 @@ void world_grid<WC>::process_completed() {
         region_chunks_[cd.region].push_back(cd.coord);
         chunks_.emplace(
             cd.coord,
-            std::make_unique<chunk<WC>>(*world_, cd.region, cd.coord, std::move(cd.voxels))
+            std::make_unique<chunk<WC>>(*world_, cd.region, cd.coord, std::move(cd.model),
+                                       voxel_scale_)
         );
         ++processed;
 

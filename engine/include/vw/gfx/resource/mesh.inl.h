@@ -59,8 +59,6 @@ inline auto vertex::get_attribute_descriptions() -> std::vector<VkVertexInputAtt
     return attribute_descriptions;
 }
 
-// ==================== AO helpers ====================
-
 static constexpr int ao_normal[6][3] = {
     {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
 };
@@ -73,21 +71,27 @@ static constexpr int ao_tangent_v[6][3] = {
     {0, 1, 0}, {0, 1, 0}, {0, 0, 1}, {0, 0, 1}, {0, 1, 0}, {0, 1, 0}
 };
 
-inline auto compute_vertex_ao(
-    const std::shared_ptr<model>& mdl,
-    int x, int y, int z,
-    int face, int su, int sv
+static constexpr int ao_winding_signs[6][4][2] = {
+    {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}},  // +X
+    {{-1, -1}, {-1, 1}, {1, 1}, {1, -1}},  // -X
+    {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}},  // +Y
+    {{-1, -1}, {-1, 1}, {1, 1}, {1, -1}},  // -Y
+    {{-1, -1}, {-1, 1}, {1, 1}, {1, -1}},  // +Z
+    {{1, -1}, {1, 1}, {-1, 1}, {-1, -1}},  // -Z
+};
+
+inline auto compute_vertex_ao_free(
+    const model& mdl, int x, int y, int z, int face, int su, int sv
 ) -> float32 {
     int nx = x + ao_normal[face][0];
     int ny = y + ao_normal[face][1];
     int nz = z + ao_normal[face][2];
 
     auto is_solid = [&](int px, int py, int pz) -> bool {
-        if (px < 0 || px >= mdl->width() ||
-            py < 0 || py >= mdl->height() ||
-            pz < 0 || pz >= mdl->depth())
+        if (px < 0 || px >= mdl.width() || py < 0 || py >= mdl.height() || pz < 0 ||
+            pz >= mdl.depth())
             return false;
-        return !mdl->is_empty(px, py, pz);
+        return !mdl.is_empty(px, py, pz);
     };
 
     int ux = ao_tangent_u[face][0], uy = ao_tangent_u[face][1], uz = ao_tangent_u[face][2];
@@ -96,29 +100,14 @@ inline auto compute_vertex_ao(
     bool side1 = is_solid(nx + su * ux, ny + su * uy, nz + su * uz);
     bool side2 = is_solid(nx + sv * vx, ny + sv * vy, nz + sv * vz);
 
-    if (side1 && side2) return 0.0f;
+    if (side1 && side2)
+        return 0.0f;
 
-    bool corner = is_solid(
-        nx + su * ux + sv * vx,
-        ny + su * uy + sv * vy,
-        nz + su * uz + sv * vz
-    );
+    bool corner = is_solid(nx + su * ux + sv * vx, ny + su * uy + sv * vy, nz + su * uz + sv * vz);
 
     int ao_val = 3 - static_cast<int>(side1) - static_cast<int>(side2) - static_cast<int>(corner);
     return static_cast<float32>(ao_val) / 3.0f;
 }
-
-// ==================== simple_mesh_generator ====================
-
-// Per-vertex (su, sv) signs for each face direction, matching face_vertices winding
-static constexpr int ao_winding_signs[6][4][2] = {
-    {{-1, -1}, { 1, -1}, { 1,  1}, {-1,  1}},  // +X
-    {{-1, -1}, {-1,  1}, { 1,  1}, { 1, -1}},  // -X
-    {{-1, -1}, { 1, -1}, { 1,  1}, {-1,  1}},  // +Y
-    {{-1, -1}, {-1,  1}, { 1,  1}, { 1, -1}},  // -Y
-    {{-1, -1}, {-1,  1}, { 1,  1}, { 1, -1}},  // +Z
-    {{ 1, -1}, { 1,  1}, {-1,  1}, {-1, -1}},  // -Z
-};
 
 inline auto simple_mesh_generator::generate_mesh_data(
     const std::shared_ptr<model>& model
@@ -151,14 +140,19 @@ inline void simple_mesh_generator::add_cube_face(
     std::vector<vertex>& vertices,
     std::vector<uint32>& indices,
     const std::shared_ptr<model>& model,
-    int x, int y, int z,
+    int x,
+    int y,
+    int z,
     int face_direction,
     color color
 ) {
     static constexpr vec3f face_normals[6] = {
-        vec3f(1, 0, 0),  vec3f(-1, 0, 0),
-        vec3f(0, 1, 0),  vec3f(0, -1, 0),
-        vec3f(0, 0, 1),  vec3f(0, 0, -1)
+        vec3f(1, 0, 0),
+        vec3f(-1, 0, 0),
+        vec3f(0, 1, 0),
+        vec3f(0, -1, 0),
+        vec3f(0, 0, 1),
+        vec3f(0, 0, -1)
     };
 
     static constexpr vec3f face_vertices[6][4] = {
@@ -171,20 +165,25 @@ inline void simple_mesh_generator::add_cube_face(
     };
 
     const auto base_vertex = static_cast<uint32>(vertices.size());
-    vec3f normal = face_normals[face_direction];
+    vec3f normal           = face_normals[face_direction];
     vec3f position(x, y, z);
+    auto scale = static_cast<float32>(model->voxel_scale());
 
     std::array<float32, 4> ao_values;
     for (int i = 0; i < 4; i++) {
-        ao_values[i] = compute_vertex_ao(
-            model, x, y, z, face_direction,
+        ao_values[i] = compute_vertex_ao_free(
+            *model,
+            x,
+            y,
+            z,
+            face_direction,
             ao_winding_signs[face_direction][i][0],
             ao_winding_signs[face_direction][i][1]
         );
     }
 
     for (int i = 0; i < 4; i++) {
-        vec3f vertex_pos = position + face_vertices[face_direction][i];
+        vec3f vertex_pos = (position + face_vertices[face_direction][i]) * scale;
         vertices.emplace_back(vertex_pos, normal, color.value, ao_values[i]);
     }
 
@@ -208,7 +207,8 @@ inline void simple_mesh_generator::add_cube_face(
 inline auto simple_mesh_generator::is_face_visible(
     const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
 ) -> bool {
-    if (!model) return false;
+    if (!model)
+        return false;
 
     static constexpr int dx[6] = {1, -1, 0, 0, 0, 0};
     static constexpr int dy[6] = {0, 0, 1, -1, 0, 0};
@@ -218,63 +218,70 @@ inline auto simple_mesh_generator::is_face_visible(
     int ny = y + dy[face_direction];
     int nz = z + dz[face_direction];
 
-    if (nx < 0 || nx >= model->width() || ny < 0 || ny >= model->height() ||
-        nz < 0 || nz >= model->depth()) {
+    if (nx < 0 || nx >= model->width() || ny < 0 || ny >= model->height() || nz < 0 ||
+        nz >= model->depth()) {
         return true;
     }
 
     return model->is_empty(nx, ny, nz);
 }
 
-// ==================== greedy_mesh_generator ====================
-
-struct face_axis_mapping {
+struct greedy_mesh_generator::face_axis_mapping {
     int width, height, depth;
     int face_direction;
+    int32 voxel_scale;
 
-    face_axis_mapping(const std::shared_ptr<model>& mdl, int face_dir)
-        : face_direction(face_dir) {
+    face_axis_mapping(const model& mdl, int face_dir)
+        : face_direction(face_dir), voxel_scale(mdl.voxel_scale()) {
         switch (face_dir / 2) {
             case 0:
-                width = mdl->depth(); height = mdl->height(); depth = mdl->width();
+                width  = mdl.depth();
+                height = mdl.height();
+                depth  = mdl.width();
                 break;
             case 1:
-                width = mdl->width(); height = mdl->depth(); depth = mdl->height();
+                width  = mdl.width();
+                height = mdl.depth();
+                depth  = mdl.height();
                 break;
             default:
-                width = mdl->width(); height = mdl->height(); depth = mdl->depth();
+                width  = mdl.width();
+                height = mdl.height();
+                depth  = mdl.depth();
                 break;
         }
     }
 
-    [[nodiscard]] auto to_model_coords(int u, int v, int layer) const
-        -> std::tuple<int, int, int> {
+    [[nodiscard]] auto to_model_coords(
+        int u, int v, int layer
+    ) const -> std::tuple<int, int, int> {
         int d = (face_direction % 2 == 0) ? layer : depth - 1 - layer;
         switch (face_direction / 2) {
-            case 0: return {d, v, u};
-            case 1: return {u, d, v};
+            case 0:  return {d, v, u};
+            case 1:  return {u, d, v};
             default: return {u, v, d};
         }
     }
 
-    [[nodiscard]] auto to_world_min_max(int u, int v, int w, int h, int layer) const
-        -> std::pair<vec3f, vec3f> {
-        auto d_lo = static_cast<float32>((face_direction % 2 == 0) ? layer : depth - 1 - layer);
-        auto d_hi = d_lo + 1.0f;
-        auto u_lo = static_cast<float32>(u);
-        auto u_hi = static_cast<float32>(u + w);
-        auto v_lo = static_cast<float32>(v);
-        auto v_hi = static_cast<float32>(v + h);
+    [[nodiscard]] auto to_world_min_max(
+        int u, int v, int w, int h, int layer
+    ) const -> std::pair<vec3f, vec3f> {
+        auto vs = static_cast<float32>(voxel_scale);
+        auto d_lo = static_cast<float32>((face_direction % 2 == 0) ? layer : depth - 1 - layer) * vs;
+        auto d_hi = d_lo + vs;
+        auto u_lo = static_cast<float32>(u) * vs;
+        auto u_hi = static_cast<float32>(u + w) * vs;
+        auto v_lo = static_cast<float32>(v) * vs;
+        auto v_hi = static_cast<float32>(v + h) * vs;
 
         switch (face_direction / 2) {
-            case 0: return {{d_lo, v_lo, u_lo}, {d_hi, v_hi, u_hi}};
-            case 1: return {{u_lo, d_lo, v_lo}, {u_hi, d_hi, v_hi}};
+            case 0:  return {{d_lo, v_lo, u_lo}, {d_hi, v_hi, u_hi}};
+            case 1:  return {{u_lo, d_lo, v_lo}, {u_hi, d_hi, v_hi}};
             default: return {{u_lo, v_lo, d_lo}, {u_hi, v_hi, d_hi}};
         }
     }
 };
 
-// Maps canonical AO order (BL, BR, TR, TL) to face winding vertex order
 static constexpr int canonical_to_winding[6][4] = {
     {0, 1, 2, 3},  // +X
     {0, 3, 2, 1},  // -X
@@ -285,15 +292,11 @@ static constexpr int canonical_to_winding[6][4] = {
 };
 
 inline auto greedy_mesh_generator::generate_mesh_data(
-    greedy_mesh_storage& storage, const std::shared_ptr<model>& model
+    greedy_mesh_storage& storage, const model& mdl
 ) -> mesh {
-    if (!model) {
-        throw std::runtime_error("model is null");
-    }
-
     storage.clear();
 
-    auto total = model->width() * model->height() * model->depth();
+    auto total    = mdl.width() * mdl.height() * mdl.depth();
     auto estimate = static_cast<size_t>(total / 4);
 
     if (storage.vertices.capacity() < estimate) {
@@ -304,31 +307,122 @@ inline auto greedy_mesh_generator::generate_mesh_data(
     }
 
     for (int face_direction = 0; face_direction < 6; face_direction++) {
-        generate_face_quads(storage, model, face_direction);
+        generate_face_quads(storage, mdl, face_direction);
     }
 
     return mesh{storage.vertices, storage.indices};
 }
 
-inline void greedy_mesh_generator::generate_face_quads(
+inline void greedy_mesh_generator::build_face_mask(
     greedy_mesh_storage& storage,
-    const std::shared_ptr<model>& model,
-    int face_direction
+    const model& mdl,
+    const face_axis_mapping& axes,
+    int face_direction,
+    int layer
 ) {
-    face_axis_mapping axes(model, face_direction);
     constexpr int ps = model::page_size;
-
-    auto mask_size = static_cast<size_t>(axes.width) * static_cast<size_t>(axes.height);
-    storage.mask.resize(mask_size);
-    storage.visited.resize(mask_size);
 
     auto idx = [&](int u, int v) -> size_t {
         return static_cast<size_t>(u) * static_cast<size_t>(axes.height) + static_cast<size_t>(v);
     };
 
-    const int depth_pages = (axes.depth + ps - 1) / ps;
-    int u_pages = (axes.width + ps - 1) / ps;
-    int v_pages = (axes.height + ps - 1) / ps;
+    for (int u_block = 0; u_block < axes.width; u_block += ps) {
+        int u_end = std::min(u_block + ps, axes.width);
+        for (int v_block = 0; v_block < axes.height; v_block += ps) {
+            int v_end = std::min(v_block + ps, axes.height);
+
+            auto [pmx, pmy, pmz] = axes.to_model_coords(u_block, v_block, layer);
+            auto* page = mdl.get_page(pmx / ps, pmy / ps, pmz / ps);
+
+            if (!page) {
+                for (int u = u_block; u < u_end; u++) {
+                    for (int v = v_block; v < v_end; v++) {
+                        storage.mask[idx(u, v)] = colors::empty;
+                    }
+                }
+                continue;
+            }
+
+            for (int u = u_block; u < u_end; u++) {
+                for (int v = v_block; v < v_end; v++) {
+                    auto [mx, my, mz] = axes.to_model_coords(u, v, layer);
+                    int lx = mx % ps, ly = my % ps, lz = mz % ps;
+                    auto& vx = (*page)[lx + ly * ps + lz * ps * ps];
+                    if (!vx.is_empty() && is_face_visible(mdl, mx, my, mz, face_direction)) {
+                        storage.mask[idx(u, v)] = vx.value;
+                    } else {
+                        storage.mask[idx(u, v)] = colors::empty;
+                    }
+                }
+            }
+        }
+    }
+}
+
+inline void greedy_mesh_generator::merge_and_emit_strips(
+    greedy_mesh_storage& storage,
+    const model& mdl,
+    const face_axis_mapping& axes,
+    int face_direction,
+    int layer
+) {
+    auto idx = [&](int u, int v) -> size_t {
+        return static_cast<size_t>(u) * static_cast<size_t>(axes.height) + static_cast<size_t>(v);
+    };
+
+    for (int v = 0; v < axes.height; v++) {
+        int u = 0;
+        while (u < axes.width) {
+            color col = storage.mask[idx(u, v)];
+            if (col == colors::empty) {
+                u++;
+                continue;
+            }
+
+            int strip_start = u;
+            u++;
+            while (u < axes.width && storage.mask[idx(u, v)] == col) {
+                u++;
+            }
+            int w = u - strip_start;
+
+            auto [min_pos, max_pos] = axes.to_world_min_max(strip_start, v, w, 1, layer);
+
+            auto [sx, sy, sz] = axes.to_model_coords(strip_start, v, layer);
+            auto [ex, ey, ez] = axes.to_model_coords(strip_start + w - 1, v, layer);
+
+            std::array canonical_ao = {
+                compute_vertex_ao(mdl, sx, sy, sz, face_direction, -1, -1),
+                compute_vertex_ao(mdl, ex, ey, ez, face_direction, 1, -1),
+                compute_vertex_ao(mdl, ex, ey, ez, face_direction, 1, 1),
+                compute_vertex_ao(mdl, sx, sy, sz, face_direction, -1, 1),
+            };
+
+            std::array<float32, 4> winding_ao;
+            for (int k = 0; k < 4; k++) {
+                winding_ao[k] = canonical_ao[canonical_to_winding[face_direction][k]];
+            }
+
+            add_quad(
+                storage.vertices, storage.indices, face_direction,
+                min_pos, max_pos, col, winding_ao
+            );
+        }
+    }
+}
+
+inline void greedy_mesh_generator::generate_face_quads(
+    greedy_mesh_storage& storage, const model& mdl, int face_direction
+) {
+    face_axis_mapping axes(mdl, face_direction);
+    constexpr int ps = model::page_size;
+
+    auto mask_size = static_cast<size_t>(axes.width) * static_cast<size_t>(axes.height);
+    storage.mask.resize(mask_size);
+
+    int depth_pages = (axes.depth + ps - 1) / ps;
+    int u_pages     = (axes.width + ps - 1) / ps;
+    int v_pages     = (axes.height + ps - 1) / ps;
 
     storage.depth_has_pages.resize(depth_pages);
     std::ranges::fill(storage.depth_has_pages, false);
@@ -336,7 +430,7 @@ inline void greedy_mesh_generator::generate_face_quads(
         for (int pu = 0; pu < u_pages && !storage.depth_has_pages[pd]; pu++) {
             for (int pv = 0; pv < v_pages && !storage.depth_has_pages[pd]; pv++) {
                 auto [mx, my, mz] = axes.to_model_coords(pu * ps, pv * ps, pd * ps);
-                if (model->is_page_allocated(mx / ps, my / ps, mz / ps)) {
+                if (mdl.is_page_allocated(mx / ps, my / ps, mz / ps)) {
                     storage.depth_has_pages[pd] = true;
                 }
             }
@@ -349,114 +443,15 @@ inline void greedy_mesh_generator::generate_face_quads(
             continue;
         }
 
+        build_face_mask(storage, mdl, axes, face_direction, layer);
+
         bool has_faces = false;
-
-        for (int u_block = 0; u_block < axes.width; u_block += ps) {
-            int u_end = std::min(u_block + ps, axes.width);
-            for (int v_block = 0; v_block < axes.height; v_block += ps) {
-                int v_end = std::min(v_block + ps, axes.height);
-
-                auto [pmx, pmy, pmz] = axes.to_model_coords(u_block, v_block, layer);
-
-                if (!model->is_page_allocated(pmx / ps, pmy / ps, pmz / ps)) {
-                    for (int u = u_block; u < u_end; u++) {
-                        for (int v = v_block; v < v_end; v++) {
-                            storage.mask[idx(u, v)] = face_cell{};
-                        }
-                    }
-                    continue;
-                }
-
-                for (int u = u_block; u < u_end; u++) {
-                    for (int v = v_block; v < v_end; v++) {
-                        auto [mx, my, mz] = axes.to_model_coords(u, v, layer);
-                        auto voxel = model->get_voxel(mx, my, mz);
-                        auto i = idx(u, v);
-                        if (!voxel.is_empty() &&
-                            is_face_visible(model, mx, my, mz, face_direction)) {
-                            storage.mask[i].col = voxel.value;
-                            storage.mask[i].ao[0] =
-                                compute_vertex_ao(model, mx, my, mz, face_direction, -1, -1);
-                            storage.mask[i].ao[1] =
-                                compute_vertex_ao(model, mx, my, mz, face_direction, 1, -1);
-                            storage.mask[i].ao[2] =
-                                compute_vertex_ao(model, mx, my, mz, face_direction, 1, 1);
-                            storage.mask[i].ao[3] =
-                                compute_vertex_ao(model, mx, my, mz, face_direction, -1, 1);
-                            has_faces = true;
-                        } else {
-                            storage.mask[i] = face_cell{};
-                        }
-                    }
-                }
-            }
+        for (size_t i = 0; i < mask_size && !has_faces; i++) {
+            has_faces = storage.mask[i] != colors::empty;
         }
-
         if (!has_faces) continue;
 
-        std::fill(storage.visited.begin(), storage.visited.end(), false);
-
-        for (int u = 0; u < axes.width; u++) {
-            for (int v = 0; v < axes.height; v++) {
-                auto i0 = idx(u, v);
-                if (storage.visited[i0] || storage.mask[i0].is_empty()) continue;
-
-                auto& origin = storage.mask[i0];
-
-                int w = 1;
-                while (u + w < axes.width && !storage.visited[idx(u + w, v)]
-                    && storage.mask[idx(u + w, v)].col == origin.col
-                    && storage.mask[idx(u + w - 1, v)].ao[1] == storage.mask[idx(u + w, v)].ao[0]
-                    && storage.mask[idx(u + w - 1, v)].ao[2] == storage.mask[idx(u + w, v)].ao[3]) {
-                    w++;
-                }
-
-                int h = 1;
-                bool can_extend = true;
-                while (can_extend && v + h < axes.height) {
-                    for (int ii = 0; ii < w; ii++) {
-                        auto ci = idx(u + ii, v + h);
-                        auto bi = idx(u + ii, v + h - 1);
-                        auto& cell = storage.mask[ci];
-                        auto& below = storage.mask[bi];
-                        if (cell.col != origin.col || storage.visited[ci]
-                            || below.ao[3] != cell.ao[0]
-                            || below.ao[2] != cell.ao[1]) {
-                            can_extend = false;
-                            break;
-                        }
-                        if (ii > 0) {
-                            auto& left = storage.mask[idx(u + ii - 1, v + h)];
-                            if (left.ao[1] != cell.ao[0] || left.ao[2] != cell.ao[3]) {
-                                can_extend = false;
-                                break;
-                            }
-                        }
-                    }
-                    if (can_extend) h++;
-                }
-
-                for (int ii = 0; ii < w; ii++)
-                    for (int j = 0; j < h; j++)
-                        storage.visited[idx(u + ii, v + j)] = true;
-
-                auto [min_pos, max_pos] = axes.to_world_min_max(u, v, w, h, layer);
-
-                std::array<float32, 4> canonical_ao = {
-                    storage.mask[idx(u, v)].ao[0],
-                    storage.mask[idx(u + w - 1, v)].ao[1],
-                    storage.mask[idx(u + w - 1, v + h - 1)].ao[2],
-                    storage.mask[idx(u, v + h - 1)].ao[3],
-                };
-
-                std::array<float32, 4> winding_ao;
-                for (int k = 0; k < 4; k++) {
-                    winding_ao[k] = canonical_ao[canonical_to_winding[face_direction][k]];
-                }
-
-                add_quad(storage.vertices, storage.indices, face_direction, min_pos, max_pos, origin.col, winding_ao);
-            }
-        }
+        merge_and_emit_strips(storage, mdl, axes, face_direction, layer);
     }
 }
 
@@ -475,7 +470,6 @@ inline void greedy_mesh_generator::add_quad(
         vec3f(0, 0, 1),  vec3f(0, 0, -1)
     };
 
-    // 0 = use min, 1 = use max for each component (x, y, z)
     static constexpr int face_verts[6][4][3] = {
         {{1, 0, 0}, {1, 0, 1}, {1, 1, 1}, {1, 1, 0}},  // +X
         {{0, 0, 0}, {0, 1, 0}, {0, 1, 1}, {0, 0, 1}},  // -X
@@ -486,7 +480,7 @@ inline void greedy_mesh_generator::add_quad(
     };
 
     auto base_vertex = static_cast<uint32>(vertices.size());
-    vec3f normal = face_normals[face_direction];
+    vec3f normal     = face_normals[face_direction];
 
     for (int i = 0; i < 4; i++) {
         vec3f pos{
@@ -515,10 +509,8 @@ inline void greedy_mesh_generator::add_quad(
 }
 
 inline auto greedy_mesh_generator::is_face_visible(
-    const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
+    const model& mdl, int x, int y, int z, int face_direction
 ) -> bool {
-    if (!model) return false;
-
     static constexpr int dx[6] = {1, -1, 0, 0, 0, 0};
     static constexpr int dy[6] = {0, 0, 1, -1, 0, 0};
     static constexpr int dz[6] = {0, 0, 0, 0, 1, -1};
@@ -527,12 +519,18 @@ inline auto greedy_mesh_generator::is_face_visible(
     int ny = y + dy[face_direction];
     int nz = z + dz[face_direction];
 
-    if (nx < 0 || nx >= model->width() || ny < 0 || ny >= model->height() ||
-        nz < 0 || nz >= model->depth()) {
+    if (nx < 0 || nx >= mdl.width() || ny < 0 || ny >= mdl.height() || nz < 0 ||
+        nz >= mdl.depth()) {
         return true;
     }
 
-    return model->is_empty(nx, ny, nz);
+    return mdl.is_empty(nx, ny, nz);
+}
+
+inline auto greedy_mesh_generator::compute_vertex_ao(
+    const model& mdl, int x, int y, int z, int face, int su, int sv
+) -> float32 {
+    return compute_vertex_ao_free(mdl, x, y, z, face, su, sv);
 }
 
 }  // namespace vw::gfx

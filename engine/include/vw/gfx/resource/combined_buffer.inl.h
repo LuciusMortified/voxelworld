@@ -99,8 +99,7 @@ inline void combined_buffer::allocate(
         expand_instance_buffers_();
     }
 
-    draw_command cmd{
-        //.index_count    = mesh_alloc.index_count,
+    const draw_command cmd{
         .index_count    = chunk_size_.index_count,
         .instance_count = 1,
         .first_index    = mesh_alloc.index_offset,

@@ -18,14 +18,15 @@ class model_identity_pool;
 
 class model {
 public:
-    model(model_identity_pool& identity_pool, int width, int height, int depth);
+    model(model_identity_pool& identity_pool, int width, int height, int depth,
+          int32 voxel_scale = 1);
     ~model();
 
     model(const model&)            = delete;
-    model& operator=(const model&) = delete;
+    auto operator=(const model&) -> model& = delete;
 
-    model(model&&)            = default;
-    model& operator=(model&&) = default;
+    model(model&& other) noexcept;
+    auto operator=(model&& other) noexcept -> model&;
 
     [[nodiscard]] auto operator[](vec3i pos) -> voxel&;
     [[nodiscard]] auto operator[](vec3i pos) const -> const voxel&;
@@ -48,25 +49,29 @@ public:
     [[nodiscard]] auto height() const -> int;
     [[nodiscard]] auto depth() const -> int;
     [[nodiscard]] auto size() const -> vec3i;
+    [[nodiscard]] auto voxel_scale() const -> int32;
 
     void fill(const voxel& voxel);
 
     [[nodiscard]] auto get_identity() const -> model_identity;
 
-    void set_voxels(const std::vector<voxel>& voxels);
-    void set_voxels(std::vector<voxel>&& voxels);
-
-    [[nodiscard]] auto get_voxels() const -> std::vector<voxel>;
+    void clone_pages_from(const model& source);
 
     static constexpr int page_size = 8;
     static constexpr int page_volume = page_size * page_size * page_size;
     using page_type = std::array<voxel, page_volume>;
 
     [[nodiscard]] auto is_page_allocated(int px, int py, int pz) const -> bool;
+    [[nodiscard]] auto get_page(int px, int py, int pz) const -> const page_type*;
+
+    [[nodiscard]] auto pages_x() const -> int;
+    [[nodiscard]] auto pages_y() const -> int;
+    [[nodiscard]] auto pages_z() const -> int;
 
 private:
     model_identity_pool* identity_pool_;
     int width_{0}, height_{0}, depth_{0};
+    int32 voxel_scale_{1};
     int pages_x_{0}, pages_y_{0}, pages_z_{0};
     std::vector<std::unique_ptr<page_type>> pages_;
     model_identity identity_;

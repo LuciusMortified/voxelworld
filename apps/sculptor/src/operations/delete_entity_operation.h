@@ -34,8 +34,7 @@ private:
     std::string parent_name_;
     transform transform_;
     bool with_model_ = false;
-    vec3i size_;
-    std::vector<voxel> voxels_;
+    std::shared_ptr<gfx::model> saved_model_;
 };
 
 }  // namespace vw::sculptor

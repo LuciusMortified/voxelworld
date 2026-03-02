@@ -17,10 +17,6 @@ inline auto model_component::get_voxel(
     return model_->get_voxel(pos);
 }
 
-inline auto model_component::get_voxels() const -> std::vector<voxel> {
-    return model_->get_voxels();
-}
-
 inline auto model_component::is_empty(
     int x, int y, int z
 ) const -> bool {

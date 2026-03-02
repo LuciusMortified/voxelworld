@@ -10,22 +10,20 @@ namespace vw::gfx {
 
 template <typename WC>
 chunk<WC>::chunk(
-    world<WC>& world, region_id region, vec3i coord, std::vector<voxel> voxels
+    world<WC>& world, region_id region, vec3i coord, std::shared_ptr<model> model,
+    int32 voxel_scale
 )
     : guard_(world)
+    , model_(std::move(model))
     , region_id_(region) {
-    auto& model_registry = world.get_model_registry();
-    model_ = model_registry.create_unnamed(size, size, size);
-    model_->set_voxels(std::move(voxels));
-
     guard_.template with<transform_component>();
     guard_.template with<model_component>();
     guard_.template with<spatial_component>();
 
     auto world_pos = vec3f{
-        static_cast<float32>(coord.x * size),
-        static_cast<float32>(coord.y * size),
-        static_cast<float32>(coord.z * size)
+        static_cast<float32>(coord.x * size * voxel_scale),
+        static_cast<float32>(coord.y * size * voxel_scale),
+        static_cast<float32>(coord.z * size * voxel_scale)
     };
 
     world.get_transform_system().modify(guard_.get_entity()).set_position(world_pos);

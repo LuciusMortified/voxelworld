@@ -98,7 +98,7 @@ auto world_grid_system<WC, Cs...>::process_dirty_entity(
     const auto& tc = registry_->template get<transform_component>(ent);
     auto pos = tc.get_position();
 
-    auto new_chunk_coord = world_grid<WC>::world_to_chunk_coord({
+    auto new_chunk_coord = world_grid_->world_to_chunk_coord({
         static_cast<int32>(pos.x),
         static_cast<int32>(pos.y),
         static_cast<int32>(pos.z)

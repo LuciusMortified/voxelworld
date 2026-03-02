@@ -35,7 +35,8 @@ class world_grid {
     friend class world_grid_system;
 
 public:
-    explicit world_grid(world_type& world, std::unique_ptr<world_grid_generator> generator);
+    explicit world_grid(world_type& world, std::unique_ptr<world_grid_generator> generator,
+                        int32 voxel_scale = 1);
     ~world_grid();
 
     world_grid(const world_grid&) = delete;
@@ -59,9 +60,11 @@ public:
     [[nodiscard]] auto get_pending_region_count() const -> uint32;
     [[nodiscard]] auto get_pending_chunk_count() const -> uint32;
 
-    static auto world_to_chunk_coord(vec3i world_pos) -> vec3i;
-    static auto world_to_local_coord(vec3i world_pos) -> vec3i;
-    static auto chunk_to_world_coord(vec3i chunk_coord) -> vec3i;
+    [[nodiscard]] auto voxel_scale() const -> int32;
+
+    auto world_to_chunk_coord(vec3i world_pos) const -> vec3i;
+    auto world_to_local_coord(vec3i world_pos) const -> vec3i;
+    auto chunk_to_world_coord(vec3i chunk_coord) const -> vec3i;
 
 private:
     void request_region(region_id id);
@@ -70,6 +73,7 @@ private:
     void gen_thread_function();
 
     world_type* world_;
+    int32 voxel_scale_{1};
     std::unordered_map<vec3i, std::unique_ptr<chunk_type>> chunks_;
     std::unordered_map<region_id, std::vector<vec3i>> region_chunks_;
     std::unordered_map<vec2i, region_id> column_region_cache_;

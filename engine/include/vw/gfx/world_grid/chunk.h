@@ -4,7 +4,6 @@
 #define VW_GFX_WORLD_GRID_CHUNK_H
 
 #include <memory>
-#include <vector>
 
 #include "vw/core.h"
 #include "vw/core/voxel.h"
@@ -19,10 +18,11 @@ using region_id = uint32;
 template <typename WC = base_world_components>
 class chunk {
 public:
-    static constexpr int32 size = 128;
+    static constexpr int32 size = 64;
     static constexpr int32 volume = size * size * size;
 
-    chunk(world<WC>& world, region_id region, vec3i coord, std::vector<voxel> voxels);
+    chunk(world<WC>& world, region_id region, vec3i coord, std::shared_ptr<model> model,
+          int32 voxel_scale = 1);
     ~chunk() = default;
 
     chunk(const chunk&) = delete;
