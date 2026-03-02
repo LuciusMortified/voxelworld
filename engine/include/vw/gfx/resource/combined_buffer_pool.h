@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "vw/gfx/resource/combined_buffer.h"
+#include "vw/gfx/resource/staging_buffer.h"
 #include "vw/gfx/spatial/frustum.h"
 #include "vw/gfx/world/entity.h"
 #include "vw/gfx/world/world.h"
@@ -67,7 +68,8 @@ public:
     void update(
         world_type& world,
         const camera& camera,
-        std::span<const frustum> shadow_frustums = {}
+        std::span<const frustum> shadow_frustums,
+        VkCommandBuffer cmd
     );
 
     [[nodiscard]] auto get_buffers() const -> const std::vector<std::unique_ptr<combined_buffer>>&;
@@ -90,6 +92,7 @@ private:
     );
 
     vulkan_context* context_;
+    staging_buffer staging_;
     std::vector<std::unique_ptr<combined_buffer>> buffers_;
     std::unordered_map<entity, entity_buffer_info> entity_buffer_infos_;
     std::map<buffer_chunk_size, size_t> chunk_size_to_buffer_index_;

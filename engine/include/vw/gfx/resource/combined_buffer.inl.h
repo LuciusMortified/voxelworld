@@ -16,44 +16,36 @@ inline combined_buffer::combined_buffer(
     vulkan_context& context,
     const buffer_chunk_size& chunk_size,
     VkDescriptorPool descriptor_pool,
-    VkDescriptorSetLayout descriptor_set_layout
+    VkDescriptorSetLayout descriptor_set_layout,
+    staging_buffer& staging
 )
     : context_(&context)
+    , staging_(&staging)
     , chunk_size_(chunk_size)
     , mesh_capacity_(default_mesh_capacity_)
     , instance_capacity_(default_instance_capacity_)
-    , vertex_used_(0)
-    , index_used_(0)
     , descriptor_pool_(descriptor_pool)
     , descriptor_set_layout_(descriptor_set_layout) {
-    vertex_buffer_ = std::make_unique<vertex_buffer>(
+    vertex_buffer_ = std::make_unique<device_vertex_buffer>(
         *context_, mesh_capacity_ * chunk_size_.vertex_count * sizeof(vertex)
     );
-    index_buffer_ = std::make_unique<index_buffer>(
+    index_buffer_ = std::make_unique<device_index_buffer>(
         *context_, mesh_capacity_ * chunk_size_.index_count * sizeof(uint32)
     );
-    instance_index_buffer_ = std::make_unique<storage_buffer>(
+    instance_index_buffer_ = std::make_unique<device_storage_buffer>(
         *context_,
         instance_capacity_ * sizeof(uint32),
-        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |     //
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT |  //
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
     );
-    model_matrix_buffer_ = std::make_unique<storage_buffer>(
-        *context_,
-        instance_capacity_ * sizeof(mat4f),
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT |    //
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT  //
+    model_matrix_buffer_ = std::make_unique<device_storage_buffer>(
+        *context_, instance_capacity_ * sizeof(mat4f)
     );
-    indirect_draw_buffer_ = std::make_unique<storage_buffer>(
+    indirect_draw_buffer_ = std::make_unique<device_storage_buffer>(
         *context_,
         instance_capacity_ * sizeof(draw_command),
-        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT |   //
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT |  //
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT    //
+        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
     );
 
-    // Выделяем descriptor set из pool
     VkDescriptorSetAllocateInfo alloc_info{};
     alloc_info.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     alloc_info.descriptorPool     = descriptor_pool_;
@@ -65,7 +57,6 @@ inline combined_buffer::combined_buffer(
         throw std::runtime_error("Failed to allocate descriptor set for combined_buffer!");
     }
 
-    // Обновляем descriptor set с storage buffer
     VkDescriptorBufferInfo storage_buffer_info{};
     storage_buffer_info.buffer = model_matrix_buffer_->get_buffer();
     storage_buffer_info.offset = 0;
@@ -107,12 +98,31 @@ inline void combined_buffer::allocate(
         .first_instance = instance_index,
     };
 
-    instance_index_buffer_->copy_from_struct(instance_index, instance_index * sizeof(uint32));
+    const auto instance_staged = staging_->stage_struct(instance_index);
+    staging_->copy_to(
+        instance_index_buffer_->get_buffer(),
+        instance_index * sizeof(uint32),
+        instance_staged,
+        sizeof(uint32)
+    );
 
-    indirect_draw_buffer_->copy_from_struct(cmd, instance_index * sizeof(draw_command));
-    model_matrix_buffer_->copy_from_struct(transform_matrix, instance_index * sizeof(mat4f));
+    const auto draw_cmd_staged = staging_->stage_struct(cmd);
+    staging_->copy_to(
+        indirect_draw_buffer_->get_buffer(),
+        instance_index * sizeof(draw_command),
+        draw_cmd_staged,
+        sizeof(draw_command)
+    );
 
-    entity_allocation ent_alloc{
+    const auto transform_staged = staging_->stage_struct(transform_matrix);
+    staging_->copy_to(
+        model_matrix_buffer_->get_buffer(),
+        instance_index * sizeof(mat4f),
+        transform_staged,
+        sizeof(mat4f)
+    );
+
+    const entity_allocation ent_alloc{
         .instance_index = instance_index,
         .model_index    = model_id.index,
     };
@@ -147,26 +157,35 @@ inline void combined_buffer::allocate_mesh(
         expand_mesh_buffers_();
     }
 
-    vertex_buffer_->copy_from_vector(mesh_data.vertices, vertex_offset * sizeof(vertex));
+    auto vertices_staged = staging_->stage_vector(mesh_data.vertices);
+    staging_->copy_to(
+        vertex_buffer_->get_buffer(),
+        vertex_offset * sizeof(vertex),
+        vertices_staged,
+        vertex_count * sizeof(vertex)
+    );
+
     const auto vertex_free_space_offset = (vertex_offset + vertex_count) * sizeof(vertex);
     const auto vertex_free_space_size = (chunk_size_.vertex_count - vertex_count) * sizeof(vertex);
     if (vertex_free_space_size > 0) {
-        void* vertex_data = vertex_buffer_->map();
-        std::memset(
-            static_cast<std::byte*>(vertex_data) + vertex_free_space_offset,
-            0,
-            vertex_free_space_size
+        staging_->zero_region(
+            vertex_buffer_->get_buffer(), vertex_free_space_offset, vertex_free_space_size
         );
     }
 
-    index_buffer_->copy_from_vector(mesh_data.indices, index_offset * sizeof(uint32));
-    const auto index_free_space_offset =  //
-        (index_offset + index_count) * sizeof(uint32);
+    const auto indices_staged = staging_->stage_vector(mesh_data.indices);
+    staging_->copy_to(
+        index_buffer_->get_buffer(),
+        index_offset * sizeof(uint32),
+        indices_staged,
+        index_count * sizeof(uint32)
+    );
+
+    const auto index_free_space_offset = (index_offset + index_count) * sizeof(uint32);
     const auto index_free_space_size = (chunk_size_.index_count - index_count) * sizeof(uint32);
     if (index_free_space_size > 0) {
-        void* index_data = index_buffer_->map();
-        std::memset(
-            static_cast<std::byte*>(index_data) + index_free_space_offset, 0, index_free_space_size
+        staging_->zero_region(
+            index_buffer_->get_buffer(), index_free_space_offset, index_free_space_size
         );
     }
 
@@ -176,7 +195,7 @@ inline void combined_buffer::allocate_mesh(
     new_mesh_alloc.vertex_count  = vertex_count;
     new_mesh_alloc.index_count   = index_count;
     new_mesh_alloc.generation    = model_id.generation;
-    new_mesh_alloc.ref_count     = 0;  // Счетчик ссылок будет увеличен в allocate()
+    new_mesh_alloc.ref_count     = 0;
 
     mesh_allocations_[model_id.index] = new_mesh_alloc;
 }
@@ -192,26 +211,36 @@ inline void combined_buffer::write_mesh(
     const auto vertex_count = mesh_data.vertices.size();
     const auto index_count  = mesh_data.indices.size();
 
-    vertex_buffer_->copy_from_vector(mesh_data.vertices, mesh_alloc.vertex_offset * sizeof(vertex));
+    const auto vertices_staged = staging_->stage_vector(mesh_data.vertices);
+    staging_->copy_to(
+        vertex_buffer_->get_buffer(),
+        mesh_alloc.vertex_offset * sizeof(vertex),
+        vertices_staged,
+        vertex_count * sizeof(vertex)
+    );
+
     const auto vertex_free_space_offset =
         (mesh_alloc.vertex_offset + vertex_count) * sizeof(vertex);
     const auto vertex_free_space_size = (chunk_size_.vertex_count - vertex_count) * sizeof(vertex);
     if (vertex_free_space_size > 0) {
-        void* vertex_data = vertex_buffer_->map();
-        std::memset(
-            static_cast<std::byte*>(vertex_data) + vertex_free_space_offset,
-            0,
-            vertex_free_space_size
+        staging_->zero_region(
+            vertex_buffer_->get_buffer(), vertex_free_space_offset, vertex_free_space_size
         );
     }
 
-    index_buffer_->copy_from_vector(mesh_data.indices, mesh_alloc.index_offset * sizeof(uint32_t));
+    const auto indices_staged = staging_->stage_vector(mesh_data.indices);
+    staging_->copy_to(
+        index_buffer_->get_buffer(),
+        mesh_alloc.index_offset * sizeof(uint32_t),
+        indices_staged,
+        index_count * sizeof(uint32)
+    );
+
     const auto index_free_space_offset = (mesh_alloc.index_offset + index_count) * sizeof(uint32);
     const auto index_free_space_size   = (chunk_size_.index_count - index_count) * sizeof(uint32);
     if (index_free_space_size > 0) {
-        void* index_data = index_buffer_->map();
-        std::memset(
-            static_cast<std::byte*>(index_data) + index_free_space_offset, 0, index_free_space_size
+        staging_->zero_region(
+            index_buffer_->get_buffer(), index_free_space_offset, index_free_space_size
         );
     }
 
@@ -224,12 +253,18 @@ inline void combined_buffer::write_transform(
     entity ent, const mat4f& transform_matrix
 ) {
     auto& [instance_index, model_index] = entity_allocations_[ent];
-    model_matrix_buffer_->copy_from_struct(transform_matrix, instance_index * sizeof(mat4f));
+    const auto transform_staged = staging_->stage_struct(transform_matrix);
+    staging_->copy_to(
+        model_matrix_buffer_->get_buffer(),
+        instance_index * sizeof(mat4f),
+        transform_staged,
+        sizeof(mat4f)
+    );
 }
 
-inline void combined_buffer::free(
+inline auto combined_buffer::free(
     entity ent
-) {
+) -> std::optional<entity> {
     auto& ent_alloc = entity_allocations_[ent];
 
     auto& mesh_alloc = mesh_allocations_[ent_alloc.model_index];
@@ -243,7 +278,8 @@ inline void combined_buffer::free(
         mesh_allocations_.erase(ent_alloc.model_index);
     }
 
-    // Удаляем матрицу и команду отрисовки с сохранением плотности
+    std::optional<entity> swapped_entity;
+
     auto last_index = entity_allocations_.size() - 1;
     bool need_swap =
         ent_alloc.instance_index != last_index && last_index < entity_allocations_.size();
@@ -251,29 +287,30 @@ inline void combined_buffer::free(
         entity last_ent      = instance_indexes_[last_index];
         auto& last_ent_alloc = entity_allocations_[last_ent];
 
-        draw_command new_cmd{};
-        indirect_draw_buffer_->copy_to_struct(
-            new_cmd, last_ent_alloc.instance_index * sizeof(draw_command)
-        );
-        new_cmd.first_instance = ent_alloc.instance_index;
-        indirect_draw_buffer_->copy_from_struct(
-            new_cmd, ent_alloc.instance_index * sizeof(draw_command)
-        );
-
-        mat4f new_matrix{};
-        model_matrix_buffer_->copy_to_struct(
-            new_matrix, last_ent_alloc.instance_index * sizeof(mat4f)
-        );
-        model_matrix_buffer_->copy_from_struct(
-            new_matrix, ent_alloc.instance_index * sizeof(mat4f)
+        auto& last_mesh_alloc = mesh_allocations_[last_ent_alloc.model_index];
+        const draw_command new_cmd{
+            .index_count    = chunk_size_.index_count,
+            .instance_count = 1,
+            .first_index    = last_mesh_alloc.index_offset,
+            .vertex_offset  = static_cast<int32>(last_mesh_alloc.vertex_offset),
+            .first_instance = ent_alloc.instance_index,
+        };
+        auto draw_cmd_staged = staging_->stage_struct(new_cmd);
+        staging_->copy_to(
+            indirect_draw_buffer_->get_buffer(),
+            ent_alloc.instance_index * sizeof(draw_command),
+            draw_cmd_staged,
+            sizeof(draw_command)
         );
 
         last_ent_alloc.instance_index = ent_alloc.instance_index;
-
         instance_indexes_[ent_alloc.instance_index] = last_ent;
+
+        swapped_entity = last_ent;
     }
 
     entity_allocations_.erase(ent);
+    return swapped_entity;
 }
 inline auto combined_buffer::get_entity_allocation(
     entity ent
@@ -293,44 +330,40 @@ inline void combined_buffer::expand_mesh_buffers_() {
 
     mesh_capacity_ *= 2;
 
-    auto new_vertex_buffer = std::make_unique<vertex_buffer>(
+    auto new_vertex_buffer = std::make_unique<device_vertex_buffer>(
         *context_, mesh_capacity_ * chunk_size_.vertex_count * sizeof(vertex)
     );
     vertex_buffer_->copy_to_buffer(*new_vertex_buffer, old_vertex_bytes);
 
-    auto new_index_buffer = std::make_unique<index_buffer>(
+    auto new_index_buffer = std::make_unique<device_index_buffer>(
         *context_, mesh_capacity_ * chunk_size_.index_count * sizeof(uint32)
     );
     index_buffer_->copy_to_buffer(*new_index_buffer, old_index_bytes);
+
+    staging_->replace_buffer(vertex_buffer_->get_buffer(), new_vertex_buffer->get_buffer());
+    staging_->replace_buffer(index_buffer_->get_buffer(), new_index_buffer->get_buffer());
 
     vertex_buffer_ = std::move(new_vertex_buffer);
     index_buffer_  = std::move(new_index_buffer);
 }
 
 inline void combined_buffer::expand_instance_buffers_() {
-    auto instance_count = entity_allocations_.size();
+    const auto instance_count = entity_allocations_.size();
 
     instance_capacity_ *= 2;
 
-    auto new_model_matrix_buffer = std::make_unique<storage_buffer>(
-        *context_,
-        instance_capacity_ * sizeof(mat4f),
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT |    //
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT  //
+    auto new_model_matrix_buffer = std::make_unique<device_storage_buffer>(
+        *context_, instance_capacity_ * sizeof(mat4f)
     );
-    auto new_indirect_draw_buffer = std::make_unique<storage_buffer>(
+    auto new_indirect_draw_buffer = std::make_unique<device_storage_buffer>(
         *context_,
         instance_capacity_ * sizeof(draw_command),
-        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT |   //
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT |  //
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT    //
+        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT
     );
-    auto new_instance_index_buffer = std::make_unique<storage_buffer>(
+    auto new_instance_index_buffer = std::make_unique<device_storage_buffer>(
         *context_,
         instance_capacity_ * sizeof(uint32),
-        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |     //
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT |  //
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT
+        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
     );
 
     model_matrix_buffer_->copy_to_buffer(*new_model_matrix_buffer, instance_count * sizeof(mat4f));
@@ -341,11 +374,20 @@ inline void combined_buffer::expand_instance_buffers_() {
         *new_instance_index_buffer, instance_count * sizeof(uint32)
     );
 
-    model_matrix_buffer_    = std::move(new_model_matrix_buffer);
-    indirect_draw_buffer_   = std::move(new_indirect_draw_buffer);
-    instance_index_buffer_  = std::move(new_instance_index_buffer);
+    staging_->replace_buffer(
+        model_matrix_buffer_->get_buffer(), new_model_matrix_buffer->get_buffer()
+    );
+    staging_->replace_buffer(
+        indirect_draw_buffer_->get_buffer(), new_indirect_draw_buffer->get_buffer()
+    );
+    staging_->replace_buffer(
+        instance_index_buffer_->get_buffer(), new_instance_index_buffer->get_buffer()
+    );
 
-    // Обновляем descriptor set с новым storage buffer
+    model_matrix_buffer_   = std::move(new_model_matrix_buffer);
+    indirect_draw_buffer_  = std::move(new_indirect_draw_buffer);
+    instance_index_buffer_ = std::move(new_instance_index_buffer);
+
     VkDescriptorBufferInfo storage_buffer_info{};
     storage_buffer_info.buffer = model_matrix_buffer_->get_buffer();
     storage_buffer_info.offset = 0;
@@ -354,7 +396,7 @@ inline void combined_buffer::expand_instance_buffers_() {
     VkWriteDescriptorSet descriptor_write{};
     descriptor_write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
     descriptor_write.dstSet          = descriptor_set_;
-    descriptor_write.dstBinding      = 0;  // Storage buffer binding (в отдельном layout)
+    descriptor_write.dstBinding      = 0;
     descriptor_write.dstArrayElement = 0;
     descriptor_write.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptor_write.descriptorCount = 1;

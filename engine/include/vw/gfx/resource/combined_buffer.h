@@ -6,6 +6,7 @@
 #include <vulkan/vulkan.h>
 
 #include <memory>
+#include <optional>
 #include <unordered_map>
 #include <vector>
 
@@ -14,6 +15,7 @@
 #include "vw/gfx/model/model_identity.h"
 #include "vw/gfx/resource/buffer.h"
 #include "vw/gfx/resource/mesh.h"
+#include "vw/gfx/resource/staging_buffer.h"
 #include "vw/gfx/world/entity.h"
 
 namespace vw::gfx {
@@ -87,7 +89,8 @@ public:
         vulkan_context& context,
         const buffer_chunk_size& chunk_size,
         VkDescriptorPool descriptor_pool,
-        VkDescriptorSetLayout descriptor_set_layout
+        VkDescriptorSetLayout descriptor_set_layout,
+        staging_buffer& staging
     );
     ~combined_buffer();
 
@@ -103,7 +106,7 @@ public:
     void allocate_mesh(model_identity model_id, const mesh& mesh_data);
     void write_mesh(model_identity model_id, const mesh& mesh_data);
     void write_transform(entity ent, const mat4f& transform_matrix);
-    void free(entity ent);
+    auto free(entity ent) -> std::optional<entity>;
 
     [[nodiscard]] auto get_entity_allocation(entity ent) -> const entity_allocation&;
     [[nodiscard]] auto get_vertex_buffer() const -> VkBuffer;
@@ -126,23 +129,24 @@ private:
     static constexpr uint32_t default_instance_capacity_ = 64;
 
     vulkan_context* context_;
+    staging_buffer* staging_;
     buffer_chunk_size chunk_size_;
 
     uint32 mesh_capacity_;
-    std::unique_ptr<vertex_buffer> vertex_buffer_;
-    std::unique_ptr<index_buffer> index_buffer_;
-    std::unique_ptr<storage_buffer> instance_index_buffer_;
+    std::unique_ptr<device_vertex_buffer> vertex_buffer_;
+    std::unique_ptr<device_index_buffer> index_buffer_;
+    std::unique_ptr<device_storage_buffer> instance_index_buffer_;
 
     uint32 instance_capacity_;
-    std::unique_ptr<storage_buffer> model_matrix_buffer_;
-    std::unique_ptr<storage_buffer> indirect_draw_buffer_;
+    std::unique_ptr<device_storage_buffer> model_matrix_buffer_;
+    std::unique_ptr<device_storage_buffer> indirect_draw_buffer_;
 
     std::unordered_map<entity, entity_allocation> entity_allocations_;
     std::unordered_map<uint32, mesh_allocation> mesh_allocations_;
     std::unordered_map<uint32, entity> instance_indexes_;
     std::vector<free_slot> free_slots_;
-    uint32_t vertex_used_;
-    uint32_t index_used_;
+    uint32_t vertex_used_{0};
+    uint32_t index_used_{0};
 
     VkDescriptorSet descriptor_set_              = VK_NULL_HANDLE;
     VkDescriptorPool descriptor_pool_            = VK_NULL_HANDLE;

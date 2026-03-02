@@ -245,7 +245,30 @@ void renderer<C>::render(
 
     shadow_map_->update(camera, directional_light_settings_.direction);
     const auto& cascade_frustums = shadow_map_->get_cascade_frustums();
-    combined_buffer_pool_->update(world, camera, cascade_frustums);
+    combined_buffer_pool_->update(
+        world, camera, cascade_frustums, command_buffers_[current_image_index_]
+    );
+
+    {
+        VkMemoryBarrier barrier{};
+        barrier.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
+                                VK_ACCESS_INDEX_READ_BIT |
+                                VK_ACCESS_INDIRECT_COMMAND_READ_BIT |
+                                VK_ACCESS_SHADER_READ_BIT;
+        vkCmdPipelineBarrier(
+            command_buffers_[current_image_index_],
+            VK_PIPELINE_STAGE_TRANSFER_BIT,
+            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |
+                VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT |
+                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+            0,
+            1, &barrier,
+            0, nullptr,
+            0, nullptr
+        );
+    }
 
     render_shadow_pass(world, camera);
 

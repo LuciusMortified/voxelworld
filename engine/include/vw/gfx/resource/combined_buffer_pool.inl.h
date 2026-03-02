@@ -16,17 +16,27 @@ combined_buffer_pool<C>::combined_buffer_pool(
     VkDescriptorSetLayout descriptor_set_layout
 )
     : context_(&context)
+    , staging_(context)
     , descriptor_pool_(descriptor_pool)
     , descriptor_set_layout_(descriptor_set_layout) {}
 
 template <typename C>
 void combined_buffer_pool<C>::update(
-    world_type& world, const camera& camera, std::span<const frustum> shadow_frustums
+    world_type& world,
+    const camera& camera,
+    std::span<const frustum> shadow_frustums,
+    VkCommandBuffer cmd
 ) {
+    staging_.begin_frame();
+
     for (auto ent : world.destroyed()) {
         if (entity_buffer_infos_.contains(ent)) {
             auto& info = entity_buffer_infos_[ent];
-            buffers_[info.buffer_index]->free(ent);
+            auto swapped = buffers_[info.buffer_index]->free(ent);
+            if (swapped && world.template has_component<transform_component>(*swapped)) {
+                auto& tc = world.template get_component<transform_component>(*swapped);
+                buffers_[info.buffer_index]->write_transform(*swapped, tc.get_world_matrix());
+            }
             entity_buffer_infos_.erase(ent);
         }
         mesh_pending_entities_.erase(ent);
@@ -38,6 +48,8 @@ void combined_buffer_pool<C>::update(
     update_visibility_cache_(world, view_frustum, shadow_frustums);
     update_meshes_(world);
     update_transforms_(world);
+
+    staging_.flush(cmd);
 }
 
 template <typename C>
@@ -72,7 +84,7 @@ combined_buffer* combined_buffer_pool<C>::get_or_create_buffer(
     auto buffer_index = buffers_.size();
     buffers_.push_back(
         std::make_unique<combined_buffer>(
-            *context_, chunk_size, descriptor_pool_, descriptor_set_layout_
+            *context_, chunk_size, descriptor_pool_, descriptor_set_layout_, staging_
         )
     );
     chunk_size_to_buffer_index_[chunk_size] = buffer_index;
@@ -99,7 +111,11 @@ void combined_buffer_pool<C>::update_meshes_(
         if (has_spatial && !is_visible) {
             if (entity_buffer_infos_.contains(ent)) {
                 const auto& [chunk_size, buffer_index] = entity_buffer_infos_[ent];
-                buffers_[buffer_index]->free(ent);
+                auto swapped = buffers_[buffer_index]->free(ent);
+                if (swapped && world.template has_component<transform_component>(*swapped)) {
+                    auto& tc = world.template get_component<transform_component>(*swapped);
+                    buffers_[buffer_index]->write_transform(*swapped, tc.get_world_matrix());
+                }
                 entity_buffer_infos_.erase(ent);
             }
             mesh_pending_entities_.erase(ent);
@@ -113,7 +129,13 @@ void combined_buffer_pool<C>::update_meshes_(
         if (!is_renderable) {
             if (entity_buffer_infos_.contains(ent)) {
                 auto& buffer_info = entity_buffer_infos_[ent];
-                buffers_[buffer_info.buffer_index]->free(ent);
+                auto swapped = buffers_[buffer_info.buffer_index]->free(ent);
+                if (swapped && world.template has_component<transform_component>(*swapped)) {
+                    auto& tc = world.template get_component<transform_component>(*swapped);
+                    buffers_[buffer_info.buffer_index]->write_transform(
+                        *swapped, tc.get_world_matrix()
+                    );
+                }
                 entity_buffer_infos_.erase(ent);
             }
             mesh_pending_entities_.erase(ent);
@@ -136,6 +158,11 @@ void combined_buffer_pool<C>::update_meshes_(
 
         buffer_chunk_size required_chunk_size = get_chunk_size_for_mesh(vertex_count, index_count);
 
+        const VkDeviceSize mesh_staging_cost =
+            required_chunk_size.vertex_count * sizeof(vertex) +
+            required_chunk_size.index_count * sizeof(uint32) +
+            sizeof(uint32) + sizeof(draw_command) + sizeof(mat4f);
+
         const auto& transform_comp    = world.template get_component<transform_component>(ent);
         const mat4f& transform_matrix = transform_comp.get_world_matrix();
 
@@ -146,19 +173,29 @@ void combined_buffer_pool<C>::update_meshes_(
             if (buffer_info.chunk_size == required_chunk_size) {
                 const auto& ent_alloc = buffer->get_entity_allocation(ent);
                 if (ent_alloc.model_index == model_id.index) {
+                    if (staging_.available() < mesh_staging_cost) {
+                        mesh_pending_entities_.insert(ent);
+                        continue;
+                    }
                     buffer->write_mesh(model_id, *mesh_ptr);
                     mesh_pending_entities_.erase(ent);
                     continue;
                 }
             }
 
-            if (new_uploads >= max_mesh_uploads_per_frame_) {
+            if (new_uploads >= max_mesh_uploads_per_frame_ ||
+                staging_.available() < mesh_staging_cost) {
                 mesh_pending_entities_.insert(ent);
                 continue;
             }
 
-            buffer->free(ent);
-        } else if (new_uploads >= max_mesh_uploads_per_frame_) {
+            auto swapped = buffer->free(ent);
+            if (swapped && world.template has_component<transform_component>(*swapped)) {
+                auto& tc = world.template get_component<transform_component>(*swapped);
+                buffer->write_transform(*swapped, tc.get_world_matrix());
+            }
+        } else if (new_uploads >= max_mesh_uploads_per_frame_ ||
+                   staging_.available() < mesh_staging_cost) {
             mesh_pending_entities_.insert(ent);
             continue;
         }
@@ -188,18 +225,23 @@ void combined_buffer_pool<C>::update_transforms_(
     );
 
     for (entity ent : entities_to_process_) {
-        bool has_spatial = world.template has_component<spatial_component>(ent);
-        bool is_visible  = visibility_cache_.visible.contains(ent);
+        const bool has_spatial = world.template has_component<spatial_component>(ent);
+        const bool is_visible  = visibility_cache_.visible.contains(ent);
         if (has_spatial && !is_visible) {
             transform_pending_entities_.erase(ent);
             continue;
         }
 
-        bool has_model     = world.template has_component<model_component>(ent);
-        bool has_transform = world.template has_component<transform_component>(ent);
-        bool is_renderable = has_model && has_transform;
+        const bool has_model     = world.template has_component<model_component>(ent);
+        const bool has_transform = world.template has_component<transform_component>(ent);
+        const bool is_renderable = has_model && has_transform;
 
         if (entity_buffer_infos_.contains(ent) && is_renderable) {
+            if (staging_.available() < sizeof(mat4f)) {
+                transform_pending_entities_.insert(ent);
+                continue;
+            }
+
             auto& info = entity_buffer_infos_[ent];
 
             const auto& transform_comp    = world.template get_component<transform_component>(ent);

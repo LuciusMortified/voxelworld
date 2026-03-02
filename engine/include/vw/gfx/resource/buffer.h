@@ -205,6 +205,52 @@ public:
         copy_from_vector(data);
     }
 };
+class device_vertex_buffer final : public buffer {
+public:
+    device_vertex_buffer(
+        vulkan_context& context, VkDeviceSize size
+    )
+        : buffer(
+              context,
+              size,
+              VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |      //
+                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT |    //
+                  VK_BUFFER_USAGE_TRANSFER_DST_BIT,     //
+              VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+          ) {}
+};
+
+class device_index_buffer final : public buffer {
+public:
+    device_index_buffer(
+        vulkan_context& context, VkDeviceSize size
+    )
+        : buffer(
+              context,
+              size,
+              VK_BUFFER_USAGE_INDEX_BUFFER_BIT |        //
+                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT |    //
+                  VK_BUFFER_USAGE_TRANSFER_DST_BIT,     //
+              VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+          ) {}
+};
+
+class device_storage_buffer final : public buffer {
+public:
+    device_storage_buffer(
+        vulkan_context& context, VkDeviceSize size, VkBufferUsageFlags additional_usage = 0
+    )
+        : buffer(
+              context,
+              size,
+              VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |      //
+                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT |    //
+                  VK_BUFFER_USAGE_TRANSFER_DST_BIT |    //
+                  additional_usage,
+              VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+          ) {}
+};
+
 }  // namespace vw::gfx
 
 #include "vw/gfx/resource/buffer.inl.h"
