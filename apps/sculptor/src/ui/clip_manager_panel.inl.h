@@ -162,8 +162,8 @@ inline void clip_manager_panel::render(
                 ImGui::PopStyleColor();
             }
         }
-        ImGui::EndChild();
     }
+    ImGui::EndChild();
 
     if (has_selected) {
         ImGui::Spacing();
@@ -257,8 +257,8 @@ inline void clip_manager_panel::render_load_popup_() {
                     }
                 }
             }
-            ImGui::EndChild();
         }
+        ImGui::EndChild();
 
         ImGui::Spacing();
         ImGui::Separator();

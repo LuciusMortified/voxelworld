@@ -42,8 +42,8 @@ inline void open_file_modal::render(
                     filename_ = f;
                 }
             }
-            ImGui::EndChild();
         }
+        ImGui::EndChild();
 
         ImGui::Spacing();
         ImGui::Separator();

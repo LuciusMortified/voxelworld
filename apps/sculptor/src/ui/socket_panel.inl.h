@@ -297,8 +297,8 @@ inline void socket_panel::render_preview_file_list_() {
                     preview_selected_file_ = f;
                 }
             }
-            ImGui::EndChild();
         }
+        ImGui::EndChild();
 
         ImGui::Spacing();
 
