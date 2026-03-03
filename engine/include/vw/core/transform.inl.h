@@ -11,8 +11,12 @@ inline auto transform::get_position() const -> const vec3f& {
     return position_;
 }
 
-inline auto transform::get_rotation() const -> const vec3f& {
+inline auto transform::get_rotation() const -> const quat& {
     return rotation_;
+}
+
+inline auto transform::get_rotation_euler() const -> vec3f {
+    return math::quat_to_euler(rotation_);
 }
 
 inline auto transform::get_scale() const -> const vec3f& {
@@ -31,8 +35,12 @@ inline void transform::set_position(const vec3f& position) {
     position_ = position;
 }
 
-inline void transform::set_rotation(const vec3f& rotation) {
+inline void transform::set_rotation(const quat& rotation) {
     rotation_ = rotation;
+}
+
+inline void transform::set_rotation_euler(const vec3f& euler) {
+    rotation_ = math::euler_to_quat(euler);
 }
 
 inline void transform::set_scale(const vec3f& scale) {
@@ -48,7 +56,7 @@ inline void transform::translate(const vec3f& offset) {
 }
 
 inline void transform::rotate(const vec3f& angles) {
-    rotation_ += angles;
+    rotation_ = math::euler_to_quat(angles) * rotation_;
 }
 
 inline void transform::scale(const vec3f& factor) {

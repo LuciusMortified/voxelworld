@@ -21,8 +21,12 @@ inline auto transform_component::get_position() const -> const vec3f& {
     return transform_.get_position();
 }
 
-inline auto transform_component::get_rotation() const -> const vec3f& {
+inline auto transform_component::get_rotation() const -> const quat& {
     return transform_.get_rotation();
+}
+
+inline auto transform_component::get_rotation_euler() const -> vec3f {
+    return transform_.get_rotation_euler();
 }
 
 inline auto transform_component::get_scale() const -> const vec3f& {

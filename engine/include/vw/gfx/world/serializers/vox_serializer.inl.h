@@ -123,7 +123,7 @@ void vox_serializer<WC>::write_entity_(
     }
 
     auto pos = transform_comp.get_position();
-    auto rot = transform_comp.get_rotation();
+    auto rot = transform_comp.get_rotation_euler();
     auto scl = transform_comp.get_scale();
     auto ori = transform_comp.get_origin();
 
@@ -144,11 +144,12 @@ void vox_serializer<WC>::write_entity_(
         auto& socket_comp = world_->template get_component<socket_component>(ent);
         file << "\tsockets\n";
         for (const auto& sp : socket_comp.get_sockets()) {
+            auto rot_euler = math::quat_to_euler(sp.rotation);
             file << std::format(
                 "\t\tsocket {} {} {} {} {} {} {} {} {} {}\n",
                 sp.name,
                 sp.position.x, sp.position.y, sp.position.z,
-                sp.rotation.x, sp.rotation.y, sp.rotation.z,
+                rot_euler.x, rot_euler.y, rot_euler.z,
                 sp.scale.x, sp.scale.y, sp.scale.z
             );
         }

@@ -179,7 +179,7 @@ void vox_deserializer<WC>::process_transform_(
     auto& transform_system = world_->get_transform_system();
     transform_system.modify(current_entity_)
         .set_position(position)
-        .set_rotation(rotation)
+        .set_rotation_euler(rotation)
         .set_scale(scale)
         .set_origin(origin);
 }
@@ -240,7 +240,7 @@ void vox_deserializer<WC>::process_socket_(
     }
 
     auto& socket_system = world_->get_socket_system();
-    socket_system.modify(current_entity_).add_socket(name, position, rotation, scale);
+    socket_system.modify(current_entity_).add_socket(name, position, math::euler_to_quat(rotation), scale);
 }
 
 template <typename WC>

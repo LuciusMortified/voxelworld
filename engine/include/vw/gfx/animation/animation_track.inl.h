@@ -83,7 +83,7 @@ inline void animation_track::recompile_if_needed() const {
                                 break;
                         }
                     } else if constexpr (std::is_same_v<decltype(value), quat>) {
-                        t.set_rotation(math::quat_to_euler(value));
+                        t.set_rotation(value);
                     }
                 },
                 channel_var
@@ -117,9 +117,8 @@ inline auto animation_track::get_transform(
     }
 
     float32 frac = frame_f - static_cast<float32>(frame_index);
-    return math::lerp(
-        compiled_transforms_[frame_index], compiled_transforms_[frame_index + 1], frac
-    );
+
+    return math::lerp(compiled_transforms_[frame_index], compiled_transforms_[frame_index + 1], frac);
 }
 
 

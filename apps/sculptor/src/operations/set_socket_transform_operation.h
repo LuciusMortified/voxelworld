@@ -15,7 +15,7 @@ struct set_socket_transform_params {
     std::string entity_name;
     std::string socket_name;
     vec3f position;
-    vec3f rotation;
+    quat rotation;
     vec3f scale{1.0F, 1.0F, 1.0F};
 };
 
@@ -30,14 +30,14 @@ public:
     void undo() override;
 
 private:
-    void update_attached_(const vec3f& position, const vec3f& rotation, const vec3f& scale);
-    void update_preview_(const vec3f& position, const vec3f& rotation, const vec3f& scale);
+    void update_attached_(const vec3f& position, const quat& rotation, const vec3f& scale);
+    void update_preview_(const vec3f& position, const quat& rotation, const vec3f& scale);
 
     engine_type* engine_;
     app_state* state_;
     set_socket_transform_params params_;
     vec3f previous_position_;
-    vec3f previous_rotation_;
+    quat previous_rotation_;
     vec3f previous_scale_{1.0F, 1.0F, 1.0F};
 };
 

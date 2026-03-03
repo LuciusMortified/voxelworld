@@ -17,7 +17,7 @@ class socket_system;
 struct socket_point {
     std::string name;
     vec3f position{0.0F, 0.0F, 0.0F};
-    vec3f rotation{0.0F, 0.0F, 0.0F};
+    quat rotation;
     vec3f scale{1.0F, 1.0F, 1.0F};
     entity attached = invalid_entity;
 };

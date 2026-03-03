@@ -15,7 +15,7 @@ struct add_socket_params {
     std::string entity_name;
     std::string socket_name;
     vec3f position{};
-    vec3f rotation{};
+    quat rotation{};
     vec3f scale{1.0F, 1.0F, 1.0F};
 };
 

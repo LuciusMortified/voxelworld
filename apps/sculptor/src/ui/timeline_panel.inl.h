@@ -756,7 +756,8 @@ inline void timeline_panel::render_keyframe_markers(
                 );
 
                 ImVec2 mouse = ImGui::GetMousePos();
-                if (std::abs(mouse.x - x) < diamond_size + 2.f &&
+                if (ImGui::IsWindowHovered(ImGuiHoveredFlags_None) &&
+                    std::abs(mouse.x - x) < diamond_size + 2.f &&
                     std::abs(mouse.y - y) < diamond_size + 2.f) {
                     if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                         state_->anim.selected_track_name  = track_name;
@@ -828,7 +829,8 @@ inline void timeline_panel::render_playhead(
     }
 
     ImVec2 mouse = ImGui::GetMousePos();
-    if (!keyframe_clicked_ && mouse.x >= track_area_x && mouse.x <= track_area_x + track_width &&
+    if (!keyframe_clicked_ && ImGui::IsWindowHovered(ImGuiHoveredFlags_None) &&
+        mouse.x >= track_area_x && mouse.x <= track_area_x + track_width &&
         mouse.y >= area_top && mouse.y <= area_bottom) {
         if (ImGui::IsMouseDragging(ImGuiMouseButton_Left) ||
             ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {

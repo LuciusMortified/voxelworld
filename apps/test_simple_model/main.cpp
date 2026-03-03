@@ -159,7 +159,7 @@ private:
 
         auto& world            = get_engine().get_world();
         auto& transform_system = world.get_transform_system();
-        transform_system.modify(flower_->get_entity()).set_rotation({0.0f, object_rotation_, 0.0f});
+        transform_system.modify(flower_->get_entity()).set_rotation(math::euler_to_quat({0.0f, object_rotation_, 0.0f}));
 
         if (world.has_component<gfx::transform_component>(flower_->get_entity())) {
             const auto matrix =
@@ -171,7 +171,7 @@ private:
 #if 0
         auto transform_view = world.view_components<gfx::transform_component>();
         for (const auto& [entity, transform_comp] : transform_view) {
-            transform_system.modify(entity).set_rotation({0.0f, object_rotation_, 0.0f});
+            transform_system.modify(entity).set_rotation(math::euler_to_quat({0.0f, object_rotation_, 0.0f}));
         }
 #endif
     }

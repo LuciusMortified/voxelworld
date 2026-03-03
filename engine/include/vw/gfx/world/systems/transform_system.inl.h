@@ -53,7 +53,7 @@ auto transform_system<Cs...>::transform_modifier::set_position(
 
 template <typename... Cs>
 auto transform_system<Cs...>::transform_modifier::set_rotation(
-    const vec3f& rotation
+    const quat& rotation
 ) -> transform_modifier& {
     if (!system_->registry_->template has<transform_component>(entity_)) {
         return *this;
@@ -61,6 +61,25 @@ auto transform_system<Cs...>::transform_modifier::set_rotation(
 
     auto& transform_comp = system_->registry_->template get<transform_component>(entity_);
     transform_comp.transform_.set_rotation(rotation);
+    transform_comp.local_dirty_ = true;
+    transform_comp.world_dirty_ = true;
+
+    system_->registry_->template request_change<transform_component>(entity_);
+    system_->mark_children_world_dirty(entity_);
+
+    return *this;
+}
+
+template <typename... Cs>
+auto transform_system<Cs...>::transform_modifier::set_rotation_euler(
+    const vec3f& euler
+) -> transform_modifier& {
+    if (!system_->registry_->template has<transform_component>(entity_)) {
+        return *this;
+    }
+
+    auto& transform_comp = system_->registry_->template get<transform_component>(entity_);
+    transform_comp.transform_.set_rotation_euler(euler);
     transform_comp.local_dirty_ = true;
     transform_comp.world_dirty_ = true;
 

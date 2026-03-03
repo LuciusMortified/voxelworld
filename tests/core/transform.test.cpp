@@ -8,7 +8,7 @@ using namespace vw;
 TEST_CASE("transform default state", "[transform]") {
     transform t;
     REQUIRE(t.get_position() == vec3f{0.0f, 0.0f, 0.0f});
-    REQUIRE(t.get_rotation() == vec3f{0.0f, 0.0f, 0.0f});
+    REQUIRE(t.get_rotation() == quat{});
     REQUIRE(t.get_scale() == vec3f{1.0f, 1.0f, 1.0f});
     REQUIRE(t.get_origin() == vec3f{0.0f, 0.0f, 0.0f});
 }
@@ -19,8 +19,15 @@ TEST_CASE("transform setters and getters", "[transform]") {
     t.set_position(vec3f{1.0f, 2.0f, 3.0f});
     REQUIRE(t.get_position() == vec3f{1.0f, 2.0f, 3.0f});
 
-    t.set_rotation(vec3f{0.1f, 0.2f, 0.3f});
-    REQUIRE(t.get_rotation() == vec3f{0.1f, 0.2f, 0.3f});
+    quat rot = math::euler_to_quat(vec3f{0.1f, 0.2f, 0.3f});
+    t.set_rotation(rot);
+    REQUIRE(math::approx_equal(t.get_rotation(), rot));
+
+    t.set_rotation_euler(vec3f{0.1f, 0.2f, 0.3f});
+    REQUIRE(math::approx_equal(t.get_rotation(), math::euler_to_quat(vec3f{0.1f, 0.2f, 0.3f})));
+
+    auto euler_back = t.get_rotation_euler();
+    REQUIRE(math::approx_equal(euler_back, vec3f{0.1f, 0.2f, 0.3f}));
 
     t.set_scale(vec3f{2.0f, 3.0f, 4.0f});
     REQUIRE(t.get_scale() == vec3f{2.0f, 3.0f, 4.0f});
@@ -41,10 +48,8 @@ TEST_CASE("transform translate", "[transform]") {
 TEST_CASE("transform rotate", "[transform]") {
     transform t;
     t.rotate(vec3f{0.1f, 0.2f, 0.3f});
-    REQUIRE(t.get_rotation() == vec3f{0.1f, 0.2f, 0.3f});
-
-    t.rotate(vec3f{0.1f, 0.1f, 0.1f});
-    REQUIRE(math::approx_equal(t.get_rotation(), vec3f{0.2f, 0.3f, 0.4f}));
+    auto expected = math::euler_to_quat(vec3f{0.1f, 0.2f, 0.3f});
+    REQUIRE(math::approx_equal(t.get_rotation(), expected));
 }
 
 TEST_CASE("transform scale", "[transform]") {
@@ -81,10 +86,18 @@ TEST_CASE("transform calc_matrix", "[transform]") {
         REQUIRE(math::approx_equal(m, expected));
     }
 
-    SECTION("matches transform_matrix") {
+    SECTION("rotation_matrix(quat) matches rotation_matrix(euler)") {
+        vec3f euler = {0.1f, 0.2f, 0.3f};
+        auto m_euler = math::rotation_matrix(euler);
+        auto q = math::euler_to_quat(euler);
+        auto m_quat = math::rotation_matrix(q);
+        REQUIRE(math::approx_equal(m_euler, m_quat));
+    }
+
+    SECTION("matches transform_matrix with euler") {
         transform t;
         t.set_position(vec3f{1.0f, 2.0f, 3.0f});
-        t.set_rotation(vec3f{0.1f, 0.2f, 0.3f});
+        t.set_rotation_euler(vec3f{0.1f, 0.2f, 0.3f});
         t.set_scale(vec3f{1.5f, 1.5f, 1.5f});
         t.set_origin(vec3f{0.5f, 0.5f, 0.5f});
 

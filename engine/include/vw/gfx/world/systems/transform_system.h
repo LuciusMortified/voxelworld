@@ -33,7 +33,8 @@ public:
         auto set_transform_with_matrix(const transform& transform, const mat4f& local_matrix)
             -> transform_modifier&;
         auto set_position(const vec3f& position) -> transform_modifier&;
-        auto set_rotation(const vec3f& rotation) -> transform_modifier&;
+        auto set_rotation(const quat& rotation) -> transform_modifier&;
+        auto set_rotation_euler(const vec3f& euler) -> transform_modifier&;
         auto set_scale(const vec3f& scale) -> transform_modifier&;
         auto set_origin(const vec3f& origin) -> transform_modifier&;
         auto translate(const vec3f& offset) -> transform_modifier&;

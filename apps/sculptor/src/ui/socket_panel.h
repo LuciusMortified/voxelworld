@@ -28,7 +28,7 @@ private:
     void load_preview_(const std::string& socket_name, const std::string& filename) const;
     void unload_preview_(const std::string& key) const;
     void update_preview_transform_(
-        const std::string& key, const vec3f& position, const vec3f& rotation, const vec3f& scale
+        const std::string& key, const vec3f& position, const quat& rotation, const vec3f& scale
     ) const;
 
     engine_type* engine_;

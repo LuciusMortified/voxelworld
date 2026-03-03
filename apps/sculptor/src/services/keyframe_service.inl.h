@@ -39,7 +39,7 @@ inline void keyframe_service::add_keyframe() {
 
     keyframe_value kf_val;
     if (prop == gfx::animation_property::rotation) {
-        kf_val = gfx::keyframe_quat(time, math::euler_to_quat(tc.get_rotation()));
+        kf_val = gfx::keyframe_quat(time, tc.get_rotation());
     } else if (prop == gfx::animation_property::position) {
         kf_val = gfx::keyframe_vec3f(time, tc.get_position());
     } else if (prop == gfx::animation_property::scale) {

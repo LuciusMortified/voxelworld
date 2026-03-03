@@ -119,11 +119,12 @@ inline void socket_panel::render_socket_(
         ImGuiTreeNodeFlags_OpenOnArrow |  //
         ImGuiTreeNodeFlags_OpenOnDoubleClick;
     if (ImGui::TreeNodeEx(sp.name.c_str(), flags)) {
-        vec3f position     = sp.position;
+        vec3f position         = sp.position;
+        vec3f rotation_euler   = math::quat_to_euler(sp.rotation);
         vec3f rotation_deg = {
-            math::degrees(sp.rotation.x),
-            math::degrees(sp.rotation.y),
-            math::degrees(sp.rotation.z),
+            math::degrees(rotation_euler.x),
+            math::degrees(rotation_euler.y),
+            math::degrees(rotation_euler.z),
         };
         vec3f scale = sp.scale;
 
@@ -158,11 +159,11 @@ inline void socket_panel::render_socket_(
         ImGui::PopItemWidth();
 
         if (changed) {
-            const auto new_rotation = vec3f{
+            const auto new_rotation = math::euler_to_quat(vec3f{
                 math::radians(rotation_deg.x),
                 math::radians(rotation_deg.y),
                 math::radians(rotation_deg.z),
-            };
+            });
 
             set_socket_transform_params params = {
                 .entity_name = state_->scene.selected_name,
@@ -380,7 +381,7 @@ inline void socket_panel::unload_preview_(
 }
 
 inline void socket_panel::update_preview_transform_(
-    const std::string& key, const vec3f& position, const vec3f& rotation, const vec3f& scale
+    const std::string& key, const vec3f& position, const quat& rotation, const vec3f& scale
 ) const {
     const auto it = state_->sockets.socket_previews.find(key);
     if (it == state_->sockets.socket_previews.end()) {

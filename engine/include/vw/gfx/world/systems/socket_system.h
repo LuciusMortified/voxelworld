@@ -34,7 +34,7 @@ public:
         auto add_socket(
             const std::string& name,
             const vec3f& position = {},
-            const vec3f& rotation = {},
+            const quat& rotation  = {},
             const vec3f& scale    = vec3f{1, 1, 1}
         ) -> socket_modifier&;
         auto remove_socket(const std::string& name) -> socket_modifier&;
