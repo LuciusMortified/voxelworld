@@ -36,7 +36,7 @@ class world_grid {
 
 public:
     explicit world_grid(world_type& world, std::unique_ptr<world_grid_generator> generator,
-                        int32 voxel_scale = 1);
+                        int32 voxel_scale = 8);
     ~world_grid();
 
     world_grid(const world_grid&) = delete;

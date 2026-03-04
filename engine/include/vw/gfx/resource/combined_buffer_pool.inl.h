@@ -107,15 +107,6 @@ void combined_buffer_pool<C>::update_meshes_(
         const bool has_spatial = world.template has_component<spatial_component>(ent);
         const bool is_visible  = visibility_cache_.visible.contains(ent);
         if (has_spatial && !is_visible) {
-            if (entity_buffer_infos_.contains(ent)) {
-                const auto& [chunk_size, buffer_index] = entity_buffer_infos_[ent];
-                auto swapped = buffers_[buffer_index]->free(ent);
-                if (swapped && world.template has_component<transform_component>(*swapped)) {
-                    auto& tc = world.template get_component<transform_component>(*swapped);
-                    buffers_[buffer_index]->write_transform(*swapped, tc.get_world_matrix());
-                }
-                entity_buffer_infos_.erase(ent);
-            }
             mesh_pending_entities_.erase(ent);
             continue;
         }

@@ -3,7 +3,6 @@
 #ifndef VW_GFX_SPATIAL_DYNAMIC_AABB_TREE_H
 #define VW_GFX_SPATIAL_DYNAMIC_AABB_TREE_H
 
-#include <array>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -57,12 +56,12 @@ private:
     };
     
     static constexpr uint32 invalid_node_index = std::numeric_limits<uint32>::max();
-    static constexpr size_t max_stack_size = 256;  // Максимальный размер стека для итеративного обхода
-    
+
     std::vector<node> nodes_;
-    std::vector<uint32> free_nodes_;  // Пул свободных узлов для переиспользования
+    std::vector<uint32> free_nodes_;
     uint32 root_index_ = invalid_node_index;
-    std::unordered_map<entity, uint32> entity_to_node_;  // Маппинг entity -> индекс узла
+    std::unordered_map<entity, uint32> entity_to_node_;
+    mutable std::vector<uint32> query_stack_;
     
     [[nodiscard]] auto allocate_node() -> uint32;
     void free_node(uint32 index);

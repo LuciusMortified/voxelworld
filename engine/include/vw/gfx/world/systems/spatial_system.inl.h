@@ -86,13 +86,13 @@ void spatial_system<Cs...>::update_entity(
 }
 
 template <typename... Cs>
-aabb spatial_system<Cs...>::expand_aabb_for_fat(
+auto spatial_system<Cs...>::expand_aabb_for_fat(
     const aabb& bounds
-) const {
+) const -> aabb {
     constexpr float expansion_factor = 0.1f;
     constexpr float min_expansion    = 0.1f;
 
-    vec3f size = bounds.size();
+    const vec3f size = bounds.size();
     vec3f expansion{
         std::max(size.x * expansion_factor, min_expansion),
         std::max(size.y * expansion_factor, min_expansion),
@@ -106,34 +106,34 @@ aabb spatial_system<Cs...>::expand_aabb_for_fat(
 }
 
 template <typename... Cs>
-aabb spatial_system<Cs...>::calculate_aabb_from_model(
+auto spatial_system<Cs...>::calculate_aabb_from_model(
     entity ent, const model_component& model_comp, const transform_component& transform_comp
-) const {
+) const -> aabb {
     if (!model_comp.has_model()) {
-        return aabb{{0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 0.0f}};
+        return aabb{.min={0.0f, 0.0f, 0.0f}, .max={0.0f, 0.0f, 0.0f}};
     }
 
-    auto scale = model_comp.get_model()->voxel_scale();
-    int width  = model_comp.width() * scale;
-    int height = model_comp.height() * scale;
-    int depth  = model_comp.depth() * scale;
+    const auto scale = model_comp.get_model()->voxel_scale();
+    const int width  = model_comp.width() * scale;
+    const int height = model_comp.height() * scale;
+    const int depth  = model_comp.depth() * scale;
 
-    vec3f local_min{0.0f, 0.0f, 0.0f};
-    vec3f local_max{
+    constexpr vec3f local_min{0.0f, 0.0f, 0.0f};
+    const vec3f local_max{
         static_cast<float>(width), static_cast<float>(height), static_cast<float>(depth)
     };
 
-    mat4f world_matrix = transform_comp.get_world_matrix();
+    const mat4f world_matrix = transform_comp.get_world_matrix();
 
-    vec3f vertices[8] = {
-        {local_min.x, local_min.y, local_min.z},
-        {local_max.x, local_min.y, local_min.z},
-        {local_max.x, local_max.y, local_min.z},
-        {local_min.x, local_max.y, local_min.z},
-        {local_min.x, local_min.y, local_max.z},
-        {local_max.x, local_min.y, local_max.z},
-        {local_max.x, local_max.y, local_max.z},
-        {local_min.x, local_max.y, local_max.z}
+    const std::array vertices = {
+        vec3f{local_min.x, local_min.y, local_min.z},
+        vec3f{local_max.x, local_min.y, local_min.z},
+        vec3f{local_max.x, local_max.y, local_min.z},
+        vec3f{local_min.x, local_max.y, local_min.z},
+        vec3f{local_min.x, local_min.y, local_max.z},
+        vec3f{local_max.x, local_min.y, local_max.z},
+        vec3f{local_max.x, local_max.y, local_max.z},
+        vec3f{local_min.x, local_max.y, local_max.z}
     };
 
     vec3f min_point{std::numeric_limits<float>::max()};

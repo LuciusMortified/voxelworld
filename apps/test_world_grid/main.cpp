@@ -111,7 +111,7 @@ private:
 
         ImGui::Separator();
         float speed = camera_controller_->get_camera_speed();
-        if (ImGui::SliderFloat("Speed", &speed, 1.0f, 500.0f, "%.0f")) {
+        if (ImGui::SliderFloat("Speed", &speed, 1.0f, 5000.0f, "%.0f")) {
             camera_controller_->set_camera_speed(speed);
         }
 
@@ -139,7 +139,7 @@ private:
     std::unique_ptr<gfx::entity_guard<>> viewer_;
 };
 
-int main() {
+auto main() -> int {
     try {
         std::make_unique<gfx::engine<>>(1280, 720, "Voxel World - World Grid Test")
             ->run<world_grid_app>();

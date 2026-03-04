@@ -48,10 +48,10 @@ protected:
 class flat_world_grid_generator final : public world_grid_generator {
 public:
     explicit flat_world_grid_generator(int32 height = 4, int32 region_size = 16,
-                                       int32 voxel_scale = 1);
+                                       int32 voxel_scale = 8);
 
-    auto get_region_id(int32 cx, int32 cz) const -> region_id override;
-    auto generate_region(region_id id) -> region_gen_result override;
+    [[nodiscard]] auto get_region_id(int32 cx, int32 cz) const -> region_id override;
+    [[nodiscard]] auto generate_region(region_id id) -> region_gen_result override;
 
 private:
     int32 height_;
