@@ -210,8 +210,6 @@ inline void model::set_boundary_slice(int face_direction, const model& neighbor)
     slice.solid.assign(slice_size, false);
     slice.valid = true;
 
-    int layer = (face_direction % 2 == 0) ? 0 : -1;
-
     auto fill_yz = [&](int nx) {
         int px = nx / ps;
         for (int py = 0; py < neighbor.pages_y(); ++py) {
@@ -276,6 +274,7 @@ inline void model::set_boundary_slice(int face_direction, const model& neighbor)
         case 3: fill_xz(neighbor.height() - 1); break;
         case 4: fill_xy(0); break;
         case 5: fill_xy(neighbor.depth() - 1); break;
+        default:;
     }
 }
 

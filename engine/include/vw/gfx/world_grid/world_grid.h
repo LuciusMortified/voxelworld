@@ -51,6 +51,7 @@ public:
     [[nodiscard]] auto get_loaded_chunk_count() const -> uint32;
     [[nodiscard]] auto get_pending_chunk_count() const -> uint32;
     [[nodiscard]] auto get_deferred_remesh_count() const -> uint32;
+    [[nodiscard]] auto is_pending(vec3i chunk_coord) const -> bool;
 
     struct completed_stats {
         float32 boundary_from_ms  = 0.0f;

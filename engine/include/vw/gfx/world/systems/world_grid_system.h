@@ -3,8 +3,10 @@
 #ifndef VW_GFX_WORLD_SYSTEMS_WORLD_GRID_SYSTEM_H
 #define VW_GFX_WORLD_SYSTEMS_WORLD_GRID_SYSTEM_H
 
+#include <algorithm>
 #include <memory>
 #include <unordered_set>
+#include <vector>
 
 #include "vw/gfx/world/components/world_view_component.h"
 #include "vw/gfx/world/registry.h"
@@ -54,10 +56,13 @@ public:
 private:
     auto process_dirty_entity(entity ent) -> bool;
 
+    void rebuild_pending_requests(vec3i camera_chunk);
+
     registry_type* registry_;
     std::shared_ptr<world_grid<WC>> world_grid_;
     std::unordered_set<vec3i> active_chunks_;
     std::unordered_set<vec3i> pending_active_chunks_;
+    std::vector<vec3i> pending_requests_;
     world_grid_system_stats stats_;
 };
 

@@ -96,6 +96,13 @@ auto world_grid<WC>::get_deferred_remesh_count() const -> uint32 {
 }
 
 template <typename WC>
+auto world_grid<WC>::is_pending(
+    vec3i chunk_coord
+) const -> bool {
+    return pending_chunks_.contains(chunk_coord);
+}
+
+template <typename WC>
 auto world_grid<WC>::voxel_scale() const -> int32 {
     return voxel_scale_;
 }
