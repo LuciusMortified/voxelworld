@@ -134,6 +134,7 @@ public:
 private:
     void create_swapchain();
     void create_image_views();
+    void create_color_resources();
     void create_depth_resources();
     void create_render_pass();
     void create_descriptor_set_layouts();
@@ -163,8 +164,12 @@ private:
     void cleanup_shadow_pipeline();
     void cleanup_debug_pipeline();
     void cleanup_swapchain();
+    void cleanup_color_resources();
     void cleanup_depth_resources();
     void recreate_swapchain();
+
+    [[nodiscard]]
+    auto get_max_usable_sample_count() -> VkSampleCountFlagBits;
 
     void create_point_lights_descriptor_set_layout();
     void cleanup_point_lights_resources();
@@ -196,7 +201,8 @@ private:
         VkFormat format,
         VkImageTiling tiling,
         VkImageUsageFlags usage,
-        VkMemoryPropertyFlags properties
+        VkMemoryPropertyFlags properties,
+        VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT
     );
 
     [[nodiscard]]
@@ -227,6 +233,12 @@ private:
     VkFormat swapchain_image_format_ = VK_FORMAT_UNDEFINED;
     VkExtent2D swapchain_extent_{};
     std::vector<VkImageView> swapchain_image_views_;
+
+    // MSAA
+    VkSampleCountFlagBits msaa_samples_ = VK_SAMPLE_COUNT_1_BIT;
+    VkImage color_image_                = VK_NULL_HANDLE;
+    VkDeviceMemory color_image_memory_  = VK_NULL_HANDLE;
+    VkImageView color_image_view_       = VK_NULL_HANDLE;
 
     // Depth
     VkImage depth_image_               = VK_NULL_HANDLE;

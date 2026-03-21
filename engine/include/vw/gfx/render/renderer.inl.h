@@ -33,8 +33,11 @@ renderer<C>::renderer(
 
     shadow_map_ = std::make_unique<shadow_map>(*context_);
 
+    msaa_samples_ = get_max_usable_sample_count();
+
     create_swapchain();
     create_image_views();
+    create_color_resources();
     create_depth_resources();
     create_render_pass();
     create_descriptor_set_layouts();
@@ -76,6 +79,7 @@ renderer<C>::~renderer() {
     cleanup_imgui();
 
     cleanup_swapchain();
+    cleanup_color_resources();
     cleanup_depth_resources();
     cleanup_pipelines();
     cleanup_shadow_pipeline();
@@ -419,6 +423,22 @@ void renderer<C>::create_image_views() {
 }
 
 template <typename C>
+void renderer<C>::create_color_resources() {
+    create_image(
+        color_image_,
+        color_image_memory_,
+        swapchain_extent_,
+        swapchain_image_format_,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        msaa_samples_
+    );
+    color_image_view_ =
+        create_image_view(color_image_, swapchain_image_format_, VK_IMAGE_ASPECT_COLOR_BIT);
+}
+
+template <typename C>
 void renderer<C>::create_depth_resources() {
     VkFormat depth_format = find_depth_format();
 
@@ -429,30 +449,33 @@ void renderer<C>::create_depth_resources() {
         depth_format,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        msaa_samples_
     );
     depth_image_view_ = create_image_view(depth_image_, depth_format, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
 template <typename C>
 void renderer<C>::create_render_pass() {
+    // Attachment 0: MSAA color (render target)
     VkAttachmentDescription color_attachment{};
     color_attachment.format         = swapchain_image_format_;
-    color_attachment.samples        = VK_SAMPLE_COUNT_1_BIT;
+    color_attachment.samples        = msaa_samples_;
     color_attachment.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    color_attachment.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
+    color_attachment.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     color_attachment.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     color_attachment.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
-    color_attachment.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    color_attachment.finalLayout    = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkAttachmentReference color_attachment_ref{};
     color_attachment_ref.attachment = 0;
     color_attachment_ref.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    // Attachment 1: MSAA depth
     VkAttachmentDescription depth_attachment{};
-    depth_attachment.format         = VK_FORMAT_D32_SFLOAT;
-    depth_attachment.samples        = VK_SAMPLE_COUNT_1_BIT;
+    depth_attachment.format         = find_depth_format();
+    depth_attachment.samples        = msaa_samples_;
     depth_attachment.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depth_attachment.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depth_attachment.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -464,46 +487,44 @@ void renderer<C>::create_render_pass() {
     depth_attachment_ref.attachment = 1;
     depth_attachment_ref.layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+    // Attachment 2: resolve target (swapchain image, 1x)
+    VkAttachmentDescription color_resolve_attachment{};
+    color_resolve_attachment.format         = swapchain_image_format_;
+    color_resolve_attachment.samples        = VK_SAMPLE_COUNT_1_BIT;
+    color_resolve_attachment.loadOp         = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color_resolve_attachment.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
+    color_resolve_attachment.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color_resolve_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    color_resolve_attachment.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
+    color_resolve_attachment.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentReference color_resolve_ref{};
+    color_resolve_ref.attachment = 2;
+    color_resolve_ref.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
     VkSubpassDescription subpass_3d    = {};
-    subpass_3d.flags                   = 0;
     subpass_3d.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass_3d.colorAttachmentCount    = 1;
     subpass_3d.pColorAttachments       = &color_attachment_ref;
     subpass_3d.pDepthStencilAttachment = &depth_attachment_ref;
-    subpass_3d.inputAttachmentCount    = 0;
-    subpass_3d.pInputAttachments       = nullptr;
     subpass_3d.pResolveAttachments     = nullptr;
-    subpass_3d.preserveAttachmentCount = 0;
-    subpass_3d.pPreserveAttachments    = nullptr;
 
     VkSubpassDescription subpass_debug    = {};
-    subpass_debug.flags                   = 0;
     subpass_debug.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass_debug.colorAttachmentCount    = 1;
     subpass_debug.pColorAttachments       = &color_attachment_ref;
     subpass_debug.pDepthStencilAttachment = &depth_attachment_ref;
-    subpass_debug.inputAttachmentCount    = 0;
-    subpass_debug.pInputAttachments       = nullptr;
     subpass_debug.pResolveAttachments     = nullptr;
-    subpass_debug.preserveAttachmentCount = 0;
-    subpass_debug.pPreserveAttachments    = nullptr;
 
-    // ImGui subpass (без depth)
     VkSubpassDescription subpass_imgui    = {};
-    subpass_imgui.flags                   = 0;
     subpass_imgui.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass_imgui.colorAttachmentCount    = 1;
     subpass_imgui.pColorAttachments       = &color_attachment_ref;
     subpass_imgui.pDepthStencilAttachment = nullptr;
-    subpass_imgui.inputAttachmentCount    = 0;
-    subpass_imgui.pInputAttachments       = nullptr;
-    subpass_imgui.pResolveAttachments     = nullptr;
-    subpass_imgui.preserveAttachmentCount = 0;
-    subpass_imgui.pPreserveAttachments    = nullptr;
+    subpass_imgui.pResolveAttachments     = &color_resolve_ref;
 
     VkSubpassDescription subpasses[] = {subpass_3d, subpass_debug, subpass_imgui};
 
-    // Dependency between external and 3D subpass
     VkSubpassDependency dependency_3d = {};
     dependency_3d.srcSubpass          = VK_SUBPASS_EXTERNAL;
     dependency_3d.dstSubpass          = 0;
@@ -511,7 +532,6 @@ void renderer<C>::create_render_pass() {
     dependency_3d.srcAccessMask       = 0;
     dependency_3d.dstStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     dependency_3d.dstAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    dependency_3d.dependencyFlags     = 0;
 
     VkSubpassDependency dependency_debug = {};
     dependency_debug.srcSubpass          = 0;
@@ -520,9 +540,7 @@ void renderer<C>::create_render_pass() {
     dependency_debug.srcAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     dependency_debug.dstStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     dependency_debug.dstAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    dependency_debug.dependencyFlags     = 0;
 
-    // Dependency between 3D subpass and ImGui subpass
     VkSubpassDependency dependency_imgui = {};
     dependency_imgui.srcSubpass          = 1;
     dependency_imgui.dstSubpass          = 2;
@@ -531,15 +549,16 @@ void renderer<C>::create_render_pass() {
     dependency_imgui.dstStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     dependency_imgui.dstAccessMask =
         VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    dependency_imgui.dependencyFlags = 0;
 
     VkSubpassDependency dependencies[] = {dependency_3d, dependency_debug, dependency_imgui};
 
-    VkAttachmentDescription attachments[] = {color_attachment, depth_attachment};
+    VkAttachmentDescription attachments[] = {
+        color_attachment, depth_attachment, color_resolve_attachment
+    };
 
     VkRenderPassCreateInfo render_pass_info{};
     render_pass_info.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    render_pass_info.attachmentCount = 2;
+    render_pass_info.attachmentCount = 3;
     render_pass_info.pAttachments    = attachments;
     render_pass_info.subpassCount    = 3;
     render_pass_info.pSubpasses      = subpasses;
@@ -667,12 +686,15 @@ void renderer<C>::create_graphics_pipeline() {
     rasterizer.cullMode                = VK_CULL_MODE_BACK_BIT;
     rasterizer.frontFace               = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable         = VK_FALSE;
+    rasterizer.depthBiasConstantFactor = 1.0f;
+    rasterizer.depthBiasSlopeFactor    = 1.0f;
+    rasterizer.depthBiasClamp          = 0.0f;
 
     // Multisampling state
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable  = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.rasterizationSamples = msaa_samples_;
 
     // Color blend state
     VkPipelineColorBlendAttachmentState color_blend_attachment{};
@@ -791,11 +813,14 @@ void renderer<C>::create_wireframe_pipeline() {
     rasterizer.cullMode                = VK_CULL_MODE_NONE;
     rasterizer.frontFace               = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable         = VK_FALSE;
+    rasterizer.depthBiasConstantFactor = 1.0f;
+    rasterizer.depthBiasSlopeFactor    = 1.0f;
+    rasterizer.depthBiasClamp          = 0.0f;
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable  = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.rasterizationSamples = msaa_samples_;
 
     VkPipelineColorBlendAttachmentState color_blend_attachment{};
     color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
@@ -900,7 +925,7 @@ void renderer<C>::create_debug_pipeline() {
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable  = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.rasterizationSamples = msaa_samples_;
 
     // Color blend state
     VkPipelineColorBlendAttachmentState color_blend_attachment{};
@@ -972,14 +997,15 @@ void renderer<C>::create_framebuffers() {
 
     for (size_t i = 0; i < swapchain_image_views_.size(); i++) {
         VkImageView attachments[] = {
-            swapchain_image_views_[i],
+            color_image_view_,
             depth_image_view_,
+            swapchain_image_views_[i],
         };
 
         VkFramebufferCreateInfo framebuffer_info{};
         framebuffer_info.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebuffer_info.renderPass      = render_pass_;
-        framebuffer_info.attachmentCount = 2;
+        framebuffer_info.attachmentCount = 3;
         framebuffer_info.pAttachments    = attachments;
         framebuffer_info.width           = swapchain_extent_.width;
         framebuffer_info.height          = swapchain_extent_.height;
@@ -1152,7 +1178,7 @@ void renderer<C>::init_imgui() {
     init_info.Subpass                   = 2;
     init_info.MinImageCount             = 2;
     init_info.ImageCount                = swapchain_images_.size();
-    init_info.MSAASamples               = VK_SAMPLE_COUNT_1_BIT;
+    init_info.MSAASamples               = msaa_samples_;
     init_info.Allocator                 = nullptr;
     init_info.CheckVkResultFn           = nullptr;
 
@@ -1314,6 +1340,22 @@ void renderer<C>::cleanup_swapchain() {
 }
 
 template <typename C>
+void renderer<C>::cleanup_color_resources() {
+    if (color_image_view_ != VK_NULL_HANDLE) {
+        vkDestroyImageView(context_->get_device(), color_image_view_, nullptr);
+        color_image_view_ = VK_NULL_HANDLE;
+    }
+    if (color_image_ != VK_NULL_HANDLE) {
+        vkDestroyImage(context_->get_device(), color_image_, nullptr);
+        color_image_ = VK_NULL_HANDLE;
+    }
+    if (color_image_memory_ != VK_NULL_HANDLE) {
+        vkFreeMemory(context_->get_device(), color_image_memory_, nullptr);
+        color_image_memory_ = VK_NULL_HANDLE;
+    }
+}
+
+template <typename C>
 void renderer<C>::cleanup_depth_resources() {
     if (depth_image_view_ != VK_NULL_HANDLE) {
         vkDestroyImageView(context_->get_device(), depth_image_view_, nullptr);
@@ -1346,10 +1388,12 @@ void renderer<C>::recreate_swapchain() {
     wait_idle();
 
     cleanup_swapchain();
+    cleanup_color_resources();
     cleanup_depth_resources();
 
     create_swapchain();
     create_image_views();
+    create_color_resources();
     create_depth_resources();
     create_framebuffers();
     create_sync_objects();
@@ -1372,11 +1416,11 @@ void renderer<WC>::render_world_pass(
     render_pass_info.renderArea.offset = {0, 0};
     render_pass_info.renderArea.extent = swapchain_extent_;
 
-    VkClearValue clear_values[2];
+    VkClearValue clear_values[3]{};
     memcpy(&clear_values[0].color, &clear_color_, sizeof(vec4f));
     clear_values[1].depthStencil = {1.0f, 0};
 
-    render_pass_info.clearValueCount = 2;
+    render_pass_info.clearValueCount = 3;
     render_pass_info.pClearValues    = clear_values;
 
     // Первый проход для 3д объектов
@@ -1688,7 +1732,8 @@ void renderer<C>::create_image(
     VkFormat format,
     VkImageTiling tiling,
     VkImageUsageFlags usage,
-    VkMemoryPropertyFlags properties
+    VkMemoryPropertyFlags properties,
+    VkSampleCountFlagBits samples
 ) {
     VkImageCreateInfo image_info{};
     image_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1702,7 +1747,7 @@ void renderer<C>::create_image(
     image_info.tiling        = tiling;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_info.usage         = usage;
-    image_info.samples       = VK_SAMPLE_COUNT_1_BIT;
+    image_info.samples       = samples;
     image_info.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
 
     if (vkCreateImage(context_->get_device(), &image_info, nullptr, &image) != VK_SUCCESS) {
@@ -1811,6 +1856,19 @@ VkExtent2D renderer<C>::choose_swap_extent(
     );
 
     return actual_extent;
+}
+
+template <typename C>
+auto renderer<C>::get_max_usable_sample_count() -> VkSampleCountFlagBits {
+    VkPhysicalDeviceProperties props;
+    vkGetPhysicalDeviceProperties(context_->get_physical_device(), &props);
+
+    VkSampleCountFlags counts = props.limits.framebufferColorSampleCounts &
+                                props.limits.framebufferDepthSampleCounts;
+
+    if (counts & VK_SAMPLE_COUNT_4_BIT) return VK_SAMPLE_COUNT_4_BIT;
+    if (counts & VK_SAMPLE_COUNT_2_BIT) return VK_SAMPLE_COUNT_2_BIT;
+    return VK_SAMPLE_COUNT_1_BIT;
 }
 
 }  // namespace vw::gfx
