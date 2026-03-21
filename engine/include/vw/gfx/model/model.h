@@ -12,6 +12,13 @@
 #include "vw/core/voxel.h"
 #include "vw/gfx/model/model_identity.h"
 
+namespace vw::gfx::detail {
+struct boundary_slice {
+    std::vector<bool> solid;
+    bool valid = false;
+};
+}  // namespace vw::gfx::detail
+
 namespace vw::gfx {
 
 class model_identity_pool;
@@ -51,6 +58,11 @@ public:
     [[nodiscard]] auto size() const -> vec3i;
     [[nodiscard]] auto voxel_scale() const -> int32;
 
+    void set_boundary_slice(int face_direction, const model& neighbor);
+    [[nodiscard]] auto has_boundary_slice(int face_direction) const -> bool;
+    [[nodiscard]] auto is_boundary_solid(int face_direction, int x, int y, int z) const -> bool;
+    void invalidate();
+
     void fill(const voxel& voxel);
 
     [[nodiscard]] auto get_identity() const -> model_identity;
@@ -75,6 +87,7 @@ private:
     int pages_x_{0}, pages_y_{0}, pages_z_{0};
     std::vector<std::unique_ptr<page_type>> pages_;
     model_identity identity_;
+    std::array<detail::boundary_slice, 6> boundary_slices_;
 
     [[nodiscard]] auto page_index(int px, int py, int pz) const -> int;
     [[nodiscard]] static auto local_index(int lx, int ly, int lz) -> int;

@@ -117,7 +117,11 @@ inline void mesh_pool::process_completed() {
         sweep_counter_ = 0;
     }
 
-    for (auto iter = pending_meshes_.begin(); iter != pending_meshes_.end();) {
+    constexpr uint32 max_meshes_per_frame = 8;
+    uint32 completed = 0;
+
+    for (auto iter = pending_meshes_.begin();
+         iter != pending_meshes_.end() && completed < max_meshes_per_frame;) {
         const auto status = iter->second.wait_for(std::chrono::seconds(0));
         if (status == std::future_status::ready) {
             auto identity     = iter->first;
@@ -135,6 +139,7 @@ inline void mesh_pool::process_completed() {
             meshes_[identity] = std::make_shared<mesh>(std::move(data));
 
             iter = pending_meshes_.erase(iter);
+            ++completed;
         } else {
             ++iter;
         }

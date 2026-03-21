@@ -177,6 +177,11 @@ inline auto perlin_world_grid_generator::color_at(
 inline auto perlin_world_grid_generator::get_chunk_y_range(
     int32 chunk_x, int32 chunk_z
 ) -> chunk_y_range {
+    auto key = pack_coord(chunk_x, chunk_z);
+    if (auto it = y_range_cache_.find(key); it != y_range_cache_.end()) {
+        return it->second;
+    }
+
     constexpr int32 s = chunk<>::size;
     constexpr int32 margin = 10;
 
@@ -202,7 +207,9 @@ inline auto perlin_world_grid_generator::get_chunk_y_range(
         return a >= 0 ? a / b : (a - b + 1) / b;
     };
 
-    return {floor_div(bottom, s), floor_div(max_h, s)};
+    chunk_y_range result{floor_div(bottom, s), floor_div(max_h, s)};
+    y_range_cache_[key] = result;
+    return result;
 }
 
 inline auto perlin_world_grid_generator::surface_height_at(int32 wx, int32 wz) const -> int32 {

@@ -196,6 +196,108 @@ inline auto model::voxel_scale() const -> int32 {
     return voxel_scale_;
 }
 
+inline void model::set_boundary_slice(int face_direction, const model& neighbor) {
+    auto& slice = boundary_slices_[face_direction];
+    constexpr int ps = page_size;
+
+    int slice_size;
+    switch (face_direction / 2) {
+        case 0: slice_size = height_ * depth_; break;
+        case 1: slice_size = width_ * depth_; break;
+        default: slice_size = width_ * height_; break;
+    }
+
+    slice.solid.assign(slice_size, false);
+    slice.valid = true;
+
+    int layer = (face_direction % 2 == 0) ? 0 : -1;
+
+    auto fill_yz = [&](int nx) {
+        int px = nx / ps;
+        for (int py = 0; py < neighbor.pages_y(); ++py) {
+            for (int pz = 0; pz < neighbor.pages_z(); ++pz) {
+                auto* page = neighbor.get_page(px, py, pz);
+                if (!page) continue;
+                int lx = nx % ps;
+                int y0 = py * ps, z0 = pz * ps;
+                for (int ly = 0; ly < ps && y0 + ly < height_; ++ly) {
+                    for (int lz = 0; lz < ps && z0 + lz < depth_; ++lz) {
+                        if (!(*page)[lx + ly * ps + lz * ps * ps].is_empty()) {
+                            slice.solid[(y0 + ly) * depth_ + (z0 + lz)] = true;
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    auto fill_xz = [&](int ny) {
+        int py = ny / ps;
+        for (int px = 0; px < neighbor.pages_x(); ++px) {
+            for (int pz = 0; pz < neighbor.pages_z(); ++pz) {
+                auto* page = neighbor.get_page(px, py, pz);
+                if (!page) continue;
+                int ly = ny % ps;
+                int x0 = px * ps, z0 = pz * ps;
+                for (int lx = 0; lx < ps && x0 + lx < width_; ++lx) {
+                    for (int lz = 0; lz < ps && z0 + lz < depth_; ++lz) {
+                        if (!(*page)[lx + ly * ps + lz * ps * ps].is_empty()) {
+                            slice.solid[(x0 + lx) * depth_ + (z0 + lz)] = true;
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    auto fill_xy = [&](int nz) {
+        int pz = nz / ps;
+        for (int px = 0; px < neighbor.pages_x(); ++px) {
+            for (int py = 0; py < neighbor.pages_y(); ++py) {
+                auto* page = neighbor.get_page(px, py, pz);
+                if (!page) continue;
+                int lz = nz % ps;
+                int x0 = px * ps, y0 = py * ps;
+                for (int lx = 0; lx < ps && x0 + lx < width_; ++lx) {
+                    for (int ly = 0; ly < ps && y0 + ly < height_; ++ly) {
+                        if (!(*page)[lx + ly * ps + lz * ps * ps].is_empty()) {
+                            slice.solid[(x0 + lx) * height_ + (y0 + ly)] = true;
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    switch (face_direction) {
+        case 0: fill_yz(0); break;
+        case 1: fill_yz(neighbor.width() - 1); break;
+        case 2: fill_xz(0); break;
+        case 3: fill_xz(neighbor.height() - 1); break;
+        case 4: fill_xy(0); break;
+        case 5: fill_xy(neighbor.depth() - 1); break;
+    }
+}
+
+inline auto model::has_boundary_slice(int face_direction) const -> bool {
+    return boundary_slices_[face_direction].valid;
+}
+
+inline auto model::is_boundary_solid(int face_direction, int x, int y, int z) const -> bool {
+    const auto& slice = boundary_slices_[face_direction];
+    int idx;
+    switch (face_direction / 2) {
+        case 0: idx = y * depth_ + z; break;
+        case 1: idx = x * depth_ + z; break;
+        default: idx = x * height_ + y; break;
+    }
+    return slice.solid[idx];
+}
+
+inline void model::invalidate() {
+    increment_generation_();
+}
+
 inline void model::fill(
     const voxel& voxel
 ) {

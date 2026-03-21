@@ -12,6 +12,17 @@
 
 namespace vw::gfx {
 
+struct world_grid_system_stats {
+    float32 process_completed_ms = 0.0f;
+    float32 request_chunks_ms    = 0.0f;
+    float32 rebuild_active_ms    = 0.0f;
+    float32 unload_ms            = 0.0f;
+    uint32 active_count          = 0;
+    uint32 pending_count         = 0;
+    uint32 loaded_count          = 0;
+    uint32 deferred_remesh_count = 0;
+};
+
 template <typename WC, typename... Cs>
 class world_grid_system {
 public:
@@ -23,6 +34,8 @@ public:
     [[nodiscard]] auto get_world_grid() const -> std::shared_ptr<world_grid<WC>>;
 
     void update();
+
+    [[nodiscard]] auto get_stats() const -> const world_grid_system_stats&;
 
     class view_modifier {
     public:
@@ -45,6 +58,7 @@ private:
     std::shared_ptr<world_grid<WC>> world_grid_;
     std::unordered_set<vec3i> active_chunks_;
     std::unordered_set<vec3i> pending_active_chunks_;
+    world_grid_system_stats stats_;
 };
 
 template <typename WC, typename... Cs>

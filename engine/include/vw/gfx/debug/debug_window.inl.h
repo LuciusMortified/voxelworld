@@ -160,6 +160,31 @@ void debug_window<WC>::render_systems_detail() {
         row("spatial", s.spatial_ms);
         row("light", s.light_ms);
         row("world_grid", s.world_grid_ms);
+
+        const auto& wgs = engine_->get_world().get_world_grid_system().get_stats();
+        ImGui::Indent();
+        row("completed", wgs.process_completed_ms);
+
+        auto grid = engine_->get_world().get_world_grid_system().get_world_grid();
+        if (grid) {
+            const auto& cs = grid->get_completed_stats();
+            ImGui::Indent();
+            row("bound_from", cs.boundary_from_ms);
+            row("chunk_create", cs.chunk_create_ms);
+            row("bound_to", cs.boundary_to_ms);
+            row("deferred", cs.deferred_ms);
+            ImGui::Text("processed: %u", cs.chunks_processed);
+            ImGui::Unindent();
+        }
+
+        row("requests", wgs.request_chunks_ms);
+        row("rebuild", wgs.rebuild_active_ms);
+        row("unload", wgs.unload_ms);
+        ImGui::Text("active:%u loaded:%u pending:%u remesh:%u",
+                    wgs.active_count, wgs.loaded_count,
+                    wgs.pending_count, wgs.deferred_remesh_count);
+        ImGui::Unindent();
+
         row("animation", s.animation_ms);
     }
     ImGui::End();

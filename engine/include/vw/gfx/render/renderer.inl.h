@@ -686,9 +686,6 @@ void renderer<C>::create_graphics_pipeline() {
     rasterizer.cullMode                = VK_CULL_MODE_BACK_BIT;
     rasterizer.frontFace               = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable         = VK_FALSE;
-    rasterizer.depthBiasConstantFactor = 1.0f;
-    rasterizer.depthBiasSlopeFactor    = 1.0f;
-    rasterizer.depthBiasClamp          = 0.0f;
 
     // Multisampling state
     VkPipelineMultisampleStateCreateInfo multisampling{};
@@ -813,9 +810,6 @@ void renderer<C>::create_wireframe_pipeline() {
     rasterizer.cullMode                = VK_CULL_MODE_NONE;
     rasterizer.frontFace               = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable         = VK_FALSE;
-    rasterizer.depthBiasConstantFactor = 1.0f;
-    rasterizer.depthBiasSlopeFactor    = 1.0f;
-    rasterizer.depthBiasClamp          = 0.0f;
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;

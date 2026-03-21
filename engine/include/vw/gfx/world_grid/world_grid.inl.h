@@ -3,6 +3,8 @@
 #ifndef VW_GFX_WORLD_GRID_INL_H
 #define VW_GFX_WORLD_GRID_INL_H
 
+#include <chrono>
+
 #include "vw/gfx/world/world.h"
 
 namespace vw::gfx {
@@ -91,6 +93,11 @@ auto world_grid<WC>::get_pending_chunk_count() const -> uint32 {
 }
 
 template <typename WC>
+auto world_grid<WC>::get_deferred_remesh_count() const -> uint32 {
+    return static_cast<uint32>(deferred_remeshes_.size());
+}
+
+template <typename WC>
 auto world_grid<WC>::voxel_scale() const -> int32 {
     return voxel_scale_;
 }
@@ -133,11 +140,11 @@ auto world_grid<WC>::chunk_to_world_coord(
 }
 
 template <typename WC>
-void world_grid<WC>::request_chunk(
+auto world_grid<WC>::request_chunk(
     vec3i coord
-) {
+) -> bool {
     if (chunks_.contains(coord) || pending_chunks_.contains(coord)) {
-        return;
+        return false;
     }
 
     pending_chunks_.insert(coord);
@@ -147,6 +154,7 @@ void world_grid<WC>::request_chunk(
         gen_queue_.push({coord});
     }
     gen_cv_.notify_one();
+    return true;
 }
 
 template <typename WC>
@@ -158,26 +166,102 @@ void world_grid<WC>::unload_chunk(
 }
 
 template <typename WC>
-void world_grid<WC>::process_completed() {
-    std::queue<chunk_data> local_queue;
-    {
-        std::scoped_lock lock(completed_mutex_);
-        std::swap(local_queue, completed_queue_);
-    }
+auto world_grid<WC>::get_completed_stats() const -> const completed_stats& {
+    return completed_stats_;
+}
 
-    while (!local_queue.empty()) {
-        auto cd = std::move(local_queue.front());
-        local_queue.pop();
+template <typename WC>
+void world_grid<WC>::process_completed() {
+    static constexpr int32 max_chunks_per_frame = 4;
+    static constexpr vec3i neighbor_offsets[6] = {
+        {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
+    };
+
+    using clock = std::chrono::high_resolution_clock;
+    auto ms = [](auto a, auto b) -> float32 {
+        return std::chrono::duration<float32>(b - a).count() * 1000.0f;
+    };
+
+    float32 boundary_from_total = 0.0f;
+    float32 chunk_create_total  = 0.0f;
+    float32 boundary_to_total   = 0.0f;
+    int32 processed = 0;
+
+    while (processed < max_chunks_per_frame) {
+        chunk_data cd{{}, nullptr};
+        {
+            std::scoped_lock lock(completed_mutex_);
+            if (completed_queue_.empty()) break;
+            cd = std::move(completed_queue_.front());
+            completed_queue_.pop();
+        }
 
         if (!pending_chunks_.contains(cd.coord)) {
             continue;
         }
 
         pending_chunks_.erase(cd.coord);
+
+        auto tb0 = clock::now();
+        for (int fd = 0; fd < 6; ++fd) {
+            auto* neighbor = get_chunk(cd.coord + neighbor_offsets[fd]);
+            if (neighbor) {
+                cd.chunk_model->set_boundary_slice(fd, *neighbor->get_model());
+            }
+        }
+        auto tb1 = clock::now();
+
         chunks_.emplace(
             cd.coord,
             std::make_unique<chunk<WC>>(*world_, cd.coord, std::move(cd.chunk_model), voxel_scale_)
         );
+        auto tb2 = clock::now();
+
+        auto* created = get_chunk(cd.coord);
+        for (int fd = 0; fd < 6; ++fd) {
+            auto* neighbor = get_chunk(cd.coord + neighbor_offsets[fd]);
+            if (neighbor) {
+                int opposite_fd = fd ^ 1;
+                neighbor->get_model()->set_boundary_slice(opposite_fd, *created->get_model());
+                deferred_remeshes_.push({cd.coord + neighbor_offsets[fd], opposite_fd});
+            }
+        }
+        auto tb3 = clock::now();
+
+        boundary_from_total += ms(tb0, tb1);
+        chunk_create_total  += ms(tb1, tb2);
+        boundary_to_total   += ms(tb2, tb3);
+        ++processed;
+    }
+
+    auto td0 = clock::now();
+    process_deferred_remeshes();
+    auto td1 = clock::now();
+
+    completed_stats_.boundary_from_ms  = boundary_from_total;
+    completed_stats_.chunk_create_ms   = chunk_create_total;
+    completed_stats_.boundary_to_ms    = boundary_to_total;
+    completed_stats_.deferred_ms       = ms(td0, td1);
+    completed_stats_.chunks_processed  = static_cast<uint32>(processed);
+    completed_stats_.remeshes_processed = 0;
+}
+
+template <typename WC>
+void world_grid<WC>::process_deferred_remeshes() {
+    static constexpr int32 max_remeshes_per_frame = 4;
+    int32 processed = 0;
+
+    while (processed < max_remeshes_per_frame && !deferred_remeshes_.empty()) {
+        auto [coord, fd] = deferred_remeshes_.front();
+        deferred_remeshes_.pop();
+
+        auto* chunk_ptr = get_chunk(coord);
+        if (!chunk_ptr) continue;
+
+        auto model = chunk_ptr->get_model();
+        model->invalidate();
+        world_->get_model_system().modify(chunk_ptr->get_entity()).set_model(model);
+        ++processed;
     }
 }
 

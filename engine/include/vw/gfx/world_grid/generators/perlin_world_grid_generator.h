@@ -4,6 +4,7 @@
 #define VW_GFX_WORLD_GRID_GENERATORS_PERLIN_WORLD_GRID_GENERATOR_H
 
 #include <array>
+#include <unordered_map>
 
 #include "vw/gfx/world_grid/world_grid_generator.h"
 
@@ -54,6 +55,12 @@ private:
 
     params params_;
     std::array<int32, 512> perm_;
+    std::unordered_map<uint64, chunk_y_range> y_range_cache_;
+
+    static auto pack_coord(int32 cx, int32 cz) -> uint64 {
+        return (static_cast<uint64>(static_cast<uint32>(cx)) << 32) |
+               static_cast<uint64>(static_cast<uint32>(cz));
+    }
 };
 
 }  // namespace vw::gfx

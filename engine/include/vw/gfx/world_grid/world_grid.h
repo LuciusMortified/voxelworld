@@ -50,6 +50,18 @@ public:
 
     [[nodiscard]] auto get_loaded_chunk_count() const -> uint32;
     [[nodiscard]] auto get_pending_chunk_count() const -> uint32;
+    [[nodiscard]] auto get_deferred_remesh_count() const -> uint32;
+
+    struct completed_stats {
+        float32 boundary_from_ms  = 0.0f;
+        float32 chunk_create_ms   = 0.0f;
+        float32 boundary_to_ms    = 0.0f;
+        float32 deferred_ms       = 0.0f;
+        uint32 chunks_processed   = 0;
+        uint32 remeshes_processed = 0;
+    };
+
+    [[nodiscard]] auto get_completed_stats() const -> const completed_stats&;
 
     [[nodiscard]] auto voxel_scale() const -> int32;
     [[nodiscard]] auto get_generator() -> world_grid_generator&;
@@ -59,7 +71,7 @@ public:
     auto chunk_to_world_coord(vec3i chunk_coord) const -> vec3i;
 
 private:
-    void request_chunk(vec3i coord);
+    auto request_chunk(vec3i coord) -> bool;
     void unload_chunk(vec3i coord);
     void process_completed();
     void gen_thread_function();
@@ -81,6 +93,14 @@ private:
     std::condition_variable gen_cv_;
     bool gen_running_ = true;
     std::unordered_set<vec3i> pending_chunks_;
+
+    struct deferred_remesh {
+        vec3i chunk_coord;
+        int face_direction;
+    };
+    std::queue<deferred_remesh> deferred_remeshes_;
+    void process_deferred_remeshes();
+    completed_stats completed_stats_;
 };
 
 }  // namespace vw::gfx

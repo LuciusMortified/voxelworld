@@ -203,6 +203,9 @@ inline auto is_face_visible(
 
     if (nx < 0 || nx >= mdl.width() || ny < 0 || ny >= mdl.height() || nz < 0 ||
         nz >= mdl.depth()) {
+        if (mdl.has_boundary_slice(face_direction)) {
+            return !mdl.is_boundary_solid(face_direction, x, y, z);
+        }
         return true;
     }
 
