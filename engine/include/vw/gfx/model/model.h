@@ -42,9 +42,7 @@ public:
     [[nodiscard]] auto operator[](int x, int y, int z) const -> const voxel&;
 
     void set_voxel(int x, int y, int z, const voxel& voxel);
-    void set_voxel(int x, int y, int z, color color);
     void set_voxel(vec3i pos, const voxel& voxel);
-    void set_voxel(vec3i pos, color color);
 
     [[nodiscard]] auto get_voxel(int x, int y, int z) const -> voxel;
     [[nodiscard]] auto get_voxel(vec3i pos) const -> voxel;
@@ -58,6 +56,7 @@ public:
     [[nodiscard]] auto size() const -> vec3i;
     [[nodiscard]] auto voxel_scale() const -> int32;
 
+    void compute_own_boundaries();
     void set_boundary_slice(int face_direction, const model& neighbor);
     [[nodiscard]] auto has_boundary_slice(int face_direction) const -> bool;
     [[nodiscard]] auto is_boundary_solid(int face_direction, int x, int y, int z) const -> bool;
@@ -88,6 +87,7 @@ private:
     std::vector<std::unique_ptr<page_type>> pages_;
     model_identity identity_;
     std::array<detail::boundary_slice, 6> boundary_slices_;
+    std::array<detail::boundary_slice, 6> own_boundaries_;
 
     [[nodiscard]] auto page_index(int px, int py, int pz) const -> int;
     [[nodiscard]] static auto local_index(int lx, int ly, int lz) -> int;

@@ -6,9 +6,9 @@
 namespace vw::sculptor {
 
 inline color_palette_panel::color_palette_panel(
-    app_state& st
+    app_state& st, const block_registry& registry
 )
-    : state_(&st) {}
+    : state_(&st), registry_(&registry) {}
 
 inline void color_palette_panel::render(
     float delta_time
@@ -27,65 +27,67 @@ inline void color_palette_panel::render(
         ImGuiWindowFlags_NoMove |           //
         ImGuiWindowFlags_AlwaysAutoResize;
 
-    ImGui::Begin("Color Palette", nullptr, window_flags);
+    ImGui::Begin("Block Palette", nullptr, window_flags);
 
-    const ImVec4 selected_color_imvec4 = to_imvec4(state_->tool.selected_color);
+    auto selected_color = registry_->get_color(state_->tool.selected_block);
+    const ImVec4 selected_imvec4 = to_imvec4(selected_color);
     ImGui::ColorButton(
         "##current_color",
-        selected_color_imvec4,
+        selected_imvec4,
         ImGuiColorEditFlags_NoAlpha | ImGuiColorEditFlags_NoPicker,
         ImVec2(ImGui::GetContentRegionAvail().x, 40.0f)
     );
     ImGui::Text(
         "RGB: (%.2f, %.2f, %.2f)",
-        selected_color_imvec4.x,
-        selected_color_imvec4.y,
-        selected_color_imvec4.z
+        selected_imvec4.x,
+        selected_imvec4.y,
+        selected_imvec4.z
     );
     ImGui::Text(
         "HEX: #%02X%02X%02X",
-        state_->tool.selected_color.r(),
-        state_->tool.selected_color.g(),
-        state_->tool.selected_color.b()
+        selected_color.r(),
+        selected_color.g(),
+        selected_color.b()
     );
 
     ImGui::Spacing();
     ImGui::Separator();
     ImGui::Spacing();
 
-    auto idx = 0;
+    static const char* category_names[] = {"Terrain", "Character", "Metal"};
 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
 
-    for (auto clr : colors::all) {
-        const ImVec4 clr_imvec4 = to_imvec4(clr);
+    for (uint8 cat = 0; cat < 3; ++cat) {
+        auto block_ids = registry_->blocks(static_cast<block_category>(cat));
+        if (block_ids.empty()) continue;
 
-        auto btn_id = std::format("##color_palette_{}", clr.value);
-        ImGui::PushID(btn_id.c_str());
+        ImGui::PopStyleVar();
+        if (cat > 0) ImGui::Spacing();
+        ImGui::Text("%s", category_names[cat]);
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
 
-        constexpr ImGuiColorEditFlags btn_flags =  //
-            ImGuiColorEditFlags_NoAlpha |          //
-            ImGuiColorEditFlags_NoPicker |         //
-            ImGuiColorEditFlags_NoBorder;
+        int idx = 0;
+        for (auto bid : block_ids) {
+            auto clr = registry_->get_color(bid);
+            const ImVec4 clr_imvec4 = to_imvec4(clr);
 
-        auto color_picked =
-            ImGui::ColorButton("##color_button", clr_imvec4, btn_flags, ImVec2(30.0f, 30.0f));
-        if (color_picked) {
-            state_->tool.selected_color = clr;
-        }
+            ImGui::PushID(static_cast<int>(bid));
 
-        ImGui::PopID();
+            constexpr ImGuiColorEditFlags btn_flags =  //
+                ImGuiColorEditFlags_NoAlpha |          //
+                ImGuiColorEditFlags_NoPicker |         //
+                ImGuiColorEditFlags_NoBorder;
 
-#if 0
-        if (ImGui::IsItemHovered()) {
-            ImGui::BeginTooltip();
-            ImGui::Text("%s", clr.name.c_str());
-            ImGui::EndTooltip();
-        }
-#endif
+            if (ImGui::ColorButton("##block", clr_imvec4, btn_flags, ImVec2(30.0f, 30.0f))) {
+                state_->tool.selected_block = bid;
+            }
 
-        if (++idx % 6 != 0) {
-            ImGui::SameLine(0, 0);
+            ImGui::PopID();
+
+            if (++idx % 6 != 0) {
+                ImGui::SameLine(0, 0);
+            }
         }
     }
 
@@ -96,9 +98,9 @@ inline void color_palette_panel::render(
     ImGui::End();
 }
 
-inline ImVec4 color_palette_panel::to_imvec4(
-    const color& clr
-) {
+inline auto color_palette_panel::to_imvec4(
+    color clr
+) -> ImVec4 {
     return {
         static_cast<float>(clr.r()) / 255.0f,
         static_cast<float>(clr.g()) / 255.0f,

@@ -305,7 +305,7 @@ void vox_deserializer<WC>::process_voxel_(
         return;
     }
 
-    current_model_->set_voxel(position, color{color_value});
+    current_model_->set_voxel(position, voxel{static_cast<uint8>(color_value & 0xFF)});
 }
 
 }  // namespace vw::gfx

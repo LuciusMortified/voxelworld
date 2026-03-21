@@ -7,6 +7,19 @@ namespace vw::gfx {
 
 // ==================== vertex ====================
 
+inline auto vertex::pack(
+    int x, int y, int z, uint8 normal_id, uint8 ao, uint8 palette_index
+) -> vertex {
+    vertex v;
+    v.data0 = (static_cast<uint32>(x) & 0x7Fu)
+            | ((static_cast<uint32>(y) & 0x7Fu) << 7)
+            | ((static_cast<uint32>(z) & 0x7Fu) << 14)
+            | ((static_cast<uint32>(normal_id) & 0x7u) << 21)
+            | ((static_cast<uint32>(ao) & 0x3u) << 24);
+    v.data1 = static_cast<uint32>(palette_index);
+    return v;
+}
+
 inline auto vertex::get_binding_descriptions() -> std::vector<VkVertexInputBindingDescription> {
     std::vector binding_descriptions = {
         VkVertexInputBindingDescription{
@@ -28,32 +41,20 @@ inline auto vertex::get_attribute_descriptions() -> std::vector<VkVertexInputAtt
         VkVertexInputAttributeDescription{
             .location = 0,
             .binding  = 0,
-            .format   = VK_FORMAT_R32G32B32_SFLOAT,
-            .offset   = offsetof(vertex, position),
+            .format   = VK_FORMAT_R32_UINT,
+            .offset   = offsetof(vertex, data0),
         },
         VkVertexInputAttributeDescription{
             .location = 1,
             .binding  = 0,
-            .format   = VK_FORMAT_R32G32B32_SFLOAT,
-            .offset   = offsetof(vertex, normal),
+            .format   = VK_FORMAT_R32_UINT,
+            .offset   = offsetof(vertex, data1),
         },
         VkVertexInputAttributeDescription{
             .location = 2,
-            .binding  = 0,
-            .format   = VK_FORMAT_R32_UINT,
-            .offset   = offsetof(vertex, color),
-        },
-        VkVertexInputAttributeDescription{
-            .location = 3,
             .binding  = 1,
             .format   = VK_FORMAT_R32_UINT,
             .offset   = 0,
-        },
-        VkVertexInputAttributeDescription{
-            .location = 4,
-            .binding  = 0,
-            .format   = VK_FORMAT_R32_SFLOAT,
-            .offset   = offsetof(vertex, ao),
         },
     };
     return attribute_descriptions;
@@ -127,21 +128,18 @@ inline face_axis_mapping::face_axis_mapping(const model& mdl, int face_dir)
     }
 }
 
-[[nodiscard]] inline auto face_axis_mapping::to_world_min_max(
+[[nodiscard]] inline auto face_axis_mapping::to_local_min_max(
     int u, int v, int w, int h, int layer
-) const -> std::pair<vec3f, vec3f> {
-    auto vs = static_cast<float32>(voxel_scale);
-    auto d_lo = static_cast<float32>((face_direction % 2 == 0) ? layer : depth - 1 - layer) * vs;
-    auto d_hi = d_lo + vs;
-    auto u_lo = static_cast<float32>(u) * vs;
-    auto u_hi = static_cast<float32>(u + w) * vs;
-    auto v_lo = static_cast<float32>(v) * vs;
-    auto v_hi = static_cast<float32>(v + h) * vs;
+) const -> std::pair<vec3i, vec3i> {
+    int d_lo = (face_direction % 2 == 0) ? layer : depth - 1 - layer;
+    int d_hi = d_lo + 1;
+    int u_hi = u + w;
+    int v_hi = v + h;
 
     switch (face_direction / 2) {
-        case 0:  return {{d_lo, v_lo, u_lo}, {d_hi, v_hi, u_hi}};
-        case 1:  return {{u_lo, d_lo, v_lo}, {u_hi, d_hi, v_hi}};
-        default: return {{u_lo, v_lo, d_lo}, {u_hi, v_hi, d_hi}};
+        case 0:  return {{d_lo, v, u}, {d_hi, v_hi, u_hi}};
+        case 1:  return {{u, d_lo, v}, {u_hi, d_hi, v_hi}};
+        default: return {{u, v, d_lo}, {u_hi, v_hi, d_hi}};
     }
 }
 
@@ -242,7 +240,7 @@ inline void build_face_mask(
         return static_cast<size_t>(u) * static_cast<size_t>(axes.height) + static_cast<size_t>(v);
     };
 
-    face_mask_cell empty_cell{colors::empty, 0};
+    face_mask_cell empty_cell{0, 0};
 
     for (int u_block = 0; u_block < axes.width; u_block += ps) {
         int u_end = std::min(u_block + ps, axes.width);
@@ -268,7 +266,7 @@ inline void build_face_mask(
                     auto& vx = (*page)[lx + ly * ps + lz * ps * ps];
                     if (!vx.is_empty() && is_face_visible(mdl, mx, my, mz, face_direction)) {
                         storage.mask[idx(u, v)] = {
-                            vx.value, compute_ao_key(mdl, mx, my, mz, face_direction)
+                            vx.id, compute_ao_key(mdl, mx, my, mz, face_direction)
                         };
                     } else {
                         storage.mask[idx(u, v)] = empty_cell;
@@ -283,17 +281,11 @@ inline void add_quad(
     std::vector<vertex>& vertices,
     std::vector<uint32>& indices,
     int face_direction,
-    const vec3f& min_pos,
-    const vec3f& max_pos,
-    color color,
-    const std::array<float32, 4>& ao
+    vec3i min_pos,
+    vec3i max_pos,
+    uint8 palette_index,
+    const std::array<uint8, 4>& ao
 ) {
-    static const vec3f face_normals[6] = {
-        vec3f(1, 0, 0),  vec3f(-1, 0, 0),
-        vec3f(0, 1, 0),  vec3f(0, -1, 0),
-        vec3f(0, 0, 1),  vec3f(0, 0, -1)
-    };
-
     static constexpr int face_verts[6][4][3] = {
         {{1, 0, 0}, {1, 0, 1}, {1, 1, 1}, {1, 1, 0}},  // +X
         {{0, 0, 0}, {0, 1, 0}, {0, 1, 1}, {0, 0, 1}},  // -X
@@ -303,16 +295,14 @@ inline void add_quad(
         {{1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 0}},  // -Z
     };
 
+    auto normal_id = static_cast<uint8>(face_direction);
     auto base_vertex = static_cast<uint32>(vertices.size());
-    vec3f normal     = face_normals[face_direction];
 
     for (int i = 0; i < 4; i++) {
-        vec3f pos{
-            face_verts[face_direction][i][0] ? max_pos.x : min_pos.x,
-            face_verts[face_direction][i][1] ? max_pos.y : min_pos.y,
-            face_verts[face_direction][i][2] ? max_pos.z : min_pos.z,
-        };
-        vertices.emplace_back(pos, normal, color.value, ao[i]);
+        int x = face_verts[face_direction][i][0] ? max_pos.x : min_pos.x;
+        int y = face_verts[face_direction][i][1] ? max_pos.y : min_pos.y;
+        int z = face_verts[face_direction][i][2] ? max_pos.z : min_pos.z;
+        vertices.push_back(vertex::pack(x, y, z, normal_id, ao[i], palette_index));
     }
 
     if (ao[0] + ao[2] > ao[1] + ao[3]) {
@@ -339,9 +329,10 @@ inline void emit_rect(
     int face_direction,
     int layer,
     int u_start, int v_start, int w, int h,
-    color col
+    uint8 voxel_id,
+    const block_registry& registry
 ) {
-    auto [min_pos, max_pos] = axes.to_world_min_max(u_start, v_start, w, h, layer);
+    auto [min_pos, max_pos] = axes.to_local_min_max(u_start, v_start, w, h, layer);
 
     auto [c0x, c0y, c0z] = axes.to_model_coords(u_start, v_start, layer);
     auto [c1x, c1y, c1z] = axes.to_model_coords(u_start + w - 1, v_start, layer);
@@ -349,18 +340,18 @@ inline void emit_rect(
     auto [c3x, c3y, c3z] = axes.to_model_coords(u_start, v_start + h - 1, layer);
 
     std::array canonical_ao = {
-        compute_vertex_ao_float(mdl, c0x, c0y, c0z, face_direction, -1, -1),
-        compute_vertex_ao_float(mdl, c1x, c1y, c1z, face_direction,  1, -1),
-        compute_vertex_ao_float(mdl, c2x, c2y, c2z, face_direction,  1,  1),
-        compute_vertex_ao_float(mdl, c3x, c3y, c3z, face_direction, -1,  1),
+        static_cast<uint8>(compute_vertex_ao_int(mdl, c0x, c0y, c0z, face_direction, -1, -1)),
+        static_cast<uint8>(compute_vertex_ao_int(mdl, c1x, c1y, c1z, face_direction,  1, -1)),
+        static_cast<uint8>(compute_vertex_ao_int(mdl, c2x, c2y, c2z, face_direction,  1,  1)),
+        static_cast<uint8>(compute_vertex_ao_int(mdl, c3x, c3y, c3z, face_direction, -1,  1)),
     };
 
-    std::array<float32, 4> winding_ao;
+    std::array<uint8, 4> winding_ao;
     for (int k = 0; k < 4; k++) {
         winding_ao[k] = canonical_ao[canonical_to_winding[face_direction][k]];
     }
 
-    add_quad(storage.vertices, storage.indices, face_direction, min_pos, max_pos, col, winding_ao);
+    add_quad(storage.vertices, storage.indices, face_direction, min_pos, max_pos, voxel_id, winding_ao);
 }
 
 }  // namespace detail
@@ -368,7 +359,7 @@ inline void emit_rect(
 // ==================== simple_mesh_generator ====================
 
 inline auto simple_mesh_generator::generate_mesh_data(
-    const std::shared_ptr<model>& model
+    const std::shared_ptr<model>& model, const block_registry& registry
 ) -> mesh {
     if (!model) {
         return mesh{};
@@ -383,7 +374,8 @@ inline auto simple_mesh_generator::generate_mesh_data(
                 if (voxel voxel_obj = model->get_voxel(x, y, z); !voxel_obj.is_empty()) {
                     for (int face = 0; face < 6; face++) {
                         if (is_face_visible(model, x, y, z, face)) {
-                            add_cube_face(vertices, indices, model, x, y, z, face, voxel_obj.value);
+                            add_cube_face(vertices, indices, model, x, y, z, face,
+                                          voxel_obj.id, registry);
                         }
                     }
                 }
@@ -402,64 +394,22 @@ inline void simple_mesh_generator::add_cube_face(
     int y,
     int z,
     int face_direction,
-    color color
+    uint8 voxel_id,
+    const block_registry& registry
 ) {
-    static constexpr vec3f face_normals[6] = {
-        vec3f(1, 0, 0),
-        vec3f(-1, 0, 0),
-        vec3f(0, 1, 0),
-        vec3f(0, -1, 0),
-        vec3f(0, 0, 1),
-        vec3f(0, 0, -1)
-    };
+    auto normal_id = static_cast<uint8>(face_direction);
 
-    static constexpr vec3f face_vertices[6][4] = {
-        {{1, 0, 0}, {1, 0, 1}, {1, 1, 1}, {1, 1, 0}},  // +X
-        {{0, 0, 0}, {0, 1, 0}, {0, 1, 1}, {0, 0, 1}},  // -X
-        {{0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {0, 1, 1}},  // +Y
-        {{0, 0, 0}, {0, 0, 1}, {1, 0, 1}, {1, 0, 0}},  // -Y
-        {{0, 0, 1}, {0, 1, 1}, {1, 1, 1}, {1, 0, 1}},  // +Z
-        {{1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 0}}   // -Z
-    };
-
-    const auto base_vertex = static_cast<uint32>(vertices.size());
-    vec3f normal           = face_normals[face_direction];
-    vec3f position(x, y, z);
-    auto scale = static_cast<float32>(model->voxel_scale());
-
-    std::array<float32, 4> ao_values;
+    std::array<uint8, 4> ao_values;
     for (int i = 0; i < 4; i++) {
-        ao_values[i] = detail::compute_vertex_ao_float(
-            *model,
-            x,
-            y,
-            z,
-            face_direction,
+        ao_values[i] = static_cast<uint8>(detail::compute_vertex_ao_int(
+            *model, x, y, z, face_direction,
             ao_winding_signs[face_direction][i][0],
             ao_winding_signs[face_direction][i][1]
-        );
+        ));
     }
 
-    for (int i = 0; i < 4; i++) {
-        vec3f vertex_pos = (position + face_vertices[face_direction][i]) * scale;
-        vertices.emplace_back(vertex_pos, normal, color.value, ao_values[i]);
-    }
-
-    if (ao_values[0] + ao_values[2] > ao_values[1] + ao_values[3]) {
-        indices.push_back(base_vertex + 0);
-        indices.push_back(base_vertex + 1);
-        indices.push_back(base_vertex + 2);
-        indices.push_back(base_vertex + 2);
-        indices.push_back(base_vertex + 3);
-        indices.push_back(base_vertex + 0);
-    } else {
-        indices.push_back(base_vertex + 1);
-        indices.push_back(base_vertex + 2);
-        indices.push_back(base_vertex + 3);
-        indices.push_back(base_vertex + 3);
-        indices.push_back(base_vertex + 0);
-        indices.push_back(base_vertex + 1);
-    }
+    detail::add_quad(vertices, indices, face_direction,
+                     {x, y, z}, {x + 1, y + 1, z + 1}, voxel_id, ao_values);
 }
 
 inline auto simple_mesh_generator::is_face_visible(
@@ -487,7 +437,7 @@ inline auto simple_mesh_generator::is_face_visible(
 // ==================== strip_mesh_generator ====================
 
 inline auto strip_mesh_generator::generate_mesh_data(
-    mesh_generation_storage& storage, const model& mdl
+    mesh_generation_storage& storage, const model& mdl, const block_registry& registry
 ) -> mesh {
     storage.clear();
 
@@ -502,7 +452,7 @@ inline auto strip_mesh_generator::generate_mesh_data(
     }
 
     for (int face_direction = 0; face_direction < 6; face_direction++) {
-        generate_face_quads(storage, mdl, face_direction);
+        generate_face_quads(storage, mdl, face_direction, registry);
     }
 
     return mesh{storage.vertices, storage.indices};
@@ -513,7 +463,8 @@ inline void strip_mesh_generator::merge_and_emit_strips(
     const model& mdl,
     const detail::face_axis_mapping& axes,
     int face_direction,
-    int layer
+    int layer,
+    const block_registry& registry
 ) {
     auto idx = [&](int u, int v) -> size_t {
         return static_cast<size_t>(u) * static_cast<size_t>(axes.height) + static_cast<size_t>(v);
@@ -536,13 +487,14 @@ inline void strip_mesh_generator::merge_and_emit_strips(
             int w = u - strip_start;
 
             detail::emit_rect(storage, mdl, axes, face_direction, layer,
-                              strip_start, v, w, 1, cell.col);
+                              strip_start, v, w, 1, cell.voxel_id, registry);
         }
     }
 }
 
 inline void strip_mesh_generator::generate_face_quads(
-    mesh_generation_storage& storage, const model& mdl, int face_direction
+    mesh_generation_storage& storage, const model& mdl, int face_direction,
+    const block_registry& registry
 ) {
     detail::face_axis_mapping axes(mdl, face_direction);
     constexpr int ps = model::page_size;
@@ -581,14 +533,14 @@ inline void strip_mesh_generator::generate_face_quads(
         }
         if (!has_faces) continue;
 
-        merge_and_emit_strips(storage, mdl, axes, face_direction, layer);
+        merge_and_emit_strips(storage, mdl, axes, face_direction, layer, registry);
     }
 }
 
 // ==================== greedy_mesh_generator ====================
 
 inline auto greedy_mesh_generator::generate_mesh_data(
-    mesh_generation_storage& storage, const model& mdl
+    mesh_generation_storage& storage, const model& mdl, const block_registry& registry
 ) -> mesh {
     storage.clear();
 
@@ -603,7 +555,7 @@ inline auto greedy_mesh_generator::generate_mesh_data(
     }
 
     for (int face_direction = 0; face_direction < 6; face_direction++) {
-        generate_face_quads(storage, mdl, face_direction);
+        generate_face_quads(storage, mdl, face_direction, registry);
     }
 
     return mesh{storage.vertices, storage.indices};
@@ -614,13 +566,14 @@ inline void greedy_mesh_generator::merge_and_emit_rects(
     const model& mdl,
     const detail::face_axis_mapping& axes,
     int face_direction,
-    int layer
+    int layer,
+    const block_registry& registry
 ) {
     auto idx = [&](int u, int v) -> size_t {
         return static_cast<size_t>(u) * static_cast<size_t>(axes.height) + static_cast<size_t>(v);
     };
 
-    face_mask_cell empty_cell{colors::empty, 0};
+    face_mask_cell empty_cell{0, 0};
 
     for (int v = 0; v < axes.height; v++) {
         for (int u = 0; u < axes.width; u++) {
@@ -652,13 +605,14 @@ inline void greedy_mesh_generator::merge_and_emit_rects(
             }
 
             detail::emit_rect(storage, mdl, axes, face_direction, layer,
-                              u, v, w, h, cell.col);
+                              u, v, w, h, cell.voxel_id, registry);
         }
     }
 }
 
 inline void greedy_mesh_generator::generate_face_quads(
-    mesh_generation_storage& storage, const model& mdl, int face_direction
+    mesh_generation_storage& storage, const model& mdl, int face_direction,
+    const block_registry& registry
 ) {
     detail::face_axis_mapping axes(mdl, face_direction);
     constexpr int ps = model::page_size;
@@ -697,7 +651,7 @@ inline void greedy_mesh_generator::generate_face_quads(
         }
         if (!has_faces) continue;
 
-        merge_and_emit_rects(storage, mdl, axes, face_direction, layer);
+        merge_and_emit_rects(storage, mdl, axes, face_direction, layer, registry);
     }
 }
 

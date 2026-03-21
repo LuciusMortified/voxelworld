@@ -38,9 +38,7 @@ public:
 
         void set_model(std::shared_ptr<model> model_ptr);
         void set_voxel(int x, int y, int z, const voxel& v);
-        void set_voxel(int x, int y, int z, color c);
         void set_voxel(vec3i pos, const voxel& v);
-        void set_voxel(vec3i pos, color c);
         void fill(const voxel& v);
 
     private:

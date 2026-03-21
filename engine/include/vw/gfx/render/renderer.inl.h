@@ -10,9 +10,9 @@ namespace vw::gfx {
 
 template <typename C>
 renderer<C>::renderer(
-    vulkan_context& context, window& window
+    vulkan_context& context, window& window, const block_registry& registry
 )
-    : context_(&context), window_(&window) {
+    : context_(&context), window_(&window), block_registry_(&registry) {
     vertex_shader_ =
         std::make_unique<shader>(*context_, "shaders/voxel.vert.spv", shader_type::VERTEX);
     fragment_shader_ =
@@ -42,6 +42,7 @@ renderer<C>::renderer(
     create_render_pass();
     create_descriptor_set_layouts();
     create_point_lights_descriptor_set_layout();
+    create_palette_descriptor_set_layout();
     create_graphics_pipeline();
     create_wireframe_pipeline();
     create_shadow_pipeline();
@@ -66,6 +67,10 @@ renderer<C>::renderer(
     light_buffer_ = std::make_unique<light_buffer_type>(
         *context_, descriptor_pool_, point_lights_descriptor_set_layout_
     );
+
+    palette_buffer_ = std::make_unique<palette_buffer>(
+        *context_, descriptor_pool_, palette_descriptor_set_layout_, *block_registry_
+    );
 }
 
 template <typename C>
@@ -85,6 +90,7 @@ renderer<C>::~renderer() {
     cleanup_shadow_pipeline();
     cleanup_debug_pipeline();
     cleanup_point_lights_resources();
+    cleanup_palette_resources();
     cleanup_descriptor_set_layouts();
     cleanup_render_pass();
     cleanup_descriptor_pool();
@@ -719,12 +725,12 @@ void renderer<C>::create_graphics_pipeline() {
     depth_stencil.depthBoundsTestEnable = VK_FALSE;
     depth_stencil.stencilTestEnable     = VK_FALSE;
 
-    // Pipeline layout с четырьмя descriptor set layouts
-    std::array<VkDescriptorSetLayout, 4> descriptor_set_layouts = {
+    std::array<VkDescriptorSetLayout, 5> descriptor_set_layouts = {
         uniform_descriptor_set_layout_,
         storage_descriptor_set_layout_,
         shadow_descriptor_set_layout_,
-        point_lights_descriptor_set_layout_
+        point_lights_descriptor_set_layout_,
+        palette_descriptor_set_layout_
     };
 
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
@@ -1505,6 +1511,19 @@ void renderer<WC>::render_world(
         3,  // Set index 3 (point lights descriptor set layout)
         1,
         &point_lights_descriptor_set,
+        0,
+        nullptr
+    );
+
+    // Биндим palette descriptor set (set 4)
+    VkDescriptorSet palette_ds = palette_buffer_->get_descriptor_set();
+    vkCmdBindDescriptorSets(
+        command_buffers_[current_image_index_],
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        pipeline_layout_,
+        4,  // Set index 4 (palette descriptor set layout)
+        1,
+        &palette_ds,
         0,
         nullptr
     );

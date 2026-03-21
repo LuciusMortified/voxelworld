@@ -291,6 +291,7 @@ void world_grid<WC>::gen_thread_function() {
         }
 
         auto result = generator_->generate_chunk(task.coord);
+        result.chunk_model->compute_own_boundaries();
 
         {
             std::scoped_lock lock(completed_mutex_);

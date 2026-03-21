@@ -34,7 +34,7 @@ struct mesh_generation_task {
 
 class mesh_pool final {
 public:
-    explicit mesh_pool(vulkan_context& context);
+    explicit mesh_pool(vulkan_context& context, const block_registry& registry);
     ~mesh_pool();
 
     mesh_pool(const mesh_pool&)                    = delete;
@@ -55,6 +55,7 @@ private:
     void sweep_orphaned_();
 
     vulkan_context* context_;
+    const block_registry* registry_;
     std::unordered_map<model_identity, std::shared_ptr<mesh>> meshes_;
     std::unordered_map<model_identity, std::weak_ptr<model>> model_refs_;
     std::unordered_map<model_identity, std::future<mesh>> pending_meshes_;

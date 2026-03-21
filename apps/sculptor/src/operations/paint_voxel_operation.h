@@ -16,7 +16,7 @@ namespace vw::sculptor {
 struct paint_voxel_params {
     std::string name;
     vec3i position;
-    color new_color;
+    uint8 new_block;
 };
 
 class paint_voxel_operation final : public base_operation {
@@ -32,7 +32,7 @@ private:
     engine_type* engine_;
     app_state* state_;
     paint_voxel_params params_;
-    color previous_color_;
+    uint8 previous_block_;
 };
 
 }  // namespace vw::sculptor

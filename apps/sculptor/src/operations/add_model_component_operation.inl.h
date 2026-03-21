@@ -24,7 +24,7 @@ inline void add_model_component_operation::execute() {
     guard->with<gfx::model_component>();
 
     const auto model = model_registry.create(params_.name, params_.size);
-    model->fill(voxel{state_->tool.selected_color});
+    model->fill(voxel{state_->tool.selected_block});
 
     model_system.modify(ent).set_model(model);
     state_->file.has_unsaved_changes = true;

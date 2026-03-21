@@ -27,10 +27,10 @@ engine<WC>::engine(
 ) {
     window_         = std::make_unique<window>(width, height, title);
     vulkan_context_ = std::make_unique<vulkan_context>(*window_);
-    renderer_       = std::make_unique<renderer_type>(*vulkan_context_, *window_);
+    renderer_       = std::make_unique<renderer_type>(*vulkan_context_, *window_, block_registry_);
     camera_ =
         std::make_unique<camera>(45.0f, static_cast<float>(width) / static_cast<float>(height));
-    world_      = std::make_unique<world_type>(*vulkan_context_);
+    world_      = std::make_unique<world_type>(*vulkan_context_, block_registry_);
     debug_tool_ = std::make_unique<debug_window_type>(*this);
 
     // Default empty app to avoid null checks
@@ -103,6 +103,11 @@ auto engine<WC>::get_camera() const -> camera& {
 template <typename WC>
 auto engine<WC>::get_world() const -> world_type& {
     return *world_;
+}
+
+template <typename WC>
+auto engine<WC>::get_block_registry() const -> const block_registry& {
+    return block_registry_;
 }
 
 template <typename WC>

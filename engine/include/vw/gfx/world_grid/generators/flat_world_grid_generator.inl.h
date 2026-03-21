@@ -21,15 +21,16 @@ inline auto flat_world_grid_generator::generate_chunk(
     auto mdl = std::make_shared<model>(*pool_, s, s, s, voxel_scale_);
 
     bool checker = ((coord.x + coord.z) & 1) == 0;
-    auto grass = checker ? color{60, 140, 50, 255} : color{80, 170, 60, 255};
+    auto grass_id = checker ? static_cast<uint8>(block_id::grass_1)
+                            : static_cast<uint8>(block_id::grass_2);
 
     for (int32 x = 0; x < s; ++x) {
         for (int32 z = 0; z < s; ++z) {
             for (int32 y = 0; y < height_; ++y) {
                 if (y == height_ - 1) {
-                    mdl->set_voxel(x, y, z, grass);
+                    mdl->set_voxel(x, y, z, voxel{grass_id});
                 } else {
-                    mdl->set_voxel(x, y, z, colors::brown);
+                    mdl->set_voxel(x, y, z, voxel{static_cast<uint8>(block_id::dirt_2)});
                 }
             }
         }

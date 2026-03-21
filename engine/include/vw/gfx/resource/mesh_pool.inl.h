@@ -14,9 +14,9 @@
 namespace vw::gfx {
 
 inline mesh_pool::mesh_pool(
-    vulkan_context& context
+    vulkan_context& context, const block_registry& registry
 )
-    : context_{&context} {
+    : context_{&context}, registry_{&registry} {
     auto count = std::min(std::thread::hardware_concurrency(), 4u);
     if (count == 0) {
         count = 1;
@@ -172,7 +172,7 @@ inline void mesh_pool::gen_thread_function() {
 
         if (task) {
             try {
-                mesh data = greedy_mesh_generator::generate_mesh_data(storage, *task->model_ptr);
+                mesh data = greedy_mesh_generator::generate_mesh_data(storage, *task->model_ptr, *registry_);
                 task->promise.set_value(std::move(data));
             } catch (const std::exception& e) {
                 task->promise.set_exception(std::current_exception());

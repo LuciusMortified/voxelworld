@@ -14,6 +14,7 @@
 #include "vw/gfx/render/shadow_map.h"
 #include "vw/gfx/resource/combined_buffer_pool.h"
 #include "vw/gfx/resource/light_buffer.h"
+#include "vw/gfx/resource/palette_buffer.h"
 #include "vw/gfx/resource/shader.h"
 #include "vw/gfx/window/window.h"
 #include "vw/gfx/world/world.h"
@@ -76,7 +77,7 @@ public:
     using combined_buffer_pool_type = combined_buffer_pool<WC>;
     using light_buffer_type         = light_buffer<WC>;
 
-    renderer(vulkan_context& context, window& window);
+    renderer(vulkan_context& context, window& window, const block_registry& registry);
     ~renderer();
 
     renderer(const renderer&)            = delete;
@@ -174,6 +175,9 @@ private:
     void create_point_lights_descriptor_set_layout();
     void cleanup_point_lights_resources();
 
+    void create_palette_descriptor_set_layout();
+    void cleanup_palette_resources();
+
     void update_shadow_uniform_buffer() const;
     void render_shadow_pass(world_type& world, const camera& camera);
 
@@ -251,6 +255,7 @@ private:
     VkDescriptorSetLayout storage_descriptor_set_layout_      = VK_NULL_HANDLE;
     VkDescriptorSetLayout shadow_descriptor_set_layout_       = VK_NULL_HANDLE;
     VkDescriptorSetLayout point_lights_descriptor_set_layout_ = VK_NULL_HANDLE;
+    VkDescriptorSetLayout palette_descriptor_set_layout_      = VK_NULL_HANDLE;
     VkPipelineLayout pipeline_layout_                         = VK_NULL_HANDLE;
     VkPipeline graphics_pipeline_                             = VK_NULL_HANDLE;
     VkPipeline wireframe_pipeline_                            = VK_NULL_HANDLE;
@@ -306,6 +311,10 @@ private:
     // Light buffer для point lights
     std::unique_ptr<light_buffer_type> light_buffer_;
 
+    // Palette buffer для block colors
+    const block_registry* block_registry_;
+    std::unique_ptr<palette_buffer> palette_buffer_;
+
     // Shadow map для directional light
     std::unique_ptr<shadow_map> shadow_map_;
 
@@ -322,6 +331,7 @@ private:
 }  // namespace vw::gfx
 
 #include "vw/gfx/render/renderer.inl.h"
+#include "vw/gfx/render/renderer_palette.inl.h"
 #include "vw/gfx/render/renderer_point_lights.inl.h"
 #include "vw/gfx/render/renderer_shadow.inl.h"
 

@@ -128,28 +128,10 @@ void model_system<Cs...>::model_modifier::set_voxel(
 
 template <typename... Cs>
 void model_system<Cs...>::model_modifier::set_voxel(
-    int x, int y, int z, color c
-) {
-    if (component_->model_) {
-        component_->model_->set_voxel(x, y, z, c);
-        system_->registry_->template request_change<model_component>(entity_);
-    }
-}
-template <typename... Cs>
-void model_system<Cs...>::model_modifier::set_voxel(
     vec3i pos, const voxel& v
 ) {
     if (component_->model_) {
         component_->model_->set_voxel(pos.x, pos.y, pos.z, v);
-        system_->registry_->template request_change<model_component>(entity_);
-    }
-}
-template <typename... Cs>
-void model_system<Cs...>::model_modifier::set_voxel(
-    vec3i pos, color c
-) {
-    if (component_->model_) {
-        component_->model_->set_voxel(pos.x, pos.y, pos.z, c);
         system_->registry_->template request_change<model_component>(entity_);
     }
 }

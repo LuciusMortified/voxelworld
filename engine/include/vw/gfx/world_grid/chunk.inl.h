@@ -24,7 +24,10 @@ chunk<WC>::chunk(
         static_cast<float32>(coord.z * size * voxel_scale)
     };
 
-    world.get_transform_system().modify(guard_.get_entity()).set_position(world_pos);
+    auto vs = static_cast<float32>(voxel_scale);
+    world.get_transform_system().modify(guard_.get_entity())
+        .set_position(world_pos)
+        .set_scale({vs, vs, vs});
     world.get_model_system().modify(guard_.get_entity()).set_model(model_);
 }
 

@@ -172,30 +172,31 @@ inline auto perlin_world_grid_generator::height_at(
     return base_h + static_cast<int32>(mixed * amplitude);
 }
 
-inline auto perlin_world_grid_generator::color_at(
+inline auto perlin_world_grid_generator::block_at(
     int32 y, int32 surface_y, float64 continent
-) const -> color {
+) const -> uint8 {
+    using enum block_id;
     int32 depth = surface_y - y;
 
     if (continent >= 0.7) {
         if (depth == 0) {
             if (surface_y > params_.mountains_height + 20)
-                return colors::white;
-            return colors::stone;
+                return static_cast<uint8>(snow_1);
+            return static_cast<uint8>(stone_1);
         }
-        return colors::stone;
+        return static_cast<uint8>(stone_2);
     }
 
     if (depth == 0) {
         if (surface_y > params_.mountains_height + 10)
-            return colors::white;
+            return static_cast<uint8>(snow_1);
         if (surface_y > params_.hills_height + 10)
-            return colors::stone;
-        return colors::grass;
+            return static_cast<uint8>(stone_1);
+        return static_cast<uint8>(grass_1);
     }
     if (depth < 3)
-        return colors::dirt;
-    return colors::stone;
+        return static_cast<uint8>(dirt_1);
+    return static_cast<uint8>(stone_3);
 }
 
 inline auto perlin_world_grid_generator::get_chunk_y_range(
@@ -266,7 +267,7 @@ inline auto perlin_world_grid_generator::generate_chunk(
                 int32 y = wy - coord.y * s;
                 if (y < 0 || y >= s)
                     continue;
-                mdl->set_voxel(x, y, z, color_at(wy, surface, continent));
+                mdl->set_voxel(x, y, z, voxel{block_at(wy, surface, continent)});
             }
         }
     }

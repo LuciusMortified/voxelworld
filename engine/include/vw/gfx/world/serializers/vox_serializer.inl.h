@@ -181,8 +181,8 @@ void vox_serializer<WC>::write_model_(
                     continue;
                 }
                 file << std::format(
-                    "\t\tv {} {} {} 0x{:08X}\n",
-                    x, y, z, v.value.value
+                    "\t\tv {} {} {} 0x{:02X}\n",
+                    x, y, z, v.id
                 );
             }
         }

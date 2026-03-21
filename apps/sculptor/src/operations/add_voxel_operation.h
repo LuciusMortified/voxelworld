@@ -16,7 +16,7 @@ namespace vw::sculptor {
 struct add_voxel_params {
     std::string name;
     vec3i position;
-    color new_color;
+    uint8 new_block;
 };
 
 class add_voxel_operation final : public base_operation {

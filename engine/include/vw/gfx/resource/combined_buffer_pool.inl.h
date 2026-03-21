@@ -35,7 +35,8 @@ void combined_buffer_pool<C>::update(
             auto swapped = buffers_[info.buffer_index]->free(ent);
             if (swapped && world.template has_component<transform_component>(*swapped)) {
                 auto& tc = world.template get_component<transform_component>(*swapped);
-                buffers_[info.buffer_index]->write_transform(*swapped, tc.get_world_matrix());
+                buffers_[info.buffer_index]->write_transform(
+                    *swapped, tc.get_world_matrix());
             }
             entity_buffer_infos_.erase(ent);
         }
@@ -231,9 +232,9 @@ void combined_buffer_pool<C>::update_transforms_(
 
             auto& info = entity_buffer_infos_[ent];
 
-            const auto& transform_comp    = world.template get_component<transform_component>(ent);
-            const mat4f& transform_matrix = transform_comp.get_world_matrix();
-            buffers_[info.buffer_index]->write_transform(ent, transform_matrix);
+            const auto& transform_comp = world.template get_component<transform_component>(ent);
+            buffers_[info.buffer_index]->write_transform(
+                ent, transform_comp.get_world_matrix());
 
             transform_pending_entities_.erase(ent);
         }

@@ -52,6 +52,7 @@ public:
     [[nodiscard]] auto get_renderer() const -> renderer_type&;
     [[nodiscard]] auto get_camera() const -> camera&;
     [[nodiscard]] auto get_world() const -> world_type&;
+    [[nodiscard]] auto get_block_registry() const -> const block_registry&;
     [[nodiscard]] auto get_debug_tool() const -> debug_window_type&;
     [[nodiscard]] const engine_stats& get_stats() const;
 
@@ -64,6 +65,7 @@ private:
     std::unique_ptr<vulkan_context> vulkan_context_;
     std::unique_ptr<renderer_type> renderer_;
     std::unique_ptr<camera> camera_;
+    block_registry block_registry_;
     std::unique_ptr<world_type> world_;
     std::unique_ptr<debug_window_type> debug_tool_;
 

@@ -56,7 +56,7 @@ public:
     using animation_system_type   = animation_system_from_tuple<WC>::type;
     using world_grid_system_type  = world_grid_system_from_tuple<WC, WC>::type;
 
-    explicit world(vulkan_context& context);
+    explicit world(vulkan_context& context, const block_registry& registry);
     ~world()                               = default;
     world(const world&)                    = delete;
     auto operator=(const world&) -> world& = delete;

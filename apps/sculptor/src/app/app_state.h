@@ -61,7 +61,7 @@ struct scene_state {
 
 struct tool_state {
     tools selected_tool  = tools::add_voxel;
-    color selected_color = colors::white;
+    uint8 selected_block = static_cast<uint8>(block_id::snow_3);
 };
 
 struct clip_settings {

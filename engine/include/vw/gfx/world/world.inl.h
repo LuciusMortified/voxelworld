@@ -7,9 +7,9 @@ namespace vw::gfx {
 
 template <typename Cs>
 world<Cs>::world(
-    vulkan_context& context
+    vulkan_context& context, const block_registry& registry
 )
-    : mesh_pool_{context}
+    : mesh_pool_{context, registry}
     , spatial_system_(registry_)
     , transform_system_(registry_, hierarchy_system_)
     , hierarchy_system_(registry_, transform_system_)
