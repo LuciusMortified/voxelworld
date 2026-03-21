@@ -13,9 +13,7 @@ template <typename WC>
 world_grid<WC>::world_grid(
     world_type& world, std::unique_ptr<world_grid_generator> generator, int32 voxel_scale
 )
-    : world_(&world)
-    , voxel_scale_(voxel_scale)
-    , generator_(std::move(generator)) {
+    : world_(&world), voxel_scale_(voxel_scale), generator_(std::move(generator)) {
     generator_->set_identity_pool(world.get_model_registry().get_identity_pool());
     auto count = std::min(std::thread::hardware_concurrency(), 4u);
     if (count == 0) {
@@ -124,11 +122,7 @@ auto world_grid<WC>::world_to_local_coord(
     vec3i world_pos
 ) const -> vec3i {
     const int32 s = chunk<WC>::size * voxel_scale_;
-    return {
-        ((world_pos.x % s) + s) % s,
-        ((world_pos.y % s) + s) % s,
-        ((world_pos.z % s) + s) % s
-    };
+    return {((world_pos.x % s) + s) % s, ((world_pos.y % s) + s) % s, ((world_pos.z % s) + s) % s};
 }
 
 template <typename WC>
@@ -173,25 +167,27 @@ auto world_grid<WC>::get_completed_stats() const -> const completed_stats& {
 template <typename WC>
 void world_grid<WC>::process_completed() {
     static constexpr int32 max_chunks_per_frame = 4;
-    static constexpr vec3i neighbor_offsets[6] = {
+    static constexpr vec3i neighbor_offsets[6]  = {
         {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
     };
 
     using clock = std::chrono::high_resolution_clock;
-    auto ms = [](auto a, auto b) -> float32 {
+    auto ms     = [](auto a, auto b) -> float32 {
         return std::chrono::duration<float32>(b - a).count() * 1000.0f;
     };
 
     float32 boundary_from_total = 0.0f;
     float32 chunk_create_total  = 0.0f;
     float32 boundary_to_total   = 0.0f;
-    int32 processed = 0;
+    int32 processed             = 0;
 
     while (processed < max_chunks_per_frame) {
-        chunk_data cd{{}, nullptr};
+        chunk_data cd{.coord = {}, .chunk_model = nullptr};
         {
             std::scoped_lock lock(completed_mutex_);
-            if (completed_queue_.empty()) break;
+            if (completed_queue_.empty()) {
+                break;
+            }
             cd = std::move(completed_queue_.front());
             completed_queue_.pop();
         }
@@ -229,8 +225,8 @@ void world_grid<WC>::process_completed() {
         auto tb3 = clock::now();
 
         boundary_from_total += ms(tb0, tb1);
-        chunk_create_total  += ms(tb1, tb2);
-        boundary_to_total   += ms(tb2, tb3);
+        chunk_create_total += ms(tb1, tb2);
+        boundary_to_total += ms(tb2, tb3);
         ++processed;
     }
 
@@ -238,25 +234,26 @@ void world_grid<WC>::process_completed() {
     process_deferred_remeshes();
     auto td1 = clock::now();
 
-    completed_stats_.boundary_from_ms  = boundary_from_total;
-    completed_stats_.chunk_create_ms   = chunk_create_total;
-    completed_stats_.boundary_to_ms    = boundary_to_total;
-    completed_stats_.deferred_ms       = ms(td0, td1);
-    completed_stats_.chunks_processed  = static_cast<uint32>(processed);
+    completed_stats_.boundary_from_ms   = boundary_from_total;
+    completed_stats_.chunk_create_ms    = chunk_create_total;
+    completed_stats_.boundary_to_ms     = boundary_to_total;
+    completed_stats_.deferred_ms        = ms(td0, td1);
+    completed_stats_.chunks_processed   = static_cast<uint32>(processed);
     completed_stats_.remeshes_processed = 0;
 }
 
 template <typename WC>
 void world_grid<WC>::process_deferred_remeshes() {
     static constexpr int32 max_remeshes_per_frame = 4;
-    int32 processed = 0;
+    int32 processed                               = 0;
 
     while (processed < max_remeshes_per_frame && !deferred_remeshes_.empty()) {
         auto [coord, fd] = deferred_remeshes_.front();
         deferred_remeshes_.pop();
 
         auto* chunk_ptr = get_chunk(coord);
-        if (!chunk_ptr) continue;
+        if (!chunk_ptr)
+            continue;
 
         auto model = chunk_ptr->get_model();
         model->invalidate();

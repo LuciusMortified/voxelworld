@@ -243,7 +243,7 @@ void main() {
     float edgeEnhancement = (1.0 - edgeFactor) * edgeIntensity * (1.0 - shadow);
 
     // Комбинируем все освещение
-    vec3 lighting = ambient + directional + pointLighting + rimColor;
+    vec3 lighting = ambient + (directional + pointLighting + rimColor) * mix(1.0, fragAo, 1.0);
     vec3 result = lighting * fragColor;
 
     // Применяем edge enhancement

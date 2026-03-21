@@ -153,10 +153,27 @@ inline auto compute_vertex_ao_int(
     int nz = z + ao_normal[face][2];
 
     auto is_solid = [&](int px, int py, int pz) -> bool {
-        if (px < 0 || px >= mdl.width() || py < 0 || py >= mdl.height() || pz < 0 ||
-            pz >= mdl.depth())
-            return false;
-        return !mdl.is_empty(px, py, pz);
+        bool ox = px < 0 || px >= mdl.width();
+        bool oy = py < 0 || py >= mdl.height();
+        bool oz = pz < 0 || pz >= mdl.depth();
+
+        if (!ox && !oy && !oz) return !mdl.is_empty(px, py, pz);
+        if ((ox ? 1 : 0) + (oy ? 1 : 0) + (oz ? 1 : 0) > 1) return false;
+
+        if (px >= mdl.width() && mdl.has_boundary_slice(0))
+            return mdl.is_boundary_solid(0, 0, py, pz);
+        if (px < 0 && mdl.has_boundary_slice(1))
+            return mdl.is_boundary_solid(1, 0, py, pz);
+        if (py >= mdl.height() && mdl.has_boundary_slice(2))
+            return mdl.is_boundary_solid(2, px, 0, pz);
+        if (py < 0 && mdl.has_boundary_slice(3))
+            return mdl.is_boundary_solid(3, px, 0, pz);
+        if (pz >= mdl.depth() && mdl.has_boundary_slice(4))
+            return mdl.is_boundary_solid(4, px, py, 0);
+        if (pz < 0 && mdl.has_boundary_slice(5))
+            return mdl.is_boundary_solid(5, px, py, 0);
+
+        return false;
     };
 
     int ux = ao_tangent_u[face][0], uy = ao_tangent_u[face][1], uz = ao_tangent_u[face][2];
@@ -326,14 +343,16 @@ inline void emit_rect(
 ) {
     auto [min_pos, max_pos] = axes.to_world_min_max(u_start, v_start, w, h, layer);
 
-    auto [sx, sy, sz] = axes.to_model_coords(u_start, v_start, layer);
-    auto [ex, ey, ez] = axes.to_model_coords(u_start + w - 1, v_start + h - 1, layer);
+    auto [c0x, c0y, c0z] = axes.to_model_coords(u_start, v_start, layer);
+    auto [c1x, c1y, c1z] = axes.to_model_coords(u_start + w - 1, v_start, layer);
+    auto [c2x, c2y, c2z] = axes.to_model_coords(u_start + w - 1, v_start + h - 1, layer);
+    auto [c3x, c3y, c3z] = axes.to_model_coords(u_start, v_start + h - 1, layer);
 
     std::array canonical_ao = {
-        compute_vertex_ao_float(mdl, sx, sy, sz, face_direction, -1, -1),
-        compute_vertex_ao_float(mdl, ex, ey, ez, face_direction,  1, -1),
-        compute_vertex_ao_float(mdl, ex, ey, ez, face_direction,  1,  1),
-        compute_vertex_ao_float(mdl, sx, sy, sz, face_direction, -1,  1),
+        compute_vertex_ao_float(mdl, c0x, c0y, c0z, face_direction, -1, -1),
+        compute_vertex_ao_float(mdl, c1x, c1y, c1z, face_direction,  1, -1),
+        compute_vertex_ao_float(mdl, c2x, c2y, c2z, face_direction,  1,  1),
+        compute_vertex_ao_float(mdl, c3x, c3y, c3z, face_direction, -1,  1),
     };
 
     std::array<float32, 4> winding_ao;
