@@ -146,7 +146,7 @@ inline auto mesh_pool::get_pending_count() const -> uint32 {
 }
 
 inline void mesh_pool::gen_thread_function() {
-    greedy_mesh_storage storage;
+    mesh_generation_storage storage;
 
     while (true) {
         std::unique_ptr<mesh_generation_task> task;

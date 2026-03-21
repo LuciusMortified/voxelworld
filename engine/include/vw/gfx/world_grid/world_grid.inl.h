@@ -81,51 +81,8 @@ auto world_grid<WC>::get_chunk(
 }
 
 template <typename WC>
-auto world_grid<WC>::get_region_id(
-    int32 cx, int32 cz
-) const -> region_id {
-    auto it = column_region_cache_.find({cx, cz});
-    if (it != column_region_cache_.end()) {
-        return it->second;
-    }
-    return generator_->get_region_id(cx, cz);
-}
-
-template <typename WC>
-auto world_grid<WC>::is_region_loaded(
-    region_id id
-) const -> bool {
-    return loaded_regions_.contains(id);
-}
-
-template <typename WC>
-auto world_grid<WC>::is_region_pending(
-    region_id id
-) const -> bool {
-    return pending_regions_.contains(id);
-}
-
-template <typename WC>
-auto world_grid<WC>::get_region_meta(
-    region_id id
-) const -> const region_meta* {
-    auto it = region_meta_cache_.find(id);
-    return it != region_meta_cache_.end() ? &it->second : nullptr;
-}
-
-template <typename WC>
 auto world_grid<WC>::get_loaded_chunk_count() const -> uint32 {
     return static_cast<uint32>(chunks_.size());
-}
-
-template <typename WC>
-auto world_grid<WC>::get_loaded_region_count() const -> uint32 {
-    return static_cast<uint32>(loaded_regions_.size());
-}
-
-template <typename WC>
-auto world_grid<WC>::get_pending_region_count() const -> uint32 {
-    return static_cast<uint32>(pending_regions_.size());
 }
 
 template <typename WC>
@@ -136,6 +93,11 @@ auto world_grid<WC>::get_pending_chunk_count() const -> uint32 {
 template <typename WC>
 auto world_grid<WC>::voxel_scale() const -> int32 {
     return voxel_scale_;
+}
+
+template <typename WC>
+auto world_grid<WC>::get_generator() -> world_grid_generator& {
+    return *generator_;
 }
 
 template <typename WC>
@@ -171,89 +133,51 @@ auto world_grid<WC>::chunk_to_world_coord(
 }
 
 template <typename WC>
-void world_grid<WC>::request_region(
-    region_id id
+void world_grid<WC>::request_chunk(
+    vec3i coord
 ) {
-    if (loaded_regions_.contains(id) || pending_regions_.contains(id)) {
+    if (chunks_.contains(coord) || pending_chunks_.contains(coord)) {
         return;
     }
 
-    pending_regions_.insert(id);
+    pending_chunks_.insert(coord);
 
     {
         std::scoped_lock lock(gen_mutex_);
-        gen_queue_.push({id});
+        gen_queue_.push({coord});
     }
     gen_cv_.notify_one();
 }
 
 template <typename WC>
-void world_grid<WC>::unload_region(
-    region_id id
+void world_grid<WC>::unload_chunk(
+    vec3i coord
 ) {
-    if (auto idx_it = region_chunks_.find(id); idx_it != region_chunks_.end()) {
-        for (const auto& coord : idx_it->second) {
-            column_region_cache_.erase({coord.x, coord.z});
-            chunks_.erase(coord);
-        }
-        region_chunks_.erase(idx_it);
-    }
-
-    std::erase_if(pending_chunks_, [id](const chunk_data& cd) -> bool {
-        return cd.region == id;
-    });
-
-    region_remaining_chunks_.erase(id);
-    loaded_regions_.erase(id);
-    pending_regions_.erase(id);
-    region_meta_cache_.erase(id);
+    chunks_.erase(coord);
+    pending_chunks_.erase(coord);
 }
 
 template <typename WC>
 void world_grid<WC>::process_completed() {
-    std::queue<region_gen_result> local_queue;
+    std::queue<chunk_data> local_queue;
     {
         std::scoped_lock lock(completed_mutex_);
         std::swap(local_queue, completed_queue_);
     }
 
     while (!local_queue.empty()) {
-        auto result = std::move(local_queue.front());
+        auto cd = std::move(local_queue.front());
         local_queue.pop();
 
-        region_meta_cache_[result.meta.id] = result.meta;
-        region_remaining_chunks_[result.meta.id] =
-            static_cast<uint32>(result.chunks.size());
-
-        for (auto& cd : result.chunks) {
-            pending_chunks_.push_back(std::move(cd));
-        }
-    }
-
-    while (!pending_chunks_.empty()) {
-        auto cd = std::move(pending_chunks_.front());
-        pending_chunks_.pop_front();
-
-        if (!pending_regions_.contains(cd.region)) {
+        if (!pending_chunks_.contains(cd.coord)) {
             continue;
         }
 
-        column_region_cache_[{cd.coord.x, cd.coord.z}] = cd.region;
-        region_chunks_[cd.region].push_back(cd.coord);
+        pending_chunks_.erase(cd.coord);
         chunks_.emplace(
             cd.coord,
-            std::make_unique<chunk<WC>>(*world_, cd.region, cd.coord, std::move(cd.chunk_model),
-                                       voxel_scale_)
+            std::make_unique<chunk<WC>>(*world_, cd.coord, std::move(cd.chunk_model), voxel_scale_)
         );
-        auto rem_it = region_remaining_chunks_.find(cd.region);
-        if (rem_it != region_remaining_chunks_.end()) {
-            --rem_it->second;
-            if (rem_it->second == 0) {
-                loaded_regions_.insert(cd.region);
-                pending_regions_.erase(cd.region);
-                region_remaining_chunks_.erase(rem_it);
-            }
-        }
     }
 }
 
@@ -278,7 +202,7 @@ void world_grid<WC>::gen_thread_function() {
             }
         }
 
-        auto result = generator_->generate_region(task.id);
+        auto result = generator_->generate_chunk(task.coord);
 
         {
             std::scoped_lock lock(completed_mutex_);

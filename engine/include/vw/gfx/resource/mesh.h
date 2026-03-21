@@ -58,10 +58,18 @@ private:
     ) -> bool;
 };
 
-struct greedy_mesh_storage {
+struct face_mask_cell {
+    color col;
+    uint8 ao_key;
+
+    auto operator==(const face_mask_cell&) const -> bool = default;
+    [[nodiscard]] auto is_empty() const -> bool { return col == colors::empty; }
+};
+
+struct mesh_generation_storage {
     std::vector<vertex> vertices;
     std::vector<uint32> indices;
-    std::vector<color> mask;
+    std::vector<face_mask_cell> mask;
     std::vector<bool> depth_has_pages;
 
     void clear() {
@@ -70,56 +78,110 @@ struct greedy_mesh_storage {
     }
 };
 
-class greedy_mesh_generator {
+namespace detail {
+struct face_axis_mapping {
+    int width, height, depth;
+    int face_direction;
+    int32 voxel_scale;
+
+    face_axis_mapping(const model& mdl, int face_dir);
+
+    [[nodiscard]] auto to_model_coords(
+        int u, int v, int layer
+    ) const -> std::tuple<int, int, int>;
+
+    [[nodiscard]] auto to_world_min_max(
+        int u, int v, int w, int h, int layer
+    ) const -> std::pair<vec3f, vec3f>;
+};
+
+[[nodiscard]] auto compute_vertex_ao_float(
+    const model& mdl, int x, int y, int z, int face, int su, int sv
+) -> float32;
+
+[[nodiscard]] auto compute_vertex_ao_int(
+    const model& mdl, int x, int y, int z, int face, int su, int sv
+) -> int;
+
+[[nodiscard]] auto compute_ao_key(
+    const model& mdl, int x, int y, int z, int face
+) -> uint8;
+
+[[nodiscard]] auto is_face_visible(
+    const model& mdl, int x, int y, int z, int face_direction
+) -> bool;
+
+void build_face_mask(
+    mesh_generation_storage& storage,
+    const model& mdl,
+    const face_axis_mapping& axes,
+    int face_direction,
+    int layer
+);
+
+void add_quad(
+    std::vector<vertex>& vertices,
+    std::vector<uint32>& indices,
+    int face_direction,
+    const vec3f& min_pos,
+    const vec3f& max_pos,
+    color color,
+    const std::array<float32, 4>& ao
+);
+
+void emit_rect(
+    mesh_generation_storage& storage,
+    const model& mdl,
+    const face_axis_mapping& axes,
+    int face_direction,
+    int layer,
+    int u_start, int v_start, int w, int h,
+    color col
+);
+}  // namespace detail
+
+class strip_mesh_generator {
 public:
     [[nodiscard]]
     static auto generate_mesh_data(
-        greedy_mesh_storage& storage, const model& mdl) -> mesh;
+        mesh_generation_storage& storage, const model& mdl) -> mesh;
 
 private:
-    struct face_axis_mapping;
-
-    static void build_face_mask(
-        greedy_mesh_storage& storage,
-        const model& mdl,
-        const face_axis_mapping& axes,
-        int face_direction,
-        int layer
-    );
-
     static void merge_and_emit_strips(
-        greedy_mesh_storage& storage,
+        mesh_generation_storage& storage,
         const model& mdl,
-        const face_axis_mapping& axes,
+        const detail::face_axis_mapping& axes,
         int face_direction,
         int layer
     );
 
     static void generate_face_quads(
-        greedy_mesh_storage& storage,
+        mesh_generation_storage& storage,
         const model& mdl,
         int face_direction
     );
+};
 
-    static void add_quad(
-        std::vector<vertex>& vertices,
-        std::vector<uint32>& indices,
+class greedy_mesh_generator {
+public:
+    [[nodiscard]]
+    static auto generate_mesh_data(
+        mesh_generation_storage& storage, const model& mdl) -> mesh;
+
+private:
+    static void merge_and_emit_rects(
+        mesh_generation_storage& storage,
+        const model& mdl,
+        const detail::face_axis_mapping& axes,
         int face_direction,
-        const vec3f& min_pos,
-        const vec3f& max_pos,
-        color color,
-        const std::array<float32, 4>& ao
+        int layer
     );
 
-    [[nodiscard]]
-    static auto is_face_visible(
-        const model& mdl, int x, int y, int z, int face_direction
-    ) -> bool;
-
-    [[nodiscard]]
-    static auto compute_vertex_ao(
-        const model& mdl, int x, int y, int z, int face, int su, int sv
-    ) -> float32;
+    static void generate_face_quads(
+        mesh_generation_storage& storage,
+        const model& mdl,
+        int face_direction
+    );
 };
 }  // namespace vw::gfx
 

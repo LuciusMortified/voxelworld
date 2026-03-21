@@ -3,9 +3,7 @@
 #ifndef VW_GFX_WORLD_GRID_H
 #define VW_GFX_WORLD_GRID_H
 
-#include <algorithm>
 #include <condition_variable>
-#include <deque>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -50,52 +48,39 @@ public:
     [[nodiscard]] auto has_chunk(vec3i chunk_coord) const -> bool;
     [[nodiscard]] auto get_chunk(vec3i chunk_coord) -> chunk<WC>*;
 
-    [[nodiscard]] auto get_region_id(int32 cx, int32 cz) const -> region_id;
-    [[nodiscard]] auto is_region_loaded(region_id id) const -> bool;
-    [[nodiscard]] auto is_region_pending(region_id id) const -> bool;
-    [[nodiscard]] auto get_region_meta(region_id id) const -> const region_meta*;
-
     [[nodiscard]] auto get_loaded_chunk_count() const -> uint32;
-    [[nodiscard]] auto get_loaded_region_count() const -> uint32;
-    [[nodiscard]] auto get_pending_region_count() const -> uint32;
     [[nodiscard]] auto get_pending_chunk_count() const -> uint32;
 
     [[nodiscard]] auto voxel_scale() const -> int32;
+    [[nodiscard]] auto get_generator() -> world_grid_generator&;
 
     auto world_to_chunk_coord(vec3i world_pos) const -> vec3i;
     auto world_to_local_coord(vec3i world_pos) const -> vec3i;
     auto chunk_to_world_coord(vec3i chunk_coord) const -> vec3i;
 
 private:
-    void request_region(region_id id);
-    void unload_region(region_id id);
+    void request_chunk(vec3i coord);
+    void unload_chunk(vec3i coord);
     void process_completed();
     void gen_thread_function();
 
     world_type* world_;
     int32 voxel_scale_{1};
     std::unordered_map<vec3i, std::unique_ptr<chunk_type>> chunks_;
-    std::unordered_map<region_id, std::vector<vec3i>> region_chunks_;
-    std::unordered_map<vec2i, region_id> column_region_cache_;
-    std::unordered_map<region_id, region_meta> region_meta_cache_;
-    std::unordered_set<region_id> loaded_regions_;
     std::unique_ptr<world_grid_generator> generator_;
 
     struct gen_task {
-        region_id id;
+        vec3i coord;
     };
 
     std::vector<std::thread> gen_threads_;
     std::queue<gen_task> gen_queue_;
-    std::queue<region_gen_result> completed_queue_;
+    std::queue<chunk_data> completed_queue_;
     std::mutex gen_mutex_;
     std::mutex completed_mutex_;
     std::condition_variable gen_cv_;
     bool gen_running_ = true;
-    std::unordered_set<region_id> pending_regions_;
-
-    std::deque<chunk_data> pending_chunks_;
-    std::unordered_map<region_id, uint32> region_remaining_chunks_;
+    std::unordered_set<vec3i> pending_chunks_;
 };
 
 }  // namespace vw::gfx

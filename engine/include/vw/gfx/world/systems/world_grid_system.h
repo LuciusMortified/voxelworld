@@ -43,8 +43,8 @@ private:
 
     registry_type* registry_;
     std::shared_ptr<world_grid<WC>> world_grid_;
-    std::unordered_set<region_id> active_regions_;
-    std::unordered_set<region_id> pending_active_regions_;
+    std::unordered_set<vec3i> active_chunks_;
+    std::unordered_set<vec3i> pending_active_chunks_;
 };
 
 template <typename WC, typename... Cs>

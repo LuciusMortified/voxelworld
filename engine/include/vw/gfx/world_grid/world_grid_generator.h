@@ -4,30 +4,22 @@
 #define VW_GFX_WORLD_GRID_GENERATOR_H
 
 #include <memory>
-#include <vector>
 
 #include "vw/core.h"
 #include "vw/gfx/world_grid/chunk.h"
 
 namespace vw::gfx {
 
-struct region_meta {
-    region_id id;
-    vec2i aabb_min;
-    vec2i aabb_max;
-};
-
 class model;
 
 struct chunk_data {
-    region_id region;
     vec3i coord;
     std::shared_ptr<model> chunk_model;
 };
 
-struct region_gen_result {
-    region_meta meta;
-    std::vector<chunk_data> chunks;
+struct chunk_y_range {
+    int32 min_y = 0;
+    int32 max_y = 0;
 };
 
 class model_identity_pool;
@@ -38,29 +30,17 @@ public:
 
     void set_identity_pool(model_identity_pool& pool) { pool_ = &pool; }
 
-    virtual auto get_region_id(int32 cx, int32 cz) const -> region_id = 0;
-    virtual auto generate_region(region_id id) -> region_gen_result = 0;
+    virtual auto generate_chunk(vec3i coord) -> chunk_data = 0;
+    [[nodiscard]] virtual auto get_chunk_y_range(int32 chunk_x, int32 chunk_z) -> chunk_y_range {
+        (void)chunk_x;
+        (void)chunk_z;
+        return {0, 0};
+    }
 
 protected:
     model_identity_pool* pool_ = nullptr;
 };
 
-class flat_world_grid_generator final : public world_grid_generator {
-public:
-    explicit flat_world_grid_generator(int32 height = 4, int32 region_size = 16,
-                                       int32 voxel_scale = 8);
-
-    [[nodiscard]] auto get_region_id(int32 cx, int32 cz) const -> region_id override;
-    [[nodiscard]] auto generate_region(region_id id) -> region_gen_result override;
-
-private:
-    int32 height_;
-    int32 region_size_;
-    int32 voxel_scale_;
-};
-
 }  // namespace vw::gfx
-
-#include "vw/gfx/world_grid/world_grid_generator.inl.h"
 
 #endif  // VW_GFX_WORLD_GRID_GENERATOR_H

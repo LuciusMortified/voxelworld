@@ -38,16 +38,16 @@ void world_grid_system<WC, Cs...>::update() {
         return;
     }
 
-    bool regions_dirty = false;
+    bool chunks_dirty = false;
     for (auto ent : requested) {
         if (process_dirty_entity(ent)) {
-            regions_dirty = true;
+            chunks_dirty = true;
         }
         registry_->template notify_changed<world_view_component>(ent);
     }
 
-    if (regions_dirty) {
-        pending_active_regions_.clear();
+    if (chunks_dirty) {
+        pending_active_chunks_.clear();
 
         for (auto ent : requested) {
             if (!registry_->template has<world_view_component>(ent) ||
@@ -59,27 +59,32 @@ void world_grid_system<WC, Cs...>::update() {
             auto cc = wv.get_chunk_coord();
             auto dist = static_cast<int32>(wv.get_view_distance());
 
+            auto& gen = world_grid_->get_generator();
             for (int32 dx = -dist; dx <= dist; ++dx) {
                 for (int32 dz = -dist; dz <= dist; ++dz) {
-                    auto rid = world_grid_->get_region_id(cc.x + dx, cc.z + dz);
-                    pending_active_regions_.insert(rid);
+                    int32 cx = cc.x + dx;
+                    int32 cz = cc.z + dz;
+                    auto yr = gen.get_chunk_y_range(cx, cz);
+                    for (int32 cy = yr.min_y; cy <= yr.max_y; ++cy) {
+                        pending_active_chunks_.insert({cx, cy, cz});
+                    }
                 }
             }
         }
 
-        for (auto rid : pending_active_regions_) {
-            if (!active_regions_.contains(rid)) {
-                world_grid_->request_region(rid);
+        for (const auto& coord : pending_active_chunks_) {
+            if (!active_chunks_.contains(coord)) {
+                world_grid_->request_chunk(coord);
             }
         }
 
-        for (auto rid : active_regions_) {
-            if (!pending_active_regions_.contains(rid)) {
-                world_grid_->unload_region(rid);
+        for (const auto& coord : active_chunks_) {
+            if (!pending_active_chunks_.contains(coord)) {
+                world_grid_->unload_chunk(coord);
             }
         }
 
-        std::swap(active_regions_, pending_active_regions_);
+        std::swap(active_chunks_, pending_active_chunks_);
     }
 
     registry_->template clear_requested<world_view_component>();
@@ -104,12 +109,10 @@ auto world_grid_system<WC, Cs...>::process_dirty_entity(
         static_cast<int32>(pos.z)
     });
 
-    if (wv.chunk_coord_ == new_chunk_coord) {
-        return false;
-    }
-
+    bool changed = wv.dirty_ || wv.chunk_coord_ != new_chunk_coord;
     wv.chunk_coord_ = new_chunk_coord;
-    return true;
+    wv.dirty_ = false;
+    return changed;
 }
 
 template <typename WC, typename... Cs>

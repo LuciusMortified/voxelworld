@@ -10,12 +10,10 @@ namespace vw::gfx {
 
 template <typename WC>
 chunk<WC>::chunk(
-    world<WC>& world, region_id region, vec3i coord, std::shared_ptr<model> model,
-    int32 voxel_scale
+    world<WC>& world, vec3i coord, std::shared_ptr<model> model, int32 voxel_scale
 )
     : guard_(world)
-    , model_(std::move(model))
-    , region_id_(region) {
+    , model_(std::move(model)) {
     guard_.template with<transform_component>();
     guard_.template with<model_component>();
     guard_.template with<spatial_component>();
@@ -47,14 +45,14 @@ auto chunk<WC>::get_voxel(
 template <typename WC>
 void chunk<WC>::set_voxel(
     int32 x, int32 y, int32 z, const voxel& v
-) {
+) const {
     model_->set_voxel(x, y, z, v);
 }
 
 template <typename WC>
 void chunk<WC>::set_voxel(
     vec3i local, const voxel& v
-) {
+) const {
     model_->set_voxel(local, v);
 }
 
@@ -73,11 +71,6 @@ auto chunk<WC>::get_model() const -> std::shared_ptr<model> {
 template <typename WC>
 auto chunk<WC>::get_entity() const -> entity {
     return guard_.get_entity();
-}
-
-template <typename WC>
-auto chunk<WC>::get_region_id() const -> region_id {
-    return region_id_;
 }
 
 }  // namespace vw::gfx

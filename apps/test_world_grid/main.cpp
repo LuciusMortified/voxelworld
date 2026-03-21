@@ -2,8 +2,8 @@
 #include <vw/gfx.h>
 
 #include "vw/gfx/world/entity_guard.h"
+#include "vw/gfx/world_grid/generators/perlin_world_grid_generator.h"
 #include "vw/gfx/world_grid/world_grid.h"
-#include "vw/gfx/world_grid/world_grid_generator.h"
 
 using namespace vw;
 
@@ -29,12 +29,25 @@ public:
             return true;
         });
 
-        camera.set_position({0.0f, 20.0f, -30.0f});
-        camera.set_rotation(0.0f, 0.0f);
         get_engine().get_renderer().set_clear_color(0.4f, 0.6f, 0.9f, 1.0f);
         get_engine().get_debug_tool().set_visible(true);
 
         setup_world_grid();
+
+        float32 max_surface_y = std::numeric_limits<float32>::lowest();
+        for (int32 x = -1; x <= 1; ++x) {
+            for (int32 z = -1; z <= 1; ++z) {
+                auto surface_y = static_cast<float32>(generator_->surface_height_at(x, z));
+                if (surface_y > max_surface_y) {
+                    max_surface_y = surface_y;
+                }
+            }
+        }
+
+        float32 cam_y =
+            (max_surface_y + 1.5f) * static_cast<float32>(generator_params_.voxel_scale);
+        camera.set_position({0.0f, cam_y, 0.0f});
+        camera.set_rotation(0.0f, 0.0f);
     }
 
     ~world_grid_app() override = default;
@@ -64,9 +77,12 @@ private:
         auto& world       = get_engine().get_world();
         auto& grid_system = world.get_world_grid_system();
 
-        constexpr int32 voxel_scale = 8;
-        auto generator = std::make_unique<gfx::flat_world_grid_generator>(2, 2, voxel_scale);
-        world_grid_ = std::make_shared<gfx::world_grid<>>(world, std::move(generator), voxel_scale);
+        generator_params_ = {};
+        auto generator    = std::make_unique<gfx::perlin_world_grid_generator>(generator_params_);
+        generator_        = generator.get();
+        world_grid_       = std::make_shared<gfx::world_grid<>>(
+            world, std::move(generator), generator_params_.voxel_scale
+        );
         grid_system.set_world_grid(world_grid_);
 
         viewer_ = std::make_unique<gfx::entity_guard<>>(world);
@@ -101,8 +117,6 @@ private:
             );
             ImGui::Text("Chunk: (%d, %d, %d)", chunk_coord.x, chunk_coord.y, chunk_coord.z);
             ImGui::Text("Loaded chunks: %u", world_grid_->get_loaded_chunk_count());
-            ImGui::Text("Loaded regions: %u", world_grid_->get_loaded_region_count());
-            ImGui::Text("Pending regions: %u", world_grid_->get_pending_region_count());
             ImGui::Text("Pending chunks: %u", world_grid_->get_pending_chunk_count());
             ImGui::Text(
                 "Pending meshes: %u", get_engine().get_world().get_mesh_pool().get_pending_count()
@@ -137,6 +151,8 @@ private:
     std::unique_ptr<gfx::fps_camera_controller> camera_controller_;
     std::shared_ptr<gfx::world_grid<>> world_grid_;
     std::unique_ptr<gfx::entity_guard<>> viewer_;
+    gfx::perlin_world_grid_generator* generator_ = nullptr;
+    gfx::perlin_world_grid_generator::params generator_params_;
 };
 
 auto main() -> int {

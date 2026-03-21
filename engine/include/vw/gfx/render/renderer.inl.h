@@ -253,20 +253,26 @@ void renderer<C>::render(
         VkMemoryBarrier barrier{};
         barrier.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |
-                                VK_ACCESS_INDEX_READ_BIT |
-                                VK_ACCESS_INDIRECT_COMMAND_READ_BIT |
-                                VK_ACCESS_SHADER_READ_BIT;
+        barrier.dstAccessMask =                    //
+            VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |  //
+            VK_ACCESS_INDEX_READ_BIT |             //
+            VK_ACCESS_INDIRECT_COMMAND_READ_BIT |  //
+            VK_ACCESS_SHADER_READ_BIT;
+        constexpr auto stage_mask =                          //
+            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |   //
+            VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT |  //
+            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
         vkCmdPipelineBarrier(
             command_buffers_[current_image_index_],
             VK_PIPELINE_STAGE_TRANSFER_BIT,
-            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |
-                VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT |
-                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,
+            stage_mask,
             0,
-            1, &barrier,
-            0, nullptr,
-            0, nullptr
+            1,
+            &barrier,
+            0,
+            nullptr,
+            0,
+            nullptr
         );
     }
 
@@ -295,7 +301,7 @@ void renderer<C>::draw_box(
 
 template <typename C>
 void renderer<C>::draw_box(
-    const vw::transform& transform, const vec3f& size, color col
+    const transform& transform, const vec3f& size, color col
 ) {
     debug_primitives_.add_box(transform, size, col);
 }
@@ -316,7 +322,7 @@ void renderer<C>::draw_grid(
 
 template <typename C>
 void renderer<C>::draw_grid(
-    const vw::transform& transform, float cell_size, int cols, int rows, color clr
+    const transform& transform, float cell_size, int cols, int rows, color clr
 ) {
     debug_primitives_.add_grid(transform, cell_size, cols, rows, clr);
 }
