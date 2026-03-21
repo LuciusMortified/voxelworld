@@ -248,17 +248,33 @@ inline void build_face_mask(
             int v_end = std::min(v_block + ps, axes.height);
 
             auto [pmx, pmy, pmz] = axes.to_model_coords(u_block, v_block, layer);
-            auto* page = mdl.get_page(pmx / ps, pmy / ps, pmz / ps);
+            auto pm = mdl.get_page_mode(pmx / ps, pmy / ps, pmz / ps);
 
-            if (!page) {
+            if (pm == page_mode::empty) {
+                for (int u = u_block; u < u_end; u++)
+                    for (int v = v_block; v < v_end; v++)
+                        storage.mask[idx(u, v)] = empty_cell;
+                continue;
+            }
+
+            if (pm == page_mode::uniform) {
+                uint8 fid = mdl.get_page_fill_id(pmx / ps, pmy / ps, pmz / ps);
                 for (int u = u_block; u < u_end; u++) {
                     for (int v = v_block; v < v_end; v++) {
-                        storage.mask[idx(u, v)] = empty_cell;
+                        auto [mx, my, mz] = axes.to_model_coords(u, v, layer);
+                        if (is_face_visible(mdl, mx, my, mz, face_direction)) {
+                            storage.mask[idx(u, v)] = {
+                                fid, compute_ao_key(mdl, mx, my, mz, face_direction)
+                            };
+                        } else {
+                            storage.mask[idx(u, v)] = empty_cell;
+                        }
                     }
                 }
                 continue;
             }
 
+            auto* page = mdl.get_page(pmx / ps, pmy / ps, pmz / ps);
             for (int u = u_block; u < u_end; u++) {
                 for (int v = v_block; v < v_end; v++) {
                     auto [mx, my, mz] = axes.to_model_coords(u, v, layer);
@@ -512,7 +528,7 @@ inline void strip_mesh_generator::generate_face_quads(
         for (int pu = 0; pu < u_pages && !storage.depth_has_pages[pd]; pu++) {
             for (int pv = 0; pv < v_pages && !storage.depth_has_pages[pd]; pv++) {
                 auto [mx, my, mz] = axes.to_model_coords(pu * ps, pv * ps, pd * ps);
-                if (mdl.is_page_allocated(mx / ps, my / ps, mz / ps)) {
+                if (mdl.get_page_mode(mx / ps, my / ps, mz / ps) != page_mode::empty) {
                     storage.depth_has_pages[pd] = true;
                 }
             }
@@ -630,7 +646,7 @@ inline void greedy_mesh_generator::generate_face_quads(
         for (int pu = 0; pu < u_pages && !storage.depth_has_pages[pd]; pu++) {
             for (int pv = 0; pv < v_pages && !storage.depth_has_pages[pd]; pv++) {
                 auto [mx, my, mz] = axes.to_model_coords(pu * ps, pv * ps, pd * ps);
-                if (mdl.is_page_allocated(mx / ps, my / ps, mz / ps)) {
+                if (mdl.get_page_mode(mx / ps, my / ps, mz / ps) != page_mode::empty) {
                     storage.depth_has_pages[pd] = true;
                 }
             }

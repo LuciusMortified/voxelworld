@@ -23,6 +23,20 @@ namespace vw::gfx {
 
 class model_identity_pool;
 
+enum class page_mode : uint8 { empty = 0, uniform = 1, sparse = 2 };
+
+struct page_entry {
+    uint32 data = 0;
+
+    [[nodiscard]] auto mode() const -> page_mode;
+    [[nodiscard]] auto fill_id() const -> uint8;
+    [[nodiscard]] auto pool_index() const -> uint16;
+
+    static auto make_empty() -> page_entry;
+    static auto make_uniform(uint8 id) -> page_entry;
+    static auto make_sparse(uint16 index) -> page_entry;
+};
+
 class model {
 public:
     model(model_identity_pool& identity_pool, int width, int height, int depth,
@@ -34,12 +48,6 @@ public:
 
     model(model&& other) noexcept;
     auto operator=(model&& other) noexcept -> model&;
-
-    [[nodiscard]] auto operator[](vec3i pos) -> voxel&;
-    [[nodiscard]] auto operator[](vec3i pos) const -> const voxel&;
-
-    [[nodiscard]] auto operator[](int x, int y, int z) -> voxel&;
-    [[nodiscard]] auto operator[](int x, int y, int z) const -> const voxel&;
 
     void set_voxel(int x, int y, int z, const voxel& voxel);
     void set_voxel(vec3i pos, const voxel& voxel);
@@ -72,7 +80,8 @@ public:
     static constexpr int page_volume = page_size * page_size * page_size;
     using page_type = std::array<voxel, page_volume>;
 
-    [[nodiscard]] auto is_page_allocated(int px, int py, int pz) const -> bool;
+    [[nodiscard]] auto get_page_mode(int px, int py, int pz) const -> page_mode;
+    [[nodiscard]] auto get_page_fill_id(int px, int py, int pz) const -> uint8;
     [[nodiscard]] auto get_page(int px, int py, int pz) const -> const page_type*;
 
     [[nodiscard]] auto pages_x() const -> int;
@@ -84,14 +93,18 @@ private:
     int width_{0}, height_{0}, depth_{0};
     int32 voxel_scale_{1};
     int pages_x_{0}, pages_y_{0}, pages_z_{0};
-    std::vector<std::unique_ptr<page_type>> pages_;
+    std::vector<page_entry> pages_;
+    std::vector<page_type> page_pool_;
+    std::vector<uint16> free_pool_indices_;
     model_identity identity_;
     std::array<detail::boundary_slice, 6> boundary_slices_;
     std::array<detail::boundary_slice, 6> own_boundaries_;
 
     [[nodiscard]] auto page_index(int px, int py, int pz) const -> int;
     [[nodiscard]] static auto local_index(int lx, int ly, int lz) -> int;
-    [[nodiscard]] auto ensure_page(int px, int py, int pz) -> page_type&;
+    auto alloc_sparse_page() -> uint16;
+    void free_sparse_page(uint16 index);
+    auto promote_to_sparse(int px, int py, int pz) -> page_type&;
 
     void increment_generation_();
 };

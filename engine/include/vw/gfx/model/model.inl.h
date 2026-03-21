@@ -9,6 +9,32 @@
 
 namespace vw::gfx {
 
+// ==================== page_entry ====================
+
+inline auto page_entry::mode() const -> page_mode {
+    return static_cast<page_mode>(data & 0x3u);
+}
+
+inline auto page_entry::fill_id() const -> uint8 {
+    return static_cast<uint8>((data >> 2) & 0xFFu);
+}
+
+inline auto page_entry::pool_index() const -> uint16 {
+    return static_cast<uint16>((data >> 10) & 0xFFFFu);
+}
+
+inline auto page_entry::make_empty() -> page_entry { return {0}; }
+
+inline auto page_entry::make_uniform(uint8 id) -> page_entry {
+    return {1u | (static_cast<uint32>(id) << 2)};
+}
+
+inline auto page_entry::make_sparse(uint16 index) -> page_entry {
+    return {2u | (static_cast<uint32>(index) << 10)};
+}
+
+// ==================== model ====================
+
 inline model::model(
     model_identity_pool& identity_pool, int width, int height, int depth, int32 voxel_scale
 )
@@ -45,6 +71,8 @@ inline model::model(
       pages_y_(other.pages_y_),
       pages_z_(other.pages_z_),
       pages_(std::move(other.pages_)),
+      page_pool_(std::move(other.page_pool_)),
+      free_pool_indices_(std::move(other.free_pool_indices_)),
       identity_(other.identity_) {
     other.identity_pool_ = nullptr;
 }
@@ -65,69 +93,43 @@ inline auto model::operator=(
         pages_y_ = other.pages_y_;
         pages_z_ = other.pages_z_;
         pages_ = std::move(other.pages_);
+        page_pool_ = std::move(other.page_pool_);
+        free_pool_indices_ = std::move(other.free_pool_indices_);
         identity_ = other.identity_;
         other.identity_pool_ = nullptr;
     }
     return *this;
 }
 
-inline auto model::operator[](
-    vec3i pos
-) -> voxel& {
-    int px = pos.x / page_size;
-    int py = pos.y / page_size;
-    int pz = pos.z / page_size;
-    auto& page = ensure_page(px, py, pz);
-    return page[local_index(pos.x % page_size, pos.y % page_size, pos.z % page_size)];
-}
-
-inline auto model::operator[](
-    vec3i pos
-) const -> const voxel& {
-    int px = pos.x / page_size;
-    int py = pos.y / page_size;
-    int pz = pos.z / page_size;
-    auto& ptr = pages_[page_index(px, py, pz)];
-    if (!ptr) {
-        static const voxel empty{};
-        return empty;
-    }
-    return (*ptr)[local_index(pos.x % page_size, pos.y % page_size, pos.z % page_size)];
-}
-
-inline auto model::operator[](
-    int x, int y, int z
-) -> voxel& {
-    return (*this)[vec3i{x, y, z}];
-}
-
-inline auto model::operator[](
-    int x, int y, int z
-) const -> const voxel& {
-    return (*this)[vec3i{x, y, z}];
-}
-
 inline void model::set_voxel(
-    int x, int y, int z, const voxel& voxel
+    int x, int y, int z, const voxel& v
 ) {
     int px = x / page_size;
     int py = y / page_size;
     int pz = z / page_size;
-    if (voxel.is_empty()) {
-        auto& ptr = pages_[page_index(px, py, pz)];
-        if (!ptr) return;
-        (*ptr)[local_index(x % page_size, y % page_size, z % page_size)] = voxel;
-    } else {
-        auto& page = ensure_page(px, py, pz);
-        page[local_index(x % page_size, y % page_size, z % page_size)] = voxel;
+    int li = local_index(x % page_size, y % page_size, z % page_size);
+    auto& entry = pages_[page_index(px, py, pz)];
+
+    switch (entry.mode()) {
+        case page_mode::empty:
+            if (v.is_empty()) return;
+            promote_to_sparse(px, py, pz)[li] = v;
+            break;
+        case page_mode::uniform:
+            if (v.id == entry.fill_id()) return;
+            promote_to_sparse(px, py, pz)[li] = v;
+            break;
+        case page_mode::sparse:
+            page_pool_[entry.pool_index()][li] = v;
+            break;
     }
     increment_generation_();
 }
 
 inline void model::set_voxel(
-    vec3i pos, const voxel& voxel
+    vec3i pos, const voxel& v
 ) {
-    set_voxel(pos.x, pos.y, pos.z, voxel);
+    set_voxel(pos.x, pos.y, pos.z, v);
 }
 
 inline auto model::get_voxel(
@@ -136,9 +138,16 @@ inline auto model::get_voxel(
     int px = x / page_size;
     int py = y / page_size;
     int pz = z / page_size;
-    auto& ptr = pages_[page_index(px, py, pz)];
-    if (!ptr) return voxel{};
-    return (*ptr)[local_index(x % page_size, y % page_size, z % page_size)];
+    const auto& entry = pages_[page_index(px, py, pz)];
+
+    switch (entry.mode()) {
+        case page_mode::empty:   return voxel{};
+        case page_mode::uniform: return voxel{entry.fill_id()};
+        case page_mode::sparse:
+            return page_pool_[entry.pool_index()]
+                [local_index(x % page_size, y % page_size, z % page_size)];
+    }
+    return voxel{};
 }
 
 inline auto model::get_voxel(
@@ -153,9 +162,16 @@ inline auto model::is_empty(
     int px = x / page_size;
     int py = y / page_size;
     int pz = z / page_size;
-    auto& ptr = pages_[page_index(px, py, pz)];
-    if (!ptr) return true;
-    return (*ptr)[local_index(x % page_size, y % page_size, z % page_size)].is_empty();
+    const auto& entry = pages_[page_index(px, py, pz)];
+
+    switch (entry.mode()) {
+        case page_mode::empty:   return true;
+        case page_mode::uniform: return false;
+        case page_mode::sparse:
+            return page_pool_[entry.pool_index()]
+                [local_index(x % page_size, y % page_size, z % page_size)].is_empty();
+    }
+    return true;
 }
 
 inline auto model::is_empty(
@@ -164,25 +180,11 @@ inline auto model::is_empty(
     return is_empty(pos.x, pos.y, pos.z);
 }
 
-inline auto model::width() const -> int {
-    return width_;
-}
-
-inline auto model::height() const -> int {
-    return height_;
-}
-
-inline auto model::depth() const -> int {
-    return depth_;
-}
-
-inline auto model::size() const -> vec3i {
-    return vec3i{width_, height_, depth_};
-}
-
-inline auto model::voxel_scale() const -> int32 {
-    return voxel_scale_;
-}
+inline auto model::width() const -> int { return width_; }
+inline auto model::height() const -> int { return height_; }
+inline auto model::depth() const -> int { return depth_; }
+inline auto model::size() const -> vec3i { return vec3i{width_, height_, depth_}; }
+inline auto model::voxel_scale() const -> int32 { return voxel_scale_; }
 
 inline void model::compute_own_boundaries() {
     constexpr int ps = page_size;
@@ -194,9 +196,16 @@ inline void model::compute_own_boundaries() {
         int lx = nx % ps;
         for (int py = 0; py < pages_y_; ++py) {
             for (int pz = 0; pz < pages_z_; ++pz) {
-                auto* page = get_page(px, py, pz);
-                if (!page) continue;
+                auto m = get_page_mode(px, py, pz);
                 int y0 = py * ps, z0 = pz * ps;
+                if (m == page_mode::empty) continue;
+                if (m == page_mode::uniform) {
+                    for (int ly = 0; ly < ps && y0 + ly < height_; ++ly)
+                        for (int lz = 0; lz < ps && z0 + lz < depth_; ++lz)
+                            slice.solid[(y0 + ly) * depth_ + (z0 + lz)] = true;
+                    continue;
+                }
+                auto* page = get_page(px, py, pz);
                 for (int ly = 0; ly < ps && y0 + ly < height_; ++ly) {
                     for (int lz = 0; lz < ps && z0 + lz < depth_; ++lz) {
                         if (!(*page)[lx + ly * ps + lz * ps * ps].is_empty()) {
@@ -215,9 +224,16 @@ inline void model::compute_own_boundaries() {
         int ly = ny % ps;
         for (int px = 0; px < pages_x_; ++px) {
             for (int pz = 0; pz < pages_z_; ++pz) {
-                auto* page = get_page(px, py, pz);
-                if (!page) continue;
+                auto m = get_page_mode(px, py, pz);
                 int x0 = px * ps, z0 = pz * ps;
+                if (m == page_mode::empty) continue;
+                if (m == page_mode::uniform) {
+                    for (int lx = 0; lx < ps && x0 + lx < width_; ++lx)
+                        for (int lz = 0; lz < ps && z0 + lz < depth_; ++lz)
+                            slice.solid[(x0 + lx) * depth_ + (z0 + lz)] = true;
+                    continue;
+                }
+                auto* page = get_page(px, py, pz);
                 for (int lx = 0; lx < ps && x0 + lx < width_; ++lx) {
                     for (int lz = 0; lz < ps && z0 + lz < depth_; ++lz) {
                         if (!(*page)[lx + ly * ps + lz * ps * ps].is_empty()) {
@@ -236,9 +252,16 @@ inline void model::compute_own_boundaries() {
         int lz = nz % ps;
         for (int px = 0; px < pages_x_; ++px) {
             for (int py = 0; py < pages_y_; ++py) {
-                auto* page = get_page(px, py, pz);
-                if (!page) continue;
+                auto m = get_page_mode(px, py, pz);
                 int x0 = px * ps, y0 = py * ps;
+                if (m == page_mode::empty) continue;
+                if (m == page_mode::uniform) {
+                    for (int lx = 0; lx < ps && x0 + lx < width_; ++lx)
+                        for (int ly = 0; ly < ps && y0 + ly < height_; ++ly)
+                            slice.solid[(x0 + lx) * height_ + (y0 + ly)] = true;
+                    continue;
+                }
+                auto* page = get_page(px, py, pz);
                 for (int lx = 0; lx < ps && x0 + lx < width_; ++lx) {
                     for (int ly = 0; ly < ps && y0 + ly < height_; ++ly) {
                         if (!(*page)[lx + ly * ps + lz * ps * ps].is_empty()) {
@@ -286,19 +309,15 @@ inline void model::invalidate() {
 }
 
 inline void model::fill(
-    const voxel& voxel
+    const voxel& v
 ) {
-    if (voxel.is_empty()) {
-        for (auto& ptr : pages_) {
-            ptr.reset();
-        }
+    page_pool_.clear();
+    free_pool_indices_.clear();
+
+    if (v.is_empty()) {
+        std::fill(pages_.begin(), pages_.end(), page_entry::make_empty());
     } else {
-        for (auto& ptr : pages_) {
-            if (!ptr) {
-                ptr = std::make_unique<page_type>();
-            }
-            ptr->fill(voxel);
-        }
+        std::fill(pages_.begin(), pages_.end(), page_entry::make_uniform(v.id));
     }
     increment_generation_();
 }
@@ -307,30 +326,30 @@ inline auto model::get_identity() const -> model_identity {
     return identity_;
 }
 
-inline auto model::is_page_allocated(
+inline auto model::get_page_mode(
     int px, int py, int pz
-) const -> bool {
-    return pages_[page_index(px, py, pz)] != nullptr;
+) const -> page_mode {
+    return pages_[page_index(px, py, pz)].mode();
+}
+
+inline auto model::get_page_fill_id(
+    int px, int py, int pz
+) const -> uint8 {
+    return pages_[page_index(px, py, pz)].fill_id();
 }
 
 inline auto model::get_page(
     int px, int py, int pz
 ) const -> const page_type* {
-    auto& ptr = pages_[page_index(px, py, pz)];
-    return ptr ? ptr.get() : nullptr;
+    const auto& entry = pages_[page_index(px, py, pz)];
+    if (entry.mode() == page_mode::sparse)
+        return &page_pool_[entry.pool_index()];
+    return nullptr;
 }
 
-inline auto model::pages_x() const -> int {
-    return pages_x_;
-}
-
-inline auto model::pages_y() const -> int {
-    return pages_y_;
-}
-
-inline auto model::pages_z() const -> int {
-    return pages_z_;
-}
+inline auto model::pages_x() const -> int { return pages_x_; }
+inline auto model::pages_y() const -> int { return pages_y_; }
+inline auto model::pages_z() const -> int { return pages_z_; }
 
 inline auto model::page_index(
     int px, int py, int pz
@@ -344,15 +363,34 @@ inline auto model::local_index(
     return lx + (ly * page_size) + (lz * page_size * page_size);
 }
 
-inline auto model::ensure_page(
+inline auto model::alloc_sparse_page() -> uint16 {
+    if (!free_pool_indices_.empty()) {
+        uint16 idx = free_pool_indices_.back();
+        free_pool_indices_.pop_back();
+        return idx;
+    }
+    auto idx = static_cast<uint16>(page_pool_.size());
+    page_pool_.emplace_back();
+    return idx;
+}
+
+inline void model::free_sparse_page(uint16 index) {
+    free_pool_indices_.push_back(index);
+}
+
+inline auto model::promote_to_sparse(
     int px, int py, int pz
 ) -> page_type& {
-    auto& ptr = pages_[page_index(px, py, pz)];
-    if (!ptr) {
-        ptr = std::make_unique<page_type>();
-        ptr->fill(voxel{});
+    auto& entry = pages_[page_index(px, py, pz)];
+    uint16 idx = alloc_sparse_page();
+    auto& page = page_pool_[idx];
+    if (entry.mode() == page_mode::uniform) {
+        page.fill(voxel{entry.fill_id()});
+    } else {
+        page.fill(voxel{});
     }
-    return *ptr;
+    entry = page_entry::make_sparse(idx);
+    return page;
 }
 
 inline void model::increment_generation_() {
@@ -362,18 +400,11 @@ inline void model::increment_generation_() {
 inline void model::clone_pages_from(
     const model& source
 ) {
-    auto count = static_cast<size_t>(pages_x_) * static_cast<size_t>(pages_y_) *
-                 static_cast<size_t>(pages_z_);
-    for (size_t i = 0; i < count; ++i) {
-        if (source.pages_[i]) {
-            pages_[i] = std::make_unique<page_type>(*source.pages_[i]);
-        } else {
-            pages_[i].reset();
-        }
-    }
+    pages_ = source.pages_;
+    page_pool_ = source.page_pool_;
+    free_pool_indices_ = source.free_pool_indices_;
     increment_generation_();
 }
-
 
 }  // namespace vw::gfx
 
