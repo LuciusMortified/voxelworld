@@ -26,10 +26,14 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     uint point_lights_count;
 } ubo;
 
-// Storage buffer для матриц моделей (set 1, binding 0)
+// Storage buffers для трансформов (set 1)
 layout(set = 1, binding = 0, std430) readonly buffer ModelMatrices {
     mat4 models[];
 } modelMatrices;
+
+layout(set = 1, binding = 1, std430) readonly buffer NormalMatrices {
+    mat4 normals[];
+} normalMatrices;
 
 layout(location = 0) out vec3 fragPos;
 layout(location = 1) out vec3 fragNormal;
@@ -46,13 +50,11 @@ vec3 unpackColor(uint packedColor) {
 
 void main() {
     mat4 model = modelMatrices.models[inInstanceIndex];
-    
-    // Трансформация позиции
+
     vec4 worldPos = model * vec4(inPosition, 1.0);
     fragPos = worldPos.xyz;
-    
-    // Трансформация нормали
-    fragNormal = normalize(mat3(transpose(inverse(model))) * inNormal);
+
+    fragNormal = normalize(mat3(normalMatrices.normals[inInstanceIndex]) * inNormal);
     
     fragColor = unpackColor(inColor);
     fragAo = inAo;

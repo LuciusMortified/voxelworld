@@ -85,6 +85,7 @@ private:
 
     void update_meshes_(world_type& world);
     void update_transforms_(world_type& world);
+    void update_visibility_(world_type& world);
     void update_visibility_cache_(
         world_type& world,
         const frustum& view_frustum,

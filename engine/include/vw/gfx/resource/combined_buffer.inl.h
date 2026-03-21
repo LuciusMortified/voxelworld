@@ -2,6 +2,7 @@
 
 #ifndef VW_GFX_COMBINED_BUFFER_INL_H
 #define VW_GFX_COMBINED_BUFFER_INL_H
+#include <array>
 #include <numeric>
 #include <ranges>
 
@@ -40,6 +41,9 @@ inline combined_buffer::combined_buffer(
     model_matrix_buffer_ = std::make_unique<device_storage_buffer>(
         *context_, instance_capacity_ * sizeof(mat4f)
     );
+    normal_matrix_buffer_ = std::make_unique<device_storage_buffer>(
+        *context_, instance_capacity_ * sizeof(mat4f)
+    );
     indirect_draw_buffer_ = std::make_unique<device_storage_buffer>(
         *context_,
         instance_capacity_ * sizeof(draw_command),
@@ -57,21 +61,7 @@ inline combined_buffer::combined_buffer(
         throw std::runtime_error("Failed to allocate descriptor set for combined_buffer!");
     }
 
-    VkDescriptorBufferInfo storage_buffer_info{};
-    storage_buffer_info.buffer = model_matrix_buffer_->get_buffer();
-    storage_buffer_info.offset = 0;
-    storage_buffer_info.range  = VK_WHOLE_SIZE;
-
-    VkWriteDescriptorSet descriptor_write{};
-    descriptor_write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptor_write.dstSet          = descriptor_set_;
-    descriptor_write.dstBinding      = 0;
-    descriptor_write.dstArrayElement = 0;
-    descriptor_write.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    descriptor_write.descriptorCount = 1;
-    descriptor_write.pBufferInfo     = &storage_buffer_info;
-
-    vkUpdateDescriptorSets(context_->get_device(), 1, &descriptor_write, 0, nullptr);
+    update_descriptor_set_();
 }
 
 inline void combined_buffer::allocate(
@@ -114,11 +104,21 @@ inline void combined_buffer::allocate(
         sizeof(draw_command)
     );
 
-    const auto transform_staged = staging_->stage_struct(transform_matrix);
+    const auto model_staged = staging_->stage_struct(transform_matrix);
     staging_->copy_to(
         model_matrix_buffer_->get_buffer(),
         instance_index * sizeof(mat4f),
-        transform_staged,
+        model_staged,
+        sizeof(mat4f)
+    );
+
+    const auto normal_matrix =
+        math::transpose_matrix(math::inverse_matrix(transform_matrix).value_or(transform_matrix));
+    const auto normal_staged = staging_->stage_struct(normal_matrix);
+    staging_->copy_to(
+        normal_matrix_buffer_->get_buffer(),
+        instance_index * sizeof(mat4f),
+        normal_staged,
         sizeof(mat4f)
     );
 
@@ -253,12 +253,34 @@ inline void combined_buffer::write_transform(
     entity ent, const mat4f& transform_matrix
 ) {
     auto& [instance_index, model_index] = entity_allocations_[ent];
-    const auto transform_staged = staging_->stage_struct(transform_matrix);
+    const auto model_staged = staging_->stage_struct(transform_matrix);
     staging_->copy_to(
         model_matrix_buffer_->get_buffer(),
         instance_index * sizeof(mat4f),
-        transform_staged,
+        model_staged,
         sizeof(mat4f)
+    );
+
+    const auto normal_matrix =
+        math::transpose_matrix(math::inverse_matrix(transform_matrix).value_or(transform_matrix));
+    const auto normal_staged = staging_->stage_struct(normal_matrix);
+    staging_->copy_to(
+        normal_matrix_buffer_->get_buffer(),
+        instance_index * sizeof(mat4f),
+        normal_staged,
+        sizeof(mat4f)
+    );
+}
+
+inline void combined_buffer::write_visibility(entity ent, bool visible) {
+    auto& [instance_index, model_index] = entity_allocations_[ent];
+    const uint32 instance_count = visible ? 1 : 0;
+    const auto staged = staging_->stage_struct(instance_count);
+    staging_->copy_to(
+        indirect_draw_buffer_->get_buffer(),
+        instance_index * sizeof(draw_command) + offsetof(draw_command, instance_count),
+        staged,
+        sizeof(uint32)
     );
 }
 
@@ -355,6 +377,9 @@ inline void combined_buffer::expand_instance_buffers_() {
     auto new_model_matrix_buffer = std::make_unique<device_storage_buffer>(
         *context_, instance_capacity_ * sizeof(mat4f)
     );
+    auto new_normal_matrix_buffer = std::make_unique<device_storage_buffer>(
+        *context_, instance_capacity_ * sizeof(mat4f)
+    );
     auto new_indirect_draw_buffer = std::make_unique<device_storage_buffer>(
         *context_,
         instance_capacity_ * sizeof(draw_command),
@@ -366,7 +391,12 @@ inline void combined_buffer::expand_instance_buffers_() {
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
     );
 
-    model_matrix_buffer_->copy_to_buffer(*new_model_matrix_buffer, instance_count * sizeof(mat4f));
+    model_matrix_buffer_->copy_to_buffer(
+        *new_model_matrix_buffer, instance_count * sizeof(mat4f)
+    );
+    normal_matrix_buffer_->copy_to_buffer(
+        *new_normal_matrix_buffer, instance_count * sizeof(mat4f)
+    );
     indirect_draw_buffer_->copy_to_buffer(
         *new_indirect_draw_buffer, instance_count * sizeof(draw_command)
     );
@@ -378,6 +408,9 @@ inline void combined_buffer::expand_instance_buffers_() {
         model_matrix_buffer_->get_buffer(), new_model_matrix_buffer->get_buffer()
     );
     staging_->replace_buffer(
+        normal_matrix_buffer_->get_buffer(), new_normal_matrix_buffer->get_buffer()
+    );
+    staging_->replace_buffer(
         indirect_draw_buffer_->get_buffer(), new_indirect_draw_buffer->get_buffer()
     );
     staging_->replace_buffer(
@@ -385,24 +418,45 @@ inline void combined_buffer::expand_instance_buffers_() {
     );
 
     model_matrix_buffer_   = std::move(new_model_matrix_buffer);
+    normal_matrix_buffer_  = std::move(new_normal_matrix_buffer);
     indirect_draw_buffer_  = std::move(new_indirect_draw_buffer);
     instance_index_buffer_ = std::move(new_instance_index_buffer);
 
-    VkDescriptorBufferInfo storage_buffer_info{};
-    storage_buffer_info.buffer = model_matrix_buffer_->get_buffer();
-    storage_buffer_info.offset = 0;
-    storage_buffer_info.range  = VK_WHOLE_SIZE;
+    update_descriptor_set_();
+}
 
-    VkWriteDescriptorSet descriptor_write{};
-    descriptor_write.sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-    descriptor_write.dstSet          = descriptor_set_;
-    descriptor_write.dstBinding      = 0;
-    descriptor_write.dstArrayElement = 0;
-    descriptor_write.descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    descriptor_write.descriptorCount = 1;
-    descriptor_write.pBufferInfo     = &storage_buffer_info;
+inline void combined_buffer::update_descriptor_set_() {
+    VkDescriptorBufferInfo model_buffer_info{};
+    model_buffer_info.buffer = model_matrix_buffer_->get_buffer();
+    model_buffer_info.offset = 0;
+    model_buffer_info.range  = VK_WHOLE_SIZE;
 
-    vkUpdateDescriptorSets(context_->get_device(), 1, &descriptor_write, 0, nullptr);
+    VkDescriptorBufferInfo normal_buffer_info{};
+    normal_buffer_info.buffer = normal_matrix_buffer_->get_buffer();
+    normal_buffer_info.offset = 0;
+    normal_buffer_info.range  = VK_WHOLE_SIZE;
+
+    std::array<VkWriteDescriptorSet, 2> descriptor_writes{};
+
+    descriptor_writes[0].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptor_writes[0].dstSet          = descriptor_set_;
+    descriptor_writes[0].dstBinding      = 0;
+    descriptor_writes[0].dstArrayElement = 0;
+    descriptor_writes[0].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptor_writes[0].descriptorCount = 1;
+    descriptor_writes[0].pBufferInfo     = &model_buffer_info;
+
+    descriptor_writes[1].sType           = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    descriptor_writes[1].dstSet          = descriptor_set_;
+    descriptor_writes[1].dstBinding      = 1;
+    descriptor_writes[1].dstArrayElement = 0;
+    descriptor_writes[1].descriptorType  = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptor_writes[1].descriptorCount = 1;
+    descriptor_writes[1].pBufferInfo     = &normal_buffer_info;
+
+    vkUpdateDescriptorSets(
+        context_->get_device(), descriptor_writes.size(), descriptor_writes.data(), 0, nullptr
+    );
 }
 
 inline uint32 combined_buffer::get_draw_command_count() const {
@@ -423,6 +477,10 @@ inline VkBuffer combined_buffer::get_indirect_draw_buffer() const {
 
 inline VkBuffer combined_buffer::get_model_matrix_buffer() const {
     return model_matrix_buffer_->get_buffer();
+}
+
+inline VkBuffer combined_buffer::get_normal_matrix_buffer() const {
+    return normal_matrix_buffer_->get_buffer();
 }
 
 inline bool combined_buffer::is_empty() const {

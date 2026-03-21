@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "vw/core/mat4.h"
+#include "vw/core/math.h"
 #include "vw/core/types.h"
 #include "vw/gfx/model/model_identity.h"
 #include "vw/gfx/resource/buffer.h"
@@ -106,6 +107,7 @@ public:
     void allocate_mesh(model_identity model_id, const mesh& mesh_data);
     void write_mesh(model_identity model_id, const mesh& mesh_data);
     void write_transform(entity ent, const mat4f& transform_matrix);
+    void write_visibility(entity ent, bool visible);
     auto free(entity ent) -> std::optional<entity>;
 
     [[nodiscard]] auto get_entity_allocation(entity ent) -> const entity_allocation&;
@@ -114,6 +116,7 @@ public:
     [[nodiscard]] VkBuffer get_instance_index_buffer() const;
     [[nodiscard]] VkBuffer get_indirect_draw_buffer() const;
     [[nodiscard]] VkBuffer get_model_matrix_buffer() const;
+    [[nodiscard]] VkBuffer get_normal_matrix_buffer() const;
     [[nodiscard]] uint32 get_draw_command_count() const;
     [[nodiscard]] bool is_empty() const;
     [[nodiscard]] const combined_buffer_stats& get_stats() const;
@@ -124,6 +127,7 @@ public:
 private:
     void expand_mesh_buffers_();
     void expand_instance_buffers_();
+    void update_descriptor_set_();
 
     static constexpr uint32_t default_mesh_capacity_     = 32;
     static constexpr uint32_t default_instance_capacity_ = 64;
@@ -139,6 +143,7 @@ private:
 
     uint32 instance_capacity_;
     std::unique_ptr<device_storage_buffer> model_matrix_buffer_;
+    std::unique_ptr<device_storage_buffer> normal_matrix_buffer_;
     std::unique_ptr<device_storage_buffer> indirect_draw_buffer_;
 
     std::unordered_map<entity, entity_allocation> entity_allocations_;

@@ -48,6 +48,7 @@ void combined_buffer_pool<C>::update(
     update_visibility_cache_(world, view_frustum, shadow_frustums);
     update_meshes_(world);
     update_transforms_(world);
+    update_visibility_(world);
 
     staging_.flush(cmd);
 }
@@ -150,7 +151,7 @@ void combined_buffer_pool<C>::update_meshes_(
         const VkDeviceSize mesh_staging_cost =
             required_chunk_size.vertex_count * sizeof(vertex) +
             required_chunk_size.index_count * sizeof(uint32) +
-            sizeof(uint32) + sizeof(draw_command) + sizeof(mat4f);
+            sizeof(uint32) + sizeof(draw_command) + sizeof(mat4f) * 2;
 
         const auto& transform_comp    = world.template get_component<transform_component>(ent);
         const mat4f& transform_matrix = transform_comp.get_world_matrix();
@@ -223,7 +224,7 @@ void combined_buffer_pool<C>::update_transforms_(
         const bool is_renderable = has_model && has_transform;
 
         if (entity_buffer_infos_.contains(ent) && is_renderable) {
-            if (staging_.available() < sizeof(mat4f)) {
+            if (staging_.available() < sizeof(mat4f) * 2) {
                 transform_pending_entities_.insert(ent);
                 continue;
             }
@@ -236,6 +237,23 @@ void combined_buffer_pool<C>::update_transforms_(
 
             transform_pending_entities_.erase(ent);
         }
+    }
+}
+
+template <typename C>
+void combined_buffer_pool<C>::update_visibility_(world_type& world) {
+    for (entity ent : visibility_cache_.changed) {
+        if (!entity_buffer_infos_.contains(ent)) {
+            continue;
+        }
+
+        if (staging_.available() < sizeof(uint32)) {
+            break;
+        }
+
+        const bool is_visible = visibility_cache_.visible.contains(ent);
+        auto& info = entity_buffer_infos_[ent];
+        buffers_[info.buffer_index]->write_visibility(ent, is_visible);
     }
 }
 

@@ -11,20 +11,22 @@ layout(set = 0, binding = 0) uniform ShadowUniformBufferObject {
     mat4 light_space_matrices[4];
 } shadowUbo;
 
-// Storage buffer для матриц моделей (set 1, binding 0)
+// Storage buffers для трансформов (set 1)
 layout(set = 1, binding = 0, std430) readonly buffer ModelMatrices {
     mat4 models[];
 } modelMatrices;
+
+layout(set = 1, binding = 1, std430) readonly buffer NormalMatrices {
+    mat4 normals[];
+} normalMatrices;
 
 layout(push_constant) uniform ShadowPushConstants {
     uint cascadeIndex;
 } pushConstants;
 
 void main() {
-    // Получаем матрицу модели для текущего объекта
     mat4 model = modelMatrices.models[inInstanceIndex];
 
-    // Трансформация позиции в world space
     vec4 worldPos = model * vec4(inPosition, 1.0);
 
     // Преобразуем в light space для shadow mapping

@@ -592,18 +592,24 @@ void renderer<C>::create_descriptor_set_layouts() {
         throw std::runtime_error("failed to create uniform descriptor set layout");
     }
 
-    // Storage buffer descriptor set layout (set 1, binding 0)
-    VkDescriptorSetLayoutBinding storage_layout_binding{};
-    storage_layout_binding.binding            = 0;
-    storage_layout_binding.descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    storage_layout_binding.descriptorCount    = 1;
-    storage_layout_binding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;
-    storage_layout_binding.pImmutableSamplers = nullptr;
+    // Storage buffer descriptor set layout (set 1: binding 0 = model matrices, binding 1 = normal matrices)
+    std::array<VkDescriptorSetLayoutBinding, 2> storage_layout_bindings{};
+    storage_layout_bindings[0].binding            = 0;
+    storage_layout_bindings[0].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    storage_layout_bindings[0].descriptorCount    = 1;
+    storage_layout_bindings[0].stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;
+    storage_layout_bindings[0].pImmutableSamplers = nullptr;
+
+    storage_layout_bindings[1].binding            = 1;
+    storage_layout_bindings[1].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    storage_layout_bindings[1].descriptorCount    = 1;
+    storage_layout_bindings[1].stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;
+    storage_layout_bindings[1].pImmutableSamplers = nullptr;
 
     VkDescriptorSetLayoutCreateInfo storage_layout_info{};
     storage_layout_info.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    storage_layout_info.bindingCount = 1;
-    storage_layout_info.pBindings    = &storage_layout_binding;
+    storage_layout_info.bindingCount = storage_layout_bindings.size();
+    storage_layout_info.pBindings    = storage_layout_bindings.data();
 
     if (vkCreateDescriptorSetLayout(
             context_->get_device(), &storage_layout_info, nullptr, &storage_descriptor_set_layout_
@@ -1085,8 +1091,8 @@ void renderer<C>::create_uniform_buffers() {
 
 template <typename C>
 void renderer<C>::create_descriptor_pool() {
-    constexpr uint32_t MAX_DESCRIPTOR_SETS  = 256;  // Поддержка множества буферов
-    constexpr uint32_t STORAGE_BUFFER_COUNT = 256;  // Один storage buffer на буфер
+    constexpr uint32_t MAX_DESCRIPTOR_SETS  = 256;
+    constexpr uint32_t STORAGE_BUFFER_COUNT = 512;  // 2 storage buffers на descriptor set (model + normal)
 
     std::array pool_sizes = {
         VkDescriptorPoolSize{
