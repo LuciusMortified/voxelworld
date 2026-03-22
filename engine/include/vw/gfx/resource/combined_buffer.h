@@ -136,12 +136,12 @@ private:
     staging_buffer* staging_;
     buffer_chunk_size chunk_size_;
 
-    uint32 mesh_capacity_;
+    uint32 mesh_capacity_{default_mesh_capacity_};
     std::unique_ptr<device_vertex_buffer> vertex_buffer_;
     std::unique_ptr<device_index_buffer> index_buffer_;
     std::unique_ptr<device_storage_buffer> instance_index_buffer_;
 
-    uint32 instance_capacity_;
+    uint32 instance_capacity_{default_instance_capacity_};
     std::unique_ptr<device_storage_buffer> model_matrix_buffer_;
     std::unique_ptr<device_storage_buffer> normal_matrix_buffer_;
     std::unique_ptr<device_storage_buffer> indirect_draw_buffer_;

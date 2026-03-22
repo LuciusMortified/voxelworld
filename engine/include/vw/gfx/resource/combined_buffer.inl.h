@@ -23,8 +23,6 @@ inline combined_buffer::combined_buffer(
     : context_(&context)
     , staging_(&staging)
     , chunk_size_(chunk_size)
-    , mesh_capacity_(default_mesh_capacity_)
-    , instance_capacity_(default_instance_capacity_)
     , descriptor_pool_(descriptor_pool)
     , descriptor_set_layout_(descriptor_set_layout) {
     vertex_buffer_ = std::make_unique<device_vertex_buffer>(

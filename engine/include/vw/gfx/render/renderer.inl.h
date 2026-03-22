@@ -78,6 +78,7 @@ renderer<C>::~renderer() {
     wait_idle();
 
     combined_buffer_pool_.reset();
+    palette_buffer_.reset();
     light_buffer_.reset();
     shadow_map_.reset();
 

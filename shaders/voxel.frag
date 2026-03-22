@@ -219,7 +219,7 @@ void main() {
     float hemisphereStrength = 0.15;
     vec3 hemisphereAmbient = calculateHemisphereAmbient(normal) * hemisphereStrength;
 
-    vec3 ambient = (baseAmbient + hemisphereAmbient) * fragAo;
+    vec3 ambient = (baseAmbient + hemisphereAmbient) * mix(1.0, fragAo, 0.9);
 
     // Directional light с sun_factor
     vec3 directional = calculateDirectionalLight(normal, viewDir, shadow);
@@ -243,7 +243,7 @@ void main() {
     float edgeEnhancement = (1.0 - edgeFactor) * edgeIntensity * (1.0 - shadow);
 
     // Комбинируем все освещение
-    vec3 lighting = ambient + (directional + pointLighting + rimColor) * mix(1.0, fragAo, 0.5);
+    vec3 lighting = ambient + (directional + pointLighting + rimColor) * mix(1.0, fragAo, 0.9);
     vec3 result = lighting * fragColor;
 
     // Применяем edge enhancement
