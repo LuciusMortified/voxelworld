@@ -3,7 +3,6 @@
 #ifndef VW_GFX_MESH_POOL_H
 #define VW_GFX_MESH_POOL_H
 
-#include <algorithm>
 #include <condition_variable>
 #include <future>
 #include <memory>
@@ -11,6 +10,7 @@
 #include <queue>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "vw/gfx/model/model_identity.h"
@@ -23,13 +23,13 @@ class model;
 
 struct mesh_generation_task {
     model_identity identity;
-    std::shared_ptr<model> model_ptr;
+    std::weak_ptr<model> model_ref;
     std::promise<mesh> promise;
 
     mesh_generation_task(
-        model_identity identity, std::shared_ptr<model> model_ptr
+        model_identity identity, std::weak_ptr<model> model_ref
     )
-        : identity(identity), model_ptr(std::move(model_ptr)) {}
+        : identity(identity), model_ref(std::move(model_ref)) {}
 };
 
 class mesh_pool final {
@@ -47,6 +47,7 @@ public:
     void request_mesh(const std::shared_ptr<model>& model_ptr);
     [[nodiscard]] auto get(const model_identity& identity) const -> std::shared_ptr<mesh>;
     void remove(const model_identity& identity);
+    void evict(const model_identity& identity);
     void process_completed();
     [[nodiscard]] auto get_pending_count() const -> uint32;
 
@@ -59,6 +60,7 @@ private:
     std::unordered_map<model_identity, std::shared_ptr<mesh>> meshes_;
     std::unordered_map<model_identity, std::weak_ptr<model>> model_refs_;
     std::unordered_map<model_identity, std::future<mesh>> pending_meshes_;
+    std::unordered_set<uint32> pending_indices_;
 
     std::vector<std::thread> gen_threads_;
     std::queue<std::unique_ptr<mesh_generation_task>> gen_queue_;

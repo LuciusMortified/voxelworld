@@ -16,20 +16,20 @@ struct model_identity {
     uint32 index      = invalid_index;
     uint32 generation = 0;
 
-    bool operator==(
+    auto operator==(
         const model_identity& other
-    ) const {
+    ) const -> bool {
         return index == other.index && generation == other.generation;
     }
 
-    bool operator!=(
+    auto operator!=(
         const model_identity& other
-    ) const {
+    ) const -> bool {
         return !(*this == other);
     }
 
     [[nodiscard]]
-    bool is_valid() const {
+    auto is_valid() const -> bool {
         return index != invalid_index;
     }
 };

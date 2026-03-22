@@ -64,10 +64,12 @@ buffer_chunk_size combined_buffer_pool<C>::get_chunk_size_for_mesh(
     uint32 vertex_count, uint32 index_count
 ) {
     uint32 vertex_chunk = 256;
-    uint32 index_chunk  = 512;
-
-    while (vertex_chunk < vertex_count || index_chunk < index_count) {
+    while (vertex_chunk < vertex_count) {
         vertex_chunk *= 2;
+    }
+
+    uint32 index_chunk = 512;
+    while (index_chunk < index_count) {
         index_chunk *= 2;
     }
 
@@ -169,6 +171,7 @@ void combined_buffer_pool<C>::update_meshes_(
                         continue;
                     }
                     buffer->write_mesh(model_id, *mesh_ptr);
+                    world.get_mesh_pool().evict(model_id);
                     mesh_pending_entities_.erase(ent);
                     continue;
                 }
@@ -193,6 +196,7 @@ void combined_buffer_pool<C>::update_meshes_(
         const auto buffer_index = chunk_size_to_buffer_index_[required_chunk_size];
 
         buffer->allocate(ent, model_id, *mesh_ptr, transform_matrix);
+        world.get_mesh_pool().evict(model_id);
 
         entity_buffer_infos_[ent] = entity_buffer_info{required_chunk_size, buffer_index};
         mesh_pending_entities_.erase(ent);

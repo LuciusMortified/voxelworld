@@ -66,6 +66,11 @@ auto world<WC>::get_mesh_pool() const -> const mesh_pool& {
     return mesh_pool_;
 }
 
+template <typename WC>
+auto world<WC>::get_mesh_pool() -> mesh_pool& {
+    return mesh_pool_;
+}
+
 template <typename C>
 template <typename... Cs>
 auto world<C>::view_components() -> component_view<registry_type, Cs...> {

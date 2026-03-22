@@ -26,12 +26,12 @@ public:
         if (!free_indices_.empty()) [[unlikely]] {
             uint32 index = free_indices_.back();
             free_indices_.pop_back();
-            return {index, generations_[index]};
+            return {.index = index, .generation = generations_[index]};
         }
 
-        uint32 index = static_cast<uint32>(generations_.size());
+        const auto index = static_cast<uint32>(generations_.size());
         generations_.push_back(0);
-        return {index, 0};
+        return {.index = index, .generation = 0};
     }
 
     [[nodiscard]] auto next_generation(
@@ -39,7 +39,7 @@ public:
     ) -> model_identity {
         std::scoped_lock lock(mutex_);
         if (has_unlocked_(id)) [[likely]] {
-            return {id.index, ++generations_[id.index]};
+            return {.index = id.index, .generation = ++generations_[id.index]};
         }
         return invalid_model_identity;
     }

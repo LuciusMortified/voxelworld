@@ -61,6 +61,16 @@ inline void mesh_pool::request_mesh(
         return;
     }
 
+    if (pending_indices_.contains(identity.index)) {
+        for (auto it = pending_meshes_.begin(); it != pending_meshes_.end(); ++it) {
+            if (it->first.index == identity.index) {
+                pending_meshes_.erase(it);
+                break;
+            }
+        }
+    }
+    pending_indices_.insert(identity.index);
+
     log::debug(
         lc_,
         "Requesting mesh generation for model {}.{} with size ({},{},{})",
@@ -97,6 +107,14 @@ inline void mesh_pool::remove(
     meshes_.erase(identity);
     model_refs_.erase(identity);
     pending_meshes_.erase(identity);
+    pending_indices_.erase(identity.index);
+}
+
+inline void mesh_pool::evict(
+    const model_identity& identity
+) {
+    meshes_.erase(identity);
+    pending_indices_.erase(identity.index);
 }
 
 inline void mesh_pool::sweep_orphaned_() {
@@ -104,6 +122,7 @@ inline void mesh_pool::sweep_orphaned_() {
         if (it->second.expired()) {
             meshes_.erase(it->first);
             pending_meshes_.erase(it->first);
+            pending_indices_.erase(it->first.index);
             it = model_refs_.erase(it);
         } else {
             ++it;
@@ -124,8 +143,8 @@ inline void mesh_pool::process_completed() {
          iter != pending_meshes_.end() && completed < max_meshes_per_frame;) {
         const auto status = iter->second.wait_for(std::chrono::seconds(0));
         if (status == std::future_status::ready) {
-            auto identity     = iter->first;
-            auto data         = iter->second.get();
+            auto identity = iter->first;
+            auto data     = iter->second.get();
 
             log::debug(
                 lc_,
@@ -171,8 +190,16 @@ inline void mesh_pool::gen_thread_function() {
         }
 
         if (task) {
+            auto model_ptr = task->model_ref.lock();
+            if (!model_ptr || model_ptr->get_identity() != task->identity) {
+                task->promise.set_value(mesh{});
+                continue;
+            }
+
             try {
-                mesh data = greedy_mesh_generator::generate_mesh_data(storage, *task->model_ptr, *registry_);
+                mesh data = greedy_mesh_generator::generate_mesh_data(
+                    storage, *model_ptr, *registry_
+                );
                 task->promise.set_value(std::move(data));
             } catch (const std::exception& e) {
                 task->promise.set_exception(std::current_exception());

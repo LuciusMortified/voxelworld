@@ -38,6 +38,11 @@ struct vertex {
 struct mesh {
     std::vector<vertex> vertices;
     std::vector<uint32> indices;
+
+    void release_data() {
+        vertices = {};
+        indices = {};
+    }
 };
 
 class simple_mesh_generator {

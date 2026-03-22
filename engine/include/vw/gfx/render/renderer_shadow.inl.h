@@ -250,7 +250,7 @@ void renderer<WC>::render_shadow_pass(
         render_pass_info.framebuffer       = shadow_map_->get_framebuffer(cascade_index);
         render_pass_info.renderArea.offset = {0, 0};
         render_pass_info.renderArea.extent = {
-            shadow_map::shadow_map_size, shadow_map::shadow_map_size
+            shadow_map_->get_size(), shadow_map_->get_size()
         };
 
         VkClearValue clear_value{};
@@ -267,15 +267,15 @@ void renderer<WC>::render_shadow_pass(
         VkViewport viewport{};
         viewport.x        = 0.0f;
         viewport.y        = 0.0f;
-        viewport.width    = static_cast<float>(shadow_map::shadow_map_size);
-        viewport.height   = static_cast<float>(shadow_map::shadow_map_size);
+        viewport.width    = static_cast<float>(shadow_map_->get_size());
+        viewport.height   = static_cast<float>(shadow_map_->get_size());
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         vkCmdSetViewport(command_buffers_[current_image_index_], 0, 1, &viewport);
 
         VkRect2D scissor{};
         scissor.offset = {0, 0};
-        scissor.extent = {shadow_map::shadow_map_size, shadow_map::shadow_map_size};
+        scissor.extent = {shadow_map_->get_size(), shadow_map_->get_size()};
         vkCmdSetScissor(command_buffers_[current_image_index_], 0, 1, &scissor);
 
         // Биндим shadow pipeline

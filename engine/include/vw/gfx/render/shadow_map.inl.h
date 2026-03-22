@@ -15,9 +15,9 @@
 namespace vw::gfx {
 
 inline shadow_map::shadow_map(
-    vulkan_context& context
+    vulkan_context& context, uint32 size
 )
-    : context_(&context) {
+    : context_(&context), size_(size) {
     // Инициализируем матрицы единичными
     for (auto& matrix : light_space_matrices_) {
         matrix = math::identity_matrix();
@@ -55,8 +55,8 @@ inline void shadow_map::create_shadow_map_image() {
     VkImageCreateInfo image_info{};
     image_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
     image_info.imageType     = VK_IMAGE_TYPE_2D;
-    image_info.extent.width  = shadow_map_size;
-    image_info.extent.height = shadow_map_size;
+    image_info.extent.width  = size_;
+    image_info.extent.height = size_;
     image_info.extent.depth  = 1;
     image_info.mipLevels     = 1;
     image_info.arrayLayers   = cascade_count;
@@ -227,8 +227,8 @@ inline void shadow_map::create_framebuffers() {
         framebuffer_info.renderPass      = shadow_render_pass_;
         framebuffer_info.attachmentCount = 1;
         framebuffer_info.pAttachments    = &shadow_cascade_image_views_[i];
-        framebuffer_info.width           = shadow_map_size;
-        framebuffer_info.height          = shadow_map_size;
+        framebuffer_info.width           = size_;
+        framebuffer_info.height          = size_;
         framebuffer_info.layers          = 1;
 
         if (vkCreateFramebuffer(
@@ -336,7 +336,7 @@ inline void shadow_map::update(
 
         auto lsm = light_proj * light_view;
 
-        float half_size     = static_cast<float>(shadow_map_size) * 0.5f;
+        float half_size     = static_cast<float>(size_) * 0.5f;
         vec4f shadow_origin = lsm * vec4f{0.0f, 0.0f, 0.0f, 1.0f};
         float rounded_x     = std::round(shadow_origin.x * half_size);
         float rounded_y     = std::round(shadow_origin.y * half_size);

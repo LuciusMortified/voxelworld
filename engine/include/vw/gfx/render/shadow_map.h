@@ -18,10 +18,11 @@ class camera;
 
 class shadow_map {
 public:
-    static constexpr uint32 cascade_count   = 4;
-    static constexpr uint32 shadow_map_size = 4192;
+    static constexpr uint32 cascade_count = 4;
 
-    explicit shadow_map(vulkan_context& context);
+    explicit shadow_map(vulkan_context& context, uint32 size = 2048);
+
+    [[nodiscard]] auto get_size() const -> uint32 { return size_; }
     ~shadow_map();
 
     shadow_map(const shadow_map&)            = delete;
@@ -65,6 +66,7 @@ private:
     std::array<frustum, cascade_count> cascade_frustums_   = {};
     std::array<float, cascade_count> cascade_splits_       = {};
 
+    uint32 size_;
     float split_lambda_ = 0.5f;
     float shadow_far_   = 500.f;
 };

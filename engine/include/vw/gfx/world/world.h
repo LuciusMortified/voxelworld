@@ -72,6 +72,7 @@ public:
     [[nodiscard]] auto get_component(entity ent) -> T&;
 
     [[nodiscard]] auto get_mesh_pool() const -> const mesh_pool&;
+    [[nodiscard]] auto get_mesh_pool() -> mesh_pool&;
 
     template <typename... Cs>
     [[nodiscard]] auto view_components() -> component_view<registry_type, Cs...>;
