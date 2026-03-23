@@ -11,6 +11,7 @@
 #include "vw/core/color.h"
 #include "vw/core/voxel.h"
 #include "vw/gfx/model/model_identity.h"
+#include "vw/gfx/model/page_pool.h"
 
 namespace vw::gfx::detail {
 struct boundary_slice {
@@ -30,16 +31,16 @@ struct page_entry {
 
     [[nodiscard]] auto mode() const -> page_mode;
     [[nodiscard]] auto fill_id() const -> uint8;
-    [[nodiscard]] auto pool_index() const -> uint16;
+    [[nodiscard]] auto pool_index() const -> uint32;
 
     static auto make_empty() -> page_entry;
     static auto make_uniform(uint8 id) -> page_entry;
-    static auto make_sparse(uint16 index) -> page_entry;
+    static auto make_sparse(uint32 index) -> page_entry;
 };
 
 class model {
 public:
-    model(model_identity_pool& identity_pool, int width, int height, int depth,
+    model(model_identity_pool& identity_pool, page_pool& pool, int width, int height, int depth,
           int32 voxel_scale = 1);
     ~model();
 
@@ -90,20 +91,20 @@ public:
 
 private:
     model_identity_pool* identity_pool_;
+    page_pool* pool_ptr_;
     int width_{0}, height_{0}, depth_{0};
     int32 voxel_scale_{1};
     int pages_x_{0}, pages_y_{0}, pages_z_{0};
     std::vector<page_entry> pages_;
-    std::vector<page_type> page_pool_;
-    std::vector<uint16> free_pool_indices_;
+    std::vector<uint32> owned_pages_;
     model_identity identity_;
     std::array<detail::boundary_slice, 6> boundary_slices_;
     std::array<detail::boundary_slice, 6> own_boundaries_;
 
     [[nodiscard]] auto page_index(int px, int py, int pz) const -> int;
     [[nodiscard]] static auto local_index(int lx, int ly, int lz) -> int;
-    auto alloc_sparse_page() -> uint16;
-    void free_sparse_page(uint16 index);
+    auto alloc_sparse_page() -> uint32;
+    void free_sparse_page(uint32 index);
     auto promote_to_sparse(int px, int py, int pz) -> page_type&;
 
     void increment_generation_();

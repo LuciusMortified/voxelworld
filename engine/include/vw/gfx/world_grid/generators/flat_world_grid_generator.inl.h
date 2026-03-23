@@ -18,7 +18,7 @@ inline auto flat_world_grid_generator::generate_chunk(
 ) -> chunk_data {
     constexpr int32 s = chunk<>::size;
 
-    auto mdl = std::make_shared<model>(*pool_, s, s, s, voxel_scale_);
+    auto mdl = std::make_shared<model>(*pool_, *page_pool_, s, s, s, voxel_scale_);
 
     bool checker = ((coord.x + coord.z) & 1) == 0;
     auto grass_id = checker ? static_cast<uint8>(block_id::grass_1)

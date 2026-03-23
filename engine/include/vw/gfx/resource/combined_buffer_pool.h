@@ -5,6 +5,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include <chrono>
 #include <map>
 #include <memory>
 #include <span>
@@ -27,6 +28,15 @@ struct entity_buffer_info {
     size_t buffer_index;
 };
 
+struct buffer_pool_timing_stats {
+    float32 destroyed_ms    = 0.0f;
+    float32 visibility_ms   = 0.0f;
+    float32 meshes_ms       = 0.0f;
+    float32 transforms_ms   = 0.0f;
+    float32 visibility_upd_ms = 0.0f;
+    float32 staging_flush_ms  = 0.0f;
+};
+
 struct combined_buffer_pool_stats {
     float32 vertex_load_min  = 0.0f;
     float32 vertex_load_max  = 0.0f;
@@ -39,6 +49,7 @@ struct combined_buffer_pool_stats {
     uint32 instance_capacity = 0;
     uint32 instance_count    = 0;
     std::vector<combined_buffer_stats> buffers;
+    buffer_pool_timing_stats timing;
 };
 
 struct visibility_cache {

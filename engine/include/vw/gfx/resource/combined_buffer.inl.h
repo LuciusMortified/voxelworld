@@ -6,7 +6,13 @@
 #include <numeric>
 #include <ranges>
 
+#include "vw/log/logger.h"
+
 namespace vw::gfx {
+
+namespace {
+constexpr log::log_category lc_cb_{"combined_buffer"};
+}
 inline combined_buffer::~combined_buffer() {
     if (descriptor_set_ != VK_NULL_HANDLE && descriptor_pool_ != VK_NULL_HANDLE) {
         vkFreeDescriptorSets(context_->get_device(), descriptor_pool_, 1, &descriptor_set_);
@@ -65,6 +71,13 @@ inline combined_buffer::combined_buffer(
 inline void combined_buffer::allocate(
     entity e, model_identity model_id, const mesh& mesh_data, const mat4f& transform_matrix
 ) {
+    log::debug(
+        lc_cb_,
+        "ALLOCATE entity {}.{} model {}.{} verts {} idxs {}",
+        e.index, e.generation, model_id.index, model_id.generation,
+        mesh_data.vertices.size(), mesh_data.indices.size()
+    );
+
     if (!mesh_allocations_.contains(model_id.index)) {
         allocate_mesh(model_id, mesh_data);
     } else {
@@ -134,6 +147,13 @@ inline void combined_buffer::allocate(
 inline void combined_buffer::allocate_mesh(
     model_identity model_id, const mesh& mesh_data
 ) {
+    log::debug(
+        lc_cb_,
+        "ALLOC_MESH model {}.{} verts {} idxs {}",
+        model_id.index, model_id.generation,
+        mesh_data.vertices.size(), mesh_data.indices.size()
+    );
+
     const auto vertex_count = mesh_data.vertices.size();
     const auto index_count  = mesh_data.indices.size();
     uint32_t vertex_offset  = vertex_used_;
@@ -205,6 +225,13 @@ inline void combined_buffer::write_mesh(
     if (mesh_alloc.generation == model_id.generation) {
         return;
     }
+
+    log::debug(
+        lc_cb_,
+        "WRITE_MESH model {}.{} (was gen {}) verts {} idxs {}",
+        model_id.index, model_id.generation, mesh_alloc.generation,
+        mesh_data.vertices.size(), mesh_data.indices.size()
+    );
 
     const auto vertex_count = mesh_data.vertices.size();
     const auto index_count  = mesh_data.indices.size();
@@ -287,10 +314,23 @@ inline auto combined_buffer::free(
 ) -> std::optional<entity> {
     auto& ent_alloc = entity_allocations_[ent];
 
+    log::debug(
+        lc_cb_,
+        "FREE entity {}.{} model_idx {} instance_idx {}",
+        ent.index, ent.generation,
+        ent_alloc.model_index, ent_alloc.instance_index
+    );
+
     auto& mesh_alloc = mesh_allocations_[ent_alloc.model_index];
     mesh_alloc.ref_count--;
 
     if (mesh_alloc.ref_count <= 0) {
+        log::debug(
+            lc_cb_,
+            "  FREE_MESH model_idx {} v_off {} i_off {}",
+            ent_alloc.model_index,
+            mesh_alloc.vertex_offset, mesh_alloc.index_offset
+        );
         free_slots_.push_back({
             .vertex_offset = mesh_alloc.vertex_offset,
             .index_offset  = mesh_alloc.index_offset,
@@ -306,6 +346,13 @@ inline auto combined_buffer::free(
     if (need_swap) {
         entity last_ent      = instance_indexes_[last_index];
         auto& last_ent_alloc = entity_allocations_[last_ent];
+
+        log::debug(
+            lc_cb_,
+            "  SWAP entity {}.{} instance {} -> {}",
+            last_ent.index, last_ent.generation,
+            last_index, ent_alloc.instance_index
+        );
 
         auto& last_mesh_alloc = mesh_allocations_[last_ent_alloc.model_index];
         const draw_command new_cmd{

@@ -64,6 +64,8 @@ public:
     template <typename... Args>
     void critical(log_category cat, std::format_string<Args...> fmt, Args&&... args);
 
+    void add_file_sink(std::string_view path);
+
 private:
     logger();
     ~logger();

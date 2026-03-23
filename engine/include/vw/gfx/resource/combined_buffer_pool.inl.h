@@ -7,7 +7,13 @@
 #include <numeric>
 #include <ranges>
 
+#include "vw/log/logger.h"
+
 namespace vw::gfx {
+
+namespace {
+constexpr log::log_category lc_cbp_{"cbuf_pool"};
+}
 
 template <typename C>
 combined_buffer_pool<C>::combined_buffer_pool(
@@ -16,7 +22,7 @@ combined_buffer_pool<C>::combined_buffer_pool(
     VkDescriptorSetLayout descriptor_set_layout
 )
     : context_(&context)
-    , staging_(context)
+    , staging_(context, 32 * 1024 * 1024)
     , descriptor_pool_(descriptor_pool)
     , descriptor_set_layout_(descriptor_set_layout) {}
 
@@ -27,7 +33,11 @@ void combined_buffer_pool<C>::update(
     std::span<const frustum> shadow_frustums,
     VkCommandBuffer cmd
 ) {
+    using clock = std::chrono::high_resolution_clock;
+
     staging_.begin_frame();
+
+    auto t0 = clock::now();
 
     for (auto ent : world.destroyed()) {
         if (entity_buffer_infos_.contains(ent)) {
@@ -45,13 +55,38 @@ void combined_buffer_pool<C>::update(
         visibility_cache_.visible.erase(ent);
     }
 
+    auto t1 = clock::now();
+
     const frustum& view_frustum = camera.get_frustum();
     update_visibility_cache_(world, view_frustum, shadow_frustums);
+
+    auto t2 = clock::now();
+
     update_meshes_(world);
+
+    auto t3 = clock::now();
+
     update_transforms_(world);
+
+    auto t4 = clock::now();
+
     update_visibility_(world);
 
+    auto t5 = clock::now();
+
     staging_.flush(cmd);
+
+    auto t6 = clock::now();
+
+    auto ms = [](auto a, auto b) {
+        return std::chrono::duration<float32>(b - a).count() * 1000.0f;
+    };
+    stats_.timing.destroyed_ms      = ms(t0, t1);
+    stats_.timing.visibility_ms     = ms(t1, t2);
+    stats_.timing.meshes_ms         = ms(t2, t3);
+    stats_.timing.transforms_ms     = ms(t3, t4);
+    stats_.timing.visibility_upd_ms = ms(t4, t5);
+    stats_.timing.staging_flush_ms  = ms(t5, t6);
 }
 
 template <typename C>
@@ -111,6 +146,9 @@ void combined_buffer_pool<C>::update_meshes_(
         const bool has_spatial = world.template has_component<spatial_component>(ent);
         const bool is_visible  = visibility_cache_.visible.contains(ent);
         if (has_spatial && !is_visible) {
+            log::trace(
+                lc_cbp_, "SKIP entity {}.{} not visible", ent.index, ent.generation
+            );
             mesh_pending_entities_.erase(ent);
             continue;
         }
@@ -120,6 +158,10 @@ void combined_buffer_pool<C>::update_meshes_(
         bool is_renderable = has_model && has_transform;
 
         if (!is_renderable) {
+            log::trace(
+                lc_cbp_, "SKIP entity {}.{} not renderable model={} transform={}",
+                ent.index, ent.generation, has_model, has_transform
+            );
             if (entity_buffer_infos_.contains(ent)) {
                 auto& buffer_info = entity_buffer_infos_[ent];
                 auto swapped = buffers_[buffer_info.buffer_index]->free(ent);
@@ -137,12 +179,19 @@ void combined_buffer_pool<C>::update_meshes_(
 
         const auto& model_comp = world.template get_component<model_component>(ent);
         if (!model_comp.has_model()) {
+            log::trace(
+                lc_cbp_, "SKIP entity {}.{} no model ptr", ent.index, ent.generation
+            );
             continue;
         }
 
         auto model_id = model_comp.get_identity();
         auto mesh_ptr = world.get_mesh_pool().get(model_id);
         if (!mesh_ptr) {
+            log::trace(
+                lc_cbp_, "SKIP entity {}.{} mesh not ready model {}.{}",
+                ent.index, ent.generation, model_id.index, model_id.generation
+            );
             continue;
         }
 
@@ -167,6 +216,10 @@ void combined_buffer_pool<C>::update_meshes_(
                 const auto& ent_alloc = buffer->get_entity_allocation(ent);
                 if (ent_alloc.model_index == model_id.index) {
                     if (staging_.available() < mesh_staging_cost) {
+                        log::trace(
+                            lc_cbp_, "DEFER entity {}.{} staging full (write_mesh)",
+                            ent.index, ent.generation
+                        );
                         mesh_pending_entities_.insert(ent);
                         continue;
                     }
@@ -178,6 +231,10 @@ void combined_buffer_pool<C>::update_meshes_(
             }
 
             if (staging_.available() < mesh_staging_cost) {
+                log::trace(
+                    lc_cbp_, "DEFER entity {}.{} staging full (realloc)",
+                    ent.index, ent.generation
+                );
                 mesh_pending_entities_.insert(ent);
                 continue;
             }
@@ -188,6 +245,10 @@ void combined_buffer_pool<C>::update_meshes_(
                 buffer->write_transform(*swapped, tc.get_world_matrix());
             }
         } else if (staging_.available() < mesh_staging_cost) {
+            log::trace(
+                lc_cbp_, "DEFER entity {}.{} staging full (new alloc)",
+                ent.index, ent.generation
+            );
             mesh_pending_entities_.insert(ent);
             continue;
         }

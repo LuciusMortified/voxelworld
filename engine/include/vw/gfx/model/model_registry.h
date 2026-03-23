@@ -26,9 +26,11 @@ public:
     void erase(std::string_view name);
 
     [[nodiscard]] auto get_identity_pool() -> model_identity_pool& { return identity_pool_; }
+    [[nodiscard]] auto get_page_pool() -> page_pool& { return page_pool_; }
 
 private:
     model_identity_pool identity_pool_;
+    page_pool page_pool_;
     std::unordered_map<std::string, std::shared_ptr<model>> models_;
 };
 

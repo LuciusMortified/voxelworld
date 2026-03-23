@@ -248,7 +248,7 @@ inline auto perlin_world_grid_generator::generate_chunk(
 ) -> chunk_data {
     constexpr int32 s = chunk<>::size;
 
-    auto mdl = std::make_shared<model>(*pool_, s, s, s, params_.voxel_scale);
+    auto mdl = std::make_shared<model>(*pool_, *page_pool_, s, s, s, params_.voxel_scale);
 
     for (int32 x = 0; x < s; ++x) {
         for (int32 z = 0; z < s; ++z) {

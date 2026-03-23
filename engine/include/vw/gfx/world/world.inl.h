@@ -25,9 +25,9 @@ void world<Cs>::update(
 ) {
     using clock = std::chrono::high_resolution_clock;
     auto measure = [](auto&& system_fn) -> float32 {
-        auto start = clock::now();
+        const auto start = clock::now();
         system_fn();
-        auto end = clock::now();
+        const auto end = clock::now();
         return std::chrono::duration<float32>(end - start).count() * 1000.0f;
     };
 

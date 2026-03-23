@@ -254,11 +254,19 @@ void renderer<C>::render(
         throw std::runtime_error("Failed to begin recording command buffer!");
     }
 
+    using clock = std::chrono::high_resolution_clock;
+    auto t0 = clock::now();
+
     shadow_map_->update(camera, directional_light_settings_.direction);
     const auto& cascade_frustums = shadow_map_->get_cascade_frustums();
+
+    auto t1 = clock::now();
+
     combined_buffer_pool_->update(
         world, camera, cascade_frustums, command_buffers_[current_image_index_]
     );
+
+    auto t2 = clock::now();
 
     {
         VkMemoryBarrier barrier{};
@@ -289,7 +297,20 @@ void renderer<C>::render(
 
     render_shadow_pass(world, camera);
 
+    auto t3 = clock::now();
+
     render_world_pass(world, camera);
+
+    auto t4 = clock::now();
+
+    stats_.timing.shadow_map_update_ms =
+        std::chrono::duration<float32>(t1 - t0).count() * 1000.0f;
+    stats_.timing.buffer_pool_update_ms =
+        std::chrono::duration<float32>(t2 - t1).count() * 1000.0f;
+    stats_.timing.shadow_pass_ms =
+        std::chrono::duration<float32>(t3 - t2).count() * 1000.0f;
+    stats_.timing.world_pass_ms =
+        std::chrono::duration<float32>(t4 - t3).count() * 1000.0f;
 
     if (vkEndCommandBuffer(command_buffers_[current_image_index_]) != VK_SUCCESS) {
         throw std::runtime_error("Failed to record command buffer!");
@@ -1413,9 +1434,13 @@ template <typename WC>
 void renderer<WC>::render_world_pass(
     world_type& world, const camera& camera
 ) {
+    using clock = std::chrono::high_resolution_clock;
+    auto wp0 = clock::now();
+
     update_uniform_buffer(camera);
 
-    // Начинаем рендер пасс
+    auto wp1 = clock::now();
+
     VkRenderPassBeginInfo render_pass_info{};
     render_pass_info.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     render_pass_info.renderPass        = render_pass_;
@@ -1430,7 +1455,6 @@ void renderer<WC>::render_world_pass(
     render_pass_info.clearValueCount = 3;
     render_pass_info.pClearValues    = clear_values;
 
-    // Первый проход для 3д объектов
     vkCmdBeginRenderPass(
         command_buffers_[current_image_index_], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE
     );
@@ -1453,17 +1477,30 @@ void renderer<WC>::render_world_pass(
 
     render_world(world, camera);
 
-    // Переходим к проходу для примитивов
+    auto wp2 = clock::now();
+
     vkCmdNextSubpass(command_buffers_[current_image_index_], VK_SUBPASS_CONTENTS_INLINE);
 
     render_debug_primitives();
 
-    // Переходим к проходу для ImGui
+    auto wp3 = clock::now();
+
     vkCmdNextSubpass(command_buffers_[current_image_index_], VK_SUBPASS_CONTENTS_INLINE);
 
     render_imgui();
 
+    auto wp4 = clock::now();
+
     vkCmdEndRenderPass(command_buffers_[current_image_index_]);
+
+    stats_.timing.world_pass_uniform_ms =
+        std::chrono::duration<float32>(wp1 - wp0).count() * 1000.0f;
+    stats_.timing.world_pass_geometry_ms =
+        std::chrono::duration<float32>(wp2 - wp1).count() * 1000.0f;
+    stats_.timing.world_pass_debug_ms =
+        std::chrono::duration<float32>(wp3 - wp2).count() * 1000.0f;
+    stats_.timing.world_pass_imgui_ms =
+        std::chrono::duration<float32>(wp4 - wp3).count() * 1000.0f;
 }
 
 template <typename WC>

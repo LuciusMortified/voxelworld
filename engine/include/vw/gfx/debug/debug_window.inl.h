@@ -28,6 +28,9 @@ void debug_window<WC>::render(
     if (show_systems_detail_) {
         render_systems_detail();
     }
+    if (show_render_detail_) {
+        render_render_detail();
+    }
     if (show_combined_buffers_detail_) {
         render_combined_buffers_detail();
     }
@@ -103,6 +106,10 @@ void debug_window<WC>::render_fps_window() {
             show_systems_detail_ = !show_systems_detail_;
         }
         ImGui::SameLine();
+        if (ImGui::Button("render")) {
+            show_render_detail_ = !show_render_detail_;
+        }
+        ImGui::SameLine();
         if (ImGui::Button("buffers")) {
             show_combined_buffers_detail_ = !show_combined_buffers_detail_;
         }
@@ -139,11 +146,21 @@ void debug_window<WC>::render_systems_detail() {
         show_systems_detail_ = show;
         const auto& s = engine_->get_stats().systems;
 
-        auto row = [](const char* name, float32 ms) {
+        auto row = [this](const char* name, float32 ms) {
+            auto& max_val = metric_max_[name];
+            if (ms > max_val) {
+                max_val = ms;
+            }
+
             ImVec4 color = {1.0f, 1.0f, 1.0f, 1.0f};
-            if (ms > 5.0f) color = {1.0f, 0.3f, 0.3f, 1.0f};
-            else if (ms > 1.0f) color = {1.0f, 0.8f, 0.2f, 1.0f};
-            ImGui::TextColored(color, "%-14s %6.2f ms", name, ms);
+            if (ms > 5.0f) {
+                color = {1.0f, 0.3f, 0.3f, 1.0f};
+            } else if (ms > 1.0f) {
+                color = {1.0f, 0.8f, 0.2f, 1.0f};
+            }
+            ImGui::TextColored(
+                color, "%-14s %6.2f ms  max %5.2f ms", name, ms, max_val
+            );
         };
 
         row("transform", s.transform_ms);
@@ -186,6 +203,11 @@ void debug_window<WC>::render_systems_detail() {
         ImGui::Unindent();
 
         row("animation", s.animation_ms);
+
+        ImGui::Spacing();
+        if (ImGui::Button("reset##systems")) {
+            metric_max_.clear();
+        }
     }
     ImGui::End();
 }
@@ -234,6 +256,66 @@ void debug_window<WC>::render_combined_buffers_detail() {
             );
             ImGui::Unindent();
             ImGui::Separator();
+        }
+    }
+    ImGui::End();
+}
+
+template <typename WC>
+void debug_window<WC>::render_render_detail() {
+    ImGuiWindowFlags window_flags =          //
+        ImGuiWindowFlags_NoCollapse |        //
+        ImGuiWindowFlags_NoSavedSettings |   //
+        ImGuiWindowFlags_AlwaysAutoResize |  //
+        ImGuiWindowFlags_NoFocusOnAppearing;
+
+    bool show = show_render_detail_;
+    if (ImGui::Begin("Debug Tool - Render", &show, window_flags)) {
+        show_render_detail_ = show;
+        const auto& t = engine_->get_renderer().get_stats().timing;
+
+        auto row = [this](const char* name, float32 ms) {
+            auto& max_val = metric_max_[name];
+            if (ms > max_val) {
+                max_val = ms;
+            }
+
+            ImVec4 color = {1.0f, 1.0f, 1.0f, 1.0f};
+            if (ms > 5.0f) {
+                color = {1.0f, 0.3f, 0.3f, 1.0f};
+            } else if (ms > 1.0f) {
+                color = {1.0f, 0.8f, 0.2f, 1.0f};
+            }
+            ImGui::TextColored(
+                color, "%-14s %6.2f ms  max %5.2f ms", name, ms, max_val
+            );
+        };
+
+        row("shadow_update", t.shadow_map_update_ms);
+        row("buffer_pool", t.buffer_pool_update_ms);
+
+        const auto& bp = engine_->get_renderer().get_stats().combined_buffers.timing;
+        ImGui::Indent();
+        row("destroyed", bp.destroyed_ms);
+        row("visibility", bp.visibility_ms);
+        row("meshes", bp.meshes_ms);
+        row("transforms", bp.transforms_ms);
+        row("vis_update", bp.visibility_upd_ms);
+        row("staging", bp.staging_flush_ms);
+        ImGui::Unindent();
+
+        row("shadow_pass", t.shadow_pass_ms);
+        row("world_pass", t.world_pass_ms);
+        ImGui::Indent();
+        row("uniform", t.world_pass_uniform_ms);
+        row("geometry", t.world_pass_geometry_ms);
+        row("debug", t.world_pass_debug_ms);
+        row("imgui", t.world_pass_imgui_ms);
+        ImGui::Unindent();
+
+        ImGui::Spacing();
+        if (ImGui::Button("reset##render")) {
+            metric_max_.clear();
         }
     }
     ImGui::End();

@@ -122,13 +122,15 @@ inline void staging_buffer::flush(
         return;
     }
 
-    std::ranges::sort(pending_copies_, [this](const pending_copy& a, const pending_copy& b) {
-        const bool a_is_staging = (a.src == buffer_);
-        const bool b_is_staging = (b.src == buffer_);
-        if (a_is_staging != b_is_staging) return !a_is_staging;
-        if (a.src != b.src) return a.src < b.src;
-        return a.dst < b.dst;
-    });
+    std::ranges::stable_sort(
+        pending_copies_, [this](const pending_copy& a, const pending_copy& b) {
+            const bool a_is_staging = (a.src == buffer_);
+            const bool b_is_staging = (b.src == buffer_);
+            if (a_is_staging != b_is_staging) return !a_is_staging;
+            if (a.src != b.src) return a.src < b.src;
+            return a.dst < b.dst;
+        }
+    );
 
     for (auto it = pending_copies_.begin(); it != pending_copies_.end();) {
         auto batch_end = std::find_if(it + 1, pending_copies_.end(), [&](const pending_copy& c) {

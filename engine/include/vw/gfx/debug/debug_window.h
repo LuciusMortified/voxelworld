@@ -3,6 +3,9 @@
 #ifndef VW_GFX_DEBUG_WINDOW_H
 #define VW_GFX_DEBUG_WINDOW_H
 
+#include <string>
+#include <unordered_map>
+
 #include "vw/core.h"
 
 namespace vw::gfx {
@@ -36,12 +39,16 @@ private:
     void render_render_mode_controls() const;
     void render_combined_buffers_detail();
     void render_systems_detail();
+    void render_render_detail();
 
     engine_type* engine_;
 
     bool visible_                      = false;
     bool show_combined_buffers_detail_ = false;
     bool show_systems_detail_          = false;
+    bool show_render_detail_           = false;
+
+    std::unordered_map<std::string, float32> metric_max_;
 };
 
 }  // namespace vw::gfx

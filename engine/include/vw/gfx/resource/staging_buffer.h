@@ -18,7 +18,7 @@ class staging_buffer {
 public:
     explicit staging_buffer(
         vulkan_context& context,
-        VkDeviceSize frame_capacity  = 4 * 1024 * 1024,
+        VkDeviceSize frame_capacity  = 1 * 1024 * 1024,
         uint32 max_frames_in_flight = 2
     );
     ~staging_buffer();

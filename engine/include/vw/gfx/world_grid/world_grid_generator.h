@@ -23,12 +23,14 @@ struct chunk_y_range {
 };
 
 class model_identity_pool;
+class page_pool;
 
 class world_grid_generator {
 public:
     virtual ~world_grid_generator() = default;
 
     void set_identity_pool(model_identity_pool& pool) { pool_ = &pool; }
+    void set_page_pool(page_pool& pool) { page_pool_ = &pool; }
 
     virtual auto generate_chunk(vec3i coord) -> chunk_data = 0;
     [[nodiscard]] virtual auto get_chunk_y_range(int32 chunk_x, int32 chunk_z) -> chunk_y_range {
@@ -39,6 +41,7 @@ public:
 
 protected:
     model_identity_pool* pool_ = nullptr;
+    page_pool* page_pool_ = nullptr;
 };
 
 }  // namespace vw::gfx

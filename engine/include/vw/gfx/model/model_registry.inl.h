@@ -23,7 +23,7 @@ namespace vw::gfx {
 [[nodiscard]] inline auto model_registry::create(
     std::string_view name, int width, int height, int depth
 ) -> std::shared_ptr<model> {
-    auto new_model             = std::make_shared<model>(identity_pool_, width, height, depth);
+    auto new_model             = std::make_shared<model>(identity_pool_, page_pool_, width, height, depth);
     models_[std::string(name)] = new_model;
     return new_model;
 }
@@ -37,7 +37,7 @@ inline auto model_registry::create(
 [[nodiscard]] inline auto model_registry::create_unnamed(
     int width, int height, int depth
 ) -> std::shared_ptr<model> {
-    return std::make_shared<model>(identity_pool_, width, height, depth);
+    return std::make_shared<model>(identity_pool_, page_pool_, width, height, depth);
 }
 
 inline auto model_registry::create_unnamed(
@@ -55,7 +55,7 @@ inline auto model_registry::create_unnamed(
     }
 
     auto cloned_model = std::make_shared<model>(
-        identity_pool_, original->width(), original->height(), original->depth()
+        identity_pool_, page_pool_, original->width(), original->height(), original->depth()
     );
     cloned_model->clone_pages_from(*original);
 

@@ -157,6 +157,7 @@ private:
 
 auto main() -> int {
     try {
+        log::logger::get().add_file_sink("test_world_grid.log");
         std::make_unique<gfx::engine<>>(1280, 720, "Voxel World - World Grid Test")
             ->run<world_grid_app>();
     } catch (const std::exception& e) {

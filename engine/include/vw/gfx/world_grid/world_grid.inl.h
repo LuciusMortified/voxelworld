@@ -6,8 +6,13 @@
 #include <chrono>
 
 #include "vw/gfx/world/world.h"
+#include "vw/log/logger.h"
 
 namespace vw::gfx {
+
+namespace {
+constexpr log::log_category lc_wg_{"world_grid"};
+}
 
 template <typename WC>
 world_grid<WC>::world_grid(
@@ -15,6 +20,7 @@ world_grid<WC>::world_grid(
 )
     : world_(&world), voxel_scale_(voxel_scale), generator_(std::move(generator)) {
     generator_->set_identity_pool(world.get_model_registry().get_identity_pool());
+    generator_->set_page_pool(world.get_model_registry().get_page_pool());
     auto count = std::min(std::thread::hardware_concurrency(), 4u);
     if (count == 0) {
         count = 1;
@@ -162,7 +168,19 @@ template <typename WC>
 void world_grid<WC>::unload_chunk(
     vec3i coord
 ) {
-    chunks_.erase(coord);
+    auto it = chunks_.find(coord);
+    if (it != chunks_.end()) {
+        auto& c = it->second;
+        auto id = c->get_model()->get_identity();
+        log::debug(
+            lc_wg_,
+            "UNLOAD chunk ({},{},{}) entity {}.{} model {}.{}",
+            coord.x, coord.y, coord.z,
+            c->get_entity().index, c->get_entity().generation,
+            id.index, id.generation
+        );
+        chunks_.erase(it);
+    }
     pending_chunks_.erase(coord);
 }
 

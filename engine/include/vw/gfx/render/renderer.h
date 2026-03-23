@@ -5,6 +5,7 @@
 
 #include <vulkan/vulkan.h>
 
+#include <chrono>
 #include <memory>
 #include <vector>
 
@@ -65,9 +66,21 @@ struct push_constant_data {
     alignas(16) float32 model[16]{};
 };
 
+struct render_timing_stats {
+    float32 shadow_map_update_ms    = 0.0f;
+    float32 buffer_pool_update_ms   = 0.0f;
+    float32 shadow_pass_ms          = 0.0f;
+    float32 world_pass_ms           = 0.0f;
+    float32 world_pass_uniform_ms   = 0.0f;
+    float32 world_pass_geometry_ms  = 0.0f;
+    float32 world_pass_debug_ms     = 0.0f;
+    float32 world_pass_imgui_ms     = 0.0f;
+};
+
 struct renderer_stats {
     combined_buffer_pool_stats combined_buffers;
     uint32 draw_call_count = 0;
+    render_timing_stats timing;
 };
 
 template <typename WC = base_world_components>
