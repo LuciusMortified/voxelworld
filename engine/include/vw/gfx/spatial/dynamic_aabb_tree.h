@@ -3,6 +3,7 @@
 #ifndef VW_GFX_SPATIAL_DYNAMIC_AABB_TREE_H
 #define VW_GFX_SPATIAL_DYNAMIC_AABB_TREE_H
 
+#include <span>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -38,7 +39,12 @@ public:
         const aabb& bounds,
         std::unordered_set<entity>& result_out
     ) const;
-    
+
+    void query_all_any(
+        std::span<const frustum> frustums,
+        std::vector<entity>& result_out
+    ) const;
+
     [[nodiscard]] auto size() const -> size_t;
     [[nodiscard]] auto empty() const -> bool;
     

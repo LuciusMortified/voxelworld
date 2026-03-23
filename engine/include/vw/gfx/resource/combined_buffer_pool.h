@@ -54,9 +54,9 @@ struct combined_buffer_pool_stats {
 
 struct visibility_cache {
     frustum view_frustum;
-    std::unordered_set<entity> visible;
-    std::unordered_set<entity> tmp_visible;
-    std::unordered_set<entity> changed;
+    std::vector<entity> visible;
+    std::vector<entity> tmp_visible;
+    std::vector<entity> changed;
 };
 
 template <typename C>
@@ -114,10 +114,11 @@ private:
 
     visibility_cache visibility_cache_{};
     std::unordered_set<entity> entities_to_process_;
-    std::unordered_set<entity> shadow_query_tmp_;
 
     std::unordered_set<entity> mesh_pending_entities_;
     std::unordered_set<entity> transform_pending_entities_;
+
+    std::vector<frustum> all_frustums_;
 
     mutable combined_buffer_pool_stats stats_;
 };

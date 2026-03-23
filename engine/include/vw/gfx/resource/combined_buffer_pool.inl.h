@@ -52,7 +52,11 @@ void combined_buffer_pool<C>::update(
         }
         mesh_pending_entities_.erase(ent);
         transform_pending_entities_.erase(ent);
-        visibility_cache_.visible.erase(ent);
+        auto vit = std::lower_bound(
+            visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent);
+        if (vit != visibility_cache_.visible.end() && *vit == ent) {
+            visibility_cache_.visible.erase(vit);
+        }
     }
 
     auto t1 = clock::now();
@@ -140,18 +144,18 @@ void combined_buffer_pool<C>::update_meshes_(
 
     entities_to_process_.clear();
     for (entity ent : visibility_cache_.changed) {
-        if (visibility_cache_.visible.contains(ent) && !entity_buffer_infos_.contains(ent)) {
+        if (std::binary_search(visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent) && !entity_buffer_infos_.contains(ent)) {
             entities_to_process_.insert(ent);
         }
     }
     entities_to_process_.insert(mesh_pending_entities_.begin(), mesh_pending_entities_.end());
 
-    constexpr uint32 max_mesh_writes_per_frame = 512;
+    constexpr uint32 max_mesh_writes_per_frame = 4;
     uint32 mesh_writes = 0;
 
     for (entity ent : entities_to_process_) {
         const bool has_spatial = world.template has_component<spatial_component>(ent);
-        const bool is_visible  = visibility_cache_.visible.contains(ent);
+        const bool is_visible  = std::binary_search(visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent);
         if (has_spatial && !is_visible) {
             // log::trace(
             //     lc_cbp_, "SKIP entity {}.{} not visible", ent.index, ent.generation
@@ -286,7 +290,7 @@ void combined_buffer_pool<C>::update_transforms_(
 
     entities_to_process_.clear();
     for (entity ent : visibility_cache_.changed) {
-        if (visibility_cache_.visible.contains(ent) && !entity_buffer_infos_.contains(ent)) {
+        if (std::binary_search(visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent) && !entity_buffer_infos_.contains(ent)) {
             entities_to_process_.insert(ent);
         }
     }
@@ -296,7 +300,7 @@ void combined_buffer_pool<C>::update_transforms_(
 
     for (entity ent : entities_to_process_) {
         const bool has_spatial = world.template has_component<spatial_component>(ent);
-        const bool is_visible  = visibility_cache_.visible.contains(ent);
+        const bool is_visible  = std::binary_search(visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent);
         if (has_spatial && !is_visible) {
             transform_pending_entities_.erase(ent);
             continue;
@@ -334,7 +338,7 @@ void combined_buffer_pool<C>::update_visibility_(world_type& world) {
             break;
         }
 
-        const bool is_visible = visibility_cache_.visible.contains(ent);
+        const bool is_visible = std::binary_search(visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent);
         auto& info = entity_buffer_infos_[ent];
         buffers_[info.buffer_index]->write_visibility(ent, is_visible);
     }
@@ -357,27 +361,19 @@ void combined_buffer_pool<C>::update_visibility_cache_(
 
     visibility_cache_.changed.clear();
     if (frustum_changed || has_spatial_changed) {
-        spatial_system.query_all(view_frustum, visibility_cache_.tmp_visible);
+        all_frustums_.clear();
+        all_frustums_.push_back(view_frustum);
+        all_frustums_.insert(
+            all_frustums_.end(), shadow_frustums.begin(), shadow_frustums.end());
 
-        for (const auto& shadow_frustum : shadow_frustums) {
-            spatial_system.query_all(shadow_frustum, shadow_query_tmp_);
-            visibility_cache_.tmp_visible.insert(
-                shadow_query_tmp_.begin(), shadow_query_tmp_.end()
-            );
-        }
+        spatial_system.query_all_any(all_frustums_, visibility_cache_.tmp_visible);
 
-        for (auto ent : visibility_cache_.visible) {
-            if (!visibility_cache_.tmp_visible.contains(ent)) {
-                visibility_cache_.changed.insert(ent);
-            }
-        }
-        for (auto ent : visibility_cache_.tmp_visible) {
-            if (!visibility_cache_.visible.contains(ent)) {
-                visibility_cache_.changed.insert(ent);
-            }
-        }
+        std::set_symmetric_difference(
+            visibility_cache_.visible.begin(), visibility_cache_.visible.end(),
+            visibility_cache_.tmp_visible.begin(), visibility_cache_.tmp_visible.end(),
+            std::back_inserter(visibility_cache_.changed));
 
-        visibility_cache_.visible      = visibility_cache_.tmp_visible;
+        visibility_cache_.visible.swap(visibility_cache_.tmp_visible);
         visibility_cache_.view_frustum = view_frustum;
     }
 }

@@ -312,6 +312,45 @@ inline void dynamic_aabb_tree::query_all(
     }
 }
 
+inline void dynamic_aabb_tree::query_all_any(
+    std::span<const frustum> frustums,
+    std::vector<entity>& result_out
+) const {
+    result_out.clear();
+    if (root_index_ == invalid_node_index) {
+        return;
+    }
+
+    query_stack_.clear();
+    query_stack_.push_back(root_index_);
+
+    while (!query_stack_.empty()) {
+        uint32 node_index = query_stack_.back();
+        query_stack_.pop_back();
+        const node& current = nodes_[node_index];
+
+        bool any_intersects = false;
+        for (const auto& f : frustums) {
+            if (f.intersects(current.bounds)) {
+                any_intersects = true;
+                break;
+            }
+        }
+        if (!any_intersects) {
+            continue;
+        }
+
+        if (current.is_leaf) {
+            if (current.entity_id.is_valid()) {
+                result_out.push_back(current.entity_id);
+            }
+        } else {
+            query_stack_.push_back(current.left);
+            query_stack_.push_back(current.right);
+        }
+    }
+}
+
 inline void dynamic_aabb_tree::query_all(
     const ray& r,
     std::unordered_set<entity>& result_out

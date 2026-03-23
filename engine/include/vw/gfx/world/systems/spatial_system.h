@@ -3,8 +3,11 @@
 #ifndef VW_GFX_WORLD_SYSTEMS_SPATIAL_SYSTEM_H
 #define VW_GFX_WORLD_SYSTEMS_SPATIAL_SYSTEM_H
 
-#include <unordered_set>
+#include <algorithm>
 #include <optional>
+#include <span>
+#include <unordered_set>
+#include <vector>
 
 #include "vw/gfx/spatial/dynamic_aabb_tree.h"
 #include "vw/gfx/spatial/frustum.h"
@@ -44,6 +47,11 @@ public:
         std::unordered_set<entity>& result_out
     ) const;
 
+    void query_all_any(
+        std::span<const frustum> frustums,
+        std::vector<entity>& result_out
+    ) const;
+
     [[nodiscard]] auto voxel_ray_cast(
         const ray& r,
         std::unordered_set<entity>& candidates
@@ -53,12 +61,12 @@ public:
 
 private:
     void update_entity(entity ent);
-    aabb calculate_aabb_from_model(
+    auto calculate_aabb_from_model(
         entity ent,
         const model_component& model_comp,
         const transform_component& transform_comp
-    ) const;
-    aabb expand_aabb_for_fat(const aabb& bounds) const;
+    ) const -> aabb;
+    auto expand_aabb_for_fat(const aabb& bounds) const -> aabb;
 
     registry_type* registry_;
     dynamic_aabb_tree tree_;

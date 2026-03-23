@@ -175,6 +175,14 @@ void spatial_system<Cs...>::query_all(
 }
 
 template <typename... Cs>
+void spatial_system<Cs...>::query_all_any(
+    std::span<const frustum> frustums, std::vector<entity>& result_out
+) const {
+    tree_.query_all_any(frustums, result_out);
+    std::sort(result_out.begin(), result_out.end());
+}
+
+template <typename... Cs>
 void spatial_system<Cs...>::query_all(
     const ray& r, std::unordered_set<entity>& result_out
 ) const {

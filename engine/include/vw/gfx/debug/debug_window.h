@@ -22,7 +22,7 @@ public:
     ~debug_window() = default;
 
     debug_window(const debug_window&)            = delete;
-    debug_window& operator=(const debug_window&) = delete;
+    auto operator=(const debug_window&) -> debug_window& = delete;
 
     debug_window(debug_window&&)            = default;
     debug_window& operator=(debug_window&&) = default;
@@ -45,8 +45,8 @@ private:
 
     bool visible_                      = false;
     bool show_combined_buffers_detail_ = false;
-    bool show_systems_detail_          = false;
-    bool show_render_detail_           = false;
+    bool show_systems_detail_          = true;
+    bool show_render_detail_           = true;
 
     std::unordered_map<std::string, float32> metric_max_;
 };
