@@ -298,8 +298,9 @@ inline void vulkan_context::create_logical_device_() {
     shader_draw_params.shaderDrawParameters = VK_TRUE;
 
     VkPhysicalDeviceVulkan12Features features12{};
-    features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-    features12.pNext = &shader_draw_params;
+    features12.sType              = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    features12.pNext              = &shader_draw_params;
+    features12.drawIndirectCount  = VK_TRUE;
 
     VkDeviceCreateInfo create_info{};
     create_info.sType                   = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;

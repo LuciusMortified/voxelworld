@@ -12,6 +12,7 @@
 #include "vw/core.h"
 #include "vw/gfx/camera/camera.h"
 #include "vw/gfx/debug/debug_primitive.h"
+#include "vw/gfx/render/cull_pipeline.h"
 #include "vw/gfx/render/shadow_map.h"
 #include "vw/gfx/resource/combined_buffer_pool.h"
 #include "vw/gfx/resource/light_buffer.h"
@@ -327,6 +328,9 @@ private:
     // Palette buffer для block colors
     const block_registry* block_registry_;
     std::unique_ptr<palette_buffer> palette_buffer_;
+
+    // GPU frustum culling
+    std::unique_ptr<cull_pipeline> cull_pipeline_;
 
     // Shadow map для directional light
     std::unique_ptr<shadow_map> shadow_map_;

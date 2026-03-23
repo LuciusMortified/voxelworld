@@ -1,0 +1,69 @@
+#version 460 core
+
+layout(local_size_x = 64) in;
+
+struct DrawCommand {
+    uint index_count;
+    uint instance_count;
+    uint first_index;
+    int  vertex_offset;
+    uint first_instance;
+};
+
+struct AABB {
+    vec4 min_point;
+    vec4 max_point;
+};
+
+layout(set = 0, binding = 0) uniform CullFrustumData {
+    vec4 planes[30];
+    uint pass_count;
+} frustum_data;
+
+layout(set = 1, binding = 0, std430) readonly buffer InputCommands {
+    DrawCommand commands[];
+} input_commands;
+
+layout(set = 1, binding = 1, std430) readonly buffer InputAABBs {
+    AABB aabbs[];
+} input_aabbs;
+
+layout(set = 1, binding = 2, std430) writeonly buffer OutputCommands {
+    DrawCommand commands[];
+} output_commands;
+
+layout(set = 1, binding = 3, std430) buffer Counts {
+    uint counts[];
+} count_buffer;
+
+layout(push_constant) uniform PC {
+    uint instance_count;
+};
+
+bool frustum_test(uint pass, vec3 bmin, vec3 bmax) {
+    uint base = pass * 6;
+    for (uint i = 0; i < 6; i++) {
+        vec4 p = frustum_data.planes[base + i];
+        vec3 pv = mix(bmin, bmax, greaterThan(p.xyz, vec3(0.0)));
+        if (dot(p.xyz, pv) + p.w < 0.0) return false;
+    }
+    return true;
+}
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= instance_count) return;
+
+    DrawCommand cmd = input_commands.commands[idx];
+    if (cmd.instance_count == 0) return;
+
+    vec3 bmin = input_aabbs.aabbs[idx].min_point.xyz;
+    vec3 bmax = input_aabbs.aabbs[idx].max_point.xyz;
+
+    for (uint pass = 0; pass < frustum_data.pass_count; pass++) {
+        if (frustum_test(pass, bmin, bmax)) {
+            uint slot = atomicAdd(count_buffer.counts[pass], 1);
+            output_commands.commands[pass * instance_count + slot] = cmd;
+        }
+    }
+}

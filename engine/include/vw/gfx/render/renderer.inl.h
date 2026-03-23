@@ -60,8 +60,11 @@ renderer<C>::renderer(
     create_imgui_descriptor_pool();
     init_imgui();
 
+    cull_pipeline_ = std::make_unique<cull_pipeline>(*context_, descriptor_pool_);
+
     combined_buffer_pool_ = std::make_unique<combined_buffer_pool_type>(
-        *context_, descriptor_pool_, storage_descriptor_set_layout_
+        *context_, descriptor_pool_, storage_descriptor_set_layout_,
+        cull_pipeline_->get_buffer_descriptor_set_layout()
     );
 
     light_buffer_ = std::make_unique<light_buffer_type>(
@@ -78,6 +81,7 @@ renderer<C>::~renderer() {
     wait_idle();
 
     combined_buffer_pool_.reset();
+    cull_pipeline_.reset();
     palette_buffer_.reset();
     light_buffer_.reset();
     shadow_map_.reset();
@@ -277,10 +281,11 @@ void renderer<C>::render(
             VK_ACCESS_INDEX_READ_BIT |             //
             VK_ACCESS_INDIRECT_COMMAND_READ_BIT |  //
             VK_ACCESS_SHADER_READ_BIT;
-        constexpr auto stage_mask =                          //
+        constexpr auto stage_mask =                //
             VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |   //
             VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT |  //
-            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT;
+            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |  //
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
         vkCmdPipelineBarrier(
             command_buffers_[current_image_index_],
             VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -292,6 +297,30 @@ void renderer<C>::render(
             nullptr,
             0,
             nullptr
+        );
+    }
+
+    const frustum& view_frustum = camera.get_frustum();
+    cull_pipeline_->update_frustums(current_frame_, view_frustum, cascade_frustums);
+
+    for (const auto& buffer : combined_buffer_pool_->get_buffers()) {
+        if (!buffer->is_empty()) {
+            cull_pipeline_->dispatch(
+                command_buffers_[current_image_index_], *buffer, current_frame_
+            );
+        }
+    }
+
+    {
+        VkMemoryBarrier compute_barrier{};
+        compute_barrier.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+        compute_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+        compute_barrier.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+        vkCmdPipelineBarrier(
+            command_buffers_[current_image_index_],
+            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+            VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+            0, 1, &compute_barrier, 0, nullptr, 0, nullptr
         );
     }
 
@@ -1119,13 +1148,13 @@ void renderer<C>::create_uniform_buffers() {
 
 template <typename C>
 void renderer<C>::create_descriptor_pool() {
-    constexpr uint32_t MAX_DESCRIPTOR_SETS  = 256;
-    constexpr uint32_t STORAGE_BUFFER_COUNT = 512;  // 2 storage buffers на descriptor set (model + normal)
+    constexpr uint32_t MAX_DESCRIPTOR_SETS  = 512;
+    constexpr uint32_t STORAGE_BUFFER_COUNT = 1024;
 
     std::array pool_sizes = {
         VkDescriptorPoolSize{
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 2)  // Основные + shadow uniform buffers
+            static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 2 + MAX_FRAMES_IN_FLIGHT)
         },
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, STORAGE_BUFFER_COUNT},
         VkDescriptorPoolSize{
@@ -1607,15 +1636,15 @@ void renderer<WC>::render_world(
             command_buffers_[current_image_index_], index_buffer, 0, VK_INDEX_TYPE_UINT32
         );
 
-        // Indirect draw call
-        const VkBuffer indirect_buffer = buffer->get_indirect_draw_buffer();
-        const uint32_t draw_count      = buffer->get_draw_command_count();
-        if (draw_count > 0) {
-            vkCmdDrawIndexedIndirect(
+        const uint32_t max_draws = buffer->get_draw_command_count();
+        if (max_draws > 0) {
+            vkCmdDrawIndexedIndirectCount(
                 command_buffers_[current_image_index_],
-                indirect_buffer,
+                buffer->get_culled_indirect_buffer(),
                 0,
-                draw_count,
+                buffer->get_count_buffer(),
+                0,
+                max_draws,
                 sizeof(draw_command)
             );
             draw_call_count_++;

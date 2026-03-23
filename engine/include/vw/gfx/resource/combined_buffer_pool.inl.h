@@ -47,12 +47,14 @@ template <typename C>
 combined_buffer_pool<C>::combined_buffer_pool(
     vulkan_context& context,
     VkDescriptorPool descriptor_pool,
-    VkDescriptorSetLayout descriptor_set_layout
+    VkDescriptorSetLayout descriptor_set_layout,
+    VkDescriptorSetLayout compute_descriptor_set_layout
 )
     : context_(&context)
     , staging_(context, 32 * 1024 * 1024)
     , descriptor_pool_(descriptor_pool)
-    , descriptor_set_layout_(descriptor_set_layout) {}
+    , descriptor_set_layout_(descriptor_set_layout)
+    , compute_descriptor_set_layout_(compute_descriptor_set_layout) {}
 
 template <typename C>
 void combined_buffer_pool<C>::update(
@@ -73,8 +75,13 @@ void combined_buffer_pool<C>::update(
             auto swapped = buffers_[info.buffer_index]->free(ent);
             if (swapped && world.template has_component<transform_component>(*swapped)) {
                 auto& tc = world.template get_component<transform_component>(*swapped);
+                aabb bounds{};
+                if (world.template has_component<spatial_component>(*swapped)) {
+                    bounds = world.template get_component<spatial_component>(*swapped)
+                                 .get_bounds();
+                }
                 buffers_[info.buffer_index]->write_transform(
-                    *swapped, tc.get_world_matrix());
+                    *swapped, tc.get_world_matrix(), bounds);
             }
             entity_buffer_infos_.erase(ent);
         }
@@ -102,13 +109,9 @@ void combined_buffer_pool<C>::update(
 
     auto t4 = clock::now();
 
-    update_visibility_(world);
-
-    auto t5 = clock::now();
-
     staging_.flush(cmd);
 
-    auto t6 = clock::now();
+    auto t5 = clock::now();
 
     auto ms = [](auto a, auto b) {
         return std::chrono::duration<float32>(b - a).count() * 1000.0f;
@@ -116,9 +119,8 @@ void combined_buffer_pool<C>::update(
     stats_.timing.destroyed_ms      = ms(t0, t1);
     stats_.timing.visibility_ms     = ms(t1, t2);
     stats_.timing.meshes_ms         = ms(t2, t3);
-    stats_.timing.transforms_ms     = ms(t3, t4);
-    stats_.timing.visibility_upd_ms = ms(t4, t5);
-    stats_.timing.staging_flush_ms  = ms(t5, t6);
+    stats_.timing.transforms_ms    = ms(t3, t4);
+    stats_.timing.staging_flush_ms = ms(t4, t5);
 }
 
 template <typename C>
@@ -155,7 +157,8 @@ combined_buffer* combined_buffer_pool<C>::get_or_create_buffer(
     auto buffer_index = buffers_.size();
     buffers_.push_back(
         std::make_unique<combined_buffer>(
-            *context_, chunk_size, descriptor_pool_, descriptor_set_layout_, staging_
+            *context_, chunk_size, descriptor_pool_, descriptor_set_layout_,
+            compute_descriptor_set_layout_, staging_
         )
     );
     chunk_size_to_buffer_index_[chunk_size] = buffer_index;
@@ -244,8 +247,13 @@ void combined_buffer_pool<C>::update_meshes_(
                 auto swapped = buffers_[buffer_info.buffer_index]->free(ent);
                 if (swapped && world.template has_component<transform_component>(*swapped)) {
                     auto& tc = world.template get_component<transform_component>(*swapped);
+                    aabb swap_bounds{};
+                    if (world.template has_component<spatial_component>(*swapped)) {
+                        swap_bounds = world.template get_component<spatial_component>(*swapped)
+                                          .get_bounds();
+                    }
                     buffers_[buffer_info.buffer_index]->write_transform(
-                        *swapped, tc.get_world_matrix());
+                        *swapped, tc.get_world_matrix(), swap_bounds);
                 }
                 entity_buffer_infos_.erase(ent);
             }
@@ -304,7 +312,12 @@ void combined_buffer_pool<C>::update_meshes_(
             auto swapped = buffer->free(ent);
             if (swapped && world.template has_component<transform_component>(*swapped)) {
                 auto& tc = world.template get_component<transform_component>(*swapped);
-                buffer->write_transform(*swapped, tc.get_world_matrix());
+                aabb sw_bounds{};
+                if (world.template has_component<spatial_component>(*swapped)) {
+                    sw_bounds = world.template get_component<spatial_component>(*swapped)
+                                    .get_bounds();
+                }
+                buffer->write_transform(*swapped, tc.get_world_matrix(), sw_bounds);
             }
         } else if (staging_.available() < mesh_staging_cost) {
             merge_buffer_.push_back(ent);
@@ -314,7 +327,11 @@ void combined_buffer_pool<C>::update_meshes_(
         auto* buffer            = get_or_create_buffer(required_chunk_size);
         const auto buffer_index = chunk_size_to_buffer_index_[required_chunk_size];
 
-        buffer->allocate(ent, model_id, *mesh_ptr, transform_matrix);
+        aabb ent_bounds{};
+        if (world.template has_component<spatial_component>(ent)) {
+            ent_bounds = world.template get_component<spatial_component>(ent).get_bounds();
+        }
+        buffer->allocate(ent, model_id, *mesh_ptr, transform_matrix, ent_bounds);
         world.get_mesh_pool().evict(model_id);
 
         entity_buffer_infos_[ent] = entity_buffer_info{required_chunk_size, buffer_index};
@@ -392,29 +409,16 @@ void combined_buffer_pool<C>::update_transforms_(
 
         auto& info = entity_buffer_infos_[ent];
         const auto& transform_comp = world.template get_component<transform_component>(ent);
+        aabb tr_bounds{};
+        if (world.template has_component<spatial_component>(ent)) {
+            tr_bounds = world.template get_component<spatial_component>(ent).get_bounds();
+        }
         buffers_[info.buffer_index]->write_transform(
-            ent, transform_comp.get_world_matrix());
+            ent, transform_comp.get_world_matrix(), tr_bounds);
     }
 
     std::sort(merge_buffer_.begin(), merge_buffer_.end());
     transform_pending_entities_.swap(merge_buffer_);
-}
-
-template <typename C>
-void combined_buffer_pool<C>::update_visibility_(world_type& world) {
-    for (entity ent : visibility_cache_.changed) {
-        if (!entity_buffer_infos_.contains(ent)) {
-            continue;
-        }
-
-        if (staging_.available() < sizeof(uint32)) {
-            break;
-        }
-
-        const bool is_visible = std::binary_search(visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent);
-        auto& info = entity_buffer_infos_[ent];
-        buffers_[info.buffer_index]->write_visibility(ent, is_visible);
-    }
 }
 
 template <typename C>

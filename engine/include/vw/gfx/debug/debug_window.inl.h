@@ -303,7 +303,6 @@ void debug_window<WC>::render_render_detail() {
         row("visibility", bp.visibility_ms);
         row("meshes", bp.meshes_ms);
         row("transforms", bp.transforms_ms);
-        row("vis_update", bp.visibility_upd_ms);
         row("staging", bp.staging_flush_ms);
         ImGui::Unindent();
 

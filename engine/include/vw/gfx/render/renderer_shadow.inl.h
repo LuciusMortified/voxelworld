@@ -352,16 +352,17 @@ void renderer<WC>::render_shadow_pass(
                 command_buffers_[current_image_index_], index_buffer, 0, VK_INDEX_TYPE_UINT32
             );
 
-            // Indirect draw call
-            VkBuffer indirect_buffer = buffer->get_indirect_draw_buffer();
-            uint32_t draw_count      = buffer->get_draw_command_count();
-            if (draw_count > 0) {
-                vkCmdDrawIndexedIndirect(
+            const uint32_t max_draws  = buffer->get_draw_command_count();
+            const uint32_t pass_index = cascade_index + 1;
+            if (max_draws > 0) {
+                vkCmdDrawIndexedIndirectCount(
                     command_buffers_[current_image_index_],
-                    indirect_buffer,
-                    0,
-                    draw_count,
-                    sizeof(VkDrawIndexedIndirectCommand)
+                    buffer->get_culled_indirect_buffer(),
+                    static_cast<VkDeviceSize>(pass_index) * max_draws * sizeof(draw_command),
+                    buffer->get_count_buffer(),
+                    pass_index * sizeof(uint32_t),
+                    max_draws,
+                    sizeof(draw_command)
                 );
             }
         }

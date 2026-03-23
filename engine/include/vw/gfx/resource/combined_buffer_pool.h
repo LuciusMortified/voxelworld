@@ -31,9 +31,8 @@ struct buffer_pool_timing_stats {
     float32 destroyed_ms    = 0.0f;
     float32 visibility_ms   = 0.0f;
     float32 meshes_ms       = 0.0f;
-    float32 transforms_ms   = 0.0f;
-    float32 visibility_upd_ms = 0.0f;
-    float32 staging_flush_ms  = 0.0f;
+    float32 transforms_ms    = 0.0f;
+    float32 staging_flush_ms = 0.0f;
 };
 
 struct combined_buffer_pool_stats {
@@ -66,7 +65,8 @@ public:
     explicit combined_buffer_pool(
         vulkan_context& context,
         VkDescriptorPool descriptor_pool,
-        VkDescriptorSetLayout descriptor_set_layout
+        VkDescriptorSetLayout descriptor_set_layout,
+        VkDescriptorSetLayout compute_descriptor_set_layout = VK_NULL_HANDLE
     );
     ~combined_buffer_pool() = default;
 
@@ -95,7 +95,6 @@ private:
 
     void update_meshes_(world_type& world, const vec3f& camera_pos);
     void update_transforms_(world_type& world);
-    void update_visibility_(world_type& world);
     void update_visibility_cache_(
         world_type& world,
         const frustum& view_frustum,
@@ -108,8 +107,9 @@ private:
     std::unordered_map<entity, entity_buffer_info> entity_buffer_infos_;
     std::map<buffer_chunk_size, size_t> chunk_size_to_buffer_index_;
 
-    VkDescriptorPool descriptor_pool_            = VK_NULL_HANDLE;
-    VkDescriptorSetLayout descriptor_set_layout_ = VK_NULL_HANDLE;
+    VkDescriptorPool descriptor_pool_                     = VK_NULL_HANDLE;
+    VkDescriptorSetLayout descriptor_set_layout_          = VK_NULL_HANDLE;
+    VkDescriptorSetLayout compute_descriptor_set_layout_  = VK_NULL_HANDLE;
 
     visibility_cache visibility_cache_{};
     std::vector<entity> entities_to_process_;

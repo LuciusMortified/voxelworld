@@ -12,6 +12,8 @@ inline VkShaderStageFlagBits to_vulkan_shader_stage(shader_type type) {
             return VK_SHADER_STAGE_VERTEX_BIT;
         case shader_type::FRAGMENT:
             return VK_SHADER_STAGE_FRAGMENT_BIT;
+        case shader_type::COMPUTE:
+            return VK_SHADER_STAGE_COMPUTE_BIT;
     }
     throw std::runtime_error("unknown shader type");
 }
