@@ -228,6 +228,10 @@ void combined_buffer_pool<C>::update_meshes_(
         auto vertex_count = mesh_ptr->vertices.size();
         auto index_count  = mesh_ptr->indices.size();
 
+        if (vertex_count == 0 || index_count == 0) {
+            continue;
+        }
+
         buffer_chunk_size required_chunk_size = get_chunk_size_for_mesh(vertex_count, index_count);
 
         const VkDeviceSize mesh_staging_cost =
