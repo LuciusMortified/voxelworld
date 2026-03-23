@@ -10,7 +10,6 @@
 #include <memory>
 #include <span>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "vw/gfx/resource/combined_buffer.h"
@@ -94,7 +93,7 @@ public:
 private:
     auto get_or_create_buffer(const buffer_chunk_size& chunk_size) -> combined_buffer*;
 
-    void update_meshes_(world_type& world);
+    void update_meshes_(world_type& world, const vec3f& camera_pos);
     void update_transforms_(world_type& world);
     void update_visibility_(world_type& world);
     void update_visibility_cache_(
@@ -113,10 +112,11 @@ private:
     VkDescriptorSetLayout descriptor_set_layout_ = VK_NULL_HANDLE;
 
     visibility_cache visibility_cache_{};
-    std::unordered_set<entity> entities_to_process_;
+    std::vector<entity> entities_to_process_;
 
-    std::unordered_set<entity> mesh_pending_entities_;
-    std::unordered_set<entity> transform_pending_entities_;
+    std::vector<entity> mesh_pending_entities_;
+    std::vector<entity> transform_pending_entities_;
+    std::vector<entity> merge_buffer_;
 
     std::vector<frustum> all_frustums_;
 

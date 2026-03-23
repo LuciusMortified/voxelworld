@@ -12,8 +12,36 @@
 namespace vw::gfx {
 
 namespace {
+
 constexpr log::log_category lc_cbp_{"cbuf_pool"};
+
+inline void sorted_insert(std::vector<entity>& v, entity e) {
+    auto it = std::lower_bound(v.begin(), v.end(), e);
+    if (it == v.end() || *it != e) {
+        v.insert(it, e);
+    }
 }
+
+inline void sorted_erase(std::vector<entity>& v, entity e) {
+    auto it = std::lower_bound(v.begin(), v.end(), e);
+    if (it != v.end() && *it == e) {
+        v.erase(it);
+    }
+}
+
+template <typename Iter>
+inline void sorted_merge_range(
+    std::vector<entity>& dst, Iter first, Iter last
+) {
+    if (first == last) return;
+    auto old_size = static_cast<std::ptrdiff_t>(dst.size());
+    dst.insert(dst.end(), first, last);
+    std::sort(dst.begin() + old_size, dst.end());
+    std::inplace_merge(dst.begin(), dst.begin() + old_size, dst.end());
+    dst.erase(std::unique(dst.begin(), dst.end()), dst.end());
+}
+
+}  // namespace
 
 template <typename C>
 combined_buffer_pool<C>::combined_buffer_pool(
@@ -50,8 +78,8 @@ void combined_buffer_pool<C>::update(
             }
             entity_buffer_infos_.erase(ent);
         }
-        mesh_pending_entities_.erase(ent);
-        transform_pending_entities_.erase(ent);
+        sorted_erase(mesh_pending_entities_, ent);
+        sorted_erase(transform_pending_entities_, ent);
         auto vit = std::lower_bound(
             visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent);
         if (vit != visibility_cache_.visible.end() && *vit == ent) {
@@ -66,7 +94,7 @@ void combined_buffer_pool<C>::update(
 
     auto t2 = clock::now();
 
-    update_meshes_(world);
+    update_meshes_(world, camera.get_position());
 
     auto t3 = clock::now();
 
@@ -137,76 +165,103 @@ combined_buffer* combined_buffer_pool<C>::get_or_create_buffer(
 
 template <typename C>
 void combined_buffer_pool<C>::update_meshes_(
-    world_type& world
+    world_type& world, const vec3f& camera_pos
 ) {
     auto& model_changed = world.template changed<model_component>();
-    mesh_pending_entities_.insert(model_changed.begin(), model_changed.end());
+    sorted_merge_range(mesh_pending_entities_, model_changed.begin(), model_changed.end());
 
     entities_to_process_.clear();
     for (entity ent : visibility_cache_.changed) {
-        if (std::binary_search(visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent) && !entity_buffer_infos_.contains(ent)) {
-            entities_to_process_.insert(ent);
+        if (std::binary_search(
+                visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent)
+            && !entity_buffer_infos_.contains(ent)) {
+            entities_to_process_.push_back(ent);
         }
     }
-    entities_to_process_.insert(mesh_pending_entities_.begin(), mesh_pending_entities_.end());
+    std::sort(entities_to_process_.begin(), entities_to_process_.end());
 
-    constexpr uint32 max_mesh_writes_per_frame = 4;
+    merge_buffer_.clear();
+    merge_buffer_.reserve(entities_to_process_.size() + mesh_pending_entities_.size());
+    std::set_union(
+        entities_to_process_.begin(), entities_to_process_.end(),
+        mesh_pending_entities_.begin(), mesh_pending_entities_.end(),
+        std::back_inserter(merge_buffer_));
+    entities_to_process_.swap(merge_buffer_);
+
+    auto vis_it = visibility_cache_.visible.cbegin();
+    auto vis_end = visibility_cache_.visible.cend();
+    size_t write_idx = 0;
+    for (size_t i = 0; i < entities_to_process_.size(); ++i) {
+        entity ent = entities_to_process_[i];
+        if (world.template has_component<spatial_component>(ent)) {
+            vis_it = std::lower_bound(vis_it, vis_end, ent);
+            if (vis_it == vis_end || *vis_it != ent) {
+                continue;
+            }
+        }
+        entities_to_process_[write_idx++] = ent;
+    }
+    entities_to_process_.resize(write_idx);
+
+    std::sort(entities_to_process_.begin(), entities_to_process_.end(),
+        [&](entity a, entity b) {
+            auto get_dist_sq = [&](entity e) -> float32 {
+                if (!world.template has_component<spatial_component>(e)) {
+                    return 0.0f;
+                }
+                auto& sc = world.template get_component<spatial_component>(e);
+                auto diff = sc.get_bounds().center() - camera_pos;
+                return diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
+            };
+            return get_dist_sq(a) < get_dist_sq(b);
+        });
+
+    constexpr uint32 estimated_avg_mesh_cost = 32 * 1024;
+    const uint32 max_mesh_writes = std::clamp(
+        static_cast<uint32>(staging_.available() / estimated_avg_mesh_cost), 4u, 16u);
     uint32 mesh_writes = 0;
 
-    for (entity ent : entities_to_process_) {
-        const bool has_spatial = world.template has_component<spatial_component>(ent);
-        const bool is_visible  = std::binary_search(visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent);
-        if (has_spatial && !is_visible) {
-            // log::trace(
-            //     lc_cbp_, "SKIP entity {}.{} not visible", ent.index, ent.generation
-            // );
-            continue;
+    merge_buffer_.clear();
+    merge_buffer_.reserve(entities_to_process_.size());
+
+    for (size_t i = 0; i < entities_to_process_.size(); ++i) {
+        entity ent = entities_to_process_[i];
+
+        if (mesh_writes >= max_mesh_writes) {
+            merge_buffer_.insert(
+                merge_buffer_.end(),
+                entities_to_process_.begin() + static_cast<std::ptrdiff_t>(i),
+                entities_to_process_.end());
+            break;
         }
 
         const bool has_model     = world.template has_component<model_component>(ent);
         const bool has_transform = world.template has_component<transform_component>(ent);
-        const bool is_renderable = has_model && has_transform;
 
-        if (!is_renderable) {
-            // log::trace(
-            //     lc_cbp_, "SKIP entity {}.{} not renderable model={} transform={}",
-            //     ent.index, ent.generation, has_model, has_transform
-            // );
+        if (!has_model || !has_transform) {
             if (entity_buffer_infos_.contains(ent)) {
                 auto& buffer_info = entity_buffer_infos_[ent];
                 auto swapped = buffers_[buffer_info.buffer_index]->free(ent);
                 if (swapped && world.template has_component<transform_component>(*swapped)) {
                     auto& tc = world.template get_component<transform_component>(*swapped);
                     buffers_[buffer_info.buffer_index]->write_transform(
-                        *swapped, tc.get_world_matrix()
-                    );
+                        *swapped, tc.get_world_matrix());
                 }
                 entity_buffer_infos_.erase(ent);
             }
-            mesh_pending_entities_.erase(ent);
             continue;
         }
 
         const auto& model_comp = world.template get_component<model_component>(ent);
         if (!model_comp.has_model()) {
-            // log::trace(
-            //     lc_cbp_, "SKIP entity {}.{} no model ptr", ent.index, ent.generation
-            // );
+            merge_buffer_.push_back(ent);
             continue;
         }
 
         auto model_id = model_comp.get_identity();
         auto mesh_ptr = world.get_mesh_pool().get(model_id);
         if (!mesh_ptr) {
-            // log::trace(
-            //     lc_cbp_, "SKIP entity {}.{} mesh not ready model {}.{}",
-            //     ent.index, ent.generation, model_id.index, model_id.generation
-            // );
-            continue;
-        }
-
-        if (mesh_writes >= max_mesh_writes_per_frame) {
-            mesh_pending_entities_.insert(ent);
+            merge_buffer_.push_back(ent);
             continue;
         }
 
@@ -231,27 +286,18 @@ void combined_buffer_pool<C>::update_meshes_(
                 const auto& ent_alloc = buffer->get_entity_allocation(ent);
                 if (ent_alloc.model_index == model_id.index) {
                     if (staging_.available() < mesh_staging_cost) {
-                        // log::trace(
-                        //     lc_cbp_, "DEFER entity {}.{} staging full (write_mesh)",
-                        //     ent.index, ent.generation
-                        // );
-                        mesh_pending_entities_.insert(ent);
+                        merge_buffer_.push_back(ent);
                         continue;
                     }
                     buffer->write_mesh(model_id, *mesh_ptr);
                     world.get_mesh_pool().evict(model_id);
-                    mesh_pending_entities_.erase(ent);
                     ++mesh_writes;
                     continue;
                 }
             }
 
             if (staging_.available() < mesh_staging_cost) {
-                // log::trace(
-                //     lc_cbp_, "DEFER entity {}.{} staging full (realloc)",
-                //     ent.index, ent.generation
-                // );
-                mesh_pending_entities_.insert(ent);
+                merge_buffer_.push_back(ent);
                 continue;
             }
 
@@ -261,11 +307,7 @@ void combined_buffer_pool<C>::update_meshes_(
                 buffer->write_transform(*swapped, tc.get_world_matrix());
             }
         } else if (staging_.available() < mesh_staging_cost) {
-            // log::trace(
-            //     lc_cbp_, "DEFER entity {}.{} staging full (new alloc)",
-            //     ent.index, ent.generation
-            // );
-            mesh_pending_entities_.insert(ent);
+            merge_buffer_.push_back(ent);
             continue;
         }
 
@@ -276,9 +318,11 @@ void combined_buffer_pool<C>::update_meshes_(
         world.get_mesh_pool().evict(model_id);
 
         entity_buffer_infos_[ent] = entity_buffer_info{required_chunk_size, buffer_index};
-        mesh_pending_entities_.erase(ent);
         ++mesh_writes;
     }
+
+    std::sort(merge_buffer_.begin(), merge_buffer_.end());
+    mesh_pending_entities_.swap(merge_buffer_);
 }
 
 template <typename C>
@@ -286,45 +330,74 @@ void combined_buffer_pool<C>::update_transforms_(
     world_type& world
 ) {
     auto& transform_changed = world.template changed<transform_component>();
-    transform_pending_entities_.insert(transform_changed.begin(), transform_changed.end());
+    sorted_merge_range(
+        transform_pending_entities_, transform_changed.begin(), transform_changed.end());
 
     entities_to_process_.clear();
     for (entity ent : visibility_cache_.changed) {
-        if (std::binary_search(visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent) && !entity_buffer_infos_.contains(ent)) {
-            entities_to_process_.insert(ent);
+        if (std::binary_search(
+                visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent)
+            && !entity_buffer_infos_.contains(ent)) {
+            entities_to_process_.push_back(ent);
         }
     }
-    entities_to_process_.insert(
-        transform_pending_entities_.begin(), transform_pending_entities_.end()
-    );
+    std::sort(entities_to_process_.begin(), entities_to_process_.end());
 
-    for (entity ent : entities_to_process_) {
-        const bool has_spatial = world.template has_component<spatial_component>(ent);
-        const bool is_visible  = std::binary_search(visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent);
-        if (has_spatial && !is_visible) {
-            transform_pending_entities_.erase(ent);
+    merge_buffer_.clear();
+    merge_buffer_.reserve(entities_to_process_.size() + transform_pending_entities_.size());
+    std::set_union(
+        entities_to_process_.begin(), entities_to_process_.end(),
+        transform_pending_entities_.begin(), transform_pending_entities_.end(),
+        std::back_inserter(merge_buffer_));
+    entities_to_process_.swap(merge_buffer_);
+
+    auto vis_it = visibility_cache_.visible.cbegin();
+    auto vis_end = visibility_cache_.visible.cend();
+    size_t write_idx = 0;
+    for (size_t i = 0; i < entities_to_process_.size(); ++i) {
+        entity ent = entities_to_process_[i];
+        if (world.template has_component<spatial_component>(ent)) {
+            vis_it = std::lower_bound(vis_it, vis_end, ent);
+            if (vis_it == vis_end || *vis_it != ent) {
+                continue;
+            }
+        }
+        entities_to_process_[write_idx++] = ent;
+    }
+    entities_to_process_.resize(write_idx);
+
+    merge_buffer_.clear();
+    merge_buffer_.reserve(entities_to_process_.size());
+
+    for (size_t i = 0; i < entities_to_process_.size(); ++i) {
+        entity ent = entities_to_process_[i];
+
+        if (!entity_buffer_infos_.contains(ent)) {
             continue;
         }
 
         const bool has_model     = world.template has_component<model_component>(ent);
         const bool has_transform = world.template has_component<transform_component>(ent);
-        const bool is_renderable = has_model && has_transform;
-
-        if (entity_buffer_infos_.contains(ent) && is_renderable) {
-            if (staging_.available() < sizeof(mat4f) * 2) {
-                transform_pending_entities_.insert(ent);
-                continue;
-            }
-
-            auto& info = entity_buffer_infos_[ent];
-
-            const auto& transform_comp = world.template get_component<transform_component>(ent);
-            buffers_[info.buffer_index]->write_transform(
-                ent, transform_comp.get_world_matrix());
-
-            transform_pending_entities_.erase(ent);
+        if (!has_model || !has_transform) {
+            continue;
         }
+
+        if (staging_.available() < sizeof(mat4f) * 2) {
+            merge_buffer_.insert(
+                merge_buffer_.end(),
+                entities_to_process_.begin() + static_cast<std::ptrdiff_t>(i),
+                entities_to_process_.end());
+            break;
+        }
+
+        auto& info = entity_buffer_infos_[ent];
+        const auto& transform_comp = world.template get_component<transform_component>(ent);
+        buffers_[info.buffer_index]->write_transform(
+            ent, transform_comp.get_world_matrix());
     }
+
+    std::sort(merge_buffer_.begin(), merge_buffer_.end());
+    transform_pending_entities_.swap(merge_buffer_);
 }
 
 template <typename C>
