@@ -273,6 +273,7 @@ void debug_window<WC>::render_render_detail() {
     if (ImGui::Begin("Debug Tool - Render", &show, window_flags)) {
         show_render_detail_ = show;
         const auto& t = engine_->get_renderer().get_stats().timing;
+        const auto& eng = engine_->get_stats();
 
         auto row = [this](const char* name, float32 ms) {
             auto& max_val = metric_max_[name];
@@ -291,6 +292,8 @@ void debug_window<WC>::render_render_detail() {
             );
         };
 
+        row("begin_frame", eng.begin_frame_ms);
+        row("app_render", eng.app_render_ms);
         row("shadow_update", t.shadow_map_update_ms);
         row("buffer_pool", t.buffer_pool_update_ms);
 
@@ -312,6 +315,7 @@ void debug_window<WC>::render_render_detail() {
         row("debug", t.world_pass_debug_ms);
         row("imgui", t.world_pass_imgui_ms);
         ImGui::Unindent();
+        row("end_frame", eng.end_frame_ms);
 
         ImGui::Spacing();
         if (ImGui::Button("reset##render")) {

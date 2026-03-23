@@ -172,13 +172,13 @@ void world_grid<WC>::unload_chunk(
     if (it != chunks_.end()) {
         auto& c = it->second;
         auto id = c->get_model()->get_identity();
-        log::debug(
-            lc_wg_,
-            "UNLOAD chunk ({},{},{}) entity {}.{} model {}.{}",
-            coord.x, coord.y, coord.z,
-            c->get_entity().index, c->get_entity().generation,
-            id.index, id.generation
-        );
+        // log::debug(
+        //     lc_wg_,
+        //     "UNLOAD chunk ({},{},{}) entity {}.{} model {}.{}",
+        //     coord.x, coord.y, coord.z,
+        //     c->get_entity().index, c->get_entity().generation,
+        //     id.index, id.generation
+        // );
         chunks_.erase(it);
     }
     pending_chunks_.erase(coord);

@@ -24,13 +24,13 @@ chunk<WC>::chunk(
     guard_.template with<spatial_component>();
 
     auto id = model_->get_identity();
-    log::debug(
-        lc_chunk_,
-        "CREATE chunk ({},{},{}) entity {}.{} model {}.{}",
-        coord.x, coord.y, coord.z,
-        guard_.get_entity().index, guard_.get_entity().generation,
-        id.index, id.generation
-    );
+    // log::debug(
+    //     lc_chunk_,
+    //     "CREATE chunk ({},{},{}) entity {}.{} model {}.{}",
+    //     coord.x, coord.y, coord.z,
+    //     guard_.get_entity().index, guard_.get_entity().generation,
+    //     id.index, id.generation
+    // );
 
     auto world_pos = vec3f{
         static_cast<float32>(coord.x * size * voxel_scale),

@@ -23,6 +23,10 @@ struct engine_stats {
     float32 frame_ms        = 0.0f;
     float32 world_update_ms = 0.0f;
     float32 world_render_ms = 0.0f;
+    float32 begin_frame_ms  = 0.0f;
+    float32 app_render_ms   = 0.0f;
+    float32 renderer_ms     = 0.0f;
+    float32 end_frame_ms    = 0.0f;
     uint64 ram_usage_bytes  = 0;
     uint64 vram_usage_bytes = 0;
     world_update_stats systems;

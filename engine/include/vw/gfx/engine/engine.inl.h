@@ -148,14 +148,27 @@ void engine<WC>::render(
         1000.0f;
     stats_.systems = world_->get_update_stats();
 
+    using clock = std::chrono::high_resolution_clock;
+    auto ms = [](auto a, auto b) -> float32 {
+        return std::chrono::duration<float32>(b - a).count() * 1000.0f;
+    };
+
+    auto r0 = clock::now();
     renderer_->begin_frame();
+    auto r1 = clock::now();
     app_->render(delta_time);
     debug_tool_->render(delta_time);
+    auto r2 = clock::now();
     renderer_->render(*world_, *camera_);
+    auto r3 = clock::now();
     renderer_->end_frame();
-    const auto render_end = std::chrono::high_resolution_clock::now();
-    stats_.world_render_ms =
-        std::chrono::duration<float32>(render_end - world_update_end).count() * 1000.0f;
+    auto r4 = clock::now();
+
+    stats_.begin_frame_ms  = ms(r0, r1);
+    stats_.app_render_ms   = ms(r1, r2);
+    stats_.renderer_ms     = ms(r2, r3);
+    stats_.end_frame_ms    = ms(r3, r4);
+    stats_.world_render_ms = ms(world_update_end, r4);
 }
 
 template <typename WC>

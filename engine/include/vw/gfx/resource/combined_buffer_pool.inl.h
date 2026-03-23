@@ -139,29 +139,35 @@ void combined_buffer_pool<C>::update_meshes_(
     mesh_pending_entities_.insert(model_changed.begin(), model_changed.end());
 
     entities_to_process_.clear();
-    entities_to_process_.insert(visibility_cache_.changed.begin(), visibility_cache_.changed.end());
+    for (entity ent : visibility_cache_.changed) {
+        if (visibility_cache_.visible.contains(ent) && !entity_buffer_infos_.contains(ent)) {
+            entities_to_process_.insert(ent);
+        }
+    }
     entities_to_process_.insert(mesh_pending_entities_.begin(), mesh_pending_entities_.end());
+
+    constexpr uint32 max_mesh_writes_per_frame = 512;
+    uint32 mesh_writes = 0;
 
     for (entity ent : entities_to_process_) {
         const bool has_spatial = world.template has_component<spatial_component>(ent);
         const bool is_visible  = visibility_cache_.visible.contains(ent);
         if (has_spatial && !is_visible) {
-            log::trace(
-                lc_cbp_, "SKIP entity {}.{} not visible", ent.index, ent.generation
-            );
-            mesh_pending_entities_.erase(ent);
+            // log::trace(
+            //     lc_cbp_, "SKIP entity {}.{} not visible", ent.index, ent.generation
+            // );
             continue;
         }
 
-        bool has_model     = world.template has_component<model_component>(ent);
-        bool has_transform = world.template has_component<transform_component>(ent);
-        bool is_renderable = has_model && has_transform;
+        const bool has_model     = world.template has_component<model_component>(ent);
+        const bool has_transform = world.template has_component<transform_component>(ent);
+        const bool is_renderable = has_model && has_transform;
 
         if (!is_renderable) {
-            log::trace(
-                lc_cbp_, "SKIP entity {}.{} not renderable model={} transform={}",
-                ent.index, ent.generation, has_model, has_transform
-            );
+            // log::trace(
+            //     lc_cbp_, "SKIP entity {}.{} not renderable model={} transform={}",
+            //     ent.index, ent.generation, has_model, has_transform
+            // );
             if (entity_buffer_infos_.contains(ent)) {
                 auto& buffer_info = entity_buffer_infos_[ent];
                 auto swapped = buffers_[buffer_info.buffer_index]->free(ent);
@@ -179,19 +185,24 @@ void combined_buffer_pool<C>::update_meshes_(
 
         const auto& model_comp = world.template get_component<model_component>(ent);
         if (!model_comp.has_model()) {
-            log::trace(
-                lc_cbp_, "SKIP entity {}.{} no model ptr", ent.index, ent.generation
-            );
+            // log::trace(
+            //     lc_cbp_, "SKIP entity {}.{} no model ptr", ent.index, ent.generation
+            // );
             continue;
         }
 
         auto model_id = model_comp.get_identity();
         auto mesh_ptr = world.get_mesh_pool().get(model_id);
         if (!mesh_ptr) {
-            log::trace(
-                lc_cbp_, "SKIP entity {}.{} mesh not ready model {}.{}",
-                ent.index, ent.generation, model_id.index, model_id.generation
-            );
+            // log::trace(
+            //     lc_cbp_, "SKIP entity {}.{} mesh not ready model {}.{}",
+            //     ent.index, ent.generation, model_id.index, model_id.generation
+            // );
+            continue;
+        }
+
+        if (mesh_writes >= max_mesh_writes_per_frame) {
+            mesh_pending_entities_.insert(ent);
             continue;
         }
 
@@ -216,25 +227,26 @@ void combined_buffer_pool<C>::update_meshes_(
                 const auto& ent_alloc = buffer->get_entity_allocation(ent);
                 if (ent_alloc.model_index == model_id.index) {
                     if (staging_.available() < mesh_staging_cost) {
-                        log::trace(
-                            lc_cbp_, "DEFER entity {}.{} staging full (write_mesh)",
-                            ent.index, ent.generation
-                        );
+                        // log::trace(
+                        //     lc_cbp_, "DEFER entity {}.{} staging full (write_mesh)",
+                        //     ent.index, ent.generation
+                        // );
                         mesh_pending_entities_.insert(ent);
                         continue;
                     }
                     buffer->write_mesh(model_id, *mesh_ptr);
                     world.get_mesh_pool().evict(model_id);
                     mesh_pending_entities_.erase(ent);
+                    ++mesh_writes;
                     continue;
                 }
             }
 
             if (staging_.available() < mesh_staging_cost) {
-                log::trace(
-                    lc_cbp_, "DEFER entity {}.{} staging full (realloc)",
-                    ent.index, ent.generation
-                );
+                // log::trace(
+                //     lc_cbp_, "DEFER entity {}.{} staging full (realloc)",
+                //     ent.index, ent.generation
+                // );
                 mesh_pending_entities_.insert(ent);
                 continue;
             }
@@ -245,10 +257,10 @@ void combined_buffer_pool<C>::update_meshes_(
                 buffer->write_transform(*swapped, tc.get_world_matrix());
             }
         } else if (staging_.available() < mesh_staging_cost) {
-            log::trace(
-                lc_cbp_, "DEFER entity {}.{} staging full (new alloc)",
-                ent.index, ent.generation
-            );
+            // log::trace(
+            //     lc_cbp_, "DEFER entity {}.{} staging full (new alloc)",
+            //     ent.index, ent.generation
+            // );
             mesh_pending_entities_.insert(ent);
             continue;
         }
@@ -261,6 +273,7 @@ void combined_buffer_pool<C>::update_meshes_(
 
         entity_buffer_infos_[ent] = entity_buffer_info{required_chunk_size, buffer_index};
         mesh_pending_entities_.erase(ent);
+        ++mesh_writes;
     }
 }
 
@@ -272,7 +285,11 @@ void combined_buffer_pool<C>::update_transforms_(
     transform_pending_entities_.insert(transform_changed.begin(), transform_changed.end());
 
     entities_to_process_.clear();
-    entities_to_process_.insert(visibility_cache_.changed.begin(), visibility_cache_.changed.end());
+    for (entity ent : visibility_cache_.changed) {
+        if (visibility_cache_.visible.contains(ent) && !entity_buffer_infos_.contains(ent)) {
+            entities_to_process_.insert(ent);
+        }
+    }
     entities_to_process_.insert(
         transform_pending_entities_.begin(), transform_pending_entities_.end()
     );

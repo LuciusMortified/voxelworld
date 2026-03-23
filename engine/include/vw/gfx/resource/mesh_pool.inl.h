@@ -71,15 +71,15 @@ inline void mesh_pool::request_mesh(
     }
     pending_indices_.insert(identity.index);
 
-    log::debug(
-        lc_,
-        "Requesting mesh generation for model {}.{} with size ({},{},{})",
-        identity.index,
-        identity.generation,
-        model_ptr->width(),
-        model_ptr->height(),
-        model_ptr->depth()
-    );
+    // log::debug(
+    //     lc_,
+    //     "Requesting mesh generation for model {}.{} with size ({},{},{})",
+    //     identity.index,
+    //     identity.generation,
+    //     model_ptr->width(),
+    //     model_ptr->height(),
+    //     model_ptr->depth()
+    // );
 
     model_refs_[identity] = model_ptr;
 
@@ -146,14 +146,14 @@ inline void mesh_pool::process_completed() {
             auto identity = iter->first;
             auto data     = iter->second.get();
 
-            log::debug(
-                lc_,
-                "Completed mesh generation for model {}.{} vertices {} indices {}",
-                identity.index,
-                identity.generation,
-                data.vertices.size(),
-                data.indices.size()
-            );
+            // log::debug(
+            //     lc_,
+            //     "Completed mesh generation for model {}.{} vertices {} indices {}",
+            //     identity.index,
+            //     identity.generation,
+            //     data.vertices.size(),
+            //     data.indices.size()
+            // );
 
             meshes_[identity] = std::make_shared<mesh>(std::move(data));
 
