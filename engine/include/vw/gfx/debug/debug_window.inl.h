@@ -300,12 +300,12 @@ void debug_window<WC>::render_render_detail() {
         const auto& bp = engine_->get_renderer().get_stats().combined_buffers.timing;
         ImGui::Indent();
         row("destroyed", bp.destroyed_ms);
-        row("visibility", bp.visibility_ms);
         row("meshes", bp.meshes_ms);
         row("transforms", bp.transforms_ms);
         row("staging", bp.staging_flush_ms);
         ImGui::Unindent();
 
+        row("compute_cull", t.compute_cull_ms);
         row("shadow_pass", t.shadow_pass_ms);
         row("world_pass", t.world_pass_ms);
         ImGui::Indent();

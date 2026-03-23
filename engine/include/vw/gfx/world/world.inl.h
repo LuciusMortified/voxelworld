@@ -3,6 +3,8 @@
 #ifndef VW_GFX_WORLD_WORLD_INL_H
 #define VW_GFX_WORLD_WORLD_INL_H
 
+#include "vw/core/timing.h"
+
 namespace vw::gfx {
 
 template <typename Cs>
@@ -23,21 +25,13 @@ template <typename Cs>
 void world<Cs>::update(
     float32 delta_time
 ) {
-    using clock = std::chrono::high_resolution_clock;
-    auto measure = [](auto&& system_fn) -> float32 {
-        const auto start = clock::now();
-        system_fn();
-        const auto end = clock::now();
-        return std::chrono::duration<float32>(end - start).count() * 1000.0f;
-    };
-
     registry_.clear_changed();
-    update_stats_.transform_ms = measure([&] { transform_system_.update(); });
-    update_stats_.model_ms = measure([&] { model_system_.update(); });
-    update_stats_.spatial_ms = measure([&] { spatial_system_.update(); });
-    update_stats_.light_ms = measure([&] { light_system_.update(); });
-    update_stats_.world_grid_ms = measure([&] { world_grid_system_.update(); });
-    update_stats_.animation_ms = measure([&] { animation_system_.update(delta_time); });
+    update_stats_.transform_ms  = measure_ms([&] { transform_system_.update(); });
+    update_stats_.model_ms      = measure_ms([&] { model_system_.update(); });
+    update_stats_.spatial_ms    = measure_ms([&] { spatial_system_.update(); });
+    update_stats_.light_ms      = measure_ms([&] { light_system_.update(); });
+    update_stats_.world_grid_ms = measure_ms([&] { world_grid_system_.update(); });
+    update_stats_.animation_ms  = measure_ms([&] { animation_system_.update(delta_time); });
 }
 
 template <typename Cs>

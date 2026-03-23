@@ -7,6 +7,7 @@
 #include <numeric>
 #include <ranges>
 
+#include "vw/core/timing.h"
 #include "vw/log/logger.h"
 
 namespace vw::gfx {
@@ -60,15 +61,34 @@ template <typename C>
 void combined_buffer_pool<C>::update(
     world_type& world,
     const camera& camera,
-    std::span<const frustum> shadow_frustums,
     VkCommandBuffer cmd
 ) {
-    using clock = std::chrono::high_resolution_clock;
-
     staging_.begin_frame();
 
-    auto t0 = clock::now();
+    stats_.timing.destroyed_ms = measure_ms([&] {
+        process_destroyed_(world);
+    });
 
+    stats_.timing.meshes_ms = measure_ms([&] {
+        update_meshes_(world, camera.get_position());
+    });
+
+    stats_.timing.transforms_ms = measure_ms([&] {
+        update_transforms_(world);
+    });
+
+    stats_.timing.staging_flush_ms = measure_ms([&] {
+        staging_.flush(cmd);
+    });
+}
+
+template <typename C>
+const std::vector<std::unique_ptr<combined_buffer>>& combined_buffer_pool<C>::get_buffers() const {
+    return buffers_;
+}
+
+template <typename C>
+void combined_buffer_pool<C>::process_destroyed_(world_type& world) {
     for (auto ent : world.destroyed()) {
         if (entity_buffer_infos_.contains(ent)) {
             auto& info = entity_buffer_infos_[ent];
@@ -87,45 +107,7 @@ void combined_buffer_pool<C>::update(
         }
         sorted_erase(mesh_pending_entities_, ent);
         sorted_erase(transform_pending_entities_, ent);
-        auto vit = std::lower_bound(
-            visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent);
-        if (vit != visibility_cache_.visible.end() && *vit == ent) {
-            visibility_cache_.visible.erase(vit);
-        }
     }
-
-    auto t1 = clock::now();
-
-    const frustum& view_frustum = camera.get_frustum();
-    update_visibility_cache_(world, view_frustum, shadow_frustums);
-
-    auto t2 = clock::now();
-
-    update_meshes_(world, camera.get_position());
-
-    auto t3 = clock::now();
-
-    update_transforms_(world);
-
-    auto t4 = clock::now();
-
-    staging_.flush(cmd);
-
-    auto t5 = clock::now();
-
-    auto ms = [](auto a, auto b) {
-        return std::chrono::duration<float32>(b - a).count() * 1000.0f;
-    };
-    stats_.timing.destroyed_ms      = ms(t0, t1);
-    stats_.timing.visibility_ms     = ms(t1, t2);
-    stats_.timing.meshes_ms         = ms(t2, t3);
-    stats_.timing.transforms_ms    = ms(t3, t4);
-    stats_.timing.staging_flush_ms = ms(t4, t5);
-}
-
-template <typename C>
-const std::vector<std::unique_ptr<combined_buffer>>& combined_buffer_pool<C>::get_buffers() const {
-    return buffers_;
 }
 
 template <typename C>
@@ -173,38 +155,8 @@ void combined_buffer_pool<C>::update_meshes_(
     auto& model_changed = world.template changed<model_component>();
     sorted_merge_range(mesh_pending_entities_, model_changed.begin(), model_changed.end());
 
-    entities_to_process_.clear();
-    for (entity ent : visibility_cache_.changed) {
-        if (std::binary_search(
-                visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent)
-            && !entity_buffer_infos_.contains(ent)) {
-            entities_to_process_.push_back(ent);
-        }
-    }
-    std::sort(entities_to_process_.begin(), entities_to_process_.end());
-
-    merge_buffer_.clear();
-    merge_buffer_.reserve(entities_to_process_.size() + mesh_pending_entities_.size());
-    std::set_union(
-        entities_to_process_.begin(), entities_to_process_.end(),
-        mesh_pending_entities_.begin(), mesh_pending_entities_.end(),
-        std::back_inserter(merge_buffer_));
-    entities_to_process_.swap(merge_buffer_);
-
-    auto vis_it = visibility_cache_.visible.cbegin();
-    auto vis_end = visibility_cache_.visible.cend();
-    size_t write_idx = 0;
-    for (size_t i = 0; i < entities_to_process_.size(); ++i) {
-        entity ent = entities_to_process_[i];
-        if (world.template has_component<spatial_component>(ent)) {
-            vis_it = std::lower_bound(vis_it, vis_end, ent);
-            if (vis_it == vis_end || *vis_it != ent) {
-                continue;
-            }
-        }
-        entities_to_process_[write_idx++] = ent;
-    }
-    entities_to_process_.resize(write_idx);
+    entities_to_process_.assign(
+        mesh_pending_entities_.begin(), mesh_pending_entities_.end());
 
     std::sort(entities_to_process_.begin(), entities_to_process_.end(),
         [&](entity a, entity b) {
@@ -350,38 +302,8 @@ void combined_buffer_pool<C>::update_transforms_(
     sorted_merge_range(
         transform_pending_entities_, transform_changed.begin(), transform_changed.end());
 
-    entities_to_process_.clear();
-    for (entity ent : visibility_cache_.changed) {
-        if (std::binary_search(
-                visibility_cache_.visible.begin(), visibility_cache_.visible.end(), ent)
-            && !entity_buffer_infos_.contains(ent)) {
-            entities_to_process_.push_back(ent);
-        }
-    }
-    std::sort(entities_to_process_.begin(), entities_to_process_.end());
-
-    merge_buffer_.clear();
-    merge_buffer_.reserve(entities_to_process_.size() + transform_pending_entities_.size());
-    std::set_union(
-        entities_to_process_.begin(), entities_to_process_.end(),
-        transform_pending_entities_.begin(), transform_pending_entities_.end(),
-        std::back_inserter(merge_buffer_));
-    entities_to_process_.swap(merge_buffer_);
-
-    auto vis_it = visibility_cache_.visible.cbegin();
-    auto vis_end = visibility_cache_.visible.cend();
-    size_t write_idx = 0;
-    for (size_t i = 0; i < entities_to_process_.size(); ++i) {
-        entity ent = entities_to_process_[i];
-        if (world.template has_component<spatial_component>(ent)) {
-            vis_it = std::lower_bound(vis_it, vis_end, ent);
-            if (vis_it == vis_end || *vis_it != ent) {
-                continue;
-            }
-        }
-        entities_to_process_[write_idx++] = ent;
-    }
-    entities_to_process_.resize(write_idx);
+    entities_to_process_.assign(
+        transform_pending_entities_.begin(), transform_pending_entities_.end());
 
     merge_buffer_.clear();
     merge_buffer_.reserve(entities_to_process_.size());
@@ -419,40 +341,6 @@ void combined_buffer_pool<C>::update_transforms_(
 
     std::sort(merge_buffer_.begin(), merge_buffer_.end());
     transform_pending_entities_.swap(merge_buffer_);
-}
-
-template <typename C>
-void combined_buffer_pool<C>::update_visibility_cache_(
-    world_type& world, const frustum& view_frustum, std::span<const frustum> shadow_frustums
-) {
-    auto& spatial_system = world.get_spatial_system();
-
-    constexpr float angle_threshold    = math::radians(2.f);
-    constexpr float distance_threshold = 0.5f;
-
-    const bool has_spatial_changed = !world.template changed<spatial_component>().empty();
-
-    const bool frustum_changed = !visibility_cache_.view_frustum.approximately_equal(
-        view_frustum, angle_threshold, distance_threshold
-    );
-
-    visibility_cache_.changed.clear();
-    if (frustum_changed || has_spatial_changed) {
-        all_frustums_.clear();
-        all_frustums_.push_back(view_frustum);
-        all_frustums_.insert(
-            all_frustums_.end(), shadow_frustums.begin(), shadow_frustums.end());
-
-        spatial_system.query_all_any(all_frustums_, visibility_cache_.tmp_visible);
-
-        std::set_symmetric_difference(
-            visibility_cache_.visible.begin(), visibility_cache_.visible.end(),
-            visibility_cache_.tmp_visible.begin(), visibility_cache_.tmp_visible.end(),
-            std::back_inserter(visibility_cache_.changed));
-
-        visibility_cache_.visible.swap(visibility_cache_.tmp_visible);
-        visibility_cache_.view_frustum = view_frustum;
-    }
 }
 
 template <typename C>

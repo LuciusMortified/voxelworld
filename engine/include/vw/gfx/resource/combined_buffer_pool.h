@@ -8,13 +8,11 @@
 #include <chrono>
 #include <map>
 #include <memory>
-#include <span>
 #include <unordered_map>
 #include <vector>
 
 #include "vw/gfx/resource/combined_buffer.h"
 #include "vw/gfx/resource/staging_buffer.h"
-#include "vw/gfx/spatial/frustum.h"
 #include "vw/gfx/world/entity.h"
 #include "vw/gfx/world/world.h"
 
@@ -28,9 +26,8 @@ struct entity_buffer_info {
 };
 
 struct buffer_pool_timing_stats {
-    float32 destroyed_ms    = 0.0f;
-    float32 visibility_ms   = 0.0f;
-    float32 meshes_ms       = 0.0f;
+    float32 destroyed_ms     = 0.0f;
+    float32 meshes_ms        = 0.0f;
     float32 transforms_ms    = 0.0f;
     float32 staging_flush_ms = 0.0f;
 };
@@ -48,13 +45,6 @@ struct combined_buffer_pool_stats {
     uint32 instance_count    = 0;
     std::vector<combined_buffer_stats> buffers;
     buffer_pool_timing_stats timing;
-};
-
-struct visibility_cache {
-    frustum view_frustum;
-    std::vector<entity> visible;
-    std::vector<entity> tmp_visible;
-    std::vector<entity> changed;
 };
 
 template <typename C>
@@ -78,7 +68,6 @@ public:
     void update(
         world_type& world,
         const camera& camera,
-        std::span<const frustum> shadow_frustums,
         VkCommandBuffer cmd
     );
 
@@ -93,13 +82,9 @@ public:
 private:
     auto get_or_create_buffer(const buffer_chunk_size& chunk_size) -> combined_buffer*;
 
+    void process_destroyed_(world_type& world);
     void update_meshes_(world_type& world, const vec3f& camera_pos);
     void update_transforms_(world_type& world);
-    void update_visibility_cache_(
-        world_type& world,
-        const frustum& view_frustum,
-        std::span<const frustum> shadow_frustums
-    );
 
     vulkan_context* context_;
     staging_buffer staging_;
@@ -111,14 +96,10 @@ private:
     VkDescriptorSetLayout descriptor_set_layout_          = VK_NULL_HANDLE;
     VkDescriptorSetLayout compute_descriptor_set_layout_  = VK_NULL_HANDLE;
 
-    visibility_cache visibility_cache_{};
     std::vector<entity> entities_to_process_;
-
     std::vector<entity> mesh_pending_entities_;
     std::vector<entity> transform_pending_entities_;
     std::vector<entity> merge_buffer_;
-
-    std::vector<frustum> all_frustums_;
 
     mutable combined_buffer_pool_stats stats_;
 };

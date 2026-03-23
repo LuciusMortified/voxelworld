@@ -6,6 +6,8 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
 
+#include "vw/core/timing.h"
+
 namespace vw::gfx {
 
 template <typename C>
@@ -258,88 +260,73 @@ void renderer<C>::render(
         throw std::runtime_error("Failed to begin recording command buffer!");
     }
 
-    using clock = std::chrono::high_resolution_clock;
-    auto t0 = clock::now();
+    stats_.timing.shadow_map_update_ms = measure_ms([&] {
+        shadow_map_->update(camera, directional_light_settings_.direction);
+    });
 
-    shadow_map_->update(camera, directional_light_settings_.direction);
     const auto& cascade_frustums = shadow_map_->get_cascade_frustums();
 
-    auto t1 = clock::now();
-
-    combined_buffer_pool_->update(
-        world, camera, cascade_frustums, command_buffers_[current_image_index_]
-    );
-
-    auto t2 = clock::now();
-
-    {
-        VkMemoryBarrier barrier{};
-        barrier.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask =                    //
-            VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |  //
-            VK_ACCESS_INDEX_READ_BIT |             //
-            VK_ACCESS_INDIRECT_COMMAND_READ_BIT |  //
-            VK_ACCESS_SHADER_READ_BIT;
-        constexpr auto stage_mask =                //
-            VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |   //
-            VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT |  //
-            VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |  //
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
-        vkCmdPipelineBarrier(
-            command_buffers_[current_image_index_],
-            VK_PIPELINE_STAGE_TRANSFER_BIT,
-            stage_mask,
-            0,
-            1,
-            &barrier,
-            0,
-            nullptr,
-            0,
-            nullptr
+    stats_.timing.buffer_pool_update_ms = measure_ms([&] {
+        combined_buffer_pool_->update(
+            world, camera, command_buffers_[current_image_index_]
         );
-    }
+    });
 
-    const frustum& view_frustum = camera.get_frustum();
-    cull_pipeline_->update_frustums(current_frame_, view_frustum, cascade_frustums);
-
-    for (const auto& buffer : combined_buffer_pool_->get_buffers()) {
-        if (!buffer->is_empty()) {
-            cull_pipeline_->dispatch(
-                command_buffers_[current_image_index_], *buffer, current_frame_
+    stats_.timing.compute_cull_ms = measure_ms([&] {
+        {
+            VkMemoryBarrier barrier{};
+            barrier.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask =                    //
+                VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |  //
+                VK_ACCESS_INDEX_READ_BIT |             //
+                VK_ACCESS_INDIRECT_COMMAND_READ_BIT |  //
+                VK_ACCESS_SHADER_READ_BIT;
+            constexpr auto stage_mask =                //
+                VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |   //
+                VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT |  //
+                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |  //
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+            vkCmdPipelineBarrier(
+                command_buffers_[current_image_index_],
+                VK_PIPELINE_STAGE_TRANSFER_BIT,
+                stage_mask,
+                0, 1, &barrier, 0, nullptr, 0, nullptr
             );
         }
-    }
 
-    {
-        VkMemoryBarrier compute_barrier{};
-        compute_barrier.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
-        compute_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-        compute_barrier.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
-        vkCmdPipelineBarrier(
-            command_buffers_[current_image_index_],
-            VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-            VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
-            0, 1, &compute_barrier, 0, nullptr, 0, nullptr
-        );
-    }
+        const frustum& view_frustum = camera.get_frustum();
+        cull_pipeline_->update_frustums(current_frame_, view_frustum, cascade_frustums);
 
-    render_shadow_pass(world, camera);
+        for (const auto& buffer : combined_buffer_pool_->get_buffers()) {
+            if (!buffer->is_empty()) {
+                cull_pipeline_->dispatch(
+                    command_buffers_[current_image_index_], *buffer, current_frame_
+                );
+            }
+        }
 
-    auto t3 = clock::now();
+        {
+            VkMemoryBarrier compute_barrier{};
+            compute_barrier.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+            compute_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+            compute_barrier.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+            vkCmdPipelineBarrier(
+                command_buffers_[current_image_index_],
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+                0, 1, &compute_barrier, 0, nullptr, 0, nullptr
+            );
+        }
+    });
 
-    render_world_pass(world, camera);
+    stats_.timing.shadow_pass_ms = measure_ms([&] {
+        render_shadow_pass(world, camera);
+    });
 
-    auto t4 = clock::now();
-
-    stats_.timing.shadow_map_update_ms =
-        std::chrono::duration<float32>(t1 - t0).count() * 1000.0f;
-    stats_.timing.buffer_pool_update_ms =
-        std::chrono::duration<float32>(t2 - t1).count() * 1000.0f;
-    stats_.timing.shadow_pass_ms =
-        std::chrono::duration<float32>(t3 - t2).count() * 1000.0f;
-    stats_.timing.world_pass_ms =
-        std::chrono::duration<float32>(t4 - t3).count() * 1000.0f;
+    stats_.timing.world_pass_ms = measure_ms([&] {
+        render_world_pass(world, camera);
+    });
 
     if (vkEndCommandBuffer(command_buffers_[current_image_index_]) != VK_SUCCESS) {
         throw std::runtime_error("Failed to record command buffer!");
@@ -1463,12 +1450,9 @@ template <typename WC>
 void renderer<WC>::render_world_pass(
     world_type& world, const camera& camera
 ) {
-    using clock = std::chrono::high_resolution_clock;
-    auto wp0 = clock::now();
-
-    update_uniform_buffer(camera);
-
-    auto wp1 = clock::now();
+    stats_.timing.world_pass_uniform_ms = measure_ms([&] {
+        update_uniform_buffer(camera);
+    });
 
     VkRenderPassBeginInfo render_pass_info{};
     render_pass_info.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1504,32 +1488,23 @@ void renderer<WC>::render_world_pass(
 
     vkCmdSetScissor(command_buffers_[current_image_index_], 0, 1, &scissor);
 
-    render_world(world, camera);
-
-    auto wp2 = clock::now();
-
-    vkCmdNextSubpass(command_buffers_[current_image_index_], VK_SUBPASS_CONTENTS_INLINE);
-
-    render_debug_primitives();
-
-    auto wp3 = clock::now();
+    stats_.timing.world_pass_geometry_ms = measure_ms([&] {
+        render_world(world, camera);
+    });
 
     vkCmdNextSubpass(command_buffers_[current_image_index_], VK_SUBPASS_CONTENTS_INLINE);
 
-    render_imgui();
+    stats_.timing.world_pass_debug_ms = measure_ms([&] {
+        render_debug_primitives();
+    });
 
-    auto wp4 = clock::now();
+    vkCmdNextSubpass(command_buffers_[current_image_index_], VK_SUBPASS_CONTENTS_INLINE);
+
+    stats_.timing.world_pass_imgui_ms = measure_ms([&] {
+        render_imgui();
+    });
 
     vkCmdEndRenderPass(command_buffers_[current_image_index_]);
-
-    stats_.timing.world_pass_uniform_ms =
-        std::chrono::duration<float32>(wp1 - wp0).count() * 1000.0f;
-    stats_.timing.world_pass_geometry_ms =
-        std::chrono::duration<float32>(wp2 - wp1).count() * 1000.0f;
-    stats_.timing.world_pass_debug_ms =
-        std::chrono::duration<float32>(wp3 - wp2).count() * 1000.0f;
-    stats_.timing.world_pass_imgui_ms =
-        std::chrono::duration<float32>(wp4 - wp3).count() * 1000.0f;
 }
 
 template <typename WC>

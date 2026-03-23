@@ -70,6 +70,7 @@ struct push_constant_data {
 struct render_timing_stats {
     float32 shadow_map_update_ms    = 0.0f;
     float32 buffer_pool_update_ms   = 0.0f;
+    float32 compute_cull_ms         = 0.0f;
     float32 shadow_pass_ms          = 0.0f;
     float32 world_pass_ms           = 0.0f;
     float32 world_pass_uniform_ms   = 0.0f;
