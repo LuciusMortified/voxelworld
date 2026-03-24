@@ -32,6 +32,14 @@ struct directional_light_settings {
     float32 intensity{1.0f};
 };
 
+// Настройки тумана (для CPU)
+struct fog_settings {
+    vec3f color{0.1f, 0.1f, 0.1f};
+    float32 near_distance{256.0f};
+    float32 far_distance{512.0f};
+    bool enabled{true};
+};
+
 // Для directional light (в UBO)
 struct directional_light_data {
     alignas(16) mat4f light_space_matrices[shadow_map::cascade_count];
@@ -39,6 +47,13 @@ struct directional_light_data {
     alignas(16) vec3f direction;
     alignas(16) vec3f color;
     alignas(4) float32 intensity;
+};
+
+struct fog_data {
+    alignas(16) vec3f color;
+    alignas(4) float32 near_distance;
+    alignas(4) float32 far_distance;
+    alignas(4) uint32 enabled;
 };
 
 struct uniform_buffer_object {
@@ -52,6 +67,9 @@ struct uniform_buffer_object {
 
     // Point lights count (для расширяемости)
     alignas(4) uint32 point_lights_count{0};
+
+    // Fog
+    alignas(16) fog_data fog;
 };
 
 struct shadow_push_constant_data {
@@ -142,6 +160,7 @@ public:
     );
 
     [[nodiscard]] auto get_directional_light_settings() -> directional_light_settings&;
+    [[nodiscard]] auto get_fog_settings() -> fog_settings&;
 
     // Получить ImTextureID для shadow map (для отображения в ImGui::Image)
     // В Vulkan это VkDescriptorSet, приведенный к void*
@@ -338,6 +357,9 @@ private:
 
     // Настройки directional light
     directional_light_settings directional_light_settings_;
+
+    // Настройки тумана
+    fog_settings fog_settings_;
 
     // Статистика
     mutable renderer_stats stats_;

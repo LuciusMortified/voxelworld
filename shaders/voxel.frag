@@ -14,12 +14,20 @@ struct DirectionalLightData {
     float intensity;
 };
 
+struct FogData {
+    vec3 color;
+    float near_distance;
+    float far_distance;
+    uint enabled;
+};
+
 layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 view;
     mat4 proj;
     vec3 viewPos;
     DirectionalLightData directional_light;
     uint point_lights_count;
+    FogData fog;
 } ubo;
 
 layout(set = 2, binding = 0) uniform sampler2DArrayShadow shadowMapArray;
@@ -248,6 +256,15 @@ void main() {
 
     // Применяем edge enhancement
     result += edgeEnhancement * fragColor;
+
+    // Linear fog
+    if (ubo.fog.enabled != 0u) {
+        float fogFactor = clamp(
+            (ubo.fog.far_distance - viewDepth) / (ubo.fog.far_distance - ubo.fog.near_distance),
+            0.0, 1.0
+        );
+        result = mix(ubo.fog.color, result, fogFactor);
+    }
 
     outColor = vec4(result, 1.0);
 }

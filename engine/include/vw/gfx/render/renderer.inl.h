@@ -212,6 +212,11 @@ auto renderer<C>::get_directional_light_settings() -> directional_light_settings
 }
 
 template <typename C>
+auto renderer<C>::get_fog_settings() -> fog_settings& {
+    return fog_settings_;
+}
+
+template <typename C>
 void renderer<C>::set_clear_color(
     float r, float g, float b, float a
 ) {
@@ -1658,6 +1663,12 @@ void renderer<C>::update_uniform_buffer(
 
     // Point lights count
     ubo.point_lights_count = light_buffer_->get_lights_count();
+
+    // Fog
+    ubo.fog.color         = fog_settings_.color;
+    ubo.fog.near_distance = fog_settings_.near_distance;
+    ubo.fog.far_distance  = fog_settings_.far_distance;
+    ubo.fog.enabled       = fog_settings_.enabled ? 1u : 0u;
 
     uniform_buffers_[current_frame_]->copy_from_struct(ubo);
 }

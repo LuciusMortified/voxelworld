@@ -1,6 +1,8 @@
 #include <vw/core.h>
 #include <vw/gfx.h>
 
+#include <algorithm>
+
 #include "vw/gfx/world/entity_guard.h"
 #include "vw/gfx/world_grid/generators/perlin_world_grid_generator.h"
 #include "vw/gfx/world_grid/world_grid.h"
@@ -32,15 +34,18 @@ public:
         get_engine().get_renderer().set_clear_color(0.4f, 0.6f, 0.9f, 1.0f);
         get_engine().get_debug_tool().set_visible(true);
 
+        auto& fog = get_engine().get_renderer().get_fog_settings();
+        fog.color = {0.4f, 0.6f, 0.9f};
+        fog.near_distance = 6 * 64 * 8;
+        fog.far_distance = 9 * 64 * 8;
+
         setup_world_grid();
 
         float32 max_surface_y = std::numeric_limits<float32>::lowest();
         for (int32 x = -1; x <= 1; ++x) {
             for (int32 z = -1; z <= 1; ++z) {
                 auto surface_y = static_cast<float32>(generator_->surface_height_at(x, z));
-                if (surface_y > max_surface_y) {
-                    max_surface_y = surface_y;
-                }
+                max_surface_y  = std::max(surface_y, max_surface_y);
             }
         }
 
@@ -77,10 +82,12 @@ private:
         auto& world       = get_engine().get_world();
         auto& grid_system = world.get_world_grid_system();
 
-        generator_params_ = {};
-        auto generator    = std::make_unique<gfx::perlin_world_grid_generator>(generator_params_);
-        generator_        = generator.get();
-        world_grid_       = std::make_shared<gfx::world_grid<>>(
+        generator_params_ = {
+            .voxel_scale = 8,
+        };
+        auto generator = std::make_unique<gfx::perlin_world_grid_generator>(generator_params_);
+        generator_     = generator.get();
+        world_grid_    = std::make_shared<gfx::world_grid<>>(
             world, std::move(generator), generator_params_.voxel_scale
         );
         grid_system.set_world_grid(world_grid_);
