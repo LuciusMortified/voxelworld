@@ -40,5 +40,5 @@ vcpkg_installed/
 # Пользовательские настройки
 *.user
 .cache/
-.claude/
+.claude/settings.local.json
 
