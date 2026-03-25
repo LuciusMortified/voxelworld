@@ -33,7 +33,7 @@ struct block_id {
 
 struct block_type {
     block_id id = block_id{0};
-    color color = colors::empty;
+    color clr = colors::empty;
     uint8 flags = block_flags::none;
 };
 

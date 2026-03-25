@@ -85,14 +85,14 @@ inline auto block_registry::get(
 inline auto block_registry::get_color(
     block_id id
 ) const -> color {
-    return blocks_[id.value].color;
+    return blocks_[id.value].clr;
 }
 
 inline auto block_registry::find_by_color(
     color c
 ) const -> block_id {
     for (const auto& block : blocks_) {
-        if (block.color == c && block.id != blocks::air) {
+        if (block.clr == c && block.id != blocks::air) {
             return block.id;
         }
     }

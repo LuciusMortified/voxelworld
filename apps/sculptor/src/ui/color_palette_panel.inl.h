@@ -69,7 +69,7 @@ inline void color_palette_panel::render(
             ImGuiColorEditFlags_NoPicker |         //
             ImGuiColorEditFlags_NoBorder;
 
-        const ImVec4 clr_imvec4 = to_imvec4(block.color);
+        const ImVec4 clr_imvec4 = to_imvec4(block.clr);
         if (ImGui::ColorButton("##block", clr_imvec4, btn_flags, ImVec2(30.0f, 30.0f))) {
             state_->tool.selected_block = block.id;
         }
