@@ -15,7 +15,7 @@ constexpr log::log_category lc_wg_{"world_grid"};
 
 template <typename WC>
 world_grid<WC>::world_grid(
-    world_type& world, std::unique_ptr<world_grid_generator> generator, int32 voxel_scale
+    world_type& world, std::unique_ptr<terrain_generator> generator, int32 voxel_scale
 )
     : world_(&world), voxel_scale_(voxel_scale), generator_(std::move(generator)) {
     auto count = std::min(std::thread::hardware_concurrency(), 4u);
@@ -56,6 +56,45 @@ auto world_grid<WC>::get_voxel(
 }
 
 template <typename WC>
+auto world_grid<WC>::get_surface_y(
+    int32 wx, int32 wz
+) const -> std::optional<int32> {
+    constexpr int32 s = chunk<WC>::size;
+
+    auto floor_div = [](int32 a, int32 b) -> int32 { return a >= 0 ? a / b : (a - b + 1) / b; };
+    int32 cx = floor_div(wx, s);
+    int32 cz = floor_div(wz, s);
+    vec2i col_coord{cx, cz};
+
+    auto col_it = column_chunks_.find(col_coord);
+    if (col_it == column_chunks_.end() || col_it->second.empty()) {
+        return std::nullopt;
+    }
+
+    const auto& y_levels = col_it->second;
+
+    int32 local_x = ((wx % s) + s) % s;
+    int32 local_z = ((wz % s) + s) % s;
+
+    for (auto it = y_levels.rbegin(); it != y_levels.rend(); ++it) {
+        int32 cy = *it;
+        vec3i chunk_coord{cx, cy, cz};
+        auto chunk_it = chunks_.find(chunk_coord);
+        if (chunk_it == chunks_.end()) {
+            continue;
+        }
+
+        for (int32 local_y = s - 1; local_y >= 0; --local_y) {
+            if (!chunk_it->second->get_voxel(local_x, local_y, local_z).is_empty()) {
+                return (cy * s) + local_y;
+            }
+        }
+    }
+
+    return std::nullopt;
+}
+
+template <typename WC>
 void world_grid<WC>::set_voxel(
     vec3i world_pos, const voxel& v
 ) {
@@ -84,13 +123,25 @@ auto world_grid<WC>::get_chunk(
 }
 
 template <typename WC>
+auto world_grid<WC>::has_column(
+    vec2i coord
+) const -> bool {
+    return column_chunks_.contains(coord);
+}
+
+template <typename WC>
+auto world_grid<WC>::get_loaded_column_count() const -> uint32 {
+    return static_cast<uint32>(column_chunks_.size());
+}
+
+template <typename WC>
 auto world_grid<WC>::get_loaded_chunk_count() const -> uint32 {
     return static_cast<uint32>(chunks_.size());
 }
 
 template <typename WC>
-auto world_grid<WC>::get_pending_chunk_count() const -> uint32 {
-    return static_cast<uint32>(pending_chunks_.size());
+auto world_grid<WC>::get_pending_column_count() const -> uint32 {
+    return static_cast<uint32>(pending_columns_.size());
 }
 
 template <typename WC>
@@ -99,10 +150,10 @@ auto world_grid<WC>::get_deferred_remesh_count() const -> uint32 {
 }
 
 template <typename WC>
-auto world_grid<WC>::is_pending(
-    vec3i chunk_coord
+auto world_grid<WC>::is_column_pending(
+    vec2i coord
 ) const -> bool {
-    return pending_chunks_.contains(chunk_coord);
+    return pending_columns_.contains(coord);
 }
 
 template <typename WC>
@@ -111,7 +162,7 @@ auto world_grid<WC>::voxel_scale() const -> int32 {
 }
 
 template <typename WC>
-auto world_grid<WC>::get_generator() -> world_grid_generator& {
+auto world_grid<WC>::get_terrain_generator() const -> terrain_generator& {
     return *generator_;
 }
 
@@ -144,14 +195,14 @@ auto world_grid<WC>::chunk_to_world_coord(
 }
 
 template <typename WC>
-auto world_grid<WC>::request_chunk(
-    vec3i coord
+auto world_grid<WC>::request_column(
+    vec2i coord
 ) -> bool {
-    if (chunks_.contains(coord) || pending_chunks_.contains(coord)) {
+    if (column_chunks_.contains(coord) || pending_columns_.contains(coord)) {
         return false;
     }
 
-    pending_chunks_.insert(coord);
+    pending_columns_.insert(coord);
 
     {
         std::scoped_lock lock(gen_mutex_);
@@ -162,23 +213,18 @@ auto world_grid<WC>::request_chunk(
 }
 
 template <typename WC>
-void world_grid<WC>::unload_chunk(
-    vec3i coord
+void world_grid<WC>::unload_column(
+    vec2i coord
 ) {
-    auto it = chunks_.find(coord);
-    if (it != chunks_.end()) {
-        auto& c = it->second;
-        auto id = c->get_model()->get_identity();
-        // log::debug(
-        //     lc_wg_,
-        //     "UNLOAD chunk ({},{},{}) entity {}.{} model {}.{}",
-        //     coord.x, coord.y, coord.z,
-        //     c->get_entity().index, c->get_entity().generation,
-        //     id.index, id.generation
-        // );
-        chunks_.erase(it);
+    auto col_it = column_chunks_.find(coord);
+    if (col_it != column_chunks_.end()) {
+        for (int32 y : col_it->second) {
+            vec3i chunk_coord{coord.x, y, coord.y};
+            chunks_.erase(chunk_coord);
+        }
+        column_chunks_.erase(col_it);
     }
-    pending_chunks_.erase(coord);
+    pending_columns_.erase(coord);
 }
 
 template <typename WC>
@@ -188,7 +234,7 @@ auto world_grid<WC>::get_completed_stats() const -> const completed_stats& {
 
 template <typename WC>
 void world_grid<WC>::process_completed() {
-    static constexpr int32 max_chunks_per_frame = 4;
+    static constexpr int32 max_columns_per_frame = 4;
     static constexpr vec3i neighbor_offsets[6]  = {
         {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
     };
@@ -196,63 +242,74 @@ void world_grid<WC>::process_completed() {
     float32 boundary_from_total = 0.0f;
     float32 chunk_create_total  = 0.0f;
     float32 boundary_to_total   = 0.0f;
-    int32 processed             = 0;
+    int32 processed_columns     = 0;
+    int32 processed_chunks      = 0;
 
-    while (processed < max_chunks_per_frame) {
-        chunk_data cd{.coord = {}, .chunk_model = nullptr};
+    while (processed_columns < max_columns_per_frame) {
+        std::unique_ptr<gen_column> col;
         {
             std::scoped_lock lock(completed_mutex_);
             if (completed_queue_.empty()) {
                 break;
             }
-            cd = std::move(completed_queue_.front());
+            col = std::move(completed_queue_.front());
             completed_queue_.pop();
         }
 
-        if (!pending_chunks_.contains(cd.coord)) {
+        auto col_coord = col->get_coord();
+        if (!pending_columns_.contains(col_coord)) {
             continue;
         }
 
-        pending_chunks_.erase(cd.coord);
+        pending_columns_.erase(col_coord);
 
-        boundary_from_total += measure_ms([&] {
-            for (int fd = 0; fd < 6; ++fd) {
-                auto* neighbor = get_chunk(cd.coord + neighbor_offsets[fd]);
-                if (neighbor) {
-                    cd.chunk_model->set_boundary_slice(fd, *neighbor->get_model());
+        std::vector<int32> y_levels;
+
+        for (auto& [y, cd] : col->get_all_chunk_data()) {
+            boundary_from_total += measure_ms([&] -> auto {
+                for (int fd = 0; fd < 6; ++fd) {
+                    auto* neighbor = get_chunk(cd.coord + neighbor_offsets[fd]);
+                    if (neighbor) {
+                        cd.chunk_model->set_boundary_slice(fd, *neighbor->get_model());
+                    }
                 }
-            }
-        });
+            });
 
-        chunk_create_total += measure_ms([&] {
-            chunks_.emplace(
-                cd.coord,
-                std::make_unique<chunk<WC>>(
-                    *world_, cd.coord, std::move(cd.chunk_model), voxel_scale_)
-            );
-        });
+            chunk_create_total += measure_ms([&] -> auto {
+                chunks_.emplace(
+                    cd.coord,
+                    std::make_unique<chunk<WC>>(
+                        *world_, cd.coord, std::move(cd.chunk_model), voxel_scale_)
+                );
+            });
 
-        boundary_to_total += measure_ms([&] {
-            auto* created = get_chunk(cd.coord);
-            for (int fd = 0; fd < 6; ++fd) {
-                auto* neighbor = get_chunk(cd.coord + neighbor_offsets[fd]);
-                if (neighbor) {
-                    int opposite_fd = fd ^ 1;
-                    neighbor->get_model()->set_boundary_slice(
-                        opposite_fd, *created->get_model());
-                    deferred_remeshes_.push({cd.coord + neighbor_offsets[fd], opposite_fd});
+            boundary_to_total += measure_ms([&] -> auto {
+                auto* created = get_chunk(cd.coord);
+                for (int fd = 0; fd < 6; ++fd) {
+                    auto* neighbor = get_chunk(cd.coord + neighbor_offsets[fd]);
+                    if (neighbor) {
+                        int opposite_fd = fd ^ 1;
+                        neighbor->get_model()->set_boundary_slice(
+                            opposite_fd, *created->get_model());
+                        deferred_remeshes_.push({cd.coord + neighbor_offsets[fd], opposite_fd});
+                    }
                 }
-            }
-        });
+            });
 
-        ++processed;
+            y_levels.push_back(y);
+            ++processed_chunks;
+        }
+
+        std::sort(y_levels.begin(), y_levels.end());
+        column_chunks_[col_coord] = std::move(y_levels);
+        ++processed_columns;
     }
 
-    completed_stats_.deferred_ms        = measure_ms([&] { process_deferred_remeshes(); });
+    completed_stats_.deferred_ms        = measure_ms([&] -> auto { process_deferred_remeshes(); });
     completed_stats_.boundary_from_ms   = boundary_from_total;
     completed_stats_.chunk_create_ms    = chunk_create_total;
     completed_stats_.boundary_to_ms     = boundary_to_total;
-    completed_stats_.chunks_processed   = static_cast<uint32>(processed);
+    completed_stats_.chunks_processed   = static_cast<uint32>(processed_chunks);
     completed_stats_.remeshes_processed = 0;
 }
 
@@ -297,12 +354,26 @@ void world_grid<WC>::gen_thread_function() {
             }
         }
 
-        auto result = generator_->generate_chunk(task.coord);
-        result.chunk_model->compute_own_boundaries();
+        auto col = std::make_unique<gen_column>(task.coord.x, task.coord.y);
+
+        terrain_context ctx{
+            .cx = task.coord.x,
+            .cz = task.coord.y,
+            .create_chunk = [&col](int32 y) -> chunk_data& {
+                return col->create_chunk(y, chunk_data{});
+            }
+        };
+
+        generator_->generate(ctx);
+        col->set_phase(column_phase::terrain);
+
+        for (auto& [y, cd] : col->get_all_chunk_data()) {
+            cd.chunk_model->compute_own_boundaries();
+        }
 
         {
             std::scoped_lock lock(completed_mutex_);
-            completed_queue_.push(std::move(result));
+            completed_queue_.push(std::move(col));
         }
     }
 }

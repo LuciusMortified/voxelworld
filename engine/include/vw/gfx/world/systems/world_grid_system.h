@@ -16,7 +16,7 @@ namespace vw::gfx {
 
 struct world_grid_system_stats {
     float32 process_completed_ms = 0.0f;
-    float32 request_chunks_ms    = 0.0f;
+    float32 request_columns_ms   = 0.0f;
     float32 rebuild_active_ms    = 0.0f;
     float32 unload_ms            = 0.0f;
     uint32 active_count          = 0;
@@ -55,14 +55,19 @@ public:
 
 private:
     auto process_dirty_entity(entity ent) -> bool;
+    void dispatch_column_requests();
+    void update_grid_stats();
+    auto process_dirty_entities() -> bool;
+    auto rebuild_active_set() -> vec2i;
+    void unload_inactive_columns();
 
-    void rebuild_pending_requests(vec3i camera_chunk);
+    void rebuild_pending_requests(vec2i camera_column);
 
     registry_type* registry_;
     std::shared_ptr<world_grid<WC>> world_grid_;
-    std::unordered_set<vec3i> active_chunks_;
-    std::unordered_set<vec3i> pending_active_chunks_;
-    std::vector<vec3i> pending_requests_;
+    std::unordered_set<vec2i> active_columns_;
+    std::unordered_set<vec2i> pending_active_columns_;
+    std::vector<vec2i> pending_requests_;
     world_grid_system_stats stats_;
 };
 

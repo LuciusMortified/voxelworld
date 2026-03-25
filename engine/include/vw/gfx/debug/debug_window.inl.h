@@ -194,7 +194,7 @@ void debug_window<WC>::render_systems_detail() {
             ImGui::Unindent();
         }
 
-        row("requests", wgs.request_chunks_ms);
+        row("requests", wgs.request_columns_ms);
         row("rebuild", wgs.rebuild_active_ms);
         row("unload", wgs.unload_ms);
         ImGui::Text("active:%u loaded:%u pending:%u remesh:%u",
