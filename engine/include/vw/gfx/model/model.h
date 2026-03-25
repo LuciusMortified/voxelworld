@@ -30,11 +30,11 @@ struct page_entry {
     uint32 data = 0;
 
     [[nodiscard]] auto mode() const -> page_mode;
-    [[nodiscard]] auto fill_id() const -> uint8;
+    [[nodiscard]] auto fill_id() const -> block_id;
     [[nodiscard]] auto pool_index() const -> uint32;
 
     static auto make_empty() -> page_entry;
-    static auto make_uniform(uint8 id) -> page_entry;
+    static auto make_uniform(block_id id) -> page_entry;
     static auto make_sparse(uint32 index) -> page_entry;
 };
 
@@ -82,7 +82,7 @@ public:
     using page_type = std::array<voxel, page_volume>;
 
     [[nodiscard]] auto get_page_mode(int px, int py, int pz) const -> page_mode;
-    [[nodiscard]] auto get_page_fill_id(int px, int py, int pz) const -> uint8;
+    [[nodiscard]] auto get_page_fill_id(int px, int py, int pz) const -> block_id;
     [[nodiscard]] auto get_page(int px, int py, int pz) const -> const page_type*;
 
     [[nodiscard]] auto pages_x() const -> int;

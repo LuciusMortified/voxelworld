@@ -18,8 +18,9 @@ inline palette_buffer::palette_buffer(
     , descriptor_pool_(descriptor_pool)
     , descriptor_set_layout_(descriptor_set_layout) {
     std::array<uint32, 256> palette_data{};
-    for (uint8 i = 0; i < registry.count(); ++i) {
-        palette_data[i] = registry.get_color(i).value;
+    for (uint8 i = 0; i < std::numeric_limits<uint8>::max(); ++i) {
+        const auto bid = block_id{i};
+        palette_data[i] = registry.get_color(bid).value;
     }
 
     buffer_ = std::make_unique<storage_buffer>(*context_, sizeof(palette_data));

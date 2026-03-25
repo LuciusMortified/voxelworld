@@ -54,40 +54,30 @@ inline void color_palette_panel::render(
     ImGui::Separator();
     ImGui::Spacing();
 
-    static const char* category_names[] = {"Terrain", "Character", "Metal"};
-
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
 
-    for (uint8 cat = 0; cat < 3; ++cat) {
-        auto block_ids = registry_->blocks(static_cast<block_category>(cat));
-        if (block_ids.empty()) continue;
+    uint8 idx = 0;
+    for (const auto block : registry_->blocks()) {
+        if (block.id == blocks::air) {
+            continue;
+        }
 
-        ImGui::PopStyleVar();
-        if (cat > 0) ImGui::Spacing();
-        ImGui::Text("%s", category_names[cat]);
-        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+        ImGui::PushID(idx);
 
-        int idx = 0;
-        for (auto bid : block_ids) {
-            auto clr = registry_->get_color(bid);
-            const ImVec4 clr_imvec4 = to_imvec4(clr);
+        constexpr ImGuiColorEditFlags btn_flags =  //
+            ImGuiColorEditFlags_NoAlpha |          //
+            ImGuiColorEditFlags_NoPicker |         //
+            ImGuiColorEditFlags_NoBorder;
 
-            ImGui::PushID(static_cast<int>(bid));
+        const ImVec4 clr_imvec4 = to_imvec4(block.color);
+        if (ImGui::ColorButton("##block", clr_imvec4, btn_flags, ImVec2(30.0f, 30.0f))) {
+            state_->tool.selected_block = block.id;
+        }
 
-            constexpr ImGuiColorEditFlags btn_flags =  //
-                ImGuiColorEditFlags_NoAlpha |          //
-                ImGuiColorEditFlags_NoPicker |         //
-                ImGuiColorEditFlags_NoBorder;
+        ImGui::PopID();
 
-            if (ImGui::ColorButton("##block", clr_imvec4, btn_flags, ImVec2(30.0f, 30.0f))) {
-                state_->tool.selected_block = bid;
-            }
-
-            ImGui::PopID();
-
-            if (++idx % 6 != 0) {
-                ImGui::SameLine(0, 0);
-            }
+        if (++idx % 6 != 0) {
+            ImGui::SameLine(0, 0);
         }
     }
 

@@ -20,13 +20,14 @@ struct vertex {
     uint32 data0 = 0;
     uint32 data1 = 0;
 
-    // data0: pos.x[6:0] | pos.y[13:7] | pos.z[20:14] | normal_id[23:21] | ao[25:24] | reserved[31:26]
-    // data1: palette_index[7:0] | reserved[31:8]
+    // data0: pos.x[6:0] | pos.y[13:7] | pos.z[20:14] | normal_id[23:21] | ao[25:24] |
+    // reserved[31:26] data1: palette_index[7:0] | reserved[31:8]
 
     vertex() = default;
 
     [[nodiscard]] static auto pack(
-        int x, int y, int z, uint8 normal_id, uint8 ao, uint8 palette_index) -> vertex;
+        int x, int y, int z, uint8 normal_id, uint8 ao, block_id block_id
+    ) -> vertex;
 
     [[nodiscard]] static auto get_binding_descriptions()
         -> std::vector<VkVertexInputBindingDescription>;
@@ -41,7 +42,7 @@ struct mesh {
 
     void release_data() {
         vertices = {};
-        indices = {};
+        indices  = {};
     }
 };
 
@@ -49,16 +50,19 @@ class simple_mesh_generator {
 public:
     [[nodiscard]]
     static auto generate_mesh_data(
-        const std::shared_ptr<model>& model, const block_registry& registry) -> mesh;
+        const std::shared_ptr<model>& model, const block_registry& registry
+    ) -> mesh;
 
 private:
     static void add_cube_face(
         std::vector<vertex>& vertices,
         std::vector<uint32>& indices,
         const std::shared_ptr<model>& model,
-        int x, int y, int z,
+        int x,
+        int y,
+        int z,
         int face_direction,
-        uint8 voxel_id,
+        block_id voxel_id,
         const block_registry& registry
     );
 
@@ -69,11 +73,16 @@ private:
 };
 
 struct face_mask_cell {
-    uint8 voxel_id;
+    block_id voxel_id;
     uint8 ao_key;
 
+    [[nodiscard]]
     auto operator==(const face_mask_cell&) const -> bool = default;
-    [[nodiscard]] auto is_empty() const -> bool { return voxel_id == 0; }
+
+    [[nodiscard]]
+    auto is_empty() const -> bool {
+        return voxel_id == blocks::air;
+    }
 };
 
 struct mesh_generation_storage {
@@ -96,13 +105,10 @@ struct face_axis_mapping {
 
     face_axis_mapping(const model& mdl, int face_dir);
 
-    [[nodiscard]] auto to_model_coords(
-        int u, int v, int layer
-    ) const -> std::tuple<int, int, int>;
+    [[nodiscard]] auto to_model_coords(int u, int v, int layer) const -> std::tuple<int, int, int>;
 
-    [[nodiscard]] auto to_local_min_max(
-        int u, int v, int w, int h, int layer
-    ) const -> std::pair<vec3i, vec3i>;
+    [[nodiscard]] auto to_local_min_max(int u, int v, int w, int h, int layer) const
+        -> std::pair<vec3i, vec3i>;
 };
 
 [[nodiscard]] auto compute_vertex_ao_float(
@@ -113,13 +119,10 @@ struct face_axis_mapping {
     const model& mdl, int x, int y, int z, int face, int su, int sv
 ) -> int;
 
-[[nodiscard]] auto compute_ao_key(
-    const model& mdl, int x, int y, int z, int face
-) -> uint8;
+[[nodiscard]] auto compute_ao_key(const model& mdl, int x, int y, int z, int face) -> uint8;
 
-[[nodiscard]] auto is_face_visible(
-    const model& mdl, int x, int y, int z, int face_direction
-) -> bool;
+[[nodiscard]] auto is_face_visible(const model& mdl, int x, int y, int z, int face_direction)
+    -> bool;
 
 void build_face_mask(
     mesh_generation_storage& storage,
@@ -145,7 +148,10 @@ void emit_rect(
     const face_axis_mapping& axes,
     int face_direction,
     int layer,
-    int u_start, int v_start, int w, int h,
+    int u_start,
+    int v_start,
+    int w,
+    int h,
     uint8 voxel_id,
     const block_registry& registry
 );
@@ -155,8 +161,8 @@ class strip_mesh_generator {
 public:
     [[nodiscard]]
     static auto generate_mesh_data(
-        mesh_generation_storage& storage, const model& mdl,
-        const block_registry& registry) -> mesh;
+        mesh_generation_storage& storage, const model& mdl, const block_registry& registry
+    ) -> mesh;
 
 private:
     static void merge_and_emit_strips(
@@ -180,8 +186,8 @@ class greedy_mesh_generator {
 public:
     [[nodiscard]]
     static auto generate_mesh_data(
-        mesh_generation_storage& storage, const model& mdl,
-        const block_registry& registry) -> mesh;
+        mesh_generation_storage& storage, const model& mdl, const block_registry& registry
+    ) -> mesh;
 
 private:
     static void merge_and_emit_rects(

@@ -6,150 +6,101 @@
 namespace vw {
 
 inline block_registry::block_registry() {
-    blocks_[0] = {colors::empty, block_category::terrain};
-
-    using enum block_id;
-    using enum block_category;
+    using namespace blocks;
     namespace f = block_flags;
 
+    reg(air, colors::empty);
+
     // clang-format off
+    reg(blue_0,   colors::all[ 0]);
+    reg(blue_1,   colors::all[ 1]);
+    reg(blue_2,   colors::all[ 2]);
+    reg(blue_3,   colors::all[ 3]);
+    reg(blue_4,   colors::all[ 4]);
+    reg(blue_5,   colors::all[ 5]);
 
-    // Terrain — grass
-    reg(grass_1,  {0x46, 0x82, 0x32}, terrain);
-    reg(grass_2,  {0x75, 0xa7, 0x43}, terrain);
-    reg(grass_3,  {0xa8, 0xca, 0x58}, terrain);
+    reg(green_0,  colors::all[ 6]);
+    reg(green_1,  colors::all[ 7]);
+    reg(green_2,  colors::all[ 8]);
+    reg(green_3,  colors::all[ 9]);
+    reg(green_4,  colors::all[10]);
+    reg(green_5,  colors::all[11]);
 
-    // Terrain — dirt
-    reg(dirt_1,   {0x4d, 0x2b, 0x32}, terrain);
-    reg(dirt_2,   {0x7a, 0x48, 0x41}, terrain);
-    reg(dirt_3,   {0xad, 0x77, 0x57}, terrain);
+    reg(brown_0,  colors::all[12]);
+    reg(brown_1,  colors::all[13]);
+    reg(brown_2,  colors::all[14]);
+    reg(brown_3,  colors::all[15]);
+    reg(brown_4,  colors::all[16]);
+    reg(brown_5,  colors::all[17]);
 
-    // Terrain — stone
-    reg(stone_1,  {0x39, 0x4a, 0x50}, terrain);
-    reg(stone_2,  {0x57, 0x72, 0x77}, terrain);
-    reg(stone_3,  {0x81, 0x97, 0x96}, terrain);
+    reg(orange_0, colors::all[18]);
+    reg(orange_1, colors::all[19]);
+    reg(orange_2, colors::all[20]);
+    reg(orange_3, colors::all[21]);
+    reg(orange_4, colors::all[22]);
+    reg(orange_5, colors::all[23]);
 
-    // Terrain — sand
-    reg(sand_1,   {0xd7, 0xb5, 0x94}, terrain);
-    reg(sand_2,   {0xe7, 0xd5, 0xb3}, terrain);
-    reg(sand_3,   {0xe8, 0xc1, 0x70}, terrain);
+    reg(red_0,    colors::all[24]);
+    reg(red_1,    colors::all[25]);
+    reg(red_2,    colors::all[26]);
+    reg(red_3,    colors::all[27]);
+    reg(red_4,    colors::all[28]);
+    reg(red_5,    colors::all[29]);
 
-    // Terrain — snow
-    reg(snow_1,   {0xc7, 0xcf, 0xcc}, terrain);
-    reg(snow_2,   {0xeb, 0xed, 0xe9}, terrain);
-    reg(snow_3,   {0xff, 0xff, 0xff}, terrain);
+    reg(purple_0, colors::all[30]);
+    reg(purple_1, colors::all[31]);
+    reg(purple_2, colors::all[32]);
+    reg(purple_3, colors::all[33]);
+    reg(purple_4, colors::all[34]);
+    reg(purple_5, colors::all[35]);
 
-    // Terrain — water
-    reg(water_1,  {0x3c, 0x5e, 0x8b}, terrain, f::transparent | f::liquid);
-    reg(water_2,  {0x4f, 0x8f, 0xba}, terrain, f::transparent | f::liquid);
-    reg(water_3,  {0x73, 0xbe, 0xd3}, terrain, f::transparent | f::liquid);
+    reg(gray_0,   colors::all[36]);
+    reg(gray_1,   colors::all[37]);
+    reg(gray_2,   colors::all[38]);
+    reg(gray_3,   colors::all[39]);
+    reg(gray_4,   colors::all[40]);
+    reg(gray_5,   colors::all[41]);
+    reg(gray_6,   colors::all[42]);
+    reg(gray_7,   colors::all[43]);
+    reg(gray_8,   colors::all[44]);
+    reg(gray_9,   colors::all[45]);
 
-    // Terrain — lava
-    reg(lava_1,   {0xa5, 0x30, 0x30}, terrain, f::emissive);
-    reg(lava_2,   {0xcf, 0x57, 0x3c}, terrain, f::emissive);
-    reg(lava_3,   {0xda, 0x86, 0x3e}, terrain, f::emissive);
-
-    // Terrain — log
-    reg(log_1,    {0x88, 0x4b, 0x2b}, terrain);
-    reg(log_2,    {0xbe, 0x77, 0x2b}, terrain);
-    reg(log_3,    {0xad, 0x77, 0x57}, terrain);
-
-    // Terrain — leaves
-    reg(leaves_1, {0x25, 0x56, 0x2e}, terrain);
-    reg(leaves_2, {0x46, 0x82, 0x32}, terrain);
-    reg(leaves_3, {0x75, 0xa7, 0x43}, terrain);
-
-    // Terrain — bark
-    reg(bark_1,   {0x34, 0x1c, 0x27}, terrain);
-    reg(bark_2,   {0x60, 0x2c, 0x2c}, terrain);
-
-    // Terrain — moss
-    reg(moss_1,   {0x19, 0x33, 0x2d}, terrain);
-    reg(moss_2,   {0x25, 0x56, 0x2e}, terrain);
-    reg(moss_3,   {0xd0, 0xda, 0x91}, terrain);
-
-    // Characters — skin
-    reg(skin_light_1,  {0xc0, 0x94, 0x73}, character);
-    reg(skin_light_2,  {0xd7, 0xb5, 0x94}, character);
-    reg(skin_light_3,  {0xe7, 0xd5, 0xb3}, character);
-    reg(skin_medium_1, {0x7a, 0x48, 0x41}, character);
-    reg(skin_medium_2, {0xad, 0x77, 0x57}, character);
-    reg(skin_medium_3, {0xc0, 0x94, 0x73}, character);
-    reg(skin_dark_1,   {0x4d, 0x2b, 0x32}, character);
-    reg(skin_dark_2,   {0x7a, 0x48, 0x41}, character);
-    reg(skin_dark_3,   {0x60, 0x2c, 0x2c}, character);
-
-    // Characters — hair
-    reg(hair_dark_1,   {0x09, 0x0a, 0x14}, character);
-    reg(hair_dark_2,   {0x00, 0x00, 0x00}, character);
-    reg(hair_brown_1,  {0x7a, 0x48, 0x41}, character);
-    reg(hair_brown_2,  {0x88, 0x4b, 0x2b}, character);
-    reg(hair_blonde,   {0xe8, 0xc1, 0x70}, character);
-    reg(hair_red,      {0xcf, 0x57, 0x3c}, character);
-
-    // Characters — eyes
-    reg(eye_dark_1,    {0x10, 0x14, 0x1f}, character);
-    reg(eye_dark_2,    {0x25, 0x3a, 0x5e}, character);
-    reg(eye_light,     {0x4f, 0x8f, 0xba}, character);
-
-    // Characters — clothing
-    reg(cloth_red,     {0xa5, 0x30, 0x30}, character);
-    reg(cloth_blue,    {0x3c, 0x5e, 0x8b}, character);
-    reg(cloth_green,   {0x46, 0x82, 0x32}, character);
-    reg(cloth_white,   {0xff, 0xff, 0xff}, character);
-
-    // Metals — iron
-    reg(iron_1,   {0x20, 0x2e, 0x37}, metal);
-    reg(iron_2,   {0x39, 0x4a, 0x50}, metal);
-    reg(iron_3,   {0x57, 0x72, 0x77}, metal);
-
-    // Metals — gold
-    reg(gold_1,   {0xbe, 0x77, 0x2b}, metal);
-    reg(gold_2,   {0xde, 0x9e, 0x41}, metal);
-    reg(gold_3,   {0xe8, 0xc1, 0x70}, metal);
-
-    // Metals — copper
-    reg(copper_1, {0xcf, 0x57, 0x3c}, metal);
-    reg(copper_2, {0xda, 0x86, 0x3e}, metal);
-    reg(copper_3, {0xbe, 0x77, 0x2b}, metal);
-
-    // Metals — steel
-    reg(steel_1,  {0x81, 0x97, 0x96}, metal);
-    reg(steel_2,  {0xa8, 0xb5, 0xb2}, metal);
-    reg(steel_3,  {0xc7, 0xcf, 0xcc}, metal);
-
+    reg(white,    colors::all[46]);
+    reg(black,    colors::all[47]);
     // clang-format on
 }
 
 inline void block_registry::reg(
-    block_id id, color c, block_category cat, uint8 flags
+    block_id id, color c, uint8 flags
 ) {
-    auto idx = static_cast<uint8>(id);
-    blocks_[idx] = {c, cat, flags};
-    category_blocks_[static_cast<uint8>(cat)].push_back(idx);
-    if (idx >= count_) count_ = idx + 1;
+    blocks_[id.value] = {id, c, flags};
 }
 
 inline auto block_registry::get(
-    uint8 id
+    block_id id
 ) const -> const block_type& {
-    return blocks_[id];
+    return blocks_[id.value];
 }
 
 inline auto block_registry::get_color(
-    uint8 id
+    block_id id
 ) const -> color {
-    return blocks_[id].col;
+    return blocks_[id.value].color;
 }
 
-inline auto block_registry::count() const -> uint8 {
-    return count_;
+inline auto block_registry::find_by_color(
+    color c
+) const -> block_id {
+    for (const auto& block : blocks_) {
+        if (block.color == c && block.id != blocks::air) {
+            return block.id;
+        }
+    }
+    return blocks::air;
 }
 
-inline auto block_registry::blocks(
-    block_category cat
-) const -> std::span<const uint8> {
-    return category_blocks_[static_cast<uint8>(cat)];
+inline auto block_registry::blocks() const -> const std::array<block_type, 256>& {
+    return blocks_;
 }
 
 }  // namespace vw

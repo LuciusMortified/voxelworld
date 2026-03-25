@@ -13,7 +13,7 @@
 
 namespace vw::sculptor {
 
-using keyframe_value = std::variant<gfx::keyframe_vec3f, gfx::keyframe_quat>;
+using keyframe_value    = std::variant<gfx::keyframe_vec3f, gfx::keyframe_quat>;
 using entity_guard_type = gfx::entity_guard<>;
 
 enum class tools : uint8 {
@@ -60,16 +60,16 @@ struct scene_state {
 };
 
 struct tool_state {
-    tools selected_tool  = tools::add_voxel;
-    uint8 selected_block = static_cast<uint8>(block_id::snow_3);
+    tools selected_tool     = tools::add_voxel;
+    block_id selected_block = blocks::white;
 };
 
 struct clip_settings {
-    float32 playback_speed                = 1.0f;
-    gfx::animation_loop_mode loop_mode    = gfx::animation_loop_mode::once;
-    gfx::transition blend_transition      = {};
-    gfx::transition fade_in               = {};
-    gfx::transition fade_out              = {};
+    float32 playback_speed             = 1.0f;
+    gfx::animation_loop_mode loop_mode = gfx::animation_loop_mode::once;
+    gfx::transition blend_transition   = {};
+    gfx::transition fade_in            = {};
+    gfx::transition fade_out           = {};
 };
 
 struct animation_state {

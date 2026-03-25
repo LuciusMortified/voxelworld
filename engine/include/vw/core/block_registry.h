@@ -12,12 +12,6 @@
 
 namespace vw {
 
-enum class block_category : uint8 {
-    terrain,
-    character,
-    metal,
-};
-
 namespace block_flags {
 constexpr uint8 none        = 0;
 constexpr uint8 transparent = 1 << 0;
@@ -25,63 +19,100 @@ constexpr uint8 emissive    = 1 << 1;
 constexpr uint8 liquid      = 1 << 2;
 }  // namespace block_flags
 
+struct block_id {
+    uint8 value;
+
+    constexpr block_id() : value(0) {}
+    constexpr explicit block_id(
+        uint8 value_
+    )
+        : value(value_) {}
+
+    constexpr auto operator==(const block_id&) const -> bool = default;
+};
+
 struct block_type {
-    color col;
-    block_category category = block_category::terrain;
+    block_id id = block_id{0};
+    color color = colors::empty;
     uint8 flags = block_flags::none;
 };
 
+namespace blocks {
+constexpr auto air = block_id{0};
+
 // clang-format off
-enum class block_id : uint8 {
-    air = 0,
+constexpr auto blue_0   = block_id{1};
+constexpr auto blue_1   = block_id{2};
+constexpr auto blue_2   = block_id{3};
+constexpr auto blue_3   = block_id{4};
+constexpr auto blue_4   = block_id{5};
+constexpr auto blue_5   = block_id{6};
 
-    grass_1  = 1,  grass_2  = 2,  grass_3  = 3,
-    dirt_1   = 4,  dirt_2   = 5,  dirt_3   = 6,
-    stone_1  = 7,  stone_2  = 8,  stone_3  = 9,
-    sand_1   = 10, sand_2   = 11, sand_3   = 12,
-    snow_1   = 13, snow_2   = 14, snow_3   = 15,
-    water_1  = 16, water_2  = 17, water_3  = 18,
-    lava_1   = 19, lava_2   = 20, lava_3   = 21,
-    log_1    = 22, log_2    = 23, log_3    = 24,
-    leaves_1 = 25, leaves_2 = 26, leaves_3 = 27,
-    bark_1   = 28, bark_2   = 29,
-    moss_1   = 30, moss_2   = 31, moss_3   = 32,
+constexpr auto green_0  = block_id{7};
+constexpr auto green_1  = block_id{8};
+constexpr auto green_2  = block_id{9};
+constexpr auto green_3  = block_id{10};
+constexpr auto green_4  = block_id{11};
+constexpr auto green_5  = block_id{12};
 
-    skin_light_1  = 33, skin_light_2  = 34, skin_light_3  = 35,
-    skin_medium_1 = 36, skin_medium_2 = 37, skin_medium_3 = 38,
-    skin_dark_1   = 39, skin_dark_2   = 40, skin_dark_3   = 41,
-    hair_dark_1   = 42, hair_dark_2   = 43,
-    hair_brown_1  = 44, hair_brown_2  = 45,
-    hair_blonde   = 46, hair_red      = 47,
-    eye_dark_1    = 48, eye_dark_2    = 49, eye_light = 50,
-    cloth_red     = 51, cloth_blue    = 52,
-    cloth_green   = 53, cloth_white   = 54,
+constexpr auto brown_0  = block_id{13};
+constexpr auto brown_1  = block_id{14};
+constexpr auto brown_2  = block_id{15};
+constexpr auto brown_3  = block_id{16};
+constexpr auto brown_4  = block_id{17};
+constexpr auto brown_5  = block_id{18};
 
-    iron_1   = 55, iron_2   = 56, iron_3   = 57,
-    gold_1   = 58, gold_2   = 59, gold_3   = 60,
-    copper_1 = 61, copper_2 = 62, copper_3 = 63,
-    steel_1  = 64, steel_2  = 65, steel_3  = 66,
-};
+constexpr auto orange_0 = block_id{19};
+constexpr auto orange_1 = block_id{20};
+constexpr auto orange_2 = block_id{21};
+constexpr auto orange_3 = block_id{22};
+constexpr auto orange_4 = block_id{23};
+constexpr auto orange_5 = block_id{24};
+
+constexpr auto red_0    = block_id{25};
+constexpr auto red_1    = block_id{26};
+constexpr auto red_2    = block_id{27};
+constexpr auto red_3    = block_id{28};
+constexpr auto red_4    = block_id{29};
+constexpr auto red_5    = block_id{30};
+
+constexpr auto purple_0 = block_id{31};
+constexpr auto purple_1 = block_id{32};
+constexpr auto purple_2 = block_id{33};
+constexpr auto purple_3 = block_id{34};
+constexpr auto purple_4 = block_id{35};
+constexpr auto purple_5 = block_id{36};
+
+constexpr auto gray_0   = block_id{37};
+constexpr auto gray_1   = block_id{38};
+constexpr auto gray_2   = block_id{39};
+constexpr auto gray_3   = block_id{40};
+constexpr auto gray_4   = block_id{41};
+constexpr auto gray_5   = block_id{42};
+constexpr auto gray_6   = block_id{43};
+constexpr auto gray_7   = block_id{44};
+constexpr auto gray_8   = block_id{45};
+constexpr auto gray_9   = block_id{46};
+
+constexpr auto white    = block_id{47};
+constexpr auto black    = block_id{48};
 // clang-format on
+
+}  // namespace blocks
 
 class block_registry {
 public:
     block_registry();
 
-    [[nodiscard]] auto get(uint8 id) const -> const block_type&;
-    [[nodiscard]] auto get_color(uint8 id) const -> color;
-    [[nodiscard]] auto count() const -> uint8;
-    [[nodiscard]] auto blocks(block_category cat) const -> std::span<const uint8>;
+    [[nodiscard]] auto get(block_id id) const -> const block_type&;
+    [[nodiscard]] auto get_color(block_id id) const -> color;
+    [[nodiscard]] auto find_by_color(color c) const -> block_id;
+    [[nodiscard]] auto blocks() const -> const std::array<block_type, 256>&;
 
 private:
-    static constexpr uint32 category_count = 3;
-
-    void reg(block_id id, color c, block_category cat,
-             uint8 flags = block_flags::none);
+    void reg(block_id id, color c, uint8 flags = block_flags::none);
 
     std::array<block_type, 256> blocks_{};
-    uint8 count_ = 0;
-    std::array<std::vector<uint8>, category_count> category_blocks_;
 };
 
 }  // namespace vw

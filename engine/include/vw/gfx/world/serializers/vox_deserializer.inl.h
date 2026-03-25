@@ -16,9 +16,9 @@ inline constexpr log::log_category vox_deserializer_lc{"vox_deserializer"};
 
 template <typename WC>
 vox_deserializer<WC>::vox_deserializer(
-    world_type& world
+    world_type& world, const block_registry& block_registry
 )
-    : world_(&world) {}
+    : world_(&world), block_registry_(&block_registry) {}
 
 template <typename WC>
 auto vox_deserializer<WC>::deserialize(
@@ -305,7 +305,14 @@ void vox_deserializer<WC>::process_voxel_(
         return;
     }
 
-    current_model_->set_voxel(position, voxel{static_cast<uint8>(color_value & 0xFF)});
+    block_id bid = blocks::air;
+    if (color_value > 0xFF) {
+        bid = block_registry_->find_by_color(color{color_value});
+    } else {
+        bid = block_id{static_cast<uint8>(color_value)};
+    }
+
+    current_model_->set_voxel(position, voxel{bid});
 }
 
 }  // namespace vw::gfx

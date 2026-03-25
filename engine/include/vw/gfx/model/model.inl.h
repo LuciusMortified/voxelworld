@@ -14,8 +14,8 @@ inline auto page_entry::mode() const -> page_mode {
     return static_cast<page_mode>(data & 0x3u);
 }
 
-inline auto page_entry::fill_id() const -> uint8 {
-    return static_cast<uint8>((data >> 2) & 0xFFu);
+inline auto page_entry::fill_id() const -> block_id {
+    return block_id{static_cast<uint8>((data >> 2) & 0xFFu)};
 }
 
 inline auto page_entry::pool_index() const -> uint32 {
@@ -23,13 +23,13 @@ inline auto page_entry::pool_index() const -> uint32 {
 }
 
 inline auto page_entry::make_empty() -> page_entry {
-    return {0};
+    return {0u};
 }
 
 inline auto page_entry::make_uniform(
-    uint8 id
+    block_id id
 ) -> page_entry {
-    return {1u | (static_cast<uint32>(id) << 2)};
+    return {1u | (static_cast<uint32>(id.value) << 2)};
 }
 
 inline auto page_entry::make_sparse(
@@ -388,7 +388,7 @@ inline auto model::get_page_mode(
 
 inline auto model::get_page_fill_id(
     int px, int py, int pz
-) const -> uint8 {
+) const -> block_id {
     return pages_[page_index(px, py, pz)].fill_id();
 }
 

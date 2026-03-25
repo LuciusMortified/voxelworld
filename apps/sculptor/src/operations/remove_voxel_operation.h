@@ -28,7 +28,7 @@ private:
     engine_type* engine_;
     app_state* state_;
     remove_voxel_params params_;
-    uint8 previous_block_;
+    block_id previous_block_;
 };
 
 }  // namespace vw::sculptor

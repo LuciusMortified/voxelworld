@@ -51,7 +51,7 @@ private:
     [[nodiscard]] auto ridged_noise(float64 x, float64 y) const -> float64;
     [[nodiscard]] auto continent_at(float64 nx, float64 nz) const -> float64;
     [[nodiscard]] auto height_at(int32 wx, int32 wz) const -> int32;
-    [[nodiscard]] auto block_at(int32 y, int32 surface_y, float64 continent) const -> uint8;
+    [[nodiscard]] auto block_at(int32 y, int32 surface_y, float64 continent) const -> block_id;
 
     static auto fade(float64 t) -> float64;
     static auto lerp(float64 t, float64 a, float64 b) -> float64;

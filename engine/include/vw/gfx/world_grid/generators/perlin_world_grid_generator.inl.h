@@ -174,29 +174,28 @@ inline auto perlin_world_grid_generator::height_at(
 
 inline auto perlin_world_grid_generator::block_at(
     int32 y, int32 surface_y, float64 continent
-) const -> uint8 {
-    using enum block_id;
+) const -> block_id {
     int32 depth = surface_y - y;
 
     if (continent >= 0.7) {
         if (depth == 0) {
             if (surface_y > params_.mountains_height + 20)
-                return static_cast<uint8>(snow_1);
-            return static_cast<uint8>(stone_1);
+                return blocks::gray_9;
+            return blocks::gray_5;
         }
-        return static_cast<uint8>(stone_2);
+        return blocks::gray_4;
     }
 
     if (depth == 0) {
         if (surface_y > params_.mountains_height + 10)
-            return static_cast<uint8>(snow_1);
+            return blocks::gray_9;
         if (surface_y > params_.hills_height + 10)
-            return static_cast<uint8>(stone_1);
-        return static_cast<uint8>(grass_1);
+            return blocks::gray_4;
+        return blocks::green_2;
     }
     if (depth < 3)
-        return static_cast<uint8>(dirt_1);
-    return static_cast<uint8>(stone_3);
+        return blocks::brown_0;
+    return blocks::gray_3;
 }
 
 inline auto perlin_world_grid_generator::get_chunk_y_range(
