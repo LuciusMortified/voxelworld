@@ -20,7 +20,7 @@ template <typename T, typename... Cs>
 class component_view;
 
 template <typename T, typename... Ts>
-consteval size_t type_index_in() {
+consteval auto type_index_in() -> size_t {
     static_assert((std::same_as<T, Ts> || ...), "type not in parameter pack");
     static_assert(
         ((std::same_as<T, Ts> ? 1 : 0) + ...) == 1,
@@ -37,7 +37,7 @@ consteval size_t type_index_in() {
 }
 
 template <typename... Ts>
-class registry {
+class entity_registry {
 public:
     template <typename T>
     auto get_pool() -> component_pool<T>& {
@@ -119,7 +119,7 @@ public:
 
     template <typename... Cs>
     auto view() {
-        return component_view<registry, Cs...>(*this);
+        return component_view<entity_registry, Cs...>(*this);
     }
 
     template <typename T>
@@ -162,7 +162,7 @@ public:
 
 private:
     template <typename... Deps>
-    void propagate_deps_(entity ent, std::tuple<Deps...>) {
+    void propagate_deps_(entity ent, std::tuple<Deps...> /*unused*/) {
         (propagate_one_<Deps>(ent), ...);
     }
 
@@ -262,7 +262,7 @@ private:
         auto it = std::min_element(
             std::begin(candidates),
             std::end(candidates),
-            [](const auto& a, const auto& b) { return a.first < b.first; }
+            [](const auto& a, const auto& b) -> auto { return a.first < b.first; }
         );
         entities_ = it->second;
     }
@@ -277,7 +277,7 @@ struct registry_from_tuple;
 
 template <typename... Ts>
 struct registry_from_tuple<std::tuple<Ts...>> {
-    using type = registry<Ts...>;
+    using type = entity_registry<Ts...>;
 };
 
 }  // namespace vw::gfx

@@ -85,7 +85,9 @@ private:
         generator_params_ = {
             .voxel_scale = 8,
         };
-        auto generator = std::make_unique<gfx::perlin_world_grid_generator>(generator_params_);
+        auto& registry = world.get_model_registry();
+        auto generator = std::make_unique<gfx::perlin_world_grid_generator>(
+            registry.get_identity_pool(), registry.get_page_pool(), generator_params_);
         generator_     = generator.get();
         world_grid_    = std::make_shared<gfx::world_grid<>>(
             world, std::move(generator), generator_params_.voxel_scale

@@ -4,7 +4,7 @@
 #define VW_GFX_WORLD_SYSTEMS_SOCKET_SYSTEM_H
 
 #include "vw/gfx/world/components/socket_component.h"
-#include "vw/gfx/world/registry.h"
+#include "vw/gfx/world/entity_registry.h"
 
 namespace vw::gfx {
 
@@ -17,7 +17,7 @@ class transform_system;
 template <typename... Cs>
 class socket_system final {
 public:
-    using registry_type         = registry<Cs...>;
+    using registry_type         = entity_registry<Cs...>;
     using hierarchy_system_type = hierarchy_system<Cs...>;
     using transform_system_type = transform_system<Cs...>;
 

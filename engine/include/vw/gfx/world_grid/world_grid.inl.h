@@ -3,8 +3,7 @@
 #ifndef VW_GFX_WORLD_GRID_INL_H
 #define VW_GFX_WORLD_GRID_INL_H
 
-#include <chrono>
-
+#include "vw/core/timing.h"
 #include "vw/gfx/world/world.h"
 #include "vw/log/logger.h"
 
@@ -19,8 +18,6 @@ world_grid<WC>::world_grid(
     world_type& world, std::unique_ptr<world_grid_generator> generator, int32 voxel_scale
 )
     : world_(&world), voxel_scale_(voxel_scale), generator_(std::move(generator)) {
-    generator_->set_identity_pool(world.get_model_registry().get_identity_pool());
-    generator_->set_page_pool(world.get_model_registry().get_page_pool());
     auto count = std::min(std::thread::hardware_concurrency(), 4u);
     if (count == 0) {
         count = 1;
@@ -196,11 +193,6 @@ void world_grid<WC>::process_completed() {
         {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
     };
 
-    using clock = std::chrono::high_resolution_clock;
-    auto ms     = [](auto a, auto b) -> float32 {
-        return std::chrono::duration<float32>(b - a).count() * 1000.0f;
-    };
-
     float32 boundary_from_total = 0.0f;
     float32 chunk_create_total  = 0.0f;
     float32 boundary_to_total   = 0.0f;
@@ -223,46 +215,43 @@ void world_grid<WC>::process_completed() {
 
         pending_chunks_.erase(cd.coord);
 
-        auto tb0 = clock::now();
-        for (int fd = 0; fd < 6; ++fd) {
-            auto* neighbor = get_chunk(cd.coord + neighbor_offsets[fd]);
-            if (neighbor) {
-                cd.chunk_model->set_boundary_slice(fd, *neighbor->get_model());
+        boundary_from_total += measure_ms([&] {
+            for (int fd = 0; fd < 6; ++fd) {
+                auto* neighbor = get_chunk(cd.coord + neighbor_offsets[fd]);
+                if (neighbor) {
+                    cd.chunk_model->set_boundary_slice(fd, *neighbor->get_model());
+                }
             }
-        }
-        auto tb1 = clock::now();
+        });
 
-        chunks_.emplace(
-            cd.coord,
-            std::make_unique<chunk<WC>>(*world_, cd.coord, std::move(cd.chunk_model), voxel_scale_)
-        );
-        auto tb2 = clock::now();
+        chunk_create_total += measure_ms([&] {
+            chunks_.emplace(
+                cd.coord,
+                std::make_unique<chunk<WC>>(
+                    *world_, cd.coord, std::move(cd.chunk_model), voxel_scale_)
+            );
+        });
 
-        auto* created = get_chunk(cd.coord);
-        for (int fd = 0; fd < 6; ++fd) {
-            auto* neighbor = get_chunk(cd.coord + neighbor_offsets[fd]);
-            if (neighbor) {
-                int opposite_fd = fd ^ 1;
-                neighbor->get_model()->set_boundary_slice(opposite_fd, *created->get_model());
-                deferred_remeshes_.push({cd.coord + neighbor_offsets[fd], opposite_fd});
+        boundary_to_total += measure_ms([&] {
+            auto* created = get_chunk(cd.coord);
+            for (int fd = 0; fd < 6; ++fd) {
+                auto* neighbor = get_chunk(cd.coord + neighbor_offsets[fd]);
+                if (neighbor) {
+                    int opposite_fd = fd ^ 1;
+                    neighbor->get_model()->set_boundary_slice(
+                        opposite_fd, *created->get_model());
+                    deferred_remeshes_.push({cd.coord + neighbor_offsets[fd], opposite_fd});
+                }
             }
-        }
-        auto tb3 = clock::now();
+        });
 
-        boundary_from_total += ms(tb0, tb1);
-        chunk_create_total += ms(tb1, tb2);
-        boundary_to_total += ms(tb2, tb3);
         ++processed;
     }
 
-    auto td0 = clock::now();
-    process_deferred_remeshes();
-    auto td1 = clock::now();
-
+    completed_stats_.deferred_ms        = measure_ms([&] { process_deferred_remeshes(); });
     completed_stats_.boundary_from_ms   = boundary_from_total;
     completed_stats_.chunk_create_ms    = chunk_create_total;
     completed_stats_.boundary_to_ms     = boundary_to_total;
-    completed_stats_.deferred_ms        = ms(td0, td1);
     completed_stats_.chunks_processed   = static_cast<uint32>(processed);
     completed_stats_.remeshes_processed = 0;
 }

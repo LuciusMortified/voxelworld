@@ -10,7 +10,7 @@
 #include "vw/gfx/animation/animation_clip_registry.h"
 #include "vw/gfx/model/model_registry.h"
 #include "vw/gfx/spatial/ray.h"
-#include "vw/gfx/world/registry.h"
+#include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/systems/animation_system.h"
 #include "vw/gfx/world/systems/hierarchy_system.h"
 #include "vw/gfx/world/systems/light_system.h"

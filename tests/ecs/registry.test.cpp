@@ -1,6 +1,6 @@
-#include <catch2/catch_test_macros.hpp>
+#include <vw/gfx/world/entity_registry.h>
 
-#include <vw/gfx/world/registry.h>
+#include <catch2/catch_test_macros.hpp>
 
 using namespace vw;
 using namespace vw::gfx;
@@ -17,7 +17,7 @@ struct health_component {
     int hp = 100;
 };
 
-using test_registry = registry<position_component, velocity_component, health_component>;
+using test_registry = entity_registry<position_component, velocity_component, health_component>;
 
 TEST_CASE("registry create and destroy", "[registry]") {
     test_registry reg;

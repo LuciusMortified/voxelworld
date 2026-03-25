@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "vw/gfx/world/components/world_view_component.h"
-#include "vw/gfx/world/registry.h"
+#include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world_grid/world_grid.h"
 
 namespace vw::gfx {
@@ -28,7 +28,7 @@ struct world_grid_system_stats {
 template <typename WC, typename... Cs>
 class world_grid_system {
 public:
-    using registry_type = registry<Cs...>;
+    using registry_type = entity_registry<Cs...>;
 
     explicit world_grid_system(registry_type& registry);
 

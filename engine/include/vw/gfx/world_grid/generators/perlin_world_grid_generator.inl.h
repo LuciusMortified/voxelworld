@@ -13,9 +13,9 @@
 namespace vw::gfx {
 
 inline perlin_world_grid_generator::perlin_world_grid_generator(
-    params p
+    model_identity_pool& identity_pool, page_pool& page_pool, params p
 )
-    : params_(p) {
+    : identity_pool_(&identity_pool), page_pool_(&page_pool), params_(p) {
     for (int32 i = 0; i < 256; ++i) {
         perm_[i] = i;
     }
@@ -248,7 +248,7 @@ inline auto perlin_world_grid_generator::generate_chunk(
 ) -> chunk_data {
     constexpr int32 s = chunk<>::size;
 
-    auto mdl = std::make_shared<model>(*pool_, *page_pool_, s, s, s, params_.voxel_scale);
+    auto mdl = std::make_shared<model>(*identity_pool_, *page_pool_, s, s, s, params_.voxel_scale);
 
     for (int32 x = 0; x < s; ++x) {
         for (int32 z = 0; z < s; ++z) {

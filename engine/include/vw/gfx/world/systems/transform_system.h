@@ -5,7 +5,7 @@
 
 #include <vector>
 
-#include "vw/gfx/world/registry.h"
+#include "vw/gfx/world/entity_registry.h"
 
 namespace vw {
 struct transform;
@@ -21,7 +21,7 @@ class hierarchy_system;
 template <typename... Cs>
 class transform_system final {
 public:
-    using registry_type = registry<Cs...>;
+    using registry_type = entity_registry<Cs...>;
 
     explicit transform_system(registry_type& registry, hierarchy_system<Cs...>& hierarchy_sys);
 

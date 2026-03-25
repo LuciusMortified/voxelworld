@@ -9,12 +9,12 @@
 #include <unordered_set>
 #include <vector>
 
+#include "vw/gfx/spatial/aabb.h"
 #include "vw/gfx/spatial/dynamic_aabb_tree.h"
 #include "vw/gfx/spatial/frustum.h"
 #include "vw/gfx/spatial/ray.h"
-#include "vw/gfx/spatial/aabb.h"
 #include "vw/gfx/world/components/spatial_component.h"
-#include "vw/gfx/world/registry.h"
+#include "vw/gfx/world/entity_registry.h"
 
 namespace vw::gfx {
 
@@ -24,7 +24,7 @@ struct transform_component;
 template <typename... Cs>
 class spatial_system {
 public:
-    using registry_type = registry<Cs...>;
+    using registry_type = entity_registry<Cs...>;
 
     explicit spatial_system(
         registry_type& registry

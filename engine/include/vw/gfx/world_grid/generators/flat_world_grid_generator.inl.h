@@ -9,16 +9,24 @@
 namespace vw::gfx {
 
 inline flat_world_grid_generator::flat_world_grid_generator(
-    int32 height, int32 voxel_scale
+    model_identity_pool& identity_pool, page_pool& page_pool, int32 height, int32 voxel_scale
 )
-    : height_(height), voxel_scale_(voxel_scale) {}
+    : identity_pool_(&identity_pool), page_pool_(&page_pool), height_(height), voxel_scale_(voxel_scale) {}
+
+inline auto flat_world_grid_generator::get_chunk_y_range(
+    int32 chunk_x, int32 chunk_z
+) -> chunk_y_range {
+    (void)chunk_x;
+    (void)chunk_z;
+    return {0, 0};
+}
 
 inline auto flat_world_grid_generator::generate_chunk(
     vec3i coord
 ) -> chunk_data {
     constexpr int32 s = chunk<>::size;
 
-    auto mdl = std::make_shared<model>(*pool_, *page_pool_, s, s, s, voxel_scale_);
+    auto mdl = std::make_shared<model>(*identity_pool_, *page_pool_, s, s, s, voxel_scale_);
 
     bool checker = ((coord.x + coord.z) & 1) == 0;
     auto grass_id = checker ? static_cast<uint8>(block_id::grass_1)

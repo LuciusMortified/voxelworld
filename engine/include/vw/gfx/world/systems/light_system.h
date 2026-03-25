@@ -5,15 +5,15 @@
 
 #include <unordered_set>
 
-#include "vw/gfx/world/registry.h"
 #include "vw/gfx/world/components/light_component.h"
+#include "vw/gfx/world/entity_registry.h"
 
 namespace vw::gfx {
 
 template <typename... Cs>
 class light_system final {
 public:
-    using registry_type = registry<Cs...>;
+    using registry_type = entity_registry<Cs...>;
 
     explicit light_system(registry_type& registry);
 

@@ -9,7 +9,7 @@
 
 #include "vw/gfx/resource/mesh_pool.h"
 #include "vw/gfx/world/components/model_component.h"
-#include "vw/gfx/world/registry.h"
+#include "vw/gfx/world/entity_registry.h"
 
 namespace vw::gfx {
 
@@ -26,7 +26,7 @@ class model;
 template <typename... Cs>
 class model_system {
 public:
-    using registry_type = registry<Cs...>;
+    using registry_type = entity_registry<Cs...>;
 
     explicit model_system(registry_type& registry, mesh_pool& mesh_pool);
 

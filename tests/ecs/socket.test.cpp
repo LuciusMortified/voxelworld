@@ -90,7 +90,7 @@ using test_components = std::tuple<
     spatial_component>;
 
 struct socket_test_fixture {
-    registry<hierarchy_component, transform_component, socket_component, spatial_component> reg;
+    entity_registry<hierarchy_component, transform_component, socket_component, spatial_component> reg;
     spatial_system<hierarchy_component, transform_component, socket_component, spatial_component>
         spatial_sys{reg};
     transform_system<hierarchy_component, transform_component, socket_component, spatial_component>

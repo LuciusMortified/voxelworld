@@ -15,7 +15,7 @@
 using namespace vw;
 using namespace vw::gfx;
 
-using test_registry = registry<
+using test_registry = entity_registry<
     hierarchy_component, transform_component, spatial_component,
     animation_player_component, animation_target_component>;
 
