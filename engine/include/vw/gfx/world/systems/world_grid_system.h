@@ -55,6 +55,11 @@ public:
 
 private:
     auto process_dirty_entity(entity ent) -> bool;
+    void dispatch_chunk_requests();
+    void update_grid_stats();
+    auto process_dirty_entities() -> bool;
+    auto rebuild_active_set() -> vec3i;
+    void unload_inactive_chunks();
 
     void rebuild_pending_requests(vec3i camera_chunk);
 

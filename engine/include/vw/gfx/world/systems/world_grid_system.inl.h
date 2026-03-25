@@ -3,8 +3,7 @@
 #ifndef VW_GFX_WORLD_SYSTEMS_WORLD_GRID_SYSTEM_INL_H
 #define VW_GFX_WORLD_SYSTEMS_WORLD_GRID_SYSTEM_INL_H
 
-#include <chrono>
-
+#include "vw/core/timing.h"
 #include "vw/gfx/world/components/transform_component.h"
 
 namespace vw::gfx {
@@ -38,15 +37,28 @@ void world_grid_system<WC, Cs...>::update() {
         return;
     }
 
-    using clock = std::chrono::high_resolution_clock;
-    auto ms = [](auto a, auto b) -> float32 {
-        return std::chrono::duration<float32>(b - a).count() * 1000.0f;
-    };
+    stats_.process_completed_ms = measure_ms([&] { world_grid_->process_completed(); });
+    stats_.request_chunks_ms    = measure_ms([&] { dispatch_chunk_requests(); });
+    update_grid_stats();
 
-    auto t0 = clock::now();
-    world_grid_->process_completed();
-    auto t1 = clock::now();
+    if (registry_->template requested<world_view_component>().empty()) {
+        return;
+    }
 
+    if (process_dirty_entities()) {
+        vec3i camera_chunk{};
+        stats_.rebuild_active_ms = measure_ms([&] { camera_chunk = rebuild_active_set(); });
+        stats_.unload_ms         = measure_ms([&] { unload_inactive_chunks(); });
+        std::swap(active_chunks_, pending_active_chunks_);
+        rebuild_pending_requests(camera_chunk);
+        stats_.active_count = static_cast<uint32>(active_chunks_.size());
+    }
+
+    registry_->template clear_requested<world_view_component>();
+}
+
+template <typename WC, typename... Cs>
+void world_grid_system<WC, Cs...>::dispatch_chunk_requests() {
     static constexpr int32 max_requests_per_frame = 8;
     int32 requests = 0;
     while (!pending_requests_.empty() && requests < max_requests_per_frame) {
@@ -56,76 +68,68 @@ void world_grid_system<WC, Cs...>::update() {
             ++requests;
         }
     }
-    auto t2 = clock::now();
+}
 
-    stats_.process_completed_ms  = ms(t0, t1);
-    stats_.request_chunks_ms     = ms(t1, t2);
+template <typename WC, typename... Cs>
+void world_grid_system<WC, Cs...>::update_grid_stats() {
     stats_.active_count          = static_cast<uint32>(active_chunks_.size());
     stats_.pending_count         = world_grid_->get_pending_chunk_count();
     stats_.loaded_count          = world_grid_->get_loaded_chunk_count();
     stats_.deferred_remesh_count = world_grid_->get_deferred_remesh_count();
     stats_.rebuild_active_ms     = 0.0f;
     stats_.unload_ms             = 0.0f;
+}
 
-    auto& requested = registry_->template requested<world_view_component>();
-    if (requested.empty()) {
-        return;
-    }
-
-    vec3i camera_chunk{};
+template <typename WC, typename... Cs>
+auto world_grid_system<WC, Cs...>::process_dirty_entities() -> bool {
     bool chunks_dirty = false;
-    for (auto ent : requested) {
+    for (auto ent : registry_->template requested<world_view_component>()) {
         if (process_dirty_entity(ent)) {
             chunks_dirty = true;
         }
         registry_->template notify_changed<world_view_component>(ent);
     }
+    return chunks_dirty;
+}
 
-    if (chunks_dirty) {
-        auto t3 = clock::now();
+template <typename WC, typename... Cs>
+auto world_grid_system<WC, Cs...>::rebuild_active_set() -> vec3i {
+    pending_active_chunks_.clear();
+    vec3i camera_chunk{};
 
-        pending_active_chunks_.clear();
+    for (auto ent : registry_->template requested<world_view_component>()) {
+        if (!registry_->template has<world_view_component>(ent) ||
+            !registry_->template has<transform_component>(ent)) {
+            continue;
+        }
 
-        for (auto ent : requested) {
-            if (!registry_->template has<world_view_component>(ent) ||
-                !registry_->template has<transform_component>(ent)) {
-                continue;
-            }
+        const auto& wv = registry_->template get<world_view_component>(ent);
+        camera_chunk = wv.get_chunk_coord();
+        const auto dist = static_cast<int32>(wv.get_view_distance());
 
-            const auto& wv = registry_->template get<world_view_component>(ent);
-            camera_chunk = wv.get_chunk_coord();
-            auto dist = static_cast<int32>(wv.get_view_distance());
-
-            auto& gen = world_grid_->get_generator();
-            for (int32 dx = -dist; dx <= dist; ++dx) {
-                for (int32 dz = -dist; dz <= dist; ++dz) {
-                    int32 cx = camera_chunk.x + dx;
-                    int32 cz = camera_chunk.z + dz;
-                    auto yr = gen.get_chunk_y_range(cx, cz);
-                    for (int32 cy = yr.min_y; cy <= yr.max_y; ++cy) {
-                        pending_active_chunks_.insert({cx, cy, cz});
-                    }
+        auto& gen = world_grid_->get_generator();
+        for (int32 dx = -dist; dx <= dist; ++dx) {
+            for (int32 dz = -dist; dz <= dist; ++dz) {
+                int32 cx = camera_chunk.x + dx;
+                int32 cz = camera_chunk.z + dz;
+                auto yr = gen.get_chunk_y_range(cx, cz);
+                for (int32 cy = yr.min_y; cy <= yr.max_y; ++cy) {
+                    pending_active_chunks_.insert({cx, cy, cz});
                 }
             }
         }
-        auto t4 = clock::now();
-
-        for (const auto& coord : active_chunks_) {
-            if (!pending_active_chunks_.contains(coord)) {
-                world_grid_->unload_chunk(coord);
-            }
-        }
-        auto t5 = clock::now();
-
-        std::swap(active_chunks_, pending_active_chunks_);
-        rebuild_pending_requests(camera_chunk);
-
-        stats_.rebuild_active_ms = ms(t3, t4);
-        stats_.unload_ms         = ms(t4, t5);
-        stats_.active_count      = static_cast<uint32>(active_chunks_.size());
     }
 
-    registry_->template clear_requested<world_view_component>();
+    return camera_chunk;
+}
+
+template <typename WC, typename... Cs>
+void world_grid_system<WC, Cs...>::unload_inactive_chunks() {
+    for (const auto& coord : active_chunks_) {
+        if (!pending_active_chunks_.contains(coord)) {
+            world_grid_->unload_chunk(coord);
+        }
+    }
 }
 
 template <typename WC, typename... Cs>
