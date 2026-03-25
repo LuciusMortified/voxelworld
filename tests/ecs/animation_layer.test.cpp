@@ -15,7 +15,7 @@
 using namespace vw;
 using namespace vw::gfx;
 
-using test_registry = registry<
+using test_registry = entity_registry<
     hierarchy_component, transform_component, spatial_component,
     animation_player_component, animation_target_component>;
 
@@ -38,7 +38,7 @@ using test_anim_sys = animation_system<
 struct anim_test_fixture {
     test_registry reg;
     test_spatial_sys spatial_sys{reg};
-    test_transform_sys transform_sys{reg, spatial_sys, hierarchy_sys};
+    test_transform_sys transform_sys{reg, hierarchy_sys};
     test_hierarchy_sys hierarchy_sys{reg, transform_sys};
     animation_clip_registry clip_reg;
     test_anim_sys anim_sys{reg, transform_sys, clip_reg};

@@ -3,13 +3,14 @@
 #ifndef VW_GFX_WORLD_H
 #define VW_GFX_WORLD_H
 
+#include <chrono>
 #include <optional>
 #include <unordered_set>
 
 #include "vw/gfx/animation/animation_clip_registry.h"
 #include "vw/gfx/model/model_registry.h"
 #include "vw/gfx/spatial/ray.h"
-#include "vw/gfx/world/registry.h"
+#include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/systems/animation_system.h"
 #include "vw/gfx/world/systems/hierarchy_system.h"
 #include "vw/gfx/world/systems/light_system.h"
@@ -17,9 +18,19 @@
 #include "vw/gfx/world/systems/socket_system.h"
 #include "vw/gfx/world/systems/spatial_system.h"
 #include "vw/gfx/world/systems/transform_system.h"
+#include "vw/gfx/world/systems/world_grid_system.h"
 #include "vw/gfx/world/world_components.h"
 
 namespace vw::gfx {
+
+struct world_update_stats {
+    float32 transform_ms   = 0.0f;
+    float32 model_ms       = 0.0f;
+    float32 spatial_ms     = 0.0f;
+    float32 light_ms       = 0.0f;
+    float32 world_grid_ms  = 0.0f;
+    float32 animation_ms   = 0.0f;
+};
 
 template <typename WC>
 class entity_guard;
@@ -42,9 +53,10 @@ public:
     using spatial_system_type   = spatial_system_from_tuple<WC>::type;
     using light_system_type     = light_system_from_tuple<WC>::type;
     using socket_system_type    = socket_system_from_tuple<WC>::type;
-    using animation_system_type = animation_system_from_tuple<WC>::type;
+    using animation_system_type   = animation_system_from_tuple<WC>::type;
+    using world_grid_system_type  = world_grid_system_from_tuple<WC, WC>::type;
 
-    explicit world(vulkan_context& context);
+    explicit world(vulkan_context& context, const block_registry& registry);
     ~world()                               = default;
     world(const world&)                    = delete;
     auto operator=(const world&) -> world& = delete;
@@ -60,6 +72,7 @@ public:
     [[nodiscard]] auto get_component(entity ent) -> T&;
 
     [[nodiscard]] auto get_mesh_pool() const -> const mesh_pool&;
+    [[nodiscard]] auto get_mesh_pool() -> mesh_pool&;
 
     template <typename... Cs>
     [[nodiscard]] auto view_components() -> component_view<registry_type, Cs...>;
@@ -82,10 +95,21 @@ public:
 
     [[nodiscard]] auto get_animation_clip_registry() -> animation_clip_registry&;
 
+    [[nodiscard]] auto get_world_grid_system() -> world_grid_system_type&;
+
+    [[nodiscard]] auto get_registry() -> registry_type&;
+
+    template <typename T>
+    [[nodiscard]] auto changed() -> std::unordered_set<entity>&;
+
     [[nodiscard]] auto voxel_ray_cast(
         const ray& r,
         std::unordered_set<entity>& candidates
     ) const -> std::optional<voxel_ray_hit>;
+
+    [[nodiscard]] auto destroyed() const -> const std::vector<entity>&;
+
+    [[nodiscard]] auto get_update_stats() const -> const world_update_stats&;
 
 private:
     template <typename T>
@@ -111,6 +135,8 @@ private:
     socket_system_type socket_system_;
     animation_clip_registry animation_clip_registry_;
     animation_system_type animation_system_;
+    world_grid_system_type world_grid_system_;
+    world_update_stats update_stats_;
 };
 
 }  // namespace vw::gfx

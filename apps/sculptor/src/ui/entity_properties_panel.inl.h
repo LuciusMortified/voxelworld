@@ -89,11 +89,11 @@ inline void entity_properties_panel::render_rotation() const {
     const auto ent             = state_->scene.name_to_entity[state_->scene.selected_name];
     auto& world                = engine_->get_world();
     const auto& transform_comp = world.get_component<gfx::transform_component>(ent);
-    const vec3f rotation       = transform_comp.get_rotation();
+    const vec3f rotation_euler = transform_comp.get_rotation_euler();
     vec3f rotation_deg         = {
-        math::degrees(rotation.x),
-        math::degrees(rotation.y),
-        math::degrees(rotation.z),
+        math::degrees(rotation_euler.x),
+        math::degrees(rotation_euler.y),
+        math::degrees(rotation_euler.z),
     };
     if (imgui_drag_vec3f("Rot", rotation_deg)) {
         const vec3f rotation_rad = {
@@ -102,7 +102,7 @@ inline void entity_properties_panel::render_rotation() const {
             math::radians(rotation_deg.z),
         };
         transform new_transform = transform_comp.get_transform();
-        new_transform.set_rotation(rotation_rad);
+        new_transform.set_rotation_euler(rotation_rad);
         set_transform_params params = {
             .name          = state_->scene.selected_name,
             .new_transform = new_transform,

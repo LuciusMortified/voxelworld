@@ -6,13 +6,15 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_vulkan.h>
 
+#include "vw/core/timing.h"
+
 namespace vw::gfx {
 
 template <typename C>
 renderer<C>::renderer(
-    vulkan_context& context, window& window
+    vulkan_context& context, window& window, const block_registry& registry
 )
-    : context_(&context), window_(&window) {
+    : context_(&context), window_(&window), block_registry_(&registry) {
     vertex_shader_ =
         std::make_unique<shader>(*context_, "shaders/voxel.vert.spv", shader_type::VERTEX);
     fragment_shader_ =
@@ -33,12 +35,16 @@ renderer<C>::renderer(
 
     shadow_map_ = std::make_unique<shadow_map>(*context_);
 
+    msaa_samples_ = get_max_usable_sample_count();
+
     create_swapchain();
     create_image_views();
+    create_color_resources();
     create_depth_resources();
     create_render_pass();
     create_descriptor_set_layouts();
     create_point_lights_descriptor_set_layout();
+    create_palette_descriptor_set_layout();
     create_graphics_pipeline();
     create_wireframe_pipeline();
     create_shadow_pipeline();
@@ -56,12 +62,19 @@ renderer<C>::renderer(
     create_imgui_descriptor_pool();
     init_imgui();
 
+    cull_pipeline_ = std::make_unique<cull_pipeline>(*context_, descriptor_pool_);
+
     combined_buffer_pool_ = std::make_unique<combined_buffer_pool_type>(
-        *context_, descriptor_pool_, storage_descriptor_set_layout_
+        *context_, descriptor_pool_, storage_descriptor_set_layout_,
+        cull_pipeline_->get_buffer_descriptor_set_layout()
     );
 
     light_buffer_ = std::make_unique<light_buffer_type>(
         *context_, descriptor_pool_, point_lights_descriptor_set_layout_
+    );
+
+    palette_buffer_ = std::make_unique<palette_buffer>(
+        *context_, descriptor_pool_, palette_descriptor_set_layout_, *block_registry_
     );
 }
 
@@ -70,17 +83,21 @@ renderer<C>::~renderer() {
     wait_idle();
 
     combined_buffer_pool_.reset();
+    cull_pipeline_.reset();
+    palette_buffer_.reset();
     light_buffer_.reset();
     shadow_map_.reset();
 
     cleanup_imgui();
 
     cleanup_swapchain();
+    cleanup_color_resources();
     cleanup_depth_resources();
     cleanup_pipelines();
     cleanup_shadow_pipeline();
     cleanup_debug_pipeline();
     cleanup_point_lights_resources();
+    cleanup_palette_resources();
     cleanup_descriptor_set_layouts();
     cleanup_render_pass();
     cleanup_descriptor_pool();
@@ -195,6 +212,11 @@ auto renderer<C>::get_directional_light_settings() -> directional_light_settings
 }
 
 template <typename C>
+auto renderer<C>::get_fog_settings() -> fog_settings& {
+    return fog_settings_;
+}
+
+template <typename C>
 void renderer<C>::set_clear_color(
     float r, float g, float b, float a
 ) {
@@ -243,13 +265,73 @@ void renderer<C>::render(
         throw std::runtime_error("Failed to begin recording command buffer!");
     }
 
-    shadow_map_->update(camera, directional_light_settings_.direction);
+    stats_.timing.shadow_map_update_ms = measure_ms([&] {
+        shadow_map_->update(camera, directional_light_settings_.direction);
+    });
+
     const auto& cascade_frustums = shadow_map_->get_cascade_frustums();
-    combined_buffer_pool_->update(world, camera, cascade_frustums);
 
-    render_shadow_pass(world, camera);
+    stats_.timing.buffer_pool_update_ms = measure_ms([&] {
+        combined_buffer_pool_->update(
+            world, camera, command_buffers_[current_image_index_]
+        );
+    });
 
-    render_world_pass(world, camera);
+    stats_.timing.compute_cull_ms = measure_ms([&] {
+        {
+            VkMemoryBarrier barrier{};
+            barrier.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask =                    //
+                VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT |  //
+                VK_ACCESS_INDEX_READ_BIT |             //
+                VK_ACCESS_INDIRECT_COMMAND_READ_BIT |  //
+                VK_ACCESS_SHADER_READ_BIT;
+            constexpr auto stage_mask =                //
+                VK_PIPELINE_STAGE_VERTEX_INPUT_BIT |   //
+                VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT |  //
+                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |  //
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT;
+            vkCmdPipelineBarrier(
+                command_buffers_[current_image_index_],
+                VK_PIPELINE_STAGE_TRANSFER_BIT,
+                stage_mask,
+                0, 1, &barrier, 0, nullptr, 0, nullptr
+            );
+        }
+
+        const frustum& view_frustum = camera.get_frustum();
+        cull_pipeline_->update_frustums(current_frame_, view_frustum, cascade_frustums);
+
+        for (const auto& buffer : combined_buffer_pool_->get_buffers()) {
+            if (!buffer->is_empty()) {
+                cull_pipeline_->dispatch(
+                    command_buffers_[current_image_index_], *buffer, current_frame_
+                );
+            }
+        }
+
+        {
+            VkMemoryBarrier compute_barrier{};
+            compute_barrier.sType         = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+            compute_barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+            compute_barrier.dstAccessMask = VK_ACCESS_INDIRECT_COMMAND_READ_BIT;
+            vkCmdPipelineBarrier(
+                command_buffers_[current_image_index_],
+                VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
+                0, 1, &compute_barrier, 0, nullptr, 0, nullptr
+            );
+        }
+    });
+
+    stats_.timing.shadow_pass_ms = measure_ms([&] {
+        render_shadow_pass(world, camera);
+    });
+
+    stats_.timing.world_pass_ms = measure_ms([&] {
+        render_world_pass(world, camera);
+    });
 
     if (vkEndCommandBuffer(command_buffers_[current_image_index_]) != VK_SUCCESS) {
         throw std::runtime_error("Failed to record command buffer!");
@@ -272,7 +354,7 @@ void renderer<C>::draw_box(
 
 template <typename C>
 void renderer<C>::draw_box(
-    const vw::transform& transform, const vec3f& size, color col
+    const transform& transform, const vec3f& size, color col
 ) {
     debug_primitives_.add_box(transform, size, col);
 }
@@ -293,7 +375,7 @@ void renderer<C>::draw_grid(
 
 template <typename C>
 void renderer<C>::draw_grid(
-    const vw::transform& transform, float cell_size, int cols, int rows, color clr
+    const transform& transform, float cell_size, int cols, int rows, color clr
 ) {
     debug_primitives_.add_grid(transform, cell_size, cols, rows, clr);
 }
@@ -390,6 +472,22 @@ void renderer<C>::create_image_views() {
 }
 
 template <typename C>
+void renderer<C>::create_color_resources() {
+    create_image(
+        color_image_,
+        color_image_memory_,
+        swapchain_extent_,
+        swapchain_image_format_,
+        VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        msaa_samples_
+    );
+    color_image_view_ =
+        create_image_view(color_image_, swapchain_image_format_, VK_IMAGE_ASPECT_COLOR_BIT);
+}
+
+template <typename C>
 void renderer<C>::create_depth_resources() {
     VkFormat depth_format = find_depth_format();
 
@@ -400,30 +498,33 @@ void renderer<C>::create_depth_resources() {
         depth_format,
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        msaa_samples_
     );
     depth_image_view_ = create_image_view(depth_image_, depth_format, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
 template <typename C>
 void renderer<C>::create_render_pass() {
+    // Attachment 0: MSAA color (render target)
     VkAttachmentDescription color_attachment{};
     color_attachment.format         = swapchain_image_format_;
-    color_attachment.samples        = VK_SAMPLE_COUNT_1_BIT;
+    color_attachment.samples        = msaa_samples_;
     color_attachment.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    color_attachment.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
+    color_attachment.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     color_attachment.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
     color_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     color_attachment.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
-    color_attachment.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    color_attachment.finalLayout    = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
     VkAttachmentReference color_attachment_ref{};
     color_attachment_ref.attachment = 0;
     color_attachment_ref.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
 
+    // Attachment 1: MSAA depth
     VkAttachmentDescription depth_attachment{};
-    depth_attachment.format         = VK_FORMAT_D32_SFLOAT;
-    depth_attachment.samples        = VK_SAMPLE_COUNT_1_BIT;
+    depth_attachment.format         = find_depth_format();
+    depth_attachment.samples        = msaa_samples_;
     depth_attachment.loadOp         = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depth_attachment.storeOp        = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depth_attachment.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -435,46 +536,44 @@ void renderer<C>::create_render_pass() {
     depth_attachment_ref.attachment = 1;
     depth_attachment_ref.layout     = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 
+    // Attachment 2: resolve target (swapchain image, 1x)
+    VkAttachmentDescription color_resolve_attachment{};
+    color_resolve_attachment.format         = swapchain_image_format_;
+    color_resolve_attachment.samples        = VK_SAMPLE_COUNT_1_BIT;
+    color_resolve_attachment.loadOp         = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color_resolve_attachment.storeOp        = VK_ATTACHMENT_STORE_OP_STORE;
+    color_resolve_attachment.stencilLoadOp  = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+    color_resolve_attachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    color_resolve_attachment.initialLayout  = VK_IMAGE_LAYOUT_UNDEFINED;
+    color_resolve_attachment.finalLayout    = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+
+    VkAttachmentReference color_resolve_ref{};
+    color_resolve_ref.attachment = 2;
+    color_resolve_ref.layout     = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+
     VkSubpassDescription subpass_3d    = {};
-    subpass_3d.flags                   = 0;
     subpass_3d.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass_3d.colorAttachmentCount    = 1;
     subpass_3d.pColorAttachments       = &color_attachment_ref;
     subpass_3d.pDepthStencilAttachment = &depth_attachment_ref;
-    subpass_3d.inputAttachmentCount    = 0;
-    subpass_3d.pInputAttachments       = nullptr;
     subpass_3d.pResolveAttachments     = nullptr;
-    subpass_3d.preserveAttachmentCount = 0;
-    subpass_3d.pPreserveAttachments    = nullptr;
 
     VkSubpassDescription subpass_debug    = {};
-    subpass_debug.flags                   = 0;
     subpass_debug.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass_debug.colorAttachmentCount    = 1;
     subpass_debug.pColorAttachments       = &color_attachment_ref;
     subpass_debug.pDepthStencilAttachment = &depth_attachment_ref;
-    subpass_debug.inputAttachmentCount    = 0;
-    subpass_debug.pInputAttachments       = nullptr;
     subpass_debug.pResolveAttachments     = nullptr;
-    subpass_debug.preserveAttachmentCount = 0;
-    subpass_debug.pPreserveAttachments    = nullptr;
 
-    // ImGui subpass (без depth)
     VkSubpassDescription subpass_imgui    = {};
-    subpass_imgui.flags                   = 0;
     subpass_imgui.pipelineBindPoint       = VK_PIPELINE_BIND_POINT_GRAPHICS;
     subpass_imgui.colorAttachmentCount    = 1;
     subpass_imgui.pColorAttachments       = &color_attachment_ref;
     subpass_imgui.pDepthStencilAttachment = nullptr;
-    subpass_imgui.inputAttachmentCount    = 0;
-    subpass_imgui.pInputAttachments       = nullptr;
-    subpass_imgui.pResolveAttachments     = nullptr;
-    subpass_imgui.preserveAttachmentCount = 0;
-    subpass_imgui.pPreserveAttachments    = nullptr;
+    subpass_imgui.pResolveAttachments     = &color_resolve_ref;
 
     VkSubpassDescription subpasses[] = {subpass_3d, subpass_debug, subpass_imgui};
 
-    // Dependency between external and 3D subpass
     VkSubpassDependency dependency_3d = {};
     dependency_3d.srcSubpass          = VK_SUBPASS_EXTERNAL;
     dependency_3d.dstSubpass          = 0;
@@ -482,7 +581,6 @@ void renderer<C>::create_render_pass() {
     dependency_3d.srcAccessMask       = 0;
     dependency_3d.dstStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     dependency_3d.dstAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    dependency_3d.dependencyFlags     = 0;
 
     VkSubpassDependency dependency_debug = {};
     dependency_debug.srcSubpass          = 0;
@@ -491,9 +589,7 @@ void renderer<C>::create_render_pass() {
     dependency_debug.srcAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     dependency_debug.dstStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     dependency_debug.dstAccessMask       = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    dependency_debug.dependencyFlags     = 0;
 
-    // Dependency between 3D subpass and ImGui subpass
     VkSubpassDependency dependency_imgui = {};
     dependency_imgui.srcSubpass          = 1;
     dependency_imgui.dstSubpass          = 2;
@@ -502,15 +598,16 @@ void renderer<C>::create_render_pass() {
     dependency_imgui.dstStageMask        = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
     dependency_imgui.dstAccessMask =
         VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    dependency_imgui.dependencyFlags = 0;
 
     VkSubpassDependency dependencies[] = {dependency_3d, dependency_debug, dependency_imgui};
 
-    VkAttachmentDescription attachments[] = {color_attachment, depth_attachment};
+    VkAttachmentDescription attachments[] = {
+        color_attachment, depth_attachment, color_resolve_attachment
+    };
 
     VkRenderPassCreateInfo render_pass_info{};
     render_pass_info.sType           = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO;
-    render_pass_info.attachmentCount = 2;
+    render_pass_info.attachmentCount = 3;
     render_pass_info.pAttachments    = attachments;
     render_pass_info.subpassCount    = 3;
     render_pass_info.pSubpasses      = subpasses;
@@ -544,18 +641,24 @@ void renderer<C>::create_descriptor_set_layouts() {
         throw std::runtime_error("failed to create uniform descriptor set layout");
     }
 
-    // Storage buffer descriptor set layout (set 1, binding 0)
-    VkDescriptorSetLayoutBinding storage_layout_binding{};
-    storage_layout_binding.binding            = 0;
-    storage_layout_binding.descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    storage_layout_binding.descriptorCount    = 1;
-    storage_layout_binding.stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;
-    storage_layout_binding.pImmutableSamplers = nullptr;
+    // Storage buffer descriptor set layout (set 1: binding 0 = model matrices, binding 1 = normal matrices)
+    std::array<VkDescriptorSetLayoutBinding, 2> storage_layout_bindings{};
+    storage_layout_bindings[0].binding            = 0;
+    storage_layout_bindings[0].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    storage_layout_bindings[0].descriptorCount    = 1;
+    storage_layout_bindings[0].stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;
+    storage_layout_bindings[0].pImmutableSamplers = nullptr;
+
+    storage_layout_bindings[1].binding            = 1;
+    storage_layout_bindings[1].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    storage_layout_bindings[1].descriptorCount    = 1;
+    storage_layout_bindings[1].stageFlags         = VK_SHADER_STAGE_VERTEX_BIT;
+    storage_layout_bindings[1].pImmutableSamplers = nullptr;
 
     VkDescriptorSetLayoutCreateInfo storage_layout_info{};
     storage_layout_info.sType        = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    storage_layout_info.bindingCount = 1;
-    storage_layout_info.pBindings    = &storage_layout_binding;
+    storage_layout_info.bindingCount = storage_layout_bindings.size();
+    storage_layout_info.pBindings    = storage_layout_bindings.data();
 
     if (vkCreateDescriptorSetLayout(
             context_->get_device(), &storage_layout_info, nullptr, &storage_descriptor_set_layout_
@@ -643,7 +746,7 @@ void renderer<C>::create_graphics_pipeline() {
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable  = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.rasterizationSamples = msaa_samples_;
 
     // Color blend state
     VkPipelineColorBlendAttachmentState color_blend_attachment{};
@@ -665,12 +768,12 @@ void renderer<C>::create_graphics_pipeline() {
     depth_stencil.depthBoundsTestEnable = VK_FALSE;
     depth_stencil.stencilTestEnable     = VK_FALSE;
 
-    // Pipeline layout с четырьмя descriptor set layouts
-    std::array<VkDescriptorSetLayout, 4> descriptor_set_layouts = {
+    std::array<VkDescriptorSetLayout, 5> descriptor_set_layouts = {
         uniform_descriptor_set_layout_,
         storage_descriptor_set_layout_,
         shadow_descriptor_set_layout_,
-        point_lights_descriptor_set_layout_
+        point_lights_descriptor_set_layout_,
+        palette_descriptor_set_layout_
     };
 
     VkPipelineLayoutCreateInfo pipeline_layout_info{};
@@ -766,7 +869,7 @@ void renderer<C>::create_wireframe_pipeline() {
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable  = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.rasterizationSamples = msaa_samples_;
 
     VkPipelineColorBlendAttachmentState color_blend_attachment{};
     color_blend_attachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
@@ -871,7 +974,7 @@ void renderer<C>::create_debug_pipeline() {
     VkPipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sType                = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable  = VK_FALSE;
-    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+    multisampling.rasterizationSamples = msaa_samples_;
 
     // Color blend state
     VkPipelineColorBlendAttachmentState color_blend_attachment{};
@@ -943,14 +1046,15 @@ void renderer<C>::create_framebuffers() {
 
     for (size_t i = 0; i < swapchain_image_views_.size(); i++) {
         VkImageView attachments[] = {
-            swapchain_image_views_[i],
+            color_image_view_,
             depth_image_view_,
+            swapchain_image_views_[i],
         };
 
         VkFramebufferCreateInfo framebuffer_info{};
         framebuffer_info.sType           = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
         framebuffer_info.renderPass      = render_pass_;
-        framebuffer_info.attachmentCount = 2;
+        framebuffer_info.attachmentCount = 3;
         framebuffer_info.pAttachments    = attachments;
         framebuffer_info.width           = swapchain_extent_.width;
         framebuffer_info.height          = swapchain_extent_.height;
@@ -1036,13 +1140,13 @@ void renderer<C>::create_uniform_buffers() {
 
 template <typename C>
 void renderer<C>::create_descriptor_pool() {
-    constexpr uint32_t MAX_DESCRIPTOR_SETS  = 256;  // Поддержка множества буферов
-    constexpr uint32_t STORAGE_BUFFER_COUNT = 256;  // Один storage buffer на буфер
+    constexpr uint32_t MAX_DESCRIPTOR_SETS  = 512;
+    constexpr uint32_t STORAGE_BUFFER_COUNT = 1024;
 
     std::array pool_sizes = {
         VkDescriptorPoolSize{
             VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-            static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 2)  // Основные + shadow uniform buffers
+            static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT * 2 + MAX_FRAMES_IN_FLIGHT)
         },
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, STORAGE_BUFFER_COUNT},
         VkDescriptorPoolSize{
@@ -1123,7 +1227,7 @@ void renderer<C>::init_imgui() {
     init_info.Subpass                   = 2;
     init_info.MinImageCount             = 2;
     init_info.ImageCount                = swapchain_images_.size();
-    init_info.MSAASamples               = VK_SAMPLE_COUNT_1_BIT;
+    init_info.MSAASamples               = msaa_samples_;
     init_info.Allocator                 = nullptr;
     init_info.CheckVkResultFn           = nullptr;
 
@@ -1285,6 +1389,22 @@ void renderer<C>::cleanup_swapchain() {
 }
 
 template <typename C>
+void renderer<C>::cleanup_color_resources() {
+    if (color_image_view_ != VK_NULL_HANDLE) {
+        vkDestroyImageView(context_->get_device(), color_image_view_, nullptr);
+        color_image_view_ = VK_NULL_HANDLE;
+    }
+    if (color_image_ != VK_NULL_HANDLE) {
+        vkDestroyImage(context_->get_device(), color_image_, nullptr);
+        color_image_ = VK_NULL_HANDLE;
+    }
+    if (color_image_memory_ != VK_NULL_HANDLE) {
+        vkFreeMemory(context_->get_device(), color_image_memory_, nullptr);
+        color_image_memory_ = VK_NULL_HANDLE;
+    }
+}
+
+template <typename C>
 void renderer<C>::cleanup_depth_resources() {
     if (depth_image_view_ != VK_NULL_HANDLE) {
         vkDestroyImageView(context_->get_device(), depth_image_view_, nullptr);
@@ -1317,10 +1437,12 @@ void renderer<C>::recreate_swapchain() {
     wait_idle();
 
     cleanup_swapchain();
+    cleanup_color_resources();
     cleanup_depth_resources();
 
     create_swapchain();
     create_image_views();
+    create_color_resources();
     create_depth_resources();
     create_framebuffers();
     create_sync_objects();
@@ -1333,9 +1455,10 @@ template <typename WC>
 void renderer<WC>::render_world_pass(
     world_type& world, const camera& camera
 ) {
-    update_uniform_buffer(camera);
+    stats_.timing.world_pass_uniform_ms = measure_ms([&] {
+        update_uniform_buffer(camera);
+    });
 
-    // Начинаем рендер пасс
     VkRenderPassBeginInfo render_pass_info{};
     render_pass_info.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     render_pass_info.renderPass        = render_pass_;
@@ -1343,14 +1466,13 @@ void renderer<WC>::render_world_pass(
     render_pass_info.renderArea.offset = {0, 0};
     render_pass_info.renderArea.extent = swapchain_extent_;
 
-    VkClearValue clear_values[2];
+    VkClearValue clear_values[3]{};
     memcpy(&clear_values[0].color, &clear_color_, sizeof(vec4f));
     clear_values[1].depthStencil = {1.0f, 0};
 
-    render_pass_info.clearValueCount = 2;
+    render_pass_info.clearValueCount = 3;
     render_pass_info.pClearValues    = clear_values;
 
-    // Первый проход для 3д объектов
     vkCmdBeginRenderPass(
         command_buffers_[current_image_index_], &render_pass_info, VK_SUBPASS_CONTENTS_INLINE
     );
@@ -1371,17 +1493,21 @@ void renderer<WC>::render_world_pass(
 
     vkCmdSetScissor(command_buffers_[current_image_index_], 0, 1, &scissor);
 
-    render_world(world, camera);
+    stats_.timing.world_pass_geometry_ms = measure_ms([&] {
+        render_world(world, camera);
+    });
 
-    // Переходим к проходу для примитивов
     vkCmdNextSubpass(command_buffers_[current_image_index_], VK_SUBPASS_CONTENTS_INLINE);
 
-    render_debug_primitives();
+    stats_.timing.world_pass_debug_ms = measure_ms([&] {
+        render_debug_primitives();
+    });
 
-    // Переходим к проходу для ImGui
     vkCmdNextSubpass(command_buffers_[current_image_index_], VK_SUBPASS_CONTENTS_INLINE);
 
-    render_imgui();
+    stats_.timing.world_pass_imgui_ms = measure_ms([&] {
+        render_imgui();
+    });
 
     vkCmdEndRenderPass(command_buffers_[current_image_index_]);
 }
@@ -1436,6 +1562,19 @@ void renderer<WC>::render_world(
         nullptr
     );
 
+    // Биндим palette descriptor set (set 4)
+    VkDescriptorSet palette_ds = palette_buffer_->get_descriptor_set();
+    vkCmdBindDescriptorSets(
+        command_buffers_[current_image_index_],
+        VK_PIPELINE_BIND_POINT_GRAPHICS,
+        pipeline_layout_,
+        4,  // Set index 4 (palette descriptor set layout)
+        1,
+        &palette_ds,
+        0,
+        nullptr
+    );
+
     const auto& buffers = combined_buffer_pool_->get_buffers();
     for (const auto& buffer : buffers) {
         if (buffer->is_empty()) {
@@ -1477,15 +1616,15 @@ void renderer<WC>::render_world(
             command_buffers_[current_image_index_], index_buffer, 0, VK_INDEX_TYPE_UINT32
         );
 
-        // Indirect draw call
-        const VkBuffer indirect_buffer = buffer->get_indirect_draw_buffer();
-        const uint32_t draw_count      = buffer->get_draw_command_count();
-        if (draw_count > 0) {
-            vkCmdDrawIndexedIndirect(
+        const uint32_t max_draws = buffer->get_draw_command_count();
+        if (max_draws > 0) {
+            vkCmdDrawIndexedIndirectCount(
                 command_buffers_[current_image_index_],
-                indirect_buffer,
+                buffer->get_culled_indirect_buffer(),
                 0,
-                draw_count,
+                buffer->get_count_buffer(),
+                0,
+                max_draws,
                 sizeof(draw_command)
             );
             draw_call_count_++;
@@ -1524,6 +1663,12 @@ void renderer<C>::update_uniform_buffer(
 
     // Point lights count
     ubo.point_lights_count = light_buffer_->get_lights_count();
+
+    // Fog
+    ubo.fog.color         = fog_settings_.color;
+    ubo.fog.near_distance = fog_settings_.near_distance;
+    ubo.fog.far_distance  = fog_settings_.far_distance;
+    ubo.fog.enabled       = fog_settings_.enabled ? 1u : 0u;
 
     uniform_buffers_[current_frame_]->copy_from_struct(ubo);
 }
@@ -1659,7 +1804,8 @@ void renderer<C>::create_image(
     VkFormat format,
     VkImageTiling tiling,
     VkImageUsageFlags usage,
-    VkMemoryPropertyFlags properties
+    VkMemoryPropertyFlags properties,
+    VkSampleCountFlagBits samples
 ) {
     VkImageCreateInfo image_info{};
     image_info.sType         = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -1673,7 +1819,7 @@ void renderer<C>::create_image(
     image_info.tiling        = tiling;
     image_info.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
     image_info.usage         = usage;
-    image_info.samples       = VK_SAMPLE_COUNT_1_BIT;
+    image_info.samples       = samples;
     image_info.sharingMode   = VK_SHARING_MODE_EXCLUSIVE;
 
     if (vkCreateImage(context_->get_device(), &image_info, nullptr, &image) != VK_SUCCESS) {
@@ -1782,6 +1928,19 @@ VkExtent2D renderer<C>::choose_swap_extent(
     );
 
     return actual_extent;
+}
+
+template <typename C>
+auto renderer<C>::get_max_usable_sample_count() -> VkSampleCountFlagBits {
+    VkPhysicalDeviceProperties props;
+    vkGetPhysicalDeviceProperties(context_->get_physical_device(), &props);
+
+    VkSampleCountFlags counts = props.limits.framebufferColorSampleCounts &
+                                props.limits.framebufferDepthSampleCounts;
+
+    if (counts & VK_SAMPLE_COUNT_4_BIT) return VK_SAMPLE_COUNT_4_BIT;
+    if (counts & VK_SAMPLE_COUNT_2_BIT) return VK_SAMPLE_COUNT_2_BIT;
+    return VK_SAMPLE_COUNT_1_BIT;
 }
 
 }  // namespace vw::gfx

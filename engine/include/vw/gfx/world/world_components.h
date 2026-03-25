@@ -13,6 +13,7 @@
 #include "vw/gfx/world/components/socket_component.h"
 #include "vw/gfx/world/components/spatial_component.h"
 #include "vw/gfx/world/components/transform_component.h"
+#include "vw/gfx/world/components/world_view_component.h"
 
 namespace vw::gfx {
 
@@ -24,7 +25,8 @@ using base_world_components = std::tuple<
     light_component,
     socket_component,
     animation_player_component,
-    animation_target_component>;
+    animation_target_component,
+    world_view_component>;
 
 }
 

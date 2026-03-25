@@ -10,7 +10,7 @@
 namespace vw::gfx {
 class vulkan_context;
 
-enum class shader_type { VERTEX, FRAGMENT };
+enum class shader_type { VERTEX, FRAGMENT, COMPUTE };
 
 class shader {
 public:

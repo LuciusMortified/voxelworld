@@ -23,8 +23,13 @@ struct engine_stats {
     float32 frame_ms        = 0.0f;
     float32 world_update_ms = 0.0f;
     float32 world_render_ms = 0.0f;
+    float32 begin_frame_ms  = 0.0f;
+    float32 app_render_ms   = 0.0f;
+    float32 renderer_ms     = 0.0f;
+    float32 end_frame_ms    = 0.0f;
     uint64 ram_usage_bytes  = 0;
     uint64 vram_usage_bytes = 0;
+    world_update_stats systems;
 };
 
 template <typename WC = base_world_components>
@@ -51,6 +56,7 @@ public:
     [[nodiscard]] auto get_renderer() const -> renderer_type&;
     [[nodiscard]] auto get_camera() const -> camera&;
     [[nodiscard]] auto get_world() const -> world_type&;
+    [[nodiscard]] auto get_block_registry() const -> const block_registry&;
     [[nodiscard]] auto get_debug_tool() const -> debug_window_type&;
     [[nodiscard]] const engine_stats& get_stats() const;
 
@@ -63,6 +69,7 @@ private:
     std::unique_ptr<vulkan_context> vulkan_context_;
     std::unique_ptr<renderer_type> renderer_;
     std::unique_ptr<camera> camera_;
+    block_registry block_registry_;
     std::unique_ptr<world_type> world_;
     std::unique_ptr<debug_window_type> debug_tool_;
 
@@ -79,7 +86,7 @@ private:
     static constexpr float MEMORY_UPDATE_INTERVAL_SEC = 1.0f;
 
     void update_stats();
-    [[nodiscard]] uint64 calculate_ram_usage() const;
+    [[nodiscard]] static uint64 calculate_ram_usage();
     [[nodiscard]] uint64 calculate_vram_usage() const;
 
     event_sub<window_resize_event> window_resize_sub_;

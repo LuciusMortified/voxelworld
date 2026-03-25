@@ -16,20 +16,20 @@ struct model_identity {
     uint32 index      = invalid_index;
     uint32 generation = 0;
 
-    bool operator==(
+    auto operator==(
         const model_identity& other
-    ) const {
+    ) const -> bool {
         return index == other.index && generation == other.generation;
     }
 
-    bool operator!=(
+    auto operator!=(
         const model_identity& other
-    ) const {
+    ) const -> bool {
         return !(*this == other);
     }
 
     [[nodiscard]]
-    bool is_valid() const {
+    auto is_valid() const -> bool {
         return index != invalid_index;
     }
 };
@@ -40,9 +40,9 @@ static constexpr auto invalid_model_identity = model_identity{};
 
 template <>
 struct std::hash<vw::gfx::model_identity> {
-    size_t operator()(
+    auto operator()(
         const vw::gfx::model_identity& id
-    ) const noexcept {
+    ) const noexcept -> size_t {
         size_t x = (size_t{id.generation} << 32) | size_t{id.index};
 
         // splitmix64 finalizer

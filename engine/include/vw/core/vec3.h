@@ -3,6 +3,8 @@
 #ifndef VW_CORE_VEC3_H
 #define VW_CORE_VEC3_H
 
+#include <functional>
+
 #include "vw/core/types.h"
 
 namespace vw {
@@ -54,5 +56,15 @@ using vec3f = vec3<float32>;
 using vec3d = vec3<float64>;
 
 }  // namespace vw
+
+template <>
+struct std::hash<vw::vec3<vw::int32>> {
+    auto operator()(const vw::vec3<vw::int32>& v) const noexcept -> size_t {
+        size_t seed = std::hash<vw::int32>{}(v.x);
+        seed ^= std::hash<vw::int32>{}(v.y) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        seed ^= std::hash<vw::int32>{}(v.z) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+        return seed;
+    }
+};
 
 #endif  // VW_CORE_VEC3_H

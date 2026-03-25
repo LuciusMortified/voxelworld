@@ -4,10 +4,13 @@
 #define VW_GFX_COMPONENT_REGISTRY_H
 
 #include <algorithm>
+#include <array>
 #include <memory>
 #include <ranges>
 #include <typeindex>
+#include <unordered_set>
 
+#include "vw/gfx/world/component_change_deps.h"
 #include "vw/gfx/world/component_pool.h"
 #include "vw/gfx/world/entity_pool.h"
 
@@ -17,7 +20,7 @@ template <typename T, typename... Cs>
 class component_view;
 
 template <typename T, typename... Ts>
-consteval size_t type_index_in() {
+consteval auto type_index_in() -> size_t {
     static_assert((std::same_as<T, Ts> || ...), "type not in parameter pack");
     static_assert(
         ((std::same_as<T, Ts> ? 1 : 0) + ...) == 1,
@@ -34,10 +37,10 @@ consteval size_t type_index_in() {
 }
 
 template <typename... Ts>
-class registry {
+class entity_registry {
 public:
     template <typename T>
-    component_pool<T>& get_pool() {
+    auto get_pool() -> component_pool<T>& {
         constexpr size_t index = type_index_in<T, Ts...>();
         static_assert(index < sizeof...(Ts), "type not in component registry");
 
@@ -45,14 +48,14 @@ public:
     }
 
     template <typename T>
-    const component_pool<T>& get_pool() const {
+    auto get_pool() const -> const component_pool<T>& {
         constexpr size_t index = type_index_in<T, Ts...>();
         static_assert(index < sizeof...(Ts), "type not in component registry");
 
         return std::get<index>(component_pools_);
     }
 
-    entity create() {
+    auto create() -> entity {
         return entity_pool_.create();
     }
 
@@ -77,12 +80,12 @@ public:
     }
 
     template <typename T>
-    T& get(entity e) {
+    auto get(entity e) -> T& {
         return get_pool<T>().get(e);
     }
 
     template <typename T>
-    const T& get(entity e) const {
+    auto get(entity e) const -> const T& {
         return get_pool<T>().get(e);
     }
 
@@ -101,21 +104,81 @@ public:
     }
 
     void destroy(entity e) {
+        destroyed_set_.push_back(e);
         entity_pool_.destroy(e);
     }
 
     void batch_destroy(const std::vector<entity>& entities) {
+        destroyed_set_.insert(destroyed_set_.end(), entities.begin(), entities.end());
         entity_pool_.batch_destroy(entities);
+    }
+
+    [[nodiscard]] auto destroyed() const -> const std::vector<entity>& {
+        return destroyed_set_;
     }
 
     template <typename... Cs>
     auto view() {
-        return component_view<registry, Cs...>(*this);
+        return component_view<entity_registry, Cs...>(*this);
+    }
+
+    template <typename T>
+    void request_change(entity ent) {
+        constexpr size_t index = type_index_in<T, Ts...>();
+        request_sets_[index].insert(ent);
+    }
+
+    template <typename T>
+    [[nodiscard]] auto requested() -> std::unordered_set<entity>& {
+        constexpr size_t index = type_index_in<T, Ts...>();
+        return request_sets_[index];
+    }
+
+    template <typename T>
+    void clear_requested() {
+        constexpr size_t index = type_index_in<T, Ts...>();
+        request_sets_[index].clear();
+    }
+
+    template <typename T>
+    void notify_changed(entity ent) {
+        constexpr size_t index = type_index_in<T, Ts...>();
+        changed_sets_[index].insert(ent);
+        propagate_deps_(ent, typename component_change_deps<T>::types{});
+    }
+
+    template <typename T>
+    [[nodiscard]] auto changed() -> std::unordered_set<entity>& {
+        constexpr size_t index = type_index_in<T, Ts...>();
+        return changed_sets_[index];
+    }
+
+    void clear_changed() {
+        for (auto& s : changed_sets_) {
+            s.clear();
+        }
+        destroyed_set_.clear();
     }
 
 private:
+    template <typename... Deps>
+    void propagate_deps_(entity ent, std::tuple<Deps...> /*unused*/) {
+        (propagate_one_<Deps>(ent), ...);
+    }
+
+    template <typename Dep>
+    void propagate_one_(entity ent) {
+        if (has<Dep>(ent)) {
+            constexpr size_t index = type_index_in<Dep, Ts...>();
+            request_sets_[index].insert(ent);
+        }
+    }
+
     entity_pool entity_pool_;
     std::tuple<component_pool<Ts>...> component_pools_;
+    std::array<std::unordered_set<entity>, sizeof...(Ts)> request_sets_;
+    std::array<std::unordered_set<entity>, sizeof...(Ts)> changed_sets_;
+    std::vector<entity> destroyed_set_;
 };
 
 template <typename T, typename... Cs>
@@ -199,7 +262,7 @@ private:
         auto it = std::min_element(
             std::begin(candidates),
             std::end(candidates),
-            [](const auto& a, const auto& b) { return a.first < b.first; }
+            [](const auto& a, const auto& b) -> auto { return a.first < b.first; }
         );
         entities_ = it->second;
     }
@@ -214,7 +277,7 @@ struct registry_from_tuple;
 
 template <typename... Ts>
 struct registry_from_tuple<std::tuple<Ts...>> {
-    using type = registry<Ts...>;
+    using type = entity_registry<Ts...>;
 };
 
 }  // namespace vw::gfx

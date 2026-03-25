@@ -25,6 +25,12 @@ void debug_window<WC>::render(
     }
 
     render_fps_window();
+    if (show_systems_detail_) {
+        render_systems_detail();
+    }
+    if (show_render_detail_) {
+        render_render_detail();
+    }
     if (show_combined_buffers_detail_) {
         render_combined_buffers_detail();
     }
@@ -96,7 +102,15 @@ void debug_window<WC>::render_fps_window() {
             cb_stats.instance_capacity
         );
         ImGui::Spacing();
-        if (ImGui::Button("buffer details")) {
+        if (ImGui::Button("systems")) {
+            show_systems_detail_ = !show_systems_detail_;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("render")) {
+            show_render_detail_ = !show_render_detail_;
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("buffers")) {
             show_combined_buffers_detail_ = !show_combined_buffers_detail_;
         }
         ImGui::Spacing();
@@ -117,6 +131,85 @@ void debug_window<WC>::render_render_mode_controls() const {
     if (ImGui::Button("wire")) {
         engine_->get_renderer().set_render_mode(render_mode::wireframe);
     }
+}
+
+template <typename WC>
+void debug_window<WC>::render_systems_detail() {
+    ImGuiWindowFlags window_flags =          //
+        ImGuiWindowFlags_NoCollapse |        //
+        ImGuiWindowFlags_NoSavedSettings |   //
+        ImGuiWindowFlags_AlwaysAutoResize |  //
+        ImGuiWindowFlags_NoFocusOnAppearing;
+
+    bool show = show_systems_detail_;
+    if (ImGui::Begin("Debug Tool - Systems", &show, window_flags)) {
+        show_systems_detail_ = show;
+        const auto& s = engine_->get_stats().systems;
+
+        auto row = [this](const char* name, float32 ms) {
+            auto& max_val = metric_max_[name];
+            if (ms > max_val) {
+                max_val = ms;
+            }
+
+            ImVec4 color = {1.0f, 1.0f, 1.0f, 1.0f};
+            if (ms > 5.0f) {
+                color = {1.0f, 0.3f, 0.3f, 1.0f};
+            } else if (ms > 1.0f) {
+                color = {1.0f, 0.8f, 0.2f, 1.0f};
+            }
+            ImGui::TextColored(
+                color, "%-14s %6.2f ms  max %5.2f ms", name, ms, max_val
+            );
+        };
+
+        row("transform", s.transform_ms);
+        row("model", s.model_ms);
+
+        const auto& ms = engine_->get_world().get_model_system().get_stats();
+        ImGui::Indent();
+        row("process_done", ms.process_completed_ms);
+        row("update_done", ms.update_completed_ms);
+        row("process_dirty", ms.process_dirty_ms);
+        ImGui::Text("pending ent:%u mesh:%u", ms.pending_entities_count, ms.pending_meshes_count);
+        ImGui::Unindent();
+
+        row("spatial", s.spatial_ms);
+        row("light", s.light_ms);
+        row("world_grid", s.world_grid_ms);
+
+        const auto& wgs = engine_->get_world().get_world_grid_system().get_stats();
+        ImGui::Indent();
+        row("completed", wgs.process_completed_ms);
+
+        auto grid = engine_->get_world().get_world_grid_system().get_world_grid();
+        if (grid) {
+            const auto& cs = grid->get_completed_stats();
+            ImGui::Indent();
+            row("bound_from", cs.boundary_from_ms);
+            row("chunk_create", cs.chunk_create_ms);
+            row("bound_to", cs.boundary_to_ms);
+            row("deferred", cs.deferred_ms);
+            ImGui::Text("processed: %u", cs.chunks_processed);
+            ImGui::Unindent();
+        }
+
+        row("requests", wgs.request_chunks_ms);
+        row("rebuild", wgs.rebuild_active_ms);
+        row("unload", wgs.unload_ms);
+        ImGui::Text("active:%u loaded:%u pending:%u remesh:%u",
+                    wgs.active_count, wgs.loaded_count,
+                    wgs.pending_count, wgs.deferred_remesh_count);
+        ImGui::Unindent();
+
+        row("animation", s.animation_ms);
+
+        ImGui::Spacing();
+        if (ImGui::Button("reset##systems")) {
+            metric_max_.clear();
+        }
+    }
+    ImGui::End();
 }
 
 template <typename WC>
@@ -163,6 +256,69 @@ void debug_window<WC>::render_combined_buffers_detail() {
             );
             ImGui::Unindent();
             ImGui::Separator();
+        }
+    }
+    ImGui::End();
+}
+
+template <typename WC>
+void debug_window<WC>::render_render_detail() {
+    ImGuiWindowFlags window_flags =          //
+        ImGuiWindowFlags_NoCollapse |        //
+        ImGuiWindowFlags_NoSavedSettings |   //
+        ImGuiWindowFlags_AlwaysAutoResize |  //
+        ImGuiWindowFlags_NoFocusOnAppearing;
+
+    bool show = show_render_detail_;
+    if (ImGui::Begin("Debug Tool - Render", &show, window_flags)) {
+        show_render_detail_ = show;
+        const auto& t = engine_->get_renderer().get_stats().timing;
+        const auto& eng = engine_->get_stats();
+
+        auto row = [this](const char* name, float32 ms) {
+            auto& max_val = metric_max_[name];
+            if (ms > max_val) {
+                max_val = ms;
+            }
+
+            ImVec4 color = {1.0f, 1.0f, 1.0f, 1.0f};
+            if (ms > 5.0f) {
+                color = {1.0f, 0.3f, 0.3f, 1.0f};
+            } else if (ms > 1.0f) {
+                color = {1.0f, 0.8f, 0.2f, 1.0f};
+            }
+            ImGui::TextColored(
+                color, "%-14s %6.2f ms  max %5.2f ms", name, ms, max_val
+            );
+        };
+
+        row("begin_frame", eng.begin_frame_ms);
+        row("app_render", eng.app_render_ms);
+        row("shadow_update", t.shadow_map_update_ms);
+        row("buffer_pool", t.buffer_pool_update_ms);
+
+        const auto& bp = engine_->get_renderer().get_stats().combined_buffers.timing;
+        ImGui::Indent();
+        row("destroyed", bp.destroyed_ms);
+        row("meshes", bp.meshes_ms);
+        row("transforms", bp.transforms_ms);
+        row("staging", bp.staging_flush_ms);
+        ImGui::Unindent();
+
+        row("compute_cull", t.compute_cull_ms);
+        row("shadow_pass", t.shadow_pass_ms);
+        row("world_pass", t.world_pass_ms);
+        ImGui::Indent();
+        row("uniform", t.world_pass_uniform_ms);
+        row("geometry", t.world_pass_geometry_ms);
+        row("debug", t.world_pass_debug_ms);
+        row("imgui", t.world_pass_imgui_ms);
+        ImGui::Unindent();
+        row("end_frame", eng.end_frame_ms);
+
+        ImGui::Spacing();
+        if (ImGui::Button("reset##render")) {
+            metric_max_.clear();
         }
     }
     ImGui::End();

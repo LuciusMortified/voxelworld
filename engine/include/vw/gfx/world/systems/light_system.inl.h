@@ -12,11 +12,17 @@ light_system<Cs...>::light_system(registry_type& registry)
     : registry_(&registry) {}
 
 template <typename... Cs>
-void light_system<Cs...>::update() {}
+void light_system<Cs...>::update() {
+    auto& requested = registry_->template requested<light_component>();
+    if (requested.empty()) {
+        return;
+    }
 
-template <typename... Cs>
-void light_system<Cs...>::mark_dirty(entity ent) {
-    dirty_entities_.insert(ent);
+    for (entity ent : requested) {
+        registry_->template notify_changed<light_component>(ent);
+    }
+
+    registry_->template clear_requested<light_component>();
 }
 
 template <typename... Cs>
@@ -39,7 +45,7 @@ auto light_system<Cs...>::light_modifier::set_color(
     }
     auto& comp = system_->registry_->template get<light_component>(entity_);
     comp.color_ = color;
-    system_->mark_render_dirty(entity_);
+    system_->registry_->template request_change<light_component>(entity_);
     return *this;
 }
 
@@ -52,7 +58,7 @@ auto light_system<Cs...>::light_modifier::set_intensity(
     }
     auto& comp = system_->registry_->template get<light_component>(entity_);
     comp.intensity_ = intensity;
-    system_->mark_render_dirty(entity_);
+    system_->registry_->template request_change<light_component>(entity_);
     return *this;
 }
 
@@ -65,7 +71,7 @@ auto light_system<Cs...>::light_modifier::set_range(
     }
     auto& comp = system_->registry_->template get<light_component>(entity_);
     comp.range_ = range;
-    system_->mark_render_dirty(entity_);
+    system_->registry_->template request_change<light_component>(entity_);
     return *this;
 }
 
@@ -80,18 +86,8 @@ auto light_system<Cs...>::light_modifier::set_attenuation(
     comp.attenuation_constant_ = constant;
     comp.attenuation_linear_ = linear;
     comp.attenuation_quadratic_ = quadratic;
-    system_->mark_render_dirty(entity_);
+    system_->registry_->template request_change<light_component>(entity_);
     return *this;
-}
-
-template <typename... Cs>
-auto light_system<Cs...>::get_render_dirty_entities() -> std::unordered_set<entity>& {
-    return render_dirty_entities_;
-}
-
-template <typename... Cs>
-void light_system<Cs...>::mark_render_dirty(entity ent) {
-    render_dirty_entities_.insert(ent);
 }
 
 }  // namespace vw::gfx

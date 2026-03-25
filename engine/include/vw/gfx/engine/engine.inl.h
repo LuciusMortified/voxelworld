@@ -27,10 +27,10 @@ engine<WC>::engine(
 ) {
     window_         = std::make_unique<window>(width, height, title);
     vulkan_context_ = std::make_unique<vulkan_context>(*window_);
-    renderer_       = std::make_unique<renderer_type>(*vulkan_context_, *window_);
+    renderer_       = std::make_unique<renderer_type>(*vulkan_context_, *window_, block_registry_);
     camera_ =
         std::make_unique<camera>(45.0f, static_cast<float>(width) / static_cast<float>(height));
-    world_      = std::make_unique<world_type>(*vulkan_context_);
+    world_      = std::make_unique<world_type>(*vulkan_context_, block_registry_);
     debug_tool_ = std::make_unique<debug_window_type>(*this);
 
     // Default empty app to avoid null checks
@@ -106,6 +106,11 @@ auto engine<WC>::get_world() const -> world_type& {
 }
 
 template <typename WC>
+auto engine<WC>::get_block_registry() const -> const block_registry& {
+    return block_registry_;
+}
+
+template <typename WC>
 auto engine<WC>::get_debug_tool() const -> debug_window_type& {
     return *debug_tool_;
 }
@@ -141,15 +146,29 @@ void engine<WC>::render(
     stats_.world_update_ms =
         std::chrono::duration<float32>(world_update_end - world_update_start_time_).count() *
         1000.0f;
+    stats_.systems = world_->get_update_stats();
 
+    using clock = std::chrono::high_resolution_clock;
+    auto ms = [](auto a, auto b) -> float32 {
+        return std::chrono::duration<float32>(b - a).count() * 1000.0f;
+    };
+
+    auto r0 = clock::now();
     renderer_->begin_frame();
+    auto r1 = clock::now();
     app_->render(delta_time);
     debug_tool_->render(delta_time);
+    auto r2 = clock::now();
     renderer_->render(*world_, *camera_);
+    auto r3 = clock::now();
     renderer_->end_frame();
-    const auto render_end = std::chrono::high_resolution_clock::now();
-    stats_.world_render_ms =
-        std::chrono::duration<float32>(render_end - world_update_end).count() * 1000.0f;
+    auto r4 = clock::now();
+
+    stats_.begin_frame_ms  = ms(r0, r1);
+    stats_.app_render_ms   = ms(r1, r2);
+    stats_.renderer_ms     = ms(r2, r3);
+    stats_.end_frame_ms    = ms(r3, r4);
+    stats_.world_render_ms = ms(world_update_end, r4);
 }
 
 template <typename WC>
@@ -178,7 +197,7 @@ void engine<WC>::update_stats() {
 }
 
 template <typename WC>
-uint64 engine<WC>::calculate_ram_usage() const {
+auto engine<WC>::calculate_ram_usage() -> uint64 {
 #ifdef _WIN32
     PROCESS_MEMORY_COUNTERS_EX pmc{};
     if (GetProcessMemoryInfo(
@@ -191,9 +210,9 @@ uint64 engine<WC>::calculate_ram_usage() const {
 }
 
 template <typename WC>
-uint64 engine<WC>::calculate_vram_usage() const {
-    auto& vk_context                 = *vulkan_context_;
-    VkPhysicalDevice physical_device = vk_context.get_physical_device();
+auto engine<WC>::calculate_vram_usage() const -> uint64 {
+    const auto& vk_context                 = *vulkan_context_;
+    const VkPhysicalDevice physical_device = vk_context.get_physical_device();
 
     VkPhysicalDeviceMemoryBudgetPropertiesEXT budget_props{};
     budget_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT;
@@ -203,9 +222,15 @@ uint64 engine<WC>::calculate_vram_usage() const {
     mem_props.pNext = &budget_props;
 
     auto vkGetPhysicalDeviceMemoryProperties2 =
-        reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties2KHR>(vkGetInstanceProcAddr(
-            vk_context.get_instance(), "vkGetPhysicalDeviceMemoryProperties2KHR"
-        ));
+        reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties2KHR>(
+            vkGetInstanceProcAddr(vk_context.get_instance(), "vkGetPhysicalDeviceMemoryProperties2")
+        );
+    if (vkGetPhysicalDeviceMemoryProperties2 == nullptr) {
+        vkGetPhysicalDeviceMemoryProperties2 =
+            reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties2KHR>(vkGetInstanceProcAddr(
+                vk_context.get_instance(), "vkGetPhysicalDeviceMemoryProperties2KHR"
+            ));
+    }
 
     if (vkGetPhysicalDeviceMemoryProperties2 != nullptr) {
         vkGetPhysicalDeviceMemoryProperties2(physical_device, &mem_props);

@@ -4,7 +4,6 @@
 #define VW_GFX_SPATIAL_DYNAMIC_AABB_TREE_INL_H
 
 #include <algorithm>
-#include <array>
 #include <limits>
 
 #include "vw/core/math.h"
@@ -16,6 +15,7 @@ inline dynamic_aabb_tree::dynamic_aabb_tree() {
     nodes_.reserve(256);
     free_nodes_.reserve(64);
     entity_to_node_.reserve(128);
+    query_stack_.reserve(256);
 }
 
 inline auto dynamic_aabb_tree::allocate_node() -> uint32 {
@@ -288,37 +288,65 @@ inline void dynamic_aabb_tree::query_all(
     if (root_index_ == invalid_node_index) {
         return;
     }
-    
-    // Стек для итеративного обхода дерева (без динамических аллокаций)
-    std::array<uint32, max_stack_size> stack;
-    size_t stack_top = 0;
-    
-    stack[stack_top++] = root_index_;
-    
-    while (stack_top > 0) {
-        uint32 node_index = stack[--stack_top];
+
+    query_stack_.clear();
+    query_stack_.push_back(root_index_);
+
+    while (!query_stack_.empty()) {
+        uint32 node_index = query_stack_.back();
+        query_stack_.pop_back();
         const node& current = nodes_[node_index];
-        
-        // Проверить пересечение AABB узла с frustum
+
         if (!f.intersects(current.bounds)) {
             continue;
         }
-        
+
         if (current.is_leaf) {
-            // Это лист, добавить entity в результат
             if (current.entity_id.is_valid()) {
                 result_out.insert(current.entity_id);
             }
         } else {
-            // Добавить оба поддерева в стек
-            if (stack_top + 1 < max_stack_size) {
-                stack[stack_top++] = current.left;
-                stack[stack_top++] = current.right;
-            } else if (stack_top < max_stack_size) {
-                // Если осталось место только для одного узла, добавить хотя бы один
-                stack[stack_top++] = current.left;
+            query_stack_.push_back(current.left);
+            query_stack_.push_back(current.right);
+        }
+    }
+}
+
+inline void dynamic_aabb_tree::query_all_any(
+    std::span<const frustum> frustums,
+    std::vector<entity>& result_out
+) const {
+    result_out.clear();
+    if (root_index_ == invalid_node_index) {
+        return;
+    }
+
+    query_stack_.clear();
+    query_stack_.push_back(root_index_);
+
+    while (!query_stack_.empty()) {
+        uint32 node_index = query_stack_.back();
+        query_stack_.pop_back();
+        const node& current = nodes_[node_index];
+
+        bool any_intersects = false;
+        for (const auto& f : frustums) {
+            if (f.intersects(current.bounds)) {
+                any_intersects = true;
+                break;
             }
-            // Если стек переполнен, пропускаем (крайне редкий случай для нормального дерева)
+        }
+        if (!any_intersects) {
+            continue;
+        }
+
+        if (current.is_leaf) {
+            if (current.entity_id.is_valid()) {
+                result_out.push_back(current.entity_id);
+            }
+        } else {
+            query_stack_.push_back(current.left);
+            query_stack_.push_back(current.right);
         }
     }
 }
@@ -331,37 +359,26 @@ inline void dynamic_aabb_tree::query_all(
     if (root_index_ == invalid_node_index) {
         return;
     }
-    
-    // Стек для итеративного обхода дерева (без динамических аллокаций)
-    std::array<uint32, max_stack_size> stack;
-    size_t stack_top = 0;
-    
-    stack[stack_top++] = root_index_;
-    
-    while (stack_top > 0) {
-        uint32 node_index = stack[--stack_top];
+
+    query_stack_.clear();
+    query_stack_.push_back(root_index_);
+
+    while (!query_stack_.empty()) {
+        uint32 node_index = query_stack_.back();
+        query_stack_.pop_back();
         const node& current = nodes_[node_index];
-        
-        // Проверить пересечение AABB узла с лучом
+
         if (!current.bounds.intersects(r)) {
             continue;
         }
-        
+
         if (current.is_leaf) {
-            // Это лист, добавить entity в результат
             if (current.entity_id.is_valid()) {
                 result_out.insert(current.entity_id);
             }
         } else {
-            // Добавить оба поддерева в стек
-            if (stack_top + 1 < max_stack_size) {
-                stack[stack_top++] = current.left;
-                stack[stack_top++] = current.right;
-            } else if (stack_top < max_stack_size) {
-                // Если осталось место только для одного узла, добавить хотя бы один
-                stack[stack_top++] = current.left;
-            }
-            // Если стек переполнен, пропускаем (крайне редкий случай для нормального дерева)
+            query_stack_.push_back(current.left);
+            query_stack_.push_back(current.right);
         }
     }
 }
@@ -374,37 +391,26 @@ inline void dynamic_aabb_tree::query_all(
     if (root_index_ == invalid_node_index) {
         return;
     }
-    
-    // Стек для итеративного обхода дерева (без динамических аллокаций)
-    std::array<uint32, max_stack_size> stack;
-    size_t stack_top = 0;
-    
-    stack[stack_top++] = root_index_;
-    
-    while (stack_top > 0) {
-        uint32 node_index = stack[--stack_top];
+
+    query_stack_.clear();
+    query_stack_.push_back(root_index_);
+
+    while (!query_stack_.empty()) {
+        uint32 node_index = query_stack_.back();
+        query_stack_.pop_back();
         const node& current = nodes_[node_index];
-        
-        // Проверить пересечение AABB узла с запрашиваемым AABB
+
         if (!current.bounds.intersects(bounds)) {
             continue;
         }
-        
+
         if (current.is_leaf) {
-            // Это лист, добавить entity в результат
             if (current.entity_id.is_valid()) {
                 result_out.insert(current.entity_id);
             }
         } else {
-            // Добавить оба поддерева в стек
-            if (stack_top + 1 < max_stack_size) {
-                stack[stack_top++] = current.left;
-                stack[stack_top++] = current.right;
-            } else if (stack_top < max_stack_size) {
-                // Если осталось место только для одного узла, добавить хотя бы один
-                stack[stack_top++] = current.left;
-            }
-            // Если стек переполнен, пропускаем (крайне редкий случай для нормального дерева)
+            query_stack_.push_back(current.left);
+            query_stack_.push_back(current.right);
         }
     }
 }

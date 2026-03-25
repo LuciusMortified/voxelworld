@@ -3,10 +3,9 @@
 #ifndef VW_GFX_HIERARCHY_SYSTEM_H
 #define VW_GFX_HIERARCHY_SYSTEM_H
 
-#include "vw/gfx/world/registry.h"
-
 #include "vw/gfx/world/components/hierarchy_component.h"
 #include "vw/gfx/world/components/transform_component.h"
+#include "vw/gfx/world/entity_registry.h"
 
 namespace vw::gfx {
 
@@ -16,7 +15,7 @@ class transform_system;
 template <typename... Cs>
 class hierarchy_system final {
 public:
-    using registry_type = registry<Cs...>;
+    using registry_type = entity_registry<Cs...>;
     using transform_system_type = transform_system<Cs...>;
 
     hierarchy_system(registry_type& registry, transform_system_type& transform_sys);

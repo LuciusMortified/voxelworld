@@ -10,14 +10,15 @@ namespace vw::sculptor {
 
 class color_palette_panel final {
 public:
-    explicit color_palette_panel(app_state& st);
+    color_palette_panel(app_state& st, const block_registry& registry);
 
     void render(float delta_time);
 
 private:
-    static ImVec4 to_imvec4(const color& clr);
+    static auto to_imvec4(color clr) -> ImVec4;
 
     app_state* state_;
+    const block_registry* registry_;
 };
 
 }  // namespace vw::sculptor

@@ -17,9 +17,9 @@ inline void paint_voxel_operation::execute() {
     auto& model_system = world.get_model_system();
 
     auto& model_comp = world.get_component<gfx::model_component>(ent);
-    previous_color_  = model_comp.get_voxel(params_.position).value;
+    previous_block_  = model_comp.get_voxel(params_.position).id;
 
-    model_system.modify(ent).set_voxel(params_.position, params_.new_color);
+    model_system.modify(ent).set_voxel(params_.position, voxel{params_.new_block});
     state_->file.has_unsaved_changes = true;
 }
 
@@ -29,7 +29,7 @@ inline void paint_voxel_operation::undo() {
     auto& world        = engine_->get_world();
     auto& model_system = world.get_model_system();
 
-    model_system.modify(ent).set_voxel(params_.position, previous_color_);
+    model_system.modify(ent).set_voxel(params_.position, voxel{previous_block_});
     state_->file.has_unsaved_changes = true;
 }
 

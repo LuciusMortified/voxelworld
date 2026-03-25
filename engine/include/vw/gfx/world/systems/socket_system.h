@@ -4,7 +4,7 @@
 #define VW_GFX_WORLD_SYSTEMS_SOCKET_SYSTEM_H
 
 #include "vw/gfx/world/components/socket_component.h"
-#include "vw/gfx/world/registry.h"
+#include "vw/gfx/world/entity_registry.h"
 
 namespace vw::gfx {
 
@@ -17,7 +17,7 @@ class transform_system;
 template <typename... Cs>
 class socket_system final {
 public:
-    using registry_type         = registry<Cs...>;
+    using registry_type         = entity_registry<Cs...>;
     using hierarchy_system_type = hierarchy_system<Cs...>;
     using transform_system_type = transform_system<Cs...>;
 
@@ -27,17 +27,16 @@ public:
         transform_system_type& transform_system
     );
 
-    void update();
-
-    void cleanup(entity ent);
-
     class socket_modifier {
     public:
         auto attach(const std::string& socket_name, entity child) -> socket_modifier&;
         auto detach(const std::string& socket_name) -> socket_modifier&;
-        auto add_socket(const std::string& name, const vec3f& position = {},
-                        const vec3f& rotation = {}, const vec3f& scale = vec3f{1, 1, 1})
-            -> socket_modifier&;
+        auto add_socket(
+            const std::string& name,
+            const vec3f& position = {},
+            const quat& rotation  = {},
+            const vec3f& scale    = vec3f{1, 1, 1}
+        ) -> socket_modifier&;
         auto remove_socket(const std::string& name) -> socket_modifier&;
 
     private:
@@ -49,6 +48,8 @@ public:
     };
 
     auto modify(entity ent) -> socket_modifier;
+    void cleanup(entity ent);
+    void update();
 
 private:
     registry_type* registry_;

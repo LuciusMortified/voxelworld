@@ -26,9 +26,9 @@ struct key_press_event final : event {
         : key(key), scancode(scancode), mods(mods) {}
 
     [[nodiscard]]
-    bool with(
+    auto with(
         keyboard::mods mod
-    ) const {
+    ) const -> bool {
         return (static_cast<int>(mods) & static_cast<int>(mod)) == static_cast<int>(mod);
     }
 };
@@ -163,7 +163,7 @@ private:
     std::size_t next_id_ = 1;
 
     template <event_type E>
-    static auto& get_callbacks() {
+    static auto get_callbacks() -> auto& {
         static std::map<std::size_t, std::function<bool(E&)>> callbacks;
         return callbacks;
     }

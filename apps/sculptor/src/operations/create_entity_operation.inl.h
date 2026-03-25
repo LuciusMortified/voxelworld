@@ -27,7 +27,7 @@ inline void create_entity_operation::execute() {
         ent_guard->with<gfx::model_component>();
 
         model = model_registry.create(params_.name, params_.size);
-        model->fill(voxel{state_->tool.selected_color});
+        model->fill(voxel{state_->tool.selected_block});
     }
 
     if (params_.with_socket) {

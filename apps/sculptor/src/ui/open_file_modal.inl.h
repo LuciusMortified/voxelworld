@@ -42,8 +42,8 @@ inline void open_file_modal::render(
                     filename_ = f;
                 }
             }
-            ImGui::EndChild();
         }
+        ImGui::EndChild();
 
         ImGui::Spacing();
         ImGui::Separator();
@@ -90,7 +90,7 @@ inline void open_file_modal::load_existing_filenames_() {
 inline auto open_file_modal::open_file_() -> bool {
     namespace fs = std::filesystem;
 
-    gfx::vox_deserializer deserializer{engine_->get_world()};
+    gfx::vox_deserializer<> deserializer{engine_->get_world(), engine_->get_block_registry()};
 
     const fs::path filepath =  //
         fs::path{app_state::asset_dir_name} / fs::path{filename_};
@@ -104,7 +104,7 @@ inline auto open_file_modal::open_file_() -> bool {
 
     state_->ui.need_startup_modal = false;
 
-    state_->file.filename       = filename_;
+    state_->file.filename        = filename_;
     state_->scene.root_name      = result->root_name;
     state_->scene.selected_name  = result->root_name;
     state_->scene.name_to_entity = std::move(result->name_to_entity);

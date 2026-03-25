@@ -250,7 +250,7 @@ void renderer<WC>::render_shadow_pass(
         render_pass_info.framebuffer       = shadow_map_->get_framebuffer(cascade_index);
         render_pass_info.renderArea.offset = {0, 0};
         render_pass_info.renderArea.extent = {
-            shadow_map::shadow_map_size, shadow_map::shadow_map_size
+            shadow_map_->get_size(), shadow_map_->get_size()
         };
 
         VkClearValue clear_value{};
@@ -267,15 +267,15 @@ void renderer<WC>::render_shadow_pass(
         VkViewport viewport{};
         viewport.x        = 0.0f;
         viewport.y        = 0.0f;
-        viewport.width    = static_cast<float>(shadow_map::shadow_map_size);
-        viewport.height   = static_cast<float>(shadow_map::shadow_map_size);
+        viewport.width    = static_cast<float>(shadow_map_->get_size());
+        viewport.height   = static_cast<float>(shadow_map_->get_size());
         viewport.minDepth = 0.0f;
         viewport.maxDepth = 1.0f;
         vkCmdSetViewport(command_buffers_[current_image_index_], 0, 1, &viewport);
 
         VkRect2D scissor{};
         scissor.offset = {0, 0};
-        scissor.extent = {shadow_map::shadow_map_size, shadow_map::shadow_map_size};
+        scissor.extent = {shadow_map_->get_size(), shadow_map_->get_size()};
         vkCmdSetScissor(command_buffers_[current_image_index_], 0, 1, &scissor);
 
         // Биндим shadow pipeline
@@ -352,16 +352,17 @@ void renderer<WC>::render_shadow_pass(
                 command_buffers_[current_image_index_], index_buffer, 0, VK_INDEX_TYPE_UINT32
             );
 
-            // Indirect draw call
-            VkBuffer indirect_buffer = buffer->get_indirect_draw_buffer();
-            uint32_t draw_count      = buffer->get_draw_command_count();
-            if (draw_count > 0) {
-                vkCmdDrawIndexedIndirect(
+            const uint32_t max_draws  = buffer->get_draw_command_count();
+            const uint32_t pass_index = cascade_index + 1;
+            if (max_draws > 0) {
+                vkCmdDrawIndexedIndirectCount(
                     command_buffers_[current_image_index_],
-                    indirect_buffer,
-                    0,
-                    draw_count,
-                    sizeof(VkDrawIndexedIndirectCommand)
+                    buffer->get_culled_indirect_buffer(),
+                    static_cast<VkDeviceSize>(pass_index) * max_draws * sizeof(draw_command),
+                    buffer->get_count_buffer(),
+                    pass_index * sizeof(uint32_t),
+                    max_draws,
+                    sizeof(draw_command)
                 );
             }
         }

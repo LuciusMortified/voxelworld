@@ -83,16 +83,16 @@ inline void paint_tool::on_mouse_press(
 
         const auto& model_comp = world.get_component<gfx::model_component>(ent);
         const bool has_model   = model_comp.has_model();
-        const bool is_same_color =
-            has_model && model_comp.get_voxel(hovered_voxel_).value == state_->tool.selected_color;
-        if (is_same_color) {
+        const bool is_same_block =
+            has_model && model_comp.get_voxel(hovered_voxel_).id == state_->tool.selected_block;
+        if (is_same_block) {
             return;
         }
 
         paint_voxel_params params;
         params.name      = state_->scene.selected_name;
         params.position  = hovered_voxel_;
-        params.new_color = state_->tool.selected_color;
+        params.new_block = state_->tool.selected_block;
 
         auto op = std::make_unique<paint_voxel_operation>(*engine_, *state_, params);
         op_manager_->execute(std::move(op));

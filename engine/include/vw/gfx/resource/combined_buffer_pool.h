@@ -5,15 +5,14 @@
 
 #include <vulkan/vulkan.h>
 
+#include <chrono>
 #include <map>
 #include <memory>
-#include <span>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "vw/gfx/resource/combined_buffer.h"
-#include "vw/gfx/spatial/frustum.h"
+#include "vw/gfx/resource/staging_buffer.h"
 #include "vw/gfx/world/entity.h"
 #include "vw/gfx/world/world.h"
 
@@ -24,6 +23,13 @@ class vulkan_context;
 struct entity_buffer_info {
     buffer_chunk_size chunk_size;
     size_t buffer_index;
+};
+
+struct buffer_pool_timing_stats {
+    float32 destroyed_ms     = 0.0f;
+    float32 meshes_ms        = 0.0f;
+    float32 transforms_ms    = 0.0f;
+    float32 staging_flush_ms = 0.0f;
 };
 
 struct combined_buffer_pool_stats {
@@ -38,13 +44,7 @@ struct combined_buffer_pool_stats {
     uint32 instance_capacity = 0;
     uint32 instance_count    = 0;
     std::vector<combined_buffer_stats> buffers;
-};
-
-struct visibility_cache {
-    frustum view_frustum;
-    std::unordered_set<entity> visible;
-    std::unordered_set<entity> tmp_visible;
-    std::unordered_set<entity> changed;
+    buffer_pool_timing_stats timing;
 };
 
 template <typename C>
@@ -55,51 +55,51 @@ public:
     explicit combined_buffer_pool(
         vulkan_context& context,
         VkDescriptorPool descriptor_pool,
-        VkDescriptorSetLayout descriptor_set_layout
+        VkDescriptorSetLayout descriptor_set_layout,
+        VkDescriptorSetLayout compute_descriptor_set_layout = VK_NULL_HANDLE
     );
     ~combined_buffer_pool() = default;
 
     combined_buffer_pool(const combined_buffer_pool&)            = delete;
-    combined_buffer_pool& operator=(const combined_buffer_pool&) = delete;
+    auto operator=(const combined_buffer_pool&) -> combined_buffer_pool& = delete;
     combined_buffer_pool(combined_buffer_pool&&)                 = delete;
-    combined_buffer_pool& operator=(combined_buffer_pool&&)      = delete;
+    auto operator=(combined_buffer_pool&&) -> combined_buffer_pool&      = delete;
 
     void update(
         world_type& world,
         const camera& camera,
-        std::span<const frustum> shadow_frustums = {}
+        VkCommandBuffer cmd
     );
 
     [[nodiscard]] auto get_buffers() const -> const std::vector<std::unique_ptr<combined_buffer>>&;
 
-    [[nodiscard]] static buffer_chunk_size get_chunk_size_for_mesh(
+    [[nodiscard]] static auto get_chunk_size_for_mesh(
         uint32 vertex_count, uint32 index_count
-    );
+    ) -> buffer_chunk_size;
 
-    [[nodiscard]] const combined_buffer_pool_stats& get_stats() const;
+    [[nodiscard]] auto get_stats() const -> const combined_buffer_pool_stats&;
 
 private:
-    combined_buffer* get_or_create_buffer(const buffer_chunk_size& chunk_size);
+    auto get_or_create_buffer(const buffer_chunk_size& chunk_size) -> combined_buffer*;
 
-    void update_meshes_(world_type& world, const frustum& view_frustum);
-    void update_transforms_(world_type& world, const frustum& view_frustum);
-    void update_visibility_cache_(
-        world_type& world,
-        const frustum& view_frustum,
-        std::span<const frustum> shadow_frustums
-    );
+    void process_destroyed_(world_type& world);
+    void update_meshes_(world_type& world, const vec3f& camera_pos);
+    void update_transforms_(world_type& world);
 
     vulkan_context* context_;
+    staging_buffer staging_;
     std::vector<std::unique_ptr<combined_buffer>> buffers_;
     std::unordered_map<entity, entity_buffer_info> entity_buffer_infos_;
     std::map<buffer_chunk_size, size_t> chunk_size_to_buffer_index_;
 
-    VkDescriptorPool descriptor_pool_            = VK_NULL_HANDLE;
-    VkDescriptorSetLayout descriptor_set_layout_ = VK_NULL_HANDLE;
+    VkDescriptorPool descriptor_pool_                     = VK_NULL_HANDLE;
+    VkDescriptorSetLayout descriptor_set_layout_          = VK_NULL_HANDLE;
+    VkDescriptorSetLayout compute_descriptor_set_layout_  = VK_NULL_HANDLE;
 
-    visibility_cache visibility_cache_{};
-    std::unordered_set<entity> entities_to_process_;
-    std::unordered_set<entity> shadow_query_tmp_;
+    std::vector<entity> entities_to_process_;
+    std::vector<entity> mesh_pending_entities_;
+    std::vector<entity> transform_pending_entities_;
+    std::vector<entity> merge_buffer_;
 
     mutable combined_buffer_pool_stats stats_;
 };

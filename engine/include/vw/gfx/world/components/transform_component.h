@@ -23,7 +23,8 @@ public:
 
     [[nodiscard]] auto get_transform() const -> const transform&;
     [[nodiscard]] auto get_position() const -> const vec3f&;
-    [[nodiscard]] auto get_rotation() const -> const vec3f&;
+    [[nodiscard]] auto get_rotation() const -> const quat&;
+    [[nodiscard]] auto get_rotation_euler() const -> vec3f;
     [[nodiscard]] auto get_scale() const -> const vec3f&;
     [[nodiscard]] auto get_origin() const -> const vec3f&;
 

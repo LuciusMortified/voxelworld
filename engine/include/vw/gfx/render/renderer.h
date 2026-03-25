@@ -5,15 +5,18 @@
 
 #include <vulkan/vulkan.h>
 
+#include <chrono>
 #include <memory>
 #include <vector>
 
 #include "vw/core.h"
 #include "vw/gfx/camera/camera.h"
 #include "vw/gfx/debug/debug_primitive.h"
+#include "vw/gfx/render/cull_pipeline.h"
 #include "vw/gfx/render/shadow_map.h"
 #include "vw/gfx/resource/combined_buffer_pool.h"
 #include "vw/gfx/resource/light_buffer.h"
+#include "vw/gfx/resource/palette_buffer.h"
 #include "vw/gfx/resource/shader.h"
 #include "vw/gfx/window/window.h"
 #include "vw/gfx/world/world.h"
@@ -29,6 +32,14 @@ struct directional_light_settings {
     float32 intensity{1.0f};
 };
 
+// Настройки тумана (для CPU)
+struct fog_settings {
+    vec3f color{0.1f, 0.1f, 0.1f};
+    float32 near_distance{256.0f};
+    float32 far_distance{512.0f};
+    bool enabled{true};
+};
+
 // Для directional light (в UBO)
 struct directional_light_data {
     alignas(16) mat4f light_space_matrices[shadow_map::cascade_count];
@@ -36,6 +47,13 @@ struct directional_light_data {
     alignas(16) vec3f direction;
     alignas(16) vec3f color;
     alignas(4) float32 intensity;
+};
+
+struct fog_data {
+    alignas(16) vec3f color;
+    alignas(4) float32 near_distance;
+    alignas(4) float32 far_distance;
+    alignas(4) uint32 enabled;
 };
 
 struct uniform_buffer_object {
@@ -49,6 +67,9 @@ struct uniform_buffer_object {
 
     // Point lights count (для расширяемости)
     alignas(4) uint32 point_lights_count{0};
+
+    // Fog
+    alignas(16) fog_data fog;
 };
 
 struct shadow_push_constant_data {
@@ -64,9 +85,22 @@ struct push_constant_data {
     alignas(16) float32 model[16]{};
 };
 
+struct render_timing_stats {
+    float32 shadow_map_update_ms    = 0.0f;
+    float32 buffer_pool_update_ms   = 0.0f;
+    float32 compute_cull_ms         = 0.0f;
+    float32 shadow_pass_ms          = 0.0f;
+    float32 world_pass_ms           = 0.0f;
+    float32 world_pass_uniform_ms   = 0.0f;
+    float32 world_pass_geometry_ms  = 0.0f;
+    float32 world_pass_debug_ms     = 0.0f;
+    float32 world_pass_imgui_ms     = 0.0f;
+};
+
 struct renderer_stats {
     combined_buffer_pool_stats combined_buffers;
     uint32 draw_call_count = 0;
+    render_timing_stats timing;
 };
 
 template <typename WC = base_world_components>
@@ -76,7 +110,7 @@ public:
     using combined_buffer_pool_type = combined_buffer_pool<WC>;
     using light_buffer_type         = light_buffer<WC>;
 
-    renderer(vulkan_context& context, window& window);
+    renderer(vulkan_context& context, window& window, const block_registry& registry);
     ~renderer();
 
     renderer(const renderer&)            = delete;
@@ -126,6 +160,7 @@ public:
     );
 
     [[nodiscard]] auto get_directional_light_settings() -> directional_light_settings&;
+    [[nodiscard]] auto get_fog_settings() -> fog_settings&;
 
     // Получить ImTextureID для shadow map (для отображения в ImGui::Image)
     // В Vulkan это VkDescriptorSet, приведенный к void*
@@ -134,6 +169,7 @@ public:
 private:
     void create_swapchain();
     void create_image_views();
+    void create_color_resources();
     void create_depth_resources();
     void create_render_pass();
     void create_descriptor_set_layouts();
@@ -163,11 +199,18 @@ private:
     void cleanup_shadow_pipeline();
     void cleanup_debug_pipeline();
     void cleanup_swapchain();
+    void cleanup_color_resources();
     void cleanup_depth_resources();
     void recreate_swapchain();
 
+    [[nodiscard]]
+    auto get_max_usable_sample_count() -> VkSampleCountFlagBits;
+
     void create_point_lights_descriptor_set_layout();
     void cleanup_point_lights_resources();
+
+    void create_palette_descriptor_set_layout();
+    void cleanup_palette_resources();
 
     void update_shadow_uniform_buffer() const;
     void render_shadow_pass(world_type& world, const camera& camera);
@@ -196,7 +239,8 @@ private:
         VkFormat format,
         VkImageTiling tiling,
         VkImageUsageFlags usage,
-        VkMemoryPropertyFlags properties
+        VkMemoryPropertyFlags properties,
+        VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT
     );
 
     [[nodiscard]]
@@ -228,6 +272,12 @@ private:
     VkExtent2D swapchain_extent_{};
     std::vector<VkImageView> swapchain_image_views_;
 
+    // MSAA
+    VkSampleCountFlagBits msaa_samples_ = VK_SAMPLE_COUNT_1_BIT;
+    VkImage color_image_                = VK_NULL_HANDLE;
+    VkDeviceMemory color_image_memory_  = VK_NULL_HANDLE;
+    VkImageView color_image_view_       = VK_NULL_HANDLE;
+
     // Depth
     VkImage depth_image_               = VK_NULL_HANDLE;
     VkDeviceMemory depth_image_memory_ = VK_NULL_HANDLE;
@@ -239,6 +289,7 @@ private:
     VkDescriptorSetLayout storage_descriptor_set_layout_      = VK_NULL_HANDLE;
     VkDescriptorSetLayout shadow_descriptor_set_layout_       = VK_NULL_HANDLE;
     VkDescriptorSetLayout point_lights_descriptor_set_layout_ = VK_NULL_HANDLE;
+    VkDescriptorSetLayout palette_descriptor_set_layout_      = VK_NULL_HANDLE;
     VkPipelineLayout pipeline_layout_                         = VK_NULL_HANDLE;
     VkPipeline graphics_pipeline_                             = VK_NULL_HANDLE;
     VkPipeline wireframe_pipeline_                            = VK_NULL_HANDLE;
@@ -294,11 +345,21 @@ private:
     // Light buffer для point lights
     std::unique_ptr<light_buffer_type> light_buffer_;
 
+    // Palette buffer для block colors
+    const block_registry* block_registry_;
+    std::unique_ptr<palette_buffer> palette_buffer_;
+
+    // GPU frustum culling
+    std::unique_ptr<cull_pipeline> cull_pipeline_;
+
     // Shadow map для directional light
     std::unique_ptr<shadow_map> shadow_map_;
 
     // Настройки directional light
     directional_light_settings directional_light_settings_;
+
+    // Настройки тумана
+    fog_settings fog_settings_;
 
     // Статистика
     mutable renderer_stats stats_;
@@ -310,6 +371,7 @@ private:
 }  // namespace vw::gfx
 
 #include "vw/gfx/render/renderer.inl.h"
+#include "vw/gfx/render/renderer_palette.inl.h"
 #include "vw/gfx/render/renderer_point_lights.inl.h"
 #include "vw/gfx/render/renderer_shadow.inl.h"
 

@@ -3,6 +3,7 @@
 #ifndef VW_GFX_MODEL_MODEL_IDENTITY_POOL_H
 #define VW_GFX_MODEL_MODEL_IDENTITY_POOL_H
 
+#include <mutex>
 #include <vector>
 
 #include "vw/core/types.h"
@@ -20,46 +21,57 @@ public:
         generations_.reserve(capacity);
     }
 
-    [[nodiscard]] model_identity create() {
+    [[nodiscard]] auto create() -> model_identity {
+        std::scoped_lock lock(mutex_);
         if (!free_indices_.empty()) [[unlikely]] {
             uint32 index = free_indices_.back();
             free_indices_.pop_back();
-            return {index, generations_[index]};
+            return {.index = index, .generation = generations_[index]};
         }
 
-        uint32 index = static_cast<uint32>(generations_.size());
+        const auto index = static_cast<uint32>(generations_.size());
         generations_.push_back(0);
-        return {index, 0};
+        return {.index = index, .generation = 0};
     }
 
-    [[nodiscard]] model_identity next_generation(
+    [[nodiscard]] auto next_generation(
         model_identity id
-    ) {
-        if (has(id)) [[likely]] {
-            return {id.index, ++generations_[id.index]};
+    ) -> model_identity {
+        std::scoped_lock lock(mutex_);
+        if (has_unlocked_(id)) [[likely]] {
+            return {.index = id.index, .generation = ++generations_[id.index]};
         }
         return invalid_model_identity;
     }
 
-    [[nodiscard]] bool has(
+    [[nodiscard]] auto has(
         model_identity id
-    ) const {
-        return                                            //
-            id.index != model_identity::invalid_index &&  //
-            id.index < generations_.size() &&             //
-            generations_[id.index] == id.generation;
+    ) const -> bool {
+        std::scoped_lock lock(mutex_);
+        return has_unlocked_(id);
     }
 
     void destroy(
         model_identity id
     ) {
-        if (has(id)) [[likely]] {
+        std::scoped_lock lock(mutex_);
+        if (has_unlocked_(id)) [[likely]] {
             ++generations_[id.index];
             free_indices_.push_back(id.index);
         }
     }
 
 private:
+    [[nodiscard]] auto has_unlocked_(
+        model_identity id
+    ) const -> bool {
+        return                                            //
+            id.index != model_identity::invalid_index &&  //
+            id.index < generations_.size() &&             //
+            generations_[id.index] == id.generation;
+    }
+
+    mutable std::mutex mutex_;
     std::vector<uint32> generations_;
     std::vector<uint32> free_indices_;
 };

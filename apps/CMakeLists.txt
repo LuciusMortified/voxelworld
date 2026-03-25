@@ -7,5 +7,6 @@ add_subdirectory(test_simple_model)
 add_subdirectory(test_window)
 add_subdirectory(test_animation)
 add_subdirectory(test_lighting)
+add_subdirectory(test_world_grid)
 
 add_subdirectory(sculptor)

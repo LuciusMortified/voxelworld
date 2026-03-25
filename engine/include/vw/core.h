@@ -13,5 +13,6 @@
 #include "vw/core/vec3.h"
 #include "vw/core/vec4.h"
 #include "vw/core/voxel.h"
+#include "vw/core/block_registry.h"
 
 #endif  // VW_CORE_H

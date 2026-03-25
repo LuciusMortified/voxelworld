@@ -30,7 +30,7 @@ private:
     app_state* state_;
     remove_socket_params params_;
     vec3f saved_position_;
-    vec3f saved_rotation_;
+    quat saved_rotation_;
     vec3f saved_scale_{1.0F, 1.0F, 1.0F};
 };
 

@@ -28,9 +28,8 @@ inline void delete_entity_operation::execute() {
         auto& model_comp = world.get_component<gfx::model_component>(ent);
 
         if (model_comp.has_model()) {
-            with_model_ = true;
-            size_       = model_comp.size();
-            voxels_     = model_comp.get_voxels();
+            with_model_  = true;
+            saved_model_ = model_comp.get_model();
         }
     }
 
@@ -69,12 +68,8 @@ inline void delete_entity_operation::undo() {
     if (with_model_) {
         ent_guard->with<gfx::model_component>();
 
-        auto& model_registry = world.get_model_registry();
-        auto& model_system   = world.get_model_system();
-
-        auto model = model_registry.create(params_.name, size_);
-        model->set_voxels(voxels_);
-        model_system.modify(ent).set_model(model);
+        auto& model_system = world.get_model_system();
+        model_system.modify(ent).set_model(saved_model_);
     }
 
     if (!parent_name_.empty()) {

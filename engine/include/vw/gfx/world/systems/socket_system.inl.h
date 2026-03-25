@@ -98,7 +98,7 @@ auto socket_system<Cs...>::socket_modifier::detach(
 
 template <typename... Cs>
 auto socket_system<Cs...>::socket_modifier::add_socket(
-    const std::string& name, const vec3f& position, const vec3f& rotation, const vec3f& scale
+    const std::string& name, const vec3f& position, const quat& rotation, const vec3f& scale
 ) -> socket_modifier& {
     if (!system_->registry_->template has<socket_component>(entity_)) {
         return *this;

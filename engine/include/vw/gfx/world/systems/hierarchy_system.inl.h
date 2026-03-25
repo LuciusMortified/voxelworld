@@ -47,7 +47,7 @@ void hierarchy_system<Cs...>::cleanup(
             auto& child_comp = registry_->template get<hierarchy_component>(child);
             child_comp.parent_ = invalid_entity;
 
-            transform_system_->mark_world_dirty(child);
+            transform_system_->modify(child).mark_world_dirty();
         }
     }
 }
@@ -110,7 +110,7 @@ auto hierarchy_system<Cs...>::hierarchy_modifier::set_parent(entity parent)
         auto& child_component   = system_->registry_->template get<hierarchy_component>(entity_);
         child_component.parent_ = parent;
 
-        system_->transform_system_->mark_world_dirty(entity_);
+        system_->transform_system_->modify(entity_).mark_world_dirty();
     }
 
     return *this;
@@ -131,7 +131,7 @@ auto hierarchy_system<Cs...>::hierarchy_modifier::remove_parent() -> hierarchy_m
 
         child_component.parent_ = invalid_entity;
 
-        system_->transform_system_->mark_world_dirty(entity_);
+        system_->transform_system_->modify(entity_).mark_world_dirty();
     }
 
     return *this;

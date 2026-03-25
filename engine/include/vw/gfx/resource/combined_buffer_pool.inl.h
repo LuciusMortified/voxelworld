@@ -7,26 +7,79 @@
 #include <numeric>
 #include <ranges>
 
+#include "vw/core/timing.h"
+#include "vw/log/logger.h"
+
 namespace vw::gfx {
+
+namespace {
+
+constexpr log::log_category lc_cbp_{"cbuf_pool"};
+
+inline void sorted_insert(std::vector<entity>& v, entity e) {
+    auto it = std::lower_bound(v.begin(), v.end(), e);
+    if (it == v.end() || *it != e) {
+        v.insert(it, e);
+    }
+}
+
+inline void sorted_erase(std::vector<entity>& v, entity e) {
+    auto it = std::lower_bound(v.begin(), v.end(), e);
+    if (it != v.end() && *it == e) {
+        v.erase(it);
+    }
+}
+
+template <typename Iter>
+inline void sorted_merge_range(
+    std::vector<entity>& dst, Iter first, Iter last
+) {
+    if (first == last) return;
+    auto old_size = static_cast<std::ptrdiff_t>(dst.size());
+    dst.insert(dst.end(), first, last);
+    std::sort(dst.begin() + old_size, dst.end());
+    std::inplace_merge(dst.begin(), dst.begin() + old_size, dst.end());
+    dst.erase(std::unique(dst.begin(), dst.end()), dst.end());
+}
+
+}  // namespace
 
 template <typename C>
 combined_buffer_pool<C>::combined_buffer_pool(
     vulkan_context& context,
     VkDescriptorPool descriptor_pool,
-    VkDescriptorSetLayout descriptor_set_layout
+    VkDescriptorSetLayout descriptor_set_layout,
+    VkDescriptorSetLayout compute_descriptor_set_layout
 )
     : context_(&context)
+    , staging_(context, 32 * 1024 * 1024)
     , descriptor_pool_(descriptor_pool)
-    , descriptor_set_layout_(descriptor_set_layout) {}
+    , descriptor_set_layout_(descriptor_set_layout)
+    , compute_descriptor_set_layout_(compute_descriptor_set_layout) {}
 
 template <typename C>
 void combined_buffer_pool<C>::update(
-    world_type& world, const camera& camera, std::span<const frustum> shadow_frustums
+    world_type& world,
+    const camera& camera,
+    VkCommandBuffer cmd
 ) {
-    const frustum& view_frustum = camera.get_frustum();
-    update_visibility_cache_(world, view_frustum, shadow_frustums);
-    update_meshes_(world, view_frustum);
-    update_transforms_(world, view_frustum);
+    staging_.begin_frame();
+
+    stats_.timing.destroyed_ms = measure_ms([&] {
+        process_destroyed_(world);
+    });
+
+    stats_.timing.meshes_ms = measure_ms([&] {
+        update_meshes_(world, camera.get_position());
+    });
+
+    stats_.timing.transforms_ms = measure_ms([&] {
+        update_transforms_(world);
+    });
+
+    stats_.timing.staging_flush_ms = measure_ms([&] {
+        staging_.flush(cmd);
+    });
 }
 
 template <typename C>
@@ -35,14 +88,39 @@ const std::vector<std::unique_ptr<combined_buffer>>& combined_buffer_pool<C>::ge
 }
 
 template <typename C>
+void combined_buffer_pool<C>::process_destroyed_(world_type& world) {
+    for (auto ent : world.destroyed()) {
+        if (entity_buffer_infos_.contains(ent)) {
+            auto& info = entity_buffer_infos_[ent];
+            auto swapped = buffers_[info.buffer_index]->free(ent);
+            if (swapped && world.template has_component<transform_component>(*swapped)) {
+                auto& tc = world.template get_component<transform_component>(*swapped);
+                aabb bounds{};
+                if (world.template has_component<spatial_component>(*swapped)) {
+                    bounds = world.template get_component<spatial_component>(*swapped)
+                                 .get_bounds();
+                }
+                buffers_[info.buffer_index]->write_transform(
+                    *swapped, tc.get_world_matrix(), bounds);
+            }
+            entity_buffer_infos_.erase(ent);
+        }
+        sorted_erase(mesh_pending_entities_, ent);
+        sorted_erase(transform_pending_entities_, ent);
+    }
+}
+
+template <typename C>
 buffer_chunk_size combined_buffer_pool<C>::get_chunk_size_for_mesh(
     uint32 vertex_count, uint32 index_count
 ) {
     uint32 vertex_chunk = 256;
-    uint32 index_chunk  = 512;
-
-    while (vertex_chunk < vertex_count || index_chunk < index_count) {
+    while (vertex_chunk < vertex_count) {
         vertex_chunk *= 2;
+    }
+
+    uint32 index_chunk = 512;
+    while (index_chunk < index_count) {
         index_chunk *= 2;
     }
 
@@ -61,7 +139,8 @@ combined_buffer* combined_buffer_pool<C>::get_or_create_buffer(
     auto buffer_index = buffers_.size();
     buffers_.push_back(
         std::make_unique<combined_buffer>(
-            *context_, chunk_size, descriptor_pool_, descriptor_set_layout_
+            *context_, chunk_size, descriptor_pool_, descriptor_set_layout_,
+            compute_descriptor_set_layout_, staging_
         )
     );
     chunk_size_to_buffer_index_[chunk_size] = buffer_index;
@@ -71,57 +150,94 @@ combined_buffer* combined_buffer_pool<C>::get_or_create_buffer(
 
 template <typename C>
 void combined_buffer_pool<C>::update_meshes_(
-    world_type& world, const frustum& view_frustum
+    world_type& world, const vec3f& camera_pos
 ) {
-    auto& model_system   = world.get_model_system();
-    auto& dirty_entities = model_system.get_render_dirty_entities();
+    auto& model_changed = world.template changed<model_component>();
+    sorted_merge_range(mesh_pending_entities_, model_changed.begin(), model_changed.end());
 
-    entities_to_process_.clear();
-    entities_to_process_.insert(visibility_cache_.changed.begin(), visibility_cache_.changed.end());
-    entities_to_process_.insert(dirty_entities.begin(), dirty_entities.end());
+    entities_to_process_.assign(
+        mesh_pending_entities_.begin(), mesh_pending_entities_.end());
 
-    for (entity ent : entities_to_process_) {
-        const bool has_spatial = world.template has_component<spatial_component>(ent);
-        const bool is_visible  = visibility_cache_.visible.contains(ent);
-        if (has_spatial && !is_visible) {
-            if (entity_buffer_infos_.contains(ent)) {
-                const auto& [chunk_size, buffer_index] = entity_buffer_infos_[ent];
-                buffers_[buffer_index]->free(ent);
-                entity_buffer_infos_.erase(ent);
-            }
-            dirty_entities.erase(ent);
-            continue;
+    std::sort(entities_to_process_.begin(), entities_to_process_.end(),
+        [&](entity a, entity b) {
+            auto get_dist_sq = [&](entity e) -> float32 {
+                if (!world.template has_component<spatial_component>(e)) {
+                    return 0.0f;
+                }
+                auto& sc = world.template get_component<spatial_component>(e);
+                auto diff = sc.get_bounds().center() - camera_pos;
+                return diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
+            };
+            return get_dist_sq(a) < get_dist_sq(b);
+        });
+
+    constexpr uint32 estimated_avg_mesh_cost = 32 * 1024;
+    const uint32 max_mesh_writes = std::clamp(
+        static_cast<uint32>(staging_.available() / estimated_avg_mesh_cost), 4u, 16u);
+    uint32 mesh_writes = 0;
+
+    merge_buffer_.clear();
+    merge_buffer_.reserve(entities_to_process_.size());
+
+    for (size_t i = 0; i < entities_to_process_.size(); ++i) {
+        entity ent = entities_to_process_[i];
+
+        if (mesh_writes >= max_mesh_writes) {
+            merge_buffer_.insert(
+                merge_buffer_.end(),
+                entities_to_process_.begin() + static_cast<std::ptrdiff_t>(i),
+                entities_to_process_.end());
+            break;
         }
 
-        bool has_model     = world.template has_component<model_component>(ent);
-        bool has_transform = world.template has_component<transform_component>(ent);
-        bool is_renderable = has_model && has_transform;
+        const bool has_model     = world.template has_component<model_component>(ent);
+        const bool has_transform = world.template has_component<transform_component>(ent);
 
-        if (!is_renderable) {
+        if (!has_model || !has_transform) {
             if (entity_buffer_infos_.contains(ent)) {
                 auto& buffer_info = entity_buffer_infos_[ent];
-                buffers_[buffer_info.buffer_index]->free(ent);
+                auto swapped = buffers_[buffer_info.buffer_index]->free(ent);
+                if (swapped && world.template has_component<transform_component>(*swapped)) {
+                    auto& tc = world.template get_component<transform_component>(*swapped);
+                    aabb swap_bounds{};
+                    if (world.template has_component<spatial_component>(*swapped)) {
+                        swap_bounds = world.template get_component<spatial_component>(*swapped)
+                                          .get_bounds();
+                    }
+                    buffers_[buffer_info.buffer_index]->write_transform(
+                        *swapped, tc.get_world_matrix(), swap_bounds);
+                }
                 entity_buffer_infos_.erase(ent);
             }
-            dirty_entities.erase(ent);
             continue;
         }
 
         const auto& model_comp = world.template get_component<model_component>(ent);
         if (!model_comp.has_model()) {
+            merge_buffer_.push_back(ent);
             continue;
         }
 
         auto model_id = model_comp.get_identity();
         auto mesh_ptr = world.get_mesh_pool().get(model_id);
         if (!mesh_ptr) {
+            merge_buffer_.push_back(ent);
             continue;
         }
 
         auto vertex_count = mesh_ptr->vertices.size();
         auto index_count  = mesh_ptr->indices.size();
 
+        if (vertex_count == 0 || index_count == 0) {
+            continue;
+        }
+
         buffer_chunk_size required_chunk_size = get_chunk_size_for_mesh(vertex_count, index_count);
+
+        const VkDeviceSize mesh_staging_cost =
+            required_chunk_size.vertex_count * sizeof(vertex) +
+            required_chunk_size.index_count * sizeof(uint32) +
+            sizeof(uint32) + sizeof(draw_command) + sizeof(mat4f) * 2;
 
         const auto& transform_comp    = world.template get_component<transform_component>(ent);
         const mat4f& transform_matrix = transform_comp.get_world_matrix();
@@ -133,105 +249,102 @@ void combined_buffer_pool<C>::update_meshes_(
             if (buffer_info.chunk_size == required_chunk_size) {
                 const auto& ent_alloc = buffer->get_entity_allocation(ent);
                 if (ent_alloc.model_index == model_id.index) {
+                    if (staging_.available() < mesh_staging_cost) {
+                        merge_buffer_.push_back(ent);
+                        continue;
+                    }
                     buffer->write_mesh(model_id, *mesh_ptr);
-                    dirty_entities.erase(ent);
+                    world.get_mesh_pool().evict(model_id);
+                    ++mesh_writes;
                     continue;
                 }
             }
 
-            buffer->free(ent);
+            if (staging_.available() < mesh_staging_cost) {
+                merge_buffer_.push_back(ent);
+                continue;
+            }
+
+            auto swapped = buffer->free(ent);
+            if (swapped && world.template has_component<transform_component>(*swapped)) {
+                auto& tc = world.template get_component<transform_component>(*swapped);
+                aabb sw_bounds{};
+                if (world.template has_component<spatial_component>(*swapped)) {
+                    sw_bounds = world.template get_component<spatial_component>(*swapped)
+                                    .get_bounds();
+                }
+                buffer->write_transform(*swapped, tc.get_world_matrix(), sw_bounds);
+            }
+        } else if (staging_.available() < mesh_staging_cost) {
+            merge_buffer_.push_back(ent);
+            continue;
         }
 
         auto* buffer            = get_or_create_buffer(required_chunk_size);
         const auto buffer_index = chunk_size_to_buffer_index_[required_chunk_size];
 
-        buffer->allocate(ent, model_id, *mesh_ptr, transform_matrix);
+        aabb ent_bounds{};
+        if (world.template has_component<spatial_component>(ent)) {
+            ent_bounds = world.template get_component<spatial_component>(ent).get_bounds();
+        }
+        buffer->allocate(ent, model_id, *mesh_ptr, transform_matrix, ent_bounds);
+        world.get_mesh_pool().evict(model_id);
 
         entity_buffer_infos_[ent] = entity_buffer_info{required_chunk_size, buffer_index};
-        dirty_entities.erase(ent);
+        ++mesh_writes;
     }
+
+    std::sort(merge_buffer_.begin(), merge_buffer_.end());
+    mesh_pending_entities_.swap(merge_buffer_);
 }
 
 template <typename C>
 void combined_buffer_pool<C>::update_transforms_(
-    world_type& world, const frustum& view_frustum
+    world_type& world
 ) {
-    auto& transform_system = world.get_transform_system();
-    auto& dirty_entities   = transform_system.get_render_dirty_entities();
+    auto& transform_changed = world.template changed<transform_component>();
+    sorted_merge_range(
+        transform_pending_entities_, transform_changed.begin(), transform_changed.end());
 
-    entities_to_process_.clear();
-    entities_to_process_.insert(visibility_cache_.changed.begin(), visibility_cache_.changed.end());
-    entities_to_process_.insert(dirty_entities.begin(), dirty_entities.end());
+    entities_to_process_.assign(
+        transform_pending_entities_.begin(), transform_pending_entities_.end());
 
-    for (entity ent : entities_to_process_) {
-        bool has_spatial = world.template has_component<spatial_component>(ent);
-        bool is_visible  = visibility_cache_.visible.contains(ent);
-        if (has_spatial && !is_visible) {
-            dirty_entities.erase(ent);
+    merge_buffer_.clear();
+    merge_buffer_.reserve(entities_to_process_.size());
+
+    for (size_t i = 0; i < entities_to_process_.size(); ++i) {
+        entity ent = entities_to_process_[i];
+
+        if (!entity_buffer_infos_.contains(ent)) {
             continue;
         }
 
-        bool has_model     = world.template has_component<model_component>(ent);
-        bool has_transform = world.template has_component<transform_component>(ent);
-        bool is_renderable = has_model && has_transform;
-
-        if (entity_buffer_infos_.contains(ent) && is_renderable) {
-            auto& info = entity_buffer_infos_[ent];
-
-            const auto& transform_comp    = world.template get_component<transform_component>(ent);
-            const mat4f& transform_matrix = transform_comp.get_world_matrix();
-            buffers_[info.buffer_index]->write_transform(ent, transform_matrix);
-
-            dirty_entities.erase(ent);
+        const bool has_model     = world.template has_component<model_component>(ent);
+        const bool has_transform = world.template has_component<transform_component>(ent);
+        if (!has_model || !has_transform) {
+            continue;
         }
+
+        if (staging_.available() < sizeof(mat4f) * 2) {
+            merge_buffer_.insert(
+                merge_buffer_.end(),
+                entities_to_process_.begin() + static_cast<std::ptrdiff_t>(i),
+                entities_to_process_.end());
+            break;
+        }
+
+        auto& info = entity_buffer_infos_[ent];
+        const auto& transform_comp = world.template get_component<transform_component>(ent);
+        aabb tr_bounds{};
+        if (world.template has_component<spatial_component>(ent)) {
+            tr_bounds = world.template get_component<spatial_component>(ent).get_bounds();
+        }
+        buffers_[info.buffer_index]->write_transform(
+            ent, transform_comp.get_world_matrix(), tr_bounds);
     }
-}
 
-template <typename C>
-void combined_buffer_pool<C>::update_visibility_cache_(
-    world_type& world, const frustum& view_frustum, std::span<const frustum> shadow_frustums
-) {
-    auto& spatial_system = world.get_spatial_system();
-
-    constexpr float angle_threshold    = math::radians(2.f);
-    constexpr float distance_threshold = 0.5f;
-
-    auto& render_dirty_entities = spatial_system.get_render_dirty_entities();
-    const bool has_render_dirty = !render_dirty_entities.empty();
-
-    const bool frustum_changed = !visibility_cache_.view_frustum.approximately_equal(
-        view_frustum, angle_threshold, distance_threshold
-    );
-
-    visibility_cache_.changed.clear();
-    if (frustum_changed || has_render_dirty) {
-        spatial_system.query_all(view_frustum, visibility_cache_.tmp_visible);
-
-        for (const auto& shadow_frustum : shadow_frustums) {
-            spatial_system.query_all(shadow_frustum, shadow_query_tmp_);
-            visibility_cache_.tmp_visible.insert(
-                shadow_query_tmp_.begin(), shadow_query_tmp_.end()
-            );
-        }
-
-        for (auto ent : visibility_cache_.visible) {
-            if (!visibility_cache_.tmp_visible.contains(ent)) {
-                visibility_cache_.changed.insert(ent);
-            }
-        }
-        for (auto ent : visibility_cache_.tmp_visible) {
-            if (!visibility_cache_.visible.contains(ent)) {
-                visibility_cache_.changed.insert(ent);
-            }
-        }
-
-        visibility_cache_.visible      = visibility_cache_.tmp_visible;
-        visibility_cache_.view_frustum = view_frustum;
-
-        if (has_render_dirty) {
-            render_dirty_entities.clear();
-        }
-    }
+    std::sort(merge_buffer_.begin(), merge_buffer_.end());
+    transform_pending_entities_.swap(merge_buffer_);
 }
 
 template <typename C>

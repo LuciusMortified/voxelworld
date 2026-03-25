@@ -26,7 +26,7 @@ inline app::app(
 
     , menu_bar_(eng, state_, op_manager_, file_service_)
     , tool_panel_(state_)
-    , color_palette_panel_(state_)
+    , color_palette_panel_(state_, eng.get_block_registry())
     , entity_properties_panel_(eng, state_, op_manager_)
     , socket_panel_(eng, state_, op_manager_)
     , keyframe_properties_panel_(eng, state_, op_manager_)

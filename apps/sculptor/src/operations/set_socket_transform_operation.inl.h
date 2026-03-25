@@ -60,7 +60,7 @@ inline void set_socket_transform_operation::undo() {
 }
 
 inline void set_socket_transform_operation::update_attached_(
-    const vec3f& position, const vec3f& rotation, const vec3f& scale
+    const vec3f& position, const quat& rotation, const vec3f& scale
 ) {
     auto& world = engine_->get_world();
     auto ent    = state_->scene.name_to_entity[params_.entity_name];
@@ -79,7 +79,7 @@ inline void set_socket_transform_operation::update_attached_(
 }
 
 inline void set_socket_transform_operation::update_preview_(
-    const vec3f& position, const vec3f& rotation, const vec3f& scale
+    const vec3f& position, const quat& rotation, const vec3f& scale
 ) {
     const auto pkey = socket_state::socket_preview_key(params_.entity_name, params_.socket_name);
     const auto it   = state_->sockets.socket_previews.find(pkey);

@@ -5,21 +5,19 @@
 
 #include <unordered_set>
 
-#include "vw/gfx/world/registry.h"
 #include "vw/gfx/world/components/light_component.h"
+#include "vw/gfx/world/entity_registry.h"
 
 namespace vw::gfx {
 
 template <typename... Cs>
 class light_system final {
 public:
-    using registry_type = registry<Cs...>;
-    
-    explicit light_system(registry_type& registry);
-    
-    void update();
+    using registry_type = entity_registry<Cs...>;
 
-    void mark_dirty(entity ent);
+    explicit light_system(registry_type& registry);
+
+    void update();
 
     class light_modifier {
     public:
@@ -38,13 +36,8 @@ public:
 
     auto modify(entity ent) -> light_modifier;
 
-    [[nodiscard]] auto get_render_dirty_entities() -> std::unordered_set<entity>&;
-    void mark_render_dirty(entity ent);
-
 private:
     registry_type* registry_;
-    std::unordered_set<entity> dirty_entities_;
-    std::unordered_set<entity> render_dirty_entities_;
 };
 
 template <typename... Cs>

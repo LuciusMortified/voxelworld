@@ -33,7 +33,7 @@ private:
     struct saved_socket {
         std::string name;
         vec3f position;
-        vec3f rotation;
+        quat rotation;
         vec3f scale{1.0F, 1.0F, 1.0F};
     };
 

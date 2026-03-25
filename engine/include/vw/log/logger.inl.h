@@ -3,11 +3,13 @@
 #ifndef VW_LOG_LOGGER_INL_H
 #define VW_LOG_LOGGER_INL_H
 
+#include <spdlog/sinks/basic_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
 #include <format>
 #include <memory>
+#include <string>
 
 
 namespace vw::log {
@@ -21,6 +23,14 @@ public:
     }
 
     ~impl() = default;
+
+    void add_file_sink(std::string_view path) {
+        auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(
+            std::string(path), true
+        );
+        file_sink->set_pattern("[%Y-%m-%d %H:%M:%S.%e] [%l] %v");
+        logger_->sinks().push_back(file_sink);
+    }
 
     template <typename... Args>
     void trace(
@@ -227,6 +237,10 @@ void logger::critical(
     log_category cat, std::format_string<Args...> fmt, Args&&... args
 ) {
     pimpl_->critical(cat, fmt, std::forward<Args>(args)...);
+}
+
+inline void logger::add_file_sink(std::string_view path) {
+    pimpl_->add_file_sink(path);
 }
 
 // Функции-обертки в namespace vw::log

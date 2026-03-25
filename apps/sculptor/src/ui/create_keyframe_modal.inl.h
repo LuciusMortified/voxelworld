@@ -36,7 +36,7 @@ inline void create_keyframe_modal::open(
             if (prop == gfx::animation_property::position) {
                 value_vec3f_ = tc.get_position();
             } else if (prop == gfx::animation_property::rotation) {
-                auto rot       = tc.get_rotation();
+                auto rot       = tc.get_rotation_euler();
                 value_euler_deg_ = {
                     math::degrees(rot.x), math::degrees(rot.y), math::degrees(rot.z)
                 };
@@ -85,7 +85,7 @@ inline void create_keyframe_modal::render(
                 if (prop == gfx::animation_property::position) {
                     value_vec3f_ = tc.get_position();
                 } else if (prop == gfx::animation_property::rotation) {
-                    auto rot       = tc.get_rotation();
+                    auto rot       = tc.get_rotation_euler();
                     value_euler_deg_ = {
                         math::degrees(rot.x), math::degrees(rot.y), math::degrees(rot.z)
                     };

@@ -29,7 +29,7 @@ public:
         std::vector<std::unique_ptr<entity_guard_type>> entities;
     };
 
-    vox_deserializer(world_type& world);
+    vox_deserializer(world_type& world, const block_registry& block_registry);
 
     auto deserialize(const std::filesystem::path& filepath, const options& opts = {})
         -> std::expected<result, error_type>;
@@ -46,6 +46,7 @@ private:
     void process_voxel_(std::istringstream& iss);
 
     world_type* world_;
+    const block_registry* block_registry_;
     options options_;
 
     result result_;

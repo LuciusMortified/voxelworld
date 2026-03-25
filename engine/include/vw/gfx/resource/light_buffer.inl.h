@@ -50,19 +50,15 @@ light_buffer<WC>::~light_buffer() {
 
 template <typename WC>
 void light_buffer<WC>::update(world_type& world) {
-    // Получить light_system из world
-    auto& light_system = world.get_light_system();
-    
-    // Получить render_dirty_entities из light_system
-    auto& render_dirty_entities = light_system.get_render_dirty_entities();
-    
-    // Собрать данные point lights из всех entities с light_component + transform_component
+    auto& light_changed = world.template changed<light_component>();
+    if (light_changed.empty()) {
+        return;
+    }
+
     std::vector<point_light_data> point_lights_data;
-    
-    // Используем view_components для получения всех entities с нужными компонентами
+
     auto view = world.template view_components<light_component, transform_component>();
     for (const auto& [ent, light_comp, transform_comp] : view) {
-        // Собрать данные point light
         point_light_data light_data;
         const vec3f& pos = transform_comp.get_position();
         light_data.position = vec4f(pos.x, pos.y, pos.z, 0.0f);
@@ -73,20 +69,14 @@ void light_buffer<WC>::update(world_type& world) {
         light_data.attenuation_constant = light_comp.get_attenuation_constant();
         light_data.attenuation_linear = light_comp.get_attenuation_linear();
         light_data.attenuation_quadratic = light_comp.get_attenuation_quadratic();
-        
+
         point_lights_data.push_back(light_data);
     }
-    
-    // Очистить render_dirty_entities после обработки
-    render_dirty_entities.clear();
-    
-    // Обновить lights_count_
+
     lights_count_ = static_cast<uint32>(point_lights_data.size());
-    
-    // Если capacity недостаточна - расширить буфер
+
     expand_buffer_if_needed(lights_count_);
-    
-    // Записать все собранные point_lights_data в SSBO
+
     if (lights_count_ > 0) {
         lights_buffer_->copy_from_vector(point_lights_data);
     }

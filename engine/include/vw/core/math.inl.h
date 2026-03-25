@@ -600,6 +600,36 @@ inline auto rotation_matrix(
     return rot_z * rot_y * rot_x;
 }
 
+inline auto rotation_matrix(
+    const quat& q
+) -> mat4f {
+    mat4f matrix = identity_matrix();
+
+    float xx = q.x * q.x;
+    float yy = q.y * q.y;
+    float zz = q.z * q.z;
+    float xy = q.x * q.y;
+    float xz = q.x * q.z;
+    float yz = q.y * q.z;
+    float wx = q.w * q.x;
+    float wy = q.w * q.y;
+    float wz = q.w * q.z;
+
+    matrix[0, 0] = 1.0f - 2.0f * (yy + zz);
+    matrix[0, 1] = 2.0f * (xy - wz);
+    matrix[0, 2] = 2.0f * (xz + wy);
+
+    matrix[1, 0] = 2.0f * (xy + wz);
+    matrix[1, 1] = 1.0f - 2.0f * (xx + zz);
+    matrix[1, 2] = 2.0f * (yz - wx);
+
+    matrix[2, 0] = 2.0f * (xz - wy);
+    matrix[2, 1] = 2.0f * (yz + wx);
+    matrix[2, 2] = 1.0f - 2.0f * (xx + yy);
+
+    return matrix;
+}
+
 inline auto scale_matrix(
     const vec3f& scale
 ) -> mat4f {
@@ -612,6 +642,17 @@ inline auto scale_matrix(
 
 inline auto transform_matrix(
     const vec3f& position, const vec3f& rotation, const vec3f& scale, const vec3f& origin
+) -> mat4f {
+    const mat4f trans     = translation_matrix(position);
+    const mat4f orig_back = translation_matrix(origin);
+    const mat4f rot       = rotation_matrix(rotation);
+    const mat4f scl       = scale_matrix(scale);
+
+    return trans * rot * scl * orig_back;
+}
+
+inline auto transform_matrix(
+    const vec3f& position, const quat& rotation, const vec3f& scale, const vec3f& origin
 ) -> mat4f {
     const mat4f trans     = translation_matrix(position);
     const mat4f orig_back = translation_matrix(origin);
@@ -650,11 +691,7 @@ inline auto lerp(
 ) -> transform {
     transform result;
     result.set_position(lerp(a.get_position(), b.get_position(), t));
-
-    quat qa = euler_to_quat(a.get_rotation());
-    quat qb = euler_to_quat(b.get_rotation());
-    result.set_rotation(quat_to_euler(slerp(qa, qb, t)));
-
+    result.set_rotation(slerp(a.get_rotation(), b.get_rotation(), t));
     result.set_scale(lerp(a.get_scale(), b.get_scale(), t));
     result.set_origin(lerp(a.get_origin(), b.get_origin(), t));
     return result;
@@ -895,12 +932,12 @@ inline auto slerp(
 inline auto euler_to_quat(
     const vec3f& euler
 ) -> quat {
-    float cx = std::cos(euler.x * 0.5f);
-    float sx = std::sin(euler.x * 0.5f);
-    float cy = std::cos(euler.y * 0.5f);
-    float sy = std::sin(euler.y * 0.5f);
-    float cz = std::cos(euler.z * 0.5f);
-    float sz = std::sin(euler.z * 0.5f);
+    float cx = std::cos(-euler.x * 0.5f);
+    float sx = std::sin(-euler.x * 0.5f);
+    float cy = std::cos(-euler.y * 0.5f);
+    float sy = std::sin(-euler.y * 0.5f);
+    float cz = std::cos(-euler.z * 0.5f);
+    float sz = std::sin(-euler.z * 0.5f);
 
     return {
         (sx * cy * cz) - (cx * sy * sz),
@@ -929,7 +966,7 @@ inline auto quat_to_euler(
     const float cosy_cosp = 1.0f - (2.0f * ((q.y * q.y) + (q.z * q.z)));
     const float rz        = std::atan2(siny_cosp, cosy_cosp);
 
-    return {rx, ry, rz};
+    return {-rx, -ry, -rz};
 }
 
 inline auto interpolate(

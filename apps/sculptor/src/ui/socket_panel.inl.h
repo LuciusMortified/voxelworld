@@ -86,8 +86,9 @@ inline void socket_panel::render(
             };
             auto op = std::make_unique<remove_socket_operation>(*engine_, *state_, params);
             op_manager_->execute(std::move(op));
-            const auto pkey =
-                socket_state::socket_preview_key(state_->scene.selected_name, pending_remove_socket_);
+            const auto pkey = socket_state::socket_preview_key(
+                state_->scene.selected_name, pending_remove_socket_
+            );
             unload_preview_(pkey);
             pending_remove_socket_.clear();
             ImGui::CloseCurrentPopup();
@@ -119,11 +120,12 @@ inline void socket_panel::render_socket_(
         ImGuiTreeNodeFlags_OpenOnArrow |  //
         ImGuiTreeNodeFlags_OpenOnDoubleClick;
     if (ImGui::TreeNodeEx(sp.name.c_str(), flags)) {
-        vec3f position     = sp.position;
-        vec3f rotation_deg = {
-            math::degrees(sp.rotation.x),
-            math::degrees(sp.rotation.y),
-            math::degrees(sp.rotation.z),
+        vec3f position       = sp.position;
+        vec3f rotation_euler = math::quat_to_euler(sp.rotation);
+        vec3f rotation_deg   = {
+            math::degrees(rotation_euler.x),
+            math::degrees(rotation_euler.y),
+            math::degrees(rotation_euler.z),
         };
         vec3f scale = sp.scale;
 
@@ -158,11 +160,13 @@ inline void socket_panel::render_socket_(
         ImGui::PopItemWidth();
 
         if (changed) {
-            const auto new_rotation = vec3f{
-                math::radians(rotation_deg.x),
-                math::radians(rotation_deg.y),
-                math::radians(rotation_deg.z),
-            };
+            const auto new_rotation = math::euler_to_quat(
+                vec3f{
+                    math::radians(rotation_deg.x),
+                    math::radians(rotation_deg.y),
+                    math::radians(rotation_deg.z),
+                }
+            );
 
             set_socket_transform_params params = {
                 .entity_name = state_->scene.selected_name,
@@ -174,11 +178,12 @@ inline void socket_panel::render_socket_(
             auto op = std::make_unique<set_socket_transform_operation>(*engine_, *state_, params);
             op_manager_->execute(std::move(op));
 
-            const auto pkey = socket_state::socket_preview_key(state_->scene.selected_name, sp.name);
+            const auto pkey =
+                socket_state::socket_preview_key(state_->scene.selected_name, sp.name);
             update_preview_transform_(pkey, position, new_rotation, scale);
         }
 
-        const auto pkey        = socket_state::socket_preview_key(state_->scene.selected_name, sp.name);
+        const auto pkey = socket_state::socket_preview_key(state_->scene.selected_name, sp.name);
         const bool has_preview = state_->sockets.socket_previews.contains(pkey);
         if (has_preview) {
             const auto& preview = state_->sockets.socket_previews[pkey];
@@ -297,8 +302,8 @@ inline void socket_panel::render_preview_file_list_() {
                     preview_selected_file_ = f;
                 }
             }
-            ImGui::EndChild();
         }
+        ImGui::EndChild();
 
         ImGui::Spacing();
 
@@ -332,7 +337,7 @@ inline void socket_panel::load_preview_(
 
     namespace fs = std::filesystem;
 
-    gfx::vox_deserializer deserializer{engine_->get_world()};
+    gfx::vox_deserializer deserializer{engine_->get_world(), engine_->get_block_registry()};
     const fs::path filepath = fs::path{app_state::asset_dir_name} / fs::path{filename};
 
     const gfx::vox_deserializer<>::options opts{
@@ -380,7 +385,7 @@ inline void socket_panel::unload_preview_(
 }
 
 inline void socket_panel::update_preview_transform_(
-    const std::string& key, const vec3f& position, const vec3f& rotation, const vec3f& scale
+    const std::string& key, const vec3f& position, const quat& rotation, const vec3f& scale
 ) const {
     const auto it = state_->sockets.socket_previews.find(key);
     if (it == state_->sockets.socket_previews.end()) {

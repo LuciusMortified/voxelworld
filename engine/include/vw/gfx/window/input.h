@@ -132,7 +132,7 @@ enum class mods : int {
     NUM_LOCK  = 0x0020
 };
 
-[[nodiscard]] inline bool operator&(mods lhs, mods rhs) {
+[[nodiscard]] inline auto operator&(mods lhs, mods rhs) -> bool {
     return (static_cast<int>(lhs) & static_cast<int>(rhs)) != 0;
 }
 
