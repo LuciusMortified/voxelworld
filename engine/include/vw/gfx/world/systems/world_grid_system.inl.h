@@ -38,7 +38,7 @@ void world_grid_system<WC, Cs...>::update() {
     }
 
     stats_.process_completed_ms = measure_ms([&] { world_grid_->process_completed(); });
-    stats_.request_chunks_ms    = measure_ms([&] { dispatch_chunk_requests(); });
+    stats_.request_columns_ms   = measure_ms([&] { dispatch_column_requests(); });
     update_grid_stats();
 
     if (registry_->template requested<world_view_component>().empty()) {
@@ -46,25 +46,25 @@ void world_grid_system<WC, Cs...>::update() {
     }
 
     if (process_dirty_entities()) {
-        vec3i camera_chunk{};
-        stats_.rebuild_active_ms = measure_ms([&] { camera_chunk = rebuild_active_set(); });
-        stats_.unload_ms         = measure_ms([&] { unload_inactive_chunks(); });
-        std::swap(active_chunks_, pending_active_chunks_);
-        rebuild_pending_requests(camera_chunk);
-        stats_.active_count = static_cast<uint32>(active_chunks_.size());
+        vec2i camera_column{};
+        stats_.rebuild_active_ms = measure_ms([&] { camera_column = rebuild_active_set(); });
+        stats_.unload_ms         = measure_ms([&] { unload_inactive_columns(); });
+        std::swap(active_columns_, pending_active_columns_);
+        rebuild_pending_requests(camera_column);
+        stats_.active_count = static_cast<uint32>(active_columns_.size());
     }
 
     registry_->template clear_requested<world_view_component>();
 }
 
 template <typename WC, typename... Cs>
-void world_grid_system<WC, Cs...>::dispatch_chunk_requests() {
+void world_grid_system<WC, Cs...>::dispatch_column_requests() {
     static constexpr int32 max_requests_per_frame = 8;
     int32 requests = 0;
     while (!pending_requests_.empty() && requests < max_requests_per_frame) {
         auto coord = pending_requests_.back();
         pending_requests_.pop_back();
-        if (world_grid_->request_chunk(coord)) {
+        if (world_grid_->request_column(coord)) {
             ++requests;
         }
     }
@@ -72,8 +72,8 @@ void world_grid_system<WC, Cs...>::dispatch_chunk_requests() {
 
 template <typename WC, typename... Cs>
 void world_grid_system<WC, Cs...>::update_grid_stats() {
-    stats_.active_count          = static_cast<uint32>(active_chunks_.size());
-    stats_.pending_count         = world_grid_->get_pending_chunk_count();
+    stats_.active_count          = static_cast<uint32>(active_columns_.size());
+    stats_.pending_count         = world_grid_->get_pending_column_count();
     stats_.loaded_count          = world_grid_->get_loaded_chunk_count();
     stats_.deferred_remesh_count = world_grid_->get_deferred_remesh_count();
     stats_.rebuild_active_ms     = 0.0f;
@@ -93,9 +93,9 @@ auto world_grid_system<WC, Cs...>::process_dirty_entities() -> bool {
 }
 
 template <typename WC, typename... Cs>
-auto world_grid_system<WC, Cs...>::rebuild_active_set() -> vec3i {
-    pending_active_chunks_.clear();
-    vec3i camera_chunk{};
+auto world_grid_system<WC, Cs...>::rebuild_active_set() -> vec2i {
+    pending_active_columns_.clear();
+    vec2i camera_column{};
 
     for (auto ent : registry_->template requested<world_view_component>()) {
         if (!registry_->template has<world_view_component>(ent) ||
@@ -104,30 +104,27 @@ auto world_grid_system<WC, Cs...>::rebuild_active_set() -> vec3i {
         }
 
         const auto& wv = registry_->template get<world_view_component>(ent);
-        camera_chunk = wv.get_chunk_coord();
+        auto chunk_coord = wv.get_chunk_coord();
+        camera_column = {chunk_coord.x, chunk_coord.z};
         const auto dist = static_cast<int32>(wv.get_view_distance());
 
-        auto& gen = world_grid_->get_generator();
         for (int32 dx = -dist; dx <= dist; ++dx) {
             for (int32 dz = -dist; dz <= dist; ++dz) {
-                int32 cx = camera_chunk.x + dx;
-                int32 cz = camera_chunk.z + dz;
-                auto yr = gen.get_chunk_y_range(cx, cz);
-                for (int32 cy = yr.min_y; cy <= yr.max_y; ++cy) {
-                    pending_active_chunks_.insert({cx, cy, cz});
-                }
+                int32 cx = camera_column.x + dx;
+                int32 cz = camera_column.y + dz;
+                pending_active_columns_.insert({cx, cz});
             }
         }
     }
 
-    return camera_chunk;
+    return camera_column;
 }
 
 template <typename WC, typename... Cs>
-void world_grid_system<WC, Cs...>::unload_inactive_chunks() {
-    for (const auto& coord : active_chunks_) {
-        if (!pending_active_chunks_.contains(coord)) {
-            world_grid_->unload_chunk(coord);
+void world_grid_system<WC, Cs...>::unload_inactive_columns() {
+    for (const auto& coord : active_columns_) {
+        if (!pending_active_columns_.contains(coord)) {
+            world_grid_->unload_column(coord);
         }
     }
 }
@@ -187,22 +184,22 @@ auto world_grid_system<WC, Cs...>::view_modifier::set_view_distance(
 
 template <typename WC, typename... Cs>
 void world_grid_system<WC, Cs...>::rebuild_pending_requests(
-    vec3i camera_chunk
+    vec2i camera_column
 ) {
     pending_requests_.clear();
 
-    for (const auto& coord : active_chunks_) {
-        if (!world_grid_->has_chunk(coord) && !world_grid_->is_pending(coord)) {
+    for (const auto& coord : active_columns_) {
+        if (!world_grid_->has_column(coord) && !world_grid_->is_column_pending(coord)) {
             pending_requests_.push_back(coord);
         }
     }
 
     std::sort(pending_requests_.begin(), pending_requests_.end(),
-        [&camera_chunk](const vec3i& a, const vec3i& b) {
-            auto da = a - camera_chunk;
-            auto db = b - camera_chunk;
-            auto dist_a = da.x * da.x + da.y * da.y + da.z * da.z;
-            auto dist_b = db.x * db.x + db.y * db.y + db.z * db.z;
+        [&camera_column](const vec2i& a, const vec2i& b) {
+            auto da = a - camera_column;
+            auto db = b - camera_column;
+            auto dist_a = da.x * da.x + da.y * da.y;
+            auto dist_b = db.x * db.x + db.y * db.y;
             return dist_a > dist_b;
         });
 }

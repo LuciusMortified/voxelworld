@@ -4,7 +4,7 @@
 #include <algorithm>
 
 #include "vw/gfx/world/entity_guard.h"
-#include "vw/gfx/world_grid/generators/perlin_world_grid_generator.h"
+#include "vw/gfx/world_grid/generators/perlin_terrain_generator.h"
 #include "vw/gfx/world_grid/world_grid.h"
 
 using namespace vw;
@@ -40,18 +40,6 @@ public:
         fog.far_distance = 9 * 64 * 8;
 
         setup_world_grid();
-
-        float32 max_surface_y = std::numeric_limits<float32>::lowest();
-        for (int32 x = -1; x <= 1; ++x) {
-            for (int32 z = -1; z <= 1; ++z) {
-                auto surface_y = static_cast<float32>(generator_->surface_height_at(x, z));
-                max_surface_y  = std::max(surface_y, max_surface_y);
-            }
-        }
-
-        float32 cam_y =
-            (max_surface_y + 1.5f) * static_cast<float32>(generator_params_.voxel_scale);
-        camera.set_position({0.0f, cam_y, 0.0f});
         camera.set_rotation(0.0f, 0.0f);
     }
 
@@ -61,6 +49,7 @@ public:
         float delta_time
     ) override {
         camera_controller_->update(delta_time);
+        try_place_camera();
 
         const auto& camera = get_engine().get_camera();
         const auto cam_pos = camera.get_position();
@@ -78,6 +67,22 @@ public:
     }
 
 private:
+    void try_place_camera() {
+        if (camera_placed_) {
+            return;
+        }
+
+        auto surface = world_grid_->get_surface_y(0, 0);
+        if (!surface) {
+            return;
+        }
+
+        auto scale = static_cast<float32>(generator_params_.voxel_scale);
+        float32 cam_y = (static_cast<float32>(*surface) + 3.0f) * scale;
+        get_engine().get_camera().set_position({0.0f, cam_y, 0.0f});
+        camera_placed_ = true;
+    }
+
     void setup_world_grid() {
         auto& world       = get_engine().get_world();
         auto& grid_system = world.get_world_grid_system();
@@ -86,7 +91,7 @@ private:
             .voxel_scale = 8,
         };
         auto& registry = world.get_model_registry();
-        auto generator = std::make_unique<gfx::perlin_world_grid_generator>(
+        auto generator = std::make_unique<gfx::perlin_terrain_generator>(
             registry.get_identity_pool(), registry.get_page_pool(), generator_params_);
         generator_     = generator.get();
         world_grid_    = std::make_shared<gfx::world_grid<>>(
@@ -125,8 +130,9 @@ private:
                 {static_cast<int32>(pos.x), static_cast<int32>(pos.y), static_cast<int32>(pos.z)}
             );
             ImGui::Text("Chunk: (%d, %d, %d)", chunk_coord.x, chunk_coord.y, chunk_coord.z);
+            ImGui::Text("Loaded columns: %u", world_grid_->get_loaded_column_count());
             ImGui::Text("Loaded chunks: %u", world_grid_->get_loaded_chunk_count());
-            ImGui::Text("Pending chunks: %u", world_grid_->get_pending_chunk_count());
+            ImGui::Text("Pending columns: %u", world_grid_->get_pending_column_count());
             ImGui::Text(
                 "Pending meshes: %u", get_engine().get_world().get_mesh_pool().get_pending_count()
             );
@@ -160,8 +166,9 @@ private:
     std::unique_ptr<gfx::fps_camera_controller> camera_controller_;
     std::shared_ptr<gfx::world_grid<>> world_grid_;
     std::unique_ptr<gfx::entity_guard<>> viewer_;
-    gfx::perlin_world_grid_generator* generator_ = nullptr;
-    gfx::perlin_world_grid_generator::params generator_params_;
+    gfx::perlin_terrain_generator* generator_ = nullptr;
+    gfx::perlin_terrain_generator::params generator_params_;
+    bool camera_placed_ = false;
 };
 
 auto main() -> int {
