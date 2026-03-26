@@ -15,6 +15,7 @@
 #include "vw/gfx/spatial/ray.h"
 #include "vw/gfx/world/components/spatial_component.h"
 #include "vw/gfx/world/entity_registry.h"
+#include "vw/gfx/world/spatial_layer.h"
 
 namespace vw::gfx {
 
@@ -34,17 +35,20 @@ public:
 
     void query_all(
         const frustum& f,
-        std::unordered_set<entity>& result_out
+        std::unordered_set<entity>& result_out,
+        spatial_layer_mask layer_mask = spatial_layer::all
     ) const;
 
     void query_all(
         const ray& r,
-        std::unordered_set<entity>& result_out
+        std::unordered_set<entity>& result_out,
+        spatial_layer_mask layer_mask = spatial_layer::all
     ) const;
 
     void query_all(
         const aabb& bounds,
-        std::unordered_set<entity>& result_out
+        std::unordered_set<entity>& result_out,
+        spatial_layer_mask layer_mask = spatial_layer::all
     ) const;
 
     void query_all_any(
@@ -54,10 +58,25 @@ public:
 
     [[nodiscard]] auto voxel_ray_cast(
         const ray& r,
-        std::unordered_set<entity>& candidates
+        std::unordered_set<entity>& candidates,
+        spatial_layer_mask layer_mask = spatial_layer::all
     ) const -> std::optional<voxel_ray_hit>;
 
     void cleanup(entity ent);
+
+    class spatial_modifier {
+    public:
+        auto set_layer(spatial_layer_mask layer) -> spatial_modifier&;
+
+    private:
+        friend class spatial_system;
+        spatial_modifier(spatial_system* system, entity ent);
+
+        spatial_system* system_;
+        entity entity_;
+    };
+
+    auto modify(entity ent) -> spatial_modifier;
 
 private:
     void update_entity(entity ent);

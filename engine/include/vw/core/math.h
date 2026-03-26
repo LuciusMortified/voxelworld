@@ -148,6 +148,8 @@ auto interpolate(
     float control2 = 1.0f
 ) -> quat;
 
+auto quat_look_y(const vec3f& direction) -> quat;
+
 auto perpendicular(const vec3f& eye, const vec3f& target) -> vec3f;
 auto is_safe_zero(float a, float epsilon = 1e-5f) -> bool;
 

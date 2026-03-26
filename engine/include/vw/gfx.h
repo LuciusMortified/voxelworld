@@ -4,7 +4,10 @@
 #define VW_GFX_H
 
 #include "vw/gfx/camera/camera.h"
-#include "vw/gfx/camera/fps_camera_controller.h"
+#include "vw/gfx/camera/free_camera_controller.h"
+#include "vw/gfx/camera/player_actions.h"
+#include "vw/gfx/camera/player_input_controller.h"
+#include "vw/gfx/camera/third_person_camera_controller.h"
 #include "vw/gfx/debug/debug_primitive.h"
 #include "vw/gfx/debug/debug_window.h"
 #include "vw/gfx/engine/app.h"

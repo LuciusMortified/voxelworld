@@ -47,7 +47,7 @@ private:
     void update_title_();
     static void init_asset_dir_();
 
-    gfx::fps_camera_controller camera_controller_;
+    gfx::free_camera_controller camera_controller_;
     bool camera_movement_enabled_ = false;
     bool prev_unsaved_state_      = false;
     bool prev_clip_unsaved_state_ = false;

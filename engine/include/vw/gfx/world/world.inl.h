@@ -19,7 +19,7 @@ world<Cs>::world(
     , light_system_(registry_)
     , socket_system_(registry_, hierarchy_system_, transform_system_)
     , animation_system_(registry_, transform_system_, animation_clip_registry_)
-    , character_controller_system_(registry_)
+    , character_controller_system_(registry_, transform_system_)
     , physics_system_(registry_, transform_system_)
     , world_grid_system_(registry_) {}
 
@@ -28,7 +28,7 @@ void world<Cs>::update(
     float32 delta_time
 ) {
     registry_.clear_changed();
-    update_stats_.character_controller_ms = measure_ms([&] { character_controller_system_.update(); });
+    update_stats_.character_controller_ms = measure_ms([&] { character_controller_system_.update(delta_time); });
     update_stats_.physics_ms              = measure_ms([&] { physics_system_.update(delta_time); });
     update_stats_.transform_ms            = measure_ms([&] { transform_system_.update(); });
     update_stats_.model_ms                = measure_ms([&] { model_system_.update(); });

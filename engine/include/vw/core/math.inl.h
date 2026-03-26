@@ -976,6 +976,13 @@ inline auto interpolate(
     return slerp(a, b, eased_t);
 }
 
+inline auto quat_look_y(
+    const vec3f& direction
+) -> quat {
+    float yaw = -std::atan2(direction.x, direction.z);
+    return euler_to_quat({0.0f, yaw, 0.0f});
+}
+
 inline auto perpendicular(
     const vec3f& eye, const vec3f& target
 ) -> vec3f {

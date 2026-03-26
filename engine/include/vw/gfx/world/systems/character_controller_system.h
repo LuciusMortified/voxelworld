@@ -10,19 +10,25 @@
 namespace vw::gfx {
 
 template <typename... Cs>
+class transform_system;
+
+template <typename... Cs>
 class character_controller_system final {
 public:
     using registry_type = entity_registry<Cs...>;
+    using transform_system_type = transform_system<Cs...>;
 
-    explicit character_controller_system(registry_type& registry);
+    explicit character_controller_system(registry_type& registry, transform_system_type& transform_system);
 
-    void update();
+    void update(float32 delta_time);
 
     class controller_modifier {
     public:
         auto set_move_input(const vec3f& input) -> controller_modifier&;
+        auto set_facing_direction(const vec3f& direction) -> controller_modifier&;
         auto set_move_speed(float32 speed) -> controller_modifier&;
         auto set_jump_impulse(float32 impulse) -> controller_modifier&;
+        auto set_rotation_speed(float32 speed) -> controller_modifier&;
         auto request_jump() -> controller_modifier&;
 
     private:
@@ -37,6 +43,7 @@ public:
 
 private:
     registry_type* registry_;
+    transform_system_type* transform_system_;
 };
 
 template <typename... Cs>

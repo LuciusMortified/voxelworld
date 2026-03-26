@@ -11,6 +11,10 @@ inline auto spatial_component::get_bounds() const -> const aabb& {
     return bounds_;
 }
 
+inline auto spatial_component::get_layer() const -> spatial_layer_mask {
+    return layer_;
+}
+
 inline auto spatial_component::is_dirty() const -> bool {
     return dirty_;
 }

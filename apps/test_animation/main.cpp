@@ -14,7 +14,7 @@ public:
         auto& window = get_engine().get_window();
         auto& camera = get_engine().get_camera();
 
-        camera_controller_ = std::make_unique<gfx::fps_camera_controller>(0.1f, 5.0f);
+        camera_controller_ = std::make_unique<gfx::free_camera_controller>(0.1f, 5.0f);
         camera_controller_->setup(window, camera);
 
         window.sub<gfx::key_press_event>([this](const gfx::key_press_event& event) {
@@ -559,7 +559,7 @@ private:
         ImGui::End();
     }
 
-    std::unique_ptr<gfx::fps_camera_controller> camera_controller_;
+    std::unique_ptr<gfx::free_camera_controller> camera_controller_;
     std::unique_ptr<gfx::entity_guard<>> root_;
     std::unique_ptr<gfx::entity_guard<>> red_;
     std::unique_ptr<gfx::entity_guard<>> green_;

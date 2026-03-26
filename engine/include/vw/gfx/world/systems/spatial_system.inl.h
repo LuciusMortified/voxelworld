@@ -22,6 +22,30 @@ spatial_system<Cs...>::spatial_system(
     : registry_(&registry) {}
 
 template <typename... Cs>
+auto spatial_system<Cs...>::modify(entity ent) -> spatial_modifier {
+    return spatial_modifier(this, ent);
+}
+
+template <typename... Cs>
+spatial_system<Cs...>::spatial_modifier::spatial_modifier(
+    spatial_system* system, entity ent
+)
+    : system_(system)
+    , entity_(ent) {}
+
+template <typename... Cs>
+auto spatial_system<Cs...>::spatial_modifier::set_layer(
+    spatial_layer_mask layer
+) -> spatial_modifier& {
+    if (!system_->registry_->template has<spatial_component>(entity_)) {
+        return *this;
+    }
+    auto& spatial = system_->registry_->template get<spatial_component>(entity_);
+    spatial.layer_ = layer;
+    return *this;
+}
+
+template <typename... Cs>
 void spatial_system<Cs...>::update() {
     auto& requested = registry_->template requested<spatial_component>();
     if (requested.empty()) {
@@ -155,7 +179,7 @@ auto spatial_system<Cs...>::calculate_aabb_from_model(
 
 template <typename... Cs>
 void spatial_system<Cs...>::query_all(
-    const frustum& f, std::unordered_set<entity>& result_out
+    const frustum& f, std::unordered_set<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
     tree_.query_all(f, result_out);
 
@@ -166,7 +190,7 @@ void spatial_system<Cs...>::query_all(
         }
 
         const auto& spatial = registry_->template get<spatial_component>(*it);
-        if (!f.intersects(spatial.get_bounds())) {
+        if (!(spatial.get_layer() & layer_mask) || !f.intersects(spatial.get_bounds())) {
             it = result_out.erase(it);
         } else {
             ++it;
@@ -184,7 +208,7 @@ void spatial_system<Cs...>::query_all_any(
 
 template <typename... Cs>
 void spatial_system<Cs...>::query_all(
-    const ray& r, std::unordered_set<entity>& result_out
+    const ray& r, std::unordered_set<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
     tree_.query_all(r, result_out);
 
@@ -195,7 +219,7 @@ void spatial_system<Cs...>::query_all(
         }
 
         const auto& spatial = registry_->template get<spatial_component>(*it);
-        if (!spatial.get_bounds().intersects(r)) {
+        if (!(spatial.get_layer() & layer_mask) || !spatial.get_bounds().intersects(r)) {
             it = result_out.erase(it);
         } else {
             ++it;
@@ -205,7 +229,7 @@ void spatial_system<Cs...>::query_all(
 
 template <typename... Cs>
 void spatial_system<Cs...>::query_all(
-    const aabb& bounds, std::unordered_set<entity>& result_out
+    const aabb& bounds, std::unordered_set<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
     tree_.query_all(bounds, result_out);
 
@@ -216,7 +240,7 @@ void spatial_system<Cs...>::query_all(
         }
 
         const auto& spatial = registry_->template get<spatial_component>(*it);
-        if (!spatial.get_bounds().intersects(bounds)) {
+        if (!(spatial.get_layer() & layer_mask) || !spatial.get_bounds().intersects(bounds)) {
             it = result_out.erase(it);
         } else {
             ++it;
@@ -233,9 +257,9 @@ void spatial_system<Cs...>::cleanup(
 
 template <typename... Cs>
 auto spatial_system<Cs...>::voxel_ray_cast(
-    const ray& r, std::unordered_set<entity>& candidates
+    const ray& r, std::unordered_set<entity>& candidates, spatial_layer_mask layer_mask
 ) const -> std::optional<voxel_ray_hit> {
-    query_all(r, candidates);
+    query_all(r, candidates, layer_mask);
 
     std::optional<voxel_ray_hit> closest_hit;
     float closest_distance_sq = std::numeric_limits<float>::max();
