@@ -44,6 +44,9 @@ Use types from `vw/core/types.h` instead of std/built-in:
 - NEVER add section separators like `// ========== Section ==========`
 - Exception: truly complex logic where intent is not obvious
 
+## Initialization
+Prefer constructors over setup/init methods. Dependencies should be passed via constructor parameters.
+
 ## Error Handling
 No exceptions in hot paths — use return values for errors.
 

@@ -19,16 +19,16 @@ public:
     void update(float delta_time) const;
 
     void set_mouse_sensitivity(float sensitivity);
-    [[nodiscard]] float get_mouse_sensitivity() const;
+    [[nodiscard]] auto get_mouse_sensitivity() const -> float;
 
     void set_camera_speed(float speed);
-    [[nodiscard]] float get_camera_speed() const;
+    [[nodiscard]] auto get_camera_speed() const -> float;
 
-    [[nodiscard]] bool is_mouse_captured() const;
+    [[nodiscard]] auto is_mouse_captured() const -> bool;
     void set_mouse_captured(bool captured);
     void toggle_mouse_captured();
 
-    [[nodiscard]] bool keyboard_control_enabled() const;
+    [[nodiscard]] auto keyboard_control_enabled() const -> bool;
     void set_keyboard_control_enabled(bool enabled);
     void toggle_keyboard_control_enabled();
 
@@ -39,12 +39,12 @@ private:
     float mouse_sensitivity_;
     float camera_speed_;
 
-    bool mouse_captured_;
-    bool keyboard_control_enabled_;
+    bool mouse_captured_{false};
+    bool keyboard_control_enabled_{false};
 
-    double last_mouse_x_;
-    double last_mouse_y_;
-    bool mouse_initialized_;
+    double last_mouse_x_{0.0};
+    double last_mouse_y_{0.0};
+    bool mouse_initialized_{false};
 
     window* window_ = nullptr;
     camera* camera_ = nullptr;

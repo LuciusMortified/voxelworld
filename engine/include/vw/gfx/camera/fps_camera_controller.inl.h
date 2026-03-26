@@ -12,12 +12,10 @@ inline fps_camera_controller::fps_camera_controller(
 )
     : mouse_sensitivity_(mouse_sensitivity)
     , camera_speed_(camera_speed)
-    , mouse_captured_(false)
-    , keyboard_control_enabled_(false)
-    , last_mouse_x_(0.0)
-    , last_mouse_y_(0.0)
-    , mouse_initialized_(false)
-    , key_press_sub_(0)
+    ,
+    ,
+    ,
+    , las  , mou  , key_press_sub_(0)
     , mouse_move_sub_(0) {}
 
 inline void fps_camera_controller::setup(

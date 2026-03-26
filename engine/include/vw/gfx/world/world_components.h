@@ -7,11 +7,14 @@
 
 #include "vw/gfx/world/components/animation_player_component.h"
 #include "vw/gfx/world/components/animation_target_component.h"
+#include "vw/gfx/world/components/character_controller_component.h"
 #include "vw/gfx/world/components/hierarchy_component.h"
 #include "vw/gfx/world/components/light_component.h"
 #include "vw/gfx/world/components/model_component.h"
+#include "vw/gfx/world/components/rigid_body_component.h"
 #include "vw/gfx/world/components/socket_component.h"
 #include "vw/gfx/world/components/spatial_component.h"
+#include "vw/gfx/world/components/sphere_collider_component.h"
 #include "vw/gfx/world/components/transform_component.h"
 #include "vw/gfx/world/components/world_view_component.h"
 
@@ -26,7 +29,10 @@ using base_world_components = std::tuple<
     socket_component,
     animation_player_component,
     animation_target_component,
-    world_view_component>;
+    world_view_component,
+    rigid_body_component,
+    sphere_collider_component,
+    character_controller_component>;
 
 }
 

@@ -12,9 +12,11 @@
 #include "vw/gfx/spatial/ray.h"
 #include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/systems/animation_system.h"
+#include "vw/gfx/world/systems/character_controller_system.h"
 #include "vw/gfx/world/systems/hierarchy_system.h"
 #include "vw/gfx/world/systems/light_system.h"
 #include "vw/gfx/world/systems/model_system.h"
+#include "vw/gfx/world/systems/physics_system.h"
 #include "vw/gfx/world/systems/socket_system.h"
 #include "vw/gfx/world/systems/spatial_system.h"
 #include "vw/gfx/world/systems/transform_system.h"
@@ -24,12 +26,14 @@
 namespace vw::gfx {
 
 struct world_update_stats {
-    float32 transform_ms   = 0.0f;
-    float32 model_ms       = 0.0f;
-    float32 spatial_ms     = 0.0f;
-    float32 light_ms       = 0.0f;
-    float32 world_grid_ms  = 0.0f;
-    float32 animation_ms   = 0.0f;
+    float32 character_controller_ms = 0.0f;
+    float32 physics_ms              = 0.0f;
+    float32 transform_ms            = 0.0f;
+    float32 model_ms                = 0.0f;
+    float32 spatial_ms              = 0.0f;
+    float32 light_ms                = 0.0f;
+    float32 world_grid_ms           = 0.0f;
+    float32 animation_ms            = 0.0f;
 };
 
 template <typename WC>
@@ -53,8 +57,10 @@ public:
     using spatial_system_type   = spatial_system_from_tuple<WC>::type;
     using light_system_type     = light_system_from_tuple<WC>::type;
     using socket_system_type    = socket_system_from_tuple<WC>::type;
-    using animation_system_type   = animation_system_from_tuple<WC>::type;
-    using world_grid_system_type  = world_grid_system_from_tuple<WC, WC>::type;
+    using animation_system_type              = animation_system_from_tuple<WC>::type;
+    using character_controller_system_type   = character_controller_system_from_tuple<WC>::type;
+    using physics_system_type                = physics_system_from_tuple<WC, WC>::type;
+    using world_grid_system_type             = world_grid_system_from_tuple<WC, WC>::type;
 
     explicit world(vulkan_context& context, const block_registry& registry);
     ~world()                               = default;
@@ -97,6 +103,10 @@ public:
 
     [[nodiscard]] auto get_world_grid_system() -> world_grid_system_type&;
 
+    [[nodiscard]] auto get_character_controller_system() -> character_controller_system_type&;
+
+    [[nodiscard]] auto get_physics_system() -> physics_system_type&;
+
     [[nodiscard]] auto get_registry() -> registry_type&;
 
     template <typename T>
@@ -135,6 +145,8 @@ private:
     socket_system_type socket_system_;
     animation_clip_registry animation_clip_registry_;
     animation_system_type animation_system_;
+    character_controller_system_type character_controller_system_;
+    physics_system_type physics_system_;
     world_grid_system_type world_grid_system_;
     world_update_stats update_stats_;
 };

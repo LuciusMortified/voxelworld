@@ -45,8 +45,8 @@ private:
 
     bool visible_                      = false;
     bool show_combined_buffers_detail_ = false;
-    bool show_systems_detail_          = true;
-    bool show_render_detail_           = true;
+    bool show_systems_detail_          = false;
+    bool show_render_detail_           = false;
 
     std::unordered_map<std::string, float32> metric_max_;
 };

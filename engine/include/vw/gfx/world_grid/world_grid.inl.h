@@ -52,7 +52,7 @@ auto world_grid<WC>::get_voxel(
         return empty_voxel;
     }
     auto lc = world_to_local_coord(world_pos);
-    return it->second->get_voxel(lc);
+    return it->second->get_voxel(lc / voxel_scale_);
 }
 
 template <typename WC>
@@ -62,8 +62,8 @@ auto world_grid<WC>::get_surface_y(
     constexpr int32 s = chunk<WC>::size;
 
     auto floor_div = [](int32 a, int32 b) -> int32 { return a >= 0 ? a / b : (a - b + 1) / b; };
-    int32 cx = floor_div(wx, s);
-    int32 cz = floor_div(wz, s);
+    int32 cx       = floor_div(wx, s);
+    int32 cz       = floor_div(wz, s);
     vec2i col_coord{cx, cz};
 
     auto col_it = column_chunks_.find(col_coord);
@@ -104,7 +104,7 @@ void world_grid<WC>::set_voxel(
         return;
     }
     auto lc = world_to_local_coord(world_pos);
-    it->second->set_voxel(lc, v);
+    it->second->set_voxel(lc / voxel_scale_, v);
 }
 
 template <typename WC>
@@ -235,7 +235,7 @@ auto world_grid<WC>::get_completed_stats() const -> const completed_stats& {
 template <typename WC>
 void world_grid<WC>::process_completed() {
     static constexpr int32 max_columns_per_frame = 4;
-    static constexpr vec3i neighbor_offsets[6]  = {
+    static constexpr vec3i neighbor_offsets[6]   = {
         {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
     };
 
@@ -279,7 +279,8 @@ void world_grid<WC>::process_completed() {
                 chunks_.emplace(
                     cd.coord,
                     std::make_unique<chunk<WC>>(
-                        *world_, cd.coord, std::move(cd.chunk_model), voxel_scale_)
+                        *world_, cd.coord, std::move(cd.chunk_model), voxel_scale_
+                    )
                 );
             });
 
@@ -290,7 +291,8 @@ void world_grid<WC>::process_completed() {
                     if (neighbor) {
                         int opposite_fd = fd ^ 1;
                         neighbor->get_model()->set_boundary_slice(
-                            opposite_fd, *created->get_model());
+                            opposite_fd, *created->get_model()
+                        );
                         deferred_remeshes_.push({cd.coord + neighbor_offsets[fd], opposite_fd});
                     }
                 }
@@ -357,9 +359,7 @@ void world_grid<WC>::gen_thread_function() {
         auto col = std::make_unique<gen_column>(task.coord.x, task.coord.y);
 
         terrain_context ctx{
-            .cx = task.coord.x,
-            .cz = task.coord.y,
-            .create_chunk = [&col](int32 y) -> chunk_data& {
+            .cx = task.coord.x, .cz = task.coord.y, .create_chunk = [&col](int32 y) -> chunk_data& {
                 return col->create_chunk(y, chunk_data{});
             }
         };

@@ -19,6 +19,8 @@ world<Cs>::world(
     , light_system_(registry_)
     , socket_system_(registry_, hierarchy_system_, transform_system_)
     , animation_system_(registry_, transform_system_, animation_clip_registry_)
+    , character_controller_system_(registry_)
+    , physics_system_(registry_, transform_system_)
     , world_grid_system_(registry_) {}
 
 template <typename Cs>
@@ -26,12 +28,14 @@ void world<Cs>::update(
     float32 delta_time
 ) {
     registry_.clear_changed();
-    update_stats_.transform_ms  = measure_ms([&] { transform_system_.update(); });
-    update_stats_.model_ms      = measure_ms([&] { model_system_.update(); });
-    update_stats_.spatial_ms    = measure_ms([&] { spatial_system_.update(); });
-    update_stats_.light_ms      = measure_ms([&] { light_system_.update(); });
-    update_stats_.world_grid_ms = measure_ms([&] { world_grid_system_.update(); });
-    update_stats_.animation_ms  = measure_ms([&] { animation_system_.update(delta_time); });
+    update_stats_.character_controller_ms = measure_ms([&] { character_controller_system_.update(); });
+    update_stats_.physics_ms              = measure_ms([&] { physics_system_.update(delta_time); });
+    update_stats_.transform_ms            = measure_ms([&] { transform_system_.update(); });
+    update_stats_.model_ms                = measure_ms([&] { model_system_.update(); });
+    update_stats_.spatial_ms              = measure_ms([&] { spatial_system_.update(); });
+    update_stats_.light_ms                = measure_ms([&] { light_system_.update(); });
+    update_stats_.world_grid_ms           = measure_ms([&] { world_grid_system_.update(); });
+    update_stats_.animation_ms            = measure_ms([&] { animation_system_.update(delta_time); });
 }
 
 template <typename Cs>
@@ -119,6 +123,16 @@ auto world<C>::get_animation_clip_registry() -> animation_clip_registry& {
 template <typename C>
 auto world<C>::get_world_grid_system() -> world_grid_system_type& {
     return world_grid_system_;
+}
+
+template <typename C>
+auto world<C>::get_character_controller_system() -> character_controller_system_type& {
+    return character_controller_system_;
+}
+
+template <typename C>
+auto world<C>::get_physics_system() -> physics_system_type& {
+    return physics_system_;
 }
 
 template <typename C>
