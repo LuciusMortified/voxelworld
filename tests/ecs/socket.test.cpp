@@ -91,15 +91,11 @@ using test_components = std::tuple<
 
 struct socket_test_fixture {
     entity_registry<hierarchy_component, transform_component, socket_component, spatial_component> reg;
-    world_context<test_components, hierarchy_component, transform_component, socket_component, spatial_component> ctx{reg};
-    spatial_system<test_components, hierarchy_component, transform_component, socket_component, spatial_component>
-        spatial_sys{ctx};
-    transform_system<test_components, hierarchy_component, transform_component, socket_component, spatial_component>
-        transform_sys{ctx, hierarchy_sys};
-    hierarchy_system<test_components, hierarchy_component, transform_component, socket_component, spatial_component>
-        hierarchy_sys{ctx, transform_sys};
-    socket_system<test_components, hierarchy_component, transform_component, socket_component, spatial_component>
-        socket_sys{ctx, hierarchy_sys, transform_sys};
+    world_context<test_components> ctx{reg};
+    spatial_system<test_components> spatial_sys{ctx};
+    transform_system<test_components> transform_sys{ctx, hierarchy_sys};
+    hierarchy_system<test_components> hierarchy_sys{ctx, transform_sys};
+    socket_system<test_components> socket_sys{ctx, hierarchy_sys, transform_sys};
 
     auto create_entity() -> entity {
         auto ent = reg.create();

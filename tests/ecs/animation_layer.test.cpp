@@ -27,9 +27,7 @@ using test_context = world_context<
     test_components>;
 
 using test_spatial_sys = spatial_system<
-    test_components,
-    hierarchy_component, transform_component, spatial_component,
-    animation_player_component, animation_target_component>;
+    test_components>;
 
 using test_transform_sys = transform_system<
     test_components>;
