@@ -123,12 +123,12 @@ auto world<C>::get_animation_clip_registry() -> animation_clip_registry& {
 
 template <typename C>
 void world<C>::set_world_grid(std::shared_ptr<world_grid<C>> grid) {
-    context_.world_grid = std::move(grid);
+    context_.world_grid_ptr = std::move(grid);
 }
 
 template <typename C>
 auto world<C>::get_world_grid() const -> std::shared_ptr<world_grid<C>> {
-    return context_.world_grid;
+    return context_.world_grid_ptr;
 }
 
 template <typename C>

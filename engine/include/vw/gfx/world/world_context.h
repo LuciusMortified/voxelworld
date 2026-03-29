@@ -19,8 +19,8 @@ struct world_context {
     using registry_type = entity_registry_from_tuple<WC>::type;
 
     registry_type& registry;
-    mesh_pool* mesh_pool = nullptr;
-    std::shared_ptr<world_grid<WC>> world_grid;
+    mesh_pool* mesh_pool_ptr = nullptr;
+    std::shared_ptr<world_grid<WC>> world_grid_ptr;
 };
 
 }  // namespace vw::gfx
