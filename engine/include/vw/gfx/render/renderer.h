@@ -162,6 +162,8 @@ public:
     [[nodiscard]] auto get_directional_light_settings() -> directional_light_settings&;
     [[nodiscard]] auto get_fog_settings() -> fog_settings&;
 
+    void draw_colliders(world_type& w, color col = colors::green);
+
     // Получить ImTextureID для shadow map (для отображения в ImGui::Image)
     // В Vulkan это VkDescriptorSet, приведенный к void*
     [[nodiscard]] void* get_shadow_map_texture_id(uint32 cascade_index = 0) const;

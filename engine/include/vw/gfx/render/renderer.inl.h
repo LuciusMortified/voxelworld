@@ -217,6 +217,16 @@ auto renderer<C>::get_fog_settings() -> fog_settings& {
 }
 
 template <typename C>
+void renderer<C>::draw_colliders(world<C>& w, color col) {
+    for (auto [ent, box, tc] :
+         w.get_registry().template view<box_collider_component, transform_component>()) {
+        auto pos = tc.get_position() + box.get_offset();
+        auto half = box.get_extents() * 0.5f;
+        draw_box(pos - half, box.get_extents(), col);
+    }
+}
+
+template <typename C>
 void renderer<C>::set_clear_color(
     float r, float g, float b, float a
 ) {

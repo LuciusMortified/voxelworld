@@ -9,7 +9,7 @@
 
 namespace vw::gfx {
 
-template <typename... Cs>
+template <typename>
 class spatial_system;
 
 struct spatial_component final {
@@ -24,7 +24,7 @@ public:
     [[nodiscard]] auto get_layer() const -> spatial_layer_mask;
     [[nodiscard]] auto is_dirty() const -> bool;
 
-    template <typename... Cs>
+    template <typename>
     friend class spatial_system;
 };
 

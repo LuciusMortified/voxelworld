@@ -7,7 +7,7 @@
 
 #include "vw/core.h"
 #include "vw/gfx/camera/camera.h"
-#include "vw/gfx/camera/player_actions.h"
+#include "vw/gfx/player/player_input_state.h"
 #include "vw/gfx/spatial/ray.h"
 #include "vw/gfx/world/spatial_layer.h"
 #include "vw/gfx/world/world.h"
@@ -18,7 +18,7 @@ struct third_person_camera_params {
     float32 arm_length     = 10.0f;
     float32 arm_length_min = 2.0f;
     float32 arm_length_max = 50.0f;
-    vec3f target_offset    = {0.0f, 1.8f, 0.0f};
+    vec3f target_offset    = {0.0f, 8.0f, 0.0f};
     float32 pitch_min      = -89.0f;
     float32 pitch_max      = 89.0f;
     float32 zoom_speed     = 2.0f;
@@ -30,7 +30,6 @@ template <typename WC = base_world_components>
 class third_person_camera_controller {
 public:
     using world_type = world<WC>;
-
     explicit third_person_camera_controller(
         camera& camera,
         world_type& world,
@@ -38,13 +37,6 @@ public:
     );
 
     void update(const player_input_state& input, entity target);
-
-    template <typename CharacterSystem>
-    void apply_movement(
-        const player_input_state& input,
-        CharacterSystem& character_system,
-        entity target
-    );
 
     [[nodiscard]] auto get_params() -> third_person_camera_params&;
     [[nodiscard]] auto get_pitch() const -> float32;

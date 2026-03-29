@@ -7,7 +7,7 @@
 
 namespace vw::gfx {
 
-template <typename... Cs>
+template <typename>
 class light_system;
 
 struct light_component final {
@@ -19,7 +19,7 @@ private:
     float32 attenuation_linear_;
     float32 attenuation_quadratic_;
     
-    template <typename... Cs>
+    template <typename>
     friend class light_system;
     
 public:

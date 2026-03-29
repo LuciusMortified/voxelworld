@@ -7,9 +7,8 @@
 #include <set>
 #include <vector>
 
-#include "vw/gfx/resource/mesh_pool.h"
 #include "vw/gfx/world/components/model_component.h"
-#include "vw/gfx/world/entity_registry.h"
+#include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
 
@@ -23,12 +22,13 @@ struct model_system_stats {
 
 class model;
 
-template <typename... Cs>
+template <typename WC>
 class model_system {
 public:
-    using registry_type = entity_registry<Cs...>;
+    using registry_type = entity_registry_from_tuple<WC>::type;
+    using context_type = world_context<WC>;
 
-    explicit model_system(registry_type& registry, mesh_pool& mesh_pool);
+    explicit model_system(context_type& context);
 
     class model_modifier {
     public:
@@ -56,18 +56,9 @@ private:
     void process_dirty_entities();
     void update_completed_meshes();
 
-    registry_type* registry_;
-    mesh_pool* mesh_pool_;
+    context_type* context_;
     std::unordered_set<entity> pending_entities_;
     model_system_stats stats_;
-};
-
-template <typename... Cs>
-struct model_system_from_tuple;
-
-template <typename... Cs>
-struct model_system_from_tuple<std::tuple<Cs...>> {
-    using type = model_system<Cs...>;
 };
 
 }  // namespace vw::gfx

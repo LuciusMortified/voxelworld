@@ -5,8 +5,6 @@
 
 #include "vw/gfx/camera/camera.h"
 #include "vw/gfx/camera/free_camera_controller.h"
-#include "vw/gfx/camera/player_actions.h"
-#include "vw/gfx/camera/player_input_controller.h"
 #include "vw/gfx/camera/third_person_camera_controller.h"
 #include "vw/gfx/debug/debug_primitive.h"
 #include "vw/gfx/debug/debug_window.h"
@@ -15,6 +13,9 @@
 #include "vw/gfx/model/model.h"
 #include "vw/gfx/model/model_identity.h"
 #include "vw/gfx/model/model_registry.h"
+#include "vw/gfx/player/player_input_controller.h"
+#include "vw/gfx/player/player_input_state.h"
+#include "vw/gfx/player/third_person_player_controller.h"
 #include "vw/gfx/render/renderer.h"
 #include "vw/gfx/render/vulkan_context.h"
 #include "vw/gfx/resource/buffer.h"

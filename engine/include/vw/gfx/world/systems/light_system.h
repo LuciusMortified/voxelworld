@@ -6,16 +6,17 @@
 #include <unordered_set>
 
 #include "vw/gfx/world/components/light_component.h"
-#include "vw/gfx/world/entity_registry.h"
+#include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
 
-template <typename... Cs>
+template <typename WC>
 class light_system final {
 public:
-    using registry_type = entity_registry<Cs...>;
+    using registry_type = entity_registry_from_tuple<WC>::type;
+    using context_type = world_context<WC>;
 
-    explicit light_system(registry_type& registry);
+    explicit light_system(context_type& context);
 
     void update();
 
@@ -37,15 +38,7 @@ public:
     auto modify(entity ent) -> light_modifier;
 
 private:
-    registry_type* registry_;
-};
-
-template <typename... Cs>
-struct light_system_from_tuple;
-
-template <typename... Cs>
-struct light_system_from_tuple<std::tuple<Cs...>> {
-    using type = light_system<Cs...>;
+    context_type* context_;
 };
 
 }  // namespace vw::gfx

@@ -3,7 +3,6 @@
 #ifndef VW_GFX_WORLD_H
 #define VW_GFX_WORLD_H
 
-#include <chrono>
 #include <optional>
 #include <unordered_set>
 
@@ -22,6 +21,7 @@
 #include "vw/gfx/world/systems/transform_system.h"
 #include "vw/gfx/world/systems/world_grid_system.h"
 #include "vw/gfx/world/world_components.h"
+#include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
 
@@ -50,17 +50,18 @@ class world final {
     friend class entity_guard_group<WC>;
 
 public:
-    using registry_type         = registry_from_tuple<WC>::type;
-    using transform_system_type = transform_system_from_tuple<WC>::type;
-    using hierarchy_system_type = hierarchy_system_from_tuple<WC>::type;
-    using model_system_type     = model_system_from_tuple<WC>::type;
-    using spatial_system_type   = spatial_system_from_tuple<WC>::type;
-    using light_system_type     = light_system_from_tuple<WC>::type;
-    using socket_system_type    = socket_system_from_tuple<WC>::type;
-    using animation_system_type              = animation_system_from_tuple<WC>::type;
-    using character_controller_system_type   = character_controller_system_from_tuple<WC>::type;
-    using physics_system_type                = physics_system_from_tuple<WC, WC>::type;
-    using world_grid_system_type             = world_grid_system_from_tuple<WC, WC>::type;
+    using registry_type                    = entity_registry_from_tuple<WC>::type;
+    using context_type                     = world_context<WC>;
+    using transform_system_type            = transform_system<WC>;
+    using hierarchy_system_type            = hierarchy_system<WC>;
+    using model_system_type                = model_system<WC>;
+    using spatial_system_type              = spatial_system<WC>;
+    using light_system_type                = light_system<WC>;
+    using socket_system_type               = socket_system<WC>;
+    using animation_system_type            = animation_system<WC>;
+    using character_controller_system_type = character_controller_system<WC>;
+    using physics_system_type              = physics_system<WC>;
+    using world_grid_system_type           = world_grid_system<WC>;
 
     explicit world(vulkan_context& context, const block_registry& registry);
     ~world()                               = default;
@@ -101,6 +102,9 @@ public:
 
     [[nodiscard]] auto get_animation_clip_registry() -> animation_clip_registry&;
 
+    void set_world_grid(std::shared_ptr<world_grid<WC>> grid);
+    [[nodiscard]] auto get_world_grid() const -> std::shared_ptr<world_grid<WC>>;
+
     [[nodiscard]] auto get_world_grid_system() -> world_grid_system_type&;
 
     [[nodiscard]] auto get_character_controller_system() -> character_controller_system_type&;
@@ -112,10 +116,8 @@ public:
     template <typename T>
     [[nodiscard]] auto changed() -> std::unordered_set<entity>&;
 
-    [[nodiscard]] auto voxel_ray_cast(
-        const ray& r,
-        std::unordered_set<entity>& candidates
-    ) const -> std::optional<voxel_ray_hit>;
+    [[nodiscard]] auto voxel_ray_cast(const ray& r, std::unordered_set<entity>& candidates) const
+        -> std::optional<voxel_ray_hit>;
 
     [[nodiscard]] auto destroyed() const -> const std::vector<entity>&;
 
@@ -136,6 +138,7 @@ private:
 
     registry_type registry_;
     mesh_pool mesh_pool_;
+    context_type context_;
     spatial_system_type spatial_system_;
     transform_system_type transform_system_;
     hierarchy_system_type hierarchy_system_;

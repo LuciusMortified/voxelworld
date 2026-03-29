@@ -74,8 +74,8 @@ inline app::app(
         return true;
     });
 
-    camera.set_position({25.0f, 25.0f, -35.0f});
-    camera.set_rotation(-30.0f, -35.0f);
+    camera.set_position({25.0f, 25.0f, 25.0f});
+    camera.set_rotation(-30.0f, -135.0f);
 
     renderer.set_clear_color(vec4f{0.15f, 0.27f, 0.45f, 1.0f});
 

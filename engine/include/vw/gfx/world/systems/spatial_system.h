@@ -14,21 +14,22 @@
 #include "vw/gfx/spatial/frustum.h"
 #include "vw/gfx/spatial/ray.h"
 #include "vw/gfx/world/components/spatial_component.h"
-#include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/spatial_layer.h"
+#include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
 
 struct model_component;
 struct transform_component;
 
-template <typename... Cs>
+template <typename WC>
 class spatial_system {
 public:
-    using registry_type = entity_registry<Cs...>;
+    using registry_type = entity_registry_from_tuple<WC>::type;
+    using context_type = world_context<WC>;
 
     explicit spatial_system(
-        registry_type& registry
+        context_type& context
     );
 
     void update();
@@ -87,16 +88,8 @@ private:
     ) const -> aabb;
     auto expand_aabb_for_fat(const aabb& bounds) const -> aabb;
 
-    registry_type* registry_;
+    context_type* context_;
     dynamic_aabb_tree tree_;
-};
-
-template <typename... Cs>
-struct spatial_system_from_tuple;
-
-template <typename... Cs>
-struct spatial_system_from_tuple<std::tuple<Cs...>> {
-    using type = spatial_system<Cs...>;
 };
 
 }  // namespace vw::gfx

@@ -5,30 +5,31 @@
 
 #include "vw/gfx/world/components/hierarchy_component.h"
 #include "vw/gfx/world/components/transform_component.h"
-#include "vw/gfx/world/entity_registry.h"
+#include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
 
-template <typename... Cs>
+template <typename>
 class transform_system;
 
-template <typename... Cs>
+template <typename WC>
 class hierarchy_system final {
 public:
-    using registry_type = entity_registry<Cs...>;
-    using transform_system_type = transform_system<Cs...>;
+    using context_type          = world_context<WC>;
+    using registry_type         = entity_registry_from_tuple<WC>::type;
+    using transform_system_type = transform_system<WC>;
 
-    hierarchy_system(registry_type& registry, transform_system_type& transform_sys);
+    hierarchy_system(context_type& context, transform_system_type& transform_sys);
 
     class hierarchy_modifier {
     public:
         auto set_parent(entity parent) -> hierarchy_modifier&;
         auto remove_parent() -> hierarchy_modifier&;
-        
+
     private:
         friend class hierarchy_system;
         hierarchy_modifier(hierarchy_system* system, entity ent);
-        
+
         hierarchy_system* system_;
         entity entity_;
     };
@@ -42,16 +43,8 @@ public:
 private:
     [[nodiscard]] auto check_hierarchy_cycle(entity parent, entity child) const -> bool;
 
-    registry_type* registry_;
+    context_type* context_;
     transform_system_type* transform_system_;
-};
-
-template <typename... Cs>
-struct hierarchy_system_from_tuple;
-
-template <typename... Cs>
-struct hierarchy_system_from_tuple<std::tuple<Cs...>> {
-    using type = hierarchy_system<Cs...>;
 };
 
 }  // namespace vw::gfx

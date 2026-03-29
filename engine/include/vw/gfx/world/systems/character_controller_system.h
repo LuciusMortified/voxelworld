@@ -4,21 +4,26 @@
 #define VW_GFX_WORLD_SYSTEMS_CHARACTER_CONTROLLER_SYSTEM_H
 
 #include "vw/gfx/world/components/character_controller_component.h"
+#include "vw/gfx/world/components/movement_intent_component.h"
 #include "vw/gfx/world/components/rigid_body_component.h"
 #include "vw/gfx/world/entity_registry.h"
+#include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
 
-template <typename... Cs>
+template <typename>
 class transform_system;
 
-template <typename... Cs>
+template <typename WC>
 class character_controller_system final {
 public:
-    using registry_type = entity_registry<Cs...>;
-    using transform_system_type = transform_system<Cs...>;
+    using context_type          = world_context<WC>;
+    using registry_type         = entity_registry_from_tuple<WC>::type;
+    using transform_system_type = transform_system<WC>;
 
-    explicit character_controller_system(registry_type& registry, transform_system_type& transform_system);
+    explicit character_controller_system(
+        context_type& context, transform_system_type& transform_system
+    );
 
     void update(float32 delta_time);
 
@@ -42,16 +47,8 @@ public:
     auto modify(entity ent) -> controller_modifier;
 
 private:
-    registry_type* registry_;
+    context_type* context_;
     transform_system_type* transform_system_;
-};
-
-template <typename... Cs>
-struct character_controller_system_from_tuple;
-
-template <typename... Cs>
-struct character_controller_system_from_tuple<std::tuple<Cs...>> {
-    using type = character_controller_system<Cs...>;
 };
 
 }  // namespace vw::gfx

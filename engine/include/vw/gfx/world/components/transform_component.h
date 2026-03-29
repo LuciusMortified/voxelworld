@@ -28,10 +28,10 @@ public:
     [[nodiscard]] auto get_scale() const -> const vec3f&;
     [[nodiscard]] auto get_origin() const -> const vec3f&;
 
-    template <typename... Cs>
+    template <typename>
     friend class hierarchy_system;
 
-    template <typename... Cs>
+    template <typename>
     friend class transform_system;
 };
 

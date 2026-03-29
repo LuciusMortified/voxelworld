@@ -15,66 +15,66 @@
 
 namespace vw::gfx {
 
-template <typename... Cs>
-spatial_system<Cs...>::spatial_system(
-    registry_type& registry
+template <typename WC>
+spatial_system<WC>::spatial_system(
+    context_type& context
 )
-    : registry_(&registry) {}
+    : context_(&context) {}
 
-template <typename... Cs>
-auto spatial_system<Cs...>::modify(entity ent) -> spatial_modifier {
+template <typename WC>
+auto spatial_system<WC>::modify(entity ent) -> spatial_modifier {
     return spatial_modifier(this, ent);
 }
 
-template <typename... Cs>
-spatial_system<Cs...>::spatial_modifier::spatial_modifier(
+template <typename WC>
+spatial_system<WC>::spatial_modifier::spatial_modifier(
     spatial_system* system, entity ent
 )
     : system_(system)
     , entity_(ent) {}
 
-template <typename... Cs>
-auto spatial_system<Cs...>::spatial_modifier::set_layer(
+template <typename WC>
+auto spatial_system<WC>::spatial_modifier::set_layer(
     spatial_layer_mask layer
 ) -> spatial_modifier& {
-    if (!system_->registry_->template has<spatial_component>(entity_)) {
+    if (!system_->context_->registry.template has<spatial_component>(entity_)) {
         return *this;
     }
-    auto& spatial = system_->registry_->template get<spatial_component>(entity_);
+    auto& spatial = system_->context_->registry.template get<spatial_component>(entity_);
     spatial.layer_ = layer;
     return *this;
 }
 
-template <typename... Cs>
-void spatial_system<Cs...>::update() {
-    auto& requested = registry_->template requested<spatial_component>();
+template <typename WC>
+void spatial_system<WC>::update() {
+    auto& requested = context_->registry.template requested<spatial_component>();
     if (requested.empty()) {
         return;
     }
 
     for (entity ent : requested) {
         const bool can_be_updated =  //
-            registry_->template has<model_component>(ent) &&
-            registry_->template has<transform_component>(ent) &&
-            registry_->template has<spatial_component>(ent);
+            context_->registry.template has<model_component>(ent) &&
+            context_->registry.template has<transform_component>(ent) &&
+            context_->registry.template has<spatial_component>(ent);
         if (!can_be_updated) {
             continue;
         }
         update_entity(ent);
-        registry_->template notify_changed<spatial_component>(ent);
+        context_->registry.template notify_changed<spatial_component>(ent);
     }
 
-    registry_->template clear_requested<spatial_component>();
+    context_->registry.template clear_requested<spatial_component>();
 }
 
-template <typename... Cs>
-void spatial_system<Cs...>::update_entity(
+template <typename WC>
+void spatial_system<WC>::update_entity(
     entity ent
 ) {
-    auto& spatial = registry_->template get<spatial_component>(ent);
+    auto& spatial = context_->registry.template get<spatial_component>(ent);
 
-    const auto& model_comp     = registry_->template get<model_component>(ent);
-    const auto& transform_comp = registry_->template get<transform_component>(ent);
+    const auto& model_comp     = context_->registry.template get<model_component>(ent);
+    const auto& transform_comp = context_->registry.template get<transform_component>(ent);
     aabb new_bounds            = calculate_aabb_from_model(ent, model_comp, transform_comp);
 
     bool bounds_changed =  //
@@ -109,8 +109,8 @@ void spatial_system<Cs...>::update_entity(
     }
 }
 
-template <typename... Cs>
-auto spatial_system<Cs...>::expand_aabb_for_fat(
+template <typename WC>
+auto spatial_system<WC>::expand_aabb_for_fat(
     const aabb& bounds
 ) const -> aabb {
     constexpr float expansion_factor = 0.1f;
@@ -129,8 +129,8 @@ auto spatial_system<Cs...>::expand_aabb_for_fat(
     };
 }
 
-template <typename... Cs>
-auto spatial_system<Cs...>::calculate_aabb_from_model(
+template <typename WC>
+auto spatial_system<WC>::calculate_aabb_from_model(
     entity ent, const model_component& model_comp, const transform_component& transform_comp
 ) const -> aabb {
     if (!model_comp.has_model()) {
@@ -177,19 +177,19 @@ auto spatial_system<Cs...>::calculate_aabb_from_model(
     return aabb{min_point, max_point};
 }
 
-template <typename... Cs>
-void spatial_system<Cs...>::query_all(
+template <typename WC>
+void spatial_system<WC>::query_all(
     const frustum& f, std::unordered_set<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
     tree_.query_all(f, result_out);
 
     for (auto it = result_out.begin(), ite = result_out.end(); it != ite;) {
-        if (!registry_->template has<spatial_component>(*it)) {
+        if (!context_->registry.template has<spatial_component>(*it)) {
             it = result_out.erase(it);
             continue;
         }
 
-        const auto& spatial = registry_->template get<spatial_component>(*it);
+        const auto& spatial = context_->registry.template get<spatial_component>(*it);
         if (!(spatial.get_layer() & layer_mask) || !f.intersects(spatial.get_bounds())) {
             it = result_out.erase(it);
         } else {
@@ -198,27 +198,27 @@ void spatial_system<Cs...>::query_all(
     }
 }
 
-template <typename... Cs>
-void spatial_system<Cs...>::query_all_any(
+template <typename WC>
+void spatial_system<WC>::query_all_any(
     std::span<const frustum> frustums, std::vector<entity>& result_out
 ) const {
     tree_.query_all_any(frustums, result_out);
     std::sort(result_out.begin(), result_out.end());
 }
 
-template <typename... Cs>
-void spatial_system<Cs...>::query_all(
+template <typename WC>
+void spatial_system<WC>::query_all(
     const ray& r, std::unordered_set<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
     tree_.query_all(r, result_out);
 
     for (auto it = result_out.begin(), ite = result_out.end(); it != ite;) {
-        if (!registry_->template has<spatial_component>(*it)) {
+        if (!context_->registry.template has<spatial_component>(*it)) {
             it = result_out.erase(it);
             continue;
         }
 
-        const auto& spatial = registry_->template get<spatial_component>(*it);
+        const auto& spatial = context_->registry.template get<spatial_component>(*it);
         if (!(spatial.get_layer() & layer_mask) || !spatial.get_bounds().intersects(r)) {
             it = result_out.erase(it);
         } else {
@@ -227,19 +227,19 @@ void spatial_system<Cs...>::query_all(
     }
 }
 
-template <typename... Cs>
-void spatial_system<Cs...>::query_all(
+template <typename WC>
+void spatial_system<WC>::query_all(
     const aabb& bounds, std::unordered_set<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
     tree_.query_all(bounds, result_out);
 
     for (auto it = result_out.begin(), ite = result_out.end(); it != ite;) {
-        if (!registry_->template has<spatial_component>(*it)) {
+        if (!context_->registry.template has<spatial_component>(*it)) {
             it = result_out.erase(it);
             continue;
         }
 
-        const auto& spatial = registry_->template get<spatial_component>(*it);
+        const auto& spatial = context_->registry.template get<spatial_component>(*it);
         if (!(spatial.get_layer() & layer_mask) || !spatial.get_bounds().intersects(bounds)) {
             it = result_out.erase(it);
         } else {
@@ -248,15 +248,15 @@ void spatial_system<Cs...>::query_all(
     }
 }
 
-template <typename... Cs>
-void spatial_system<Cs...>::cleanup(
+template <typename WC>
+void spatial_system<WC>::cleanup(
     entity ent
 ) {
     tree_.remove(ent);
 }
 
-template <typename... Cs>
-auto spatial_system<Cs...>::voxel_ray_cast(
+template <typename WC>
+auto spatial_system<WC>::voxel_ray_cast(
     const ray& r, std::unordered_set<entity>& candidates, spatial_layer_mask layer_mask
 ) const -> std::optional<voxel_ray_hit> {
     query_all(r, candidates, layer_mask);
@@ -266,14 +266,14 @@ auto spatial_system<Cs...>::voxel_ray_cast(
 
     for (entity ent : candidates) {
         const bool can_be_processed =  //
-            registry_->template has<model_component>(ent) &&
-            registry_->template has<transform_component>(ent);
+            context_->registry.template has<model_component>(ent) &&
+            context_->registry.template has<transform_component>(ent);
         if (!can_be_processed) {
             continue;
         }
 
-        const auto& model_comp     = registry_->template get<model_component>(ent);
-        const auto& transform_comp = registry_->template get<transform_component>(ent);
+        const auto& model_comp     = context_->registry.template get<model_component>(ent);
+        const auto& transform_comp = context_->registry.template get<transform_component>(ent);
 
         if (!model_comp.has_model()) {
             continue;

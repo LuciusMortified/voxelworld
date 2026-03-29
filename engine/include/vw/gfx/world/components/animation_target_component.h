@@ -7,7 +7,7 @@
 
 namespace vw::gfx {
 
-template <typename... Cs>
+template <typename>
 class animation_system;
 
 struct animation_target_component final {
@@ -19,7 +19,7 @@ public:
 private:
     std::string target_name_;
 
-    template <typename... Cs>
+    template <typename>
     friend class animation_system;
 };
 

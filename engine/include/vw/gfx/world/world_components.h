@@ -14,7 +14,8 @@
 #include "vw/gfx/world/components/rigid_body_component.h"
 #include "vw/gfx/world/components/socket_component.h"
 #include "vw/gfx/world/components/spatial_component.h"
-#include "vw/gfx/world/components/sphere_collider_component.h"
+#include "vw/gfx/world/components/box_collider_component.h"
+#include "vw/gfx/world/components/movement_intent_component.h"
 #include "vw/gfx/world/components/transform_component.h"
 #include "vw/gfx/world/components/world_view_component.h"
 
@@ -31,8 +32,9 @@ using base_world_components = std::tuple<
     animation_target_component,
     world_view_component,
     rigid_body_component,
-    sphere_collider_component,
-    character_controller_component>;
+    box_collider_component,
+    character_controller_component,
+    movement_intent_component>;
 
 }
 

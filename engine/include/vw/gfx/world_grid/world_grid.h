@@ -23,7 +23,7 @@ namespace vw::gfx {
 template <typename WC>
 class world;
 
-template <typename, typename...>
+template <typename>
 class world_grid_system;
 
 template <typename WC = base_world_components>
@@ -31,7 +31,7 @@ class world_grid {
     using world_type = world<WC>;
     using chunk_type = chunk<WC>;
 
-    template <typename, typename...>
+    template <typename>
     friend class world_grid_system;
 
 public:

@@ -7,14 +7,9 @@ namespace vw::gfx {
 
 template <typename WC>
 third_person_camera_controller<WC>::third_person_camera_controller(
-    camera& camera,
-    world_type& world,
-    third_person_camera_params params
+    camera& camera, world_type& world, third_person_camera_params params
 )
-    : camera_(&camera)
-    , world_(&world)
-    , params_(params)
-    , actual_arm_length_(params.arm_length) {}
+    : camera_(&camera), world_(&world), params_(params), actual_arm_length_(params.arm_length) {}
 
 template <typename WC>
 void third_person_camera_controller<WC>::update(
@@ -25,7 +20,8 @@ void third_person_camera_controller<WC>::update(
     pitch_ = math::clamp(pitch_, params_.pitch_min, params_.pitch_max);
 
     params_.arm_length -= input.zoom_delta * params_.zoom_speed;
-    params_.arm_length = math::clamp(params_.arm_length, params_.arm_length_min, params_.arm_length_max);
+    params_.arm_length =
+        math::clamp(params_.arm_length, params_.arm_length_min, params_.arm_length_max);
 
     auto& registry = world_->get_registry();
     if (!registry.template has<transform_component>(target)) {
@@ -40,7 +36,7 @@ void third_person_camera_controller<WC>::update(
     float32 yaw_rad              = yaw_ * deg_to_rad;
     float32 pitch_rad            = pitch_ * deg_to_rad;
 
-    vec3f arm_dir{
+    const vec3f arm_dir{
         std::sin(yaw_rad) * std::cos(pitch_rad),
         std::sin(pitch_rad),
         std::cos(yaw_rad) * std::cos(pitch_rad)
@@ -58,11 +54,12 @@ void third_person_camera_controller<WC>::update(
 
     if (hit) {
         const auto& hit_tc  = registry.template get<transform_component>(hit->ent);
-        vec3f hit_world_pos = hit_tc.get_world_matrix() * vec3f{
-            static_cast<float32>(hit->voxel_pos.x) + 0.5f,
-            static_cast<float32>(hit->voxel_pos.y) + 0.5f,
-            static_cast<float32>(hit->voxel_pos.z) + 0.5f
-        };
+        vec3f hit_world_pos = hit_tc.get_world_matrix() *
+            vec3f{
+                static_cast<float32>(hit->voxel_pos.x) + 0.5f,
+                static_cast<float32>(hit->voxel_pos.y) + 0.5f,
+                static_cast<float32>(hit->voxel_pos.z) + 0.5f
+            };
 
         float32 hit_distance = math::length(hit_world_pos - focus);
         float32 clamped      = hit_distance - params_.collision_skin;
@@ -76,48 +73,9 @@ void third_person_camera_controller<WC>::update(
 
     auto look_dir           = focus - cam_pos;
     float32 horizontal_dist = std::sqrt(look_dir.x * look_dir.x + look_dir.z * look_dir.z);
-    float32 look_pitch      = std::atan2(look_dir.y, horizontal_dist) * 180.0f / 3.14159265f;
-    float32 look_yaw        = std::atan2(look_dir.x, look_dir.z) * 180.0f / 3.14159265f;
+    float32 look_pitch      = std::atan2(look_dir.y, horizontal_dist) * 180.0f / math::pi;
+    float32 look_yaw        = std::atan2(look_dir.x, look_dir.z) * 180.0f / math::pi;
     camera_->set_rotation(look_pitch, look_yaw);
-}
-
-template <typename WC>
-template <typename CharacterSystem>
-void third_person_camera_controller<WC>::apply_movement(
-    const player_input_state& input,
-    CharacterSystem& character_system,
-    entity target
-) {
-    auto forward = camera_->get_forward();
-    forward.y    = 0.0f;
-    auto fwd_len = math::length(forward);
-    if (fwd_len > 0.001f) {
-        forward = forward / fwd_len;
-    }
-
-    auto right     = camera_->get_right();
-    right.y        = 0.0f;
-    auto right_len = math::length(right);
-    if (right_len > 0.001f) {
-        right = right / right_len;
-    }
-
-    vec3f move_dir = forward * input.move_input.x + right * input.move_input.y;
-    auto move_len  = math::length(move_dir);
-    if (move_len > 0.001f) {
-        move_dir = move_dir / move_len;
-    }
-
-    auto modifier = character_system.modify(target);
-    modifier.set_move_input(move_dir);
-
-    if (move_len > 0.001f) {
-        modifier.set_facing_direction(move_dir);
-    }
-
-    if (input.jump_requested) {
-        modifier.request_jump();
-    }
 }
 
 template <typename WC>

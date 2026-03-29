@@ -11,21 +11,21 @@
 
 namespace vw::gfx {
 
-template <typename... Cs>
-model_system<Cs...>::model_system(
-    registry_type& registry, mesh_pool& mesh_pool
+template <typename WC>
+model_system<WC>::model_system(
+    context_type& context
 )
-    : registry_(&registry), mesh_pool_(&mesh_pool) {}
+    : context_(&context) {}
 
-template <typename... Cs>
-void model_system<Cs...>::update() {
+template <typename WC>
+void model_system<WC>::update() {
     using clock = std::chrono::high_resolution_clock;
     auto ms = [](auto start, auto end) -> float32 {
         return std::chrono::duration<float32>(end - start).count() * 1000.0f;
     };
 
     auto t0 = clock::now();
-    mesh_pool_->process_completed();
+    context_->mesh_pool->process_completed();
     auto t1 = clock::now();
     update_completed_meshes();
     auto t2 = clock::now();
@@ -36,113 +36,113 @@ void model_system<Cs...>::update() {
     stats_.update_completed_ms   = ms(t1, t2);
     stats_.process_dirty_ms      = ms(t2, t3);
     stats_.pending_entities_count = static_cast<uint32>(pending_entities_.size());
-    stats_.pending_meshes_count   = mesh_pool_->get_pending_count();
+    stats_.pending_meshes_count   = context_->mesh_pool->get_pending_count();
 }
 
-template <typename... Cs>
-auto model_system<Cs...>::get_stats() const -> const model_system_stats& {
+template <typename WC>
+auto model_system<WC>::get_stats() const -> const model_system_stats& {
     return stats_;
 }
 
-template <typename... Cs>
-auto model_system<Cs...>::modify(
+template <typename WC>
+auto model_system<WC>::modify(
     entity e
 ) -> model_modifier {
-    auto& comp = registry_->template get<model_component>(e);
+    auto& comp = context_->registry.template get<model_component>(e);
     return model_modifier(*this, &comp, e);
 }
 
-template <typename... Cs>
-void model_system<Cs...>::process_dirty_entities() {
-    auto& requested = registry_->template requested<model_component>();
+template <typename WC>
+void model_system<WC>::process_dirty_entities() {
+    auto& requested = context_->registry.template requested<model_component>();
     for (auto ent : requested) {
-        if (!registry_->template has<model_component>(ent)) {
+        if (!context_->registry.template has<model_component>(ent)) {
             continue;
         }
 
-        auto& comp = registry_->template get<model_component>(ent);
+        auto& comp = context_->registry.template get<model_component>(ent);
         if (!comp.model_) {
             continue;
         }
 
         auto identity = comp.model_->get_identity();
-        if (!mesh_pool_->has(identity) && !mesh_pool_->is_pending(identity)) {
-            mesh_pool_->request_mesh(comp.model_);
+        if (!context_->mesh_pool->has(identity) && !context_->mesh_pool->is_pending(identity)) {
+            context_->mesh_pool->request_mesh(comp.model_);
             pending_entities_.insert(ent);
         }
 
-        registry_->template notify_changed<model_component>(ent);
+        context_->registry.template notify_changed<model_component>(ent);
     }
-    registry_->template clear_requested<model_component>();
+    context_->registry.template clear_requested<model_component>();
 }
 
-template <typename... Cs>
-void model_system<Cs...>::update_completed_meshes() {
+template <typename WC>
+void model_system<WC>::update_completed_meshes() {
     for (auto it = pending_entities_.begin(); it != pending_entities_.end();) {
         auto ent      = *it;
 
-        if (!registry_->template has<model_component>(ent)) {
+        if (!context_->registry.template has<model_component>(ent)) {
             it = pending_entities_.erase(it);
             continue;
         }
 
-        auto& comp    = registry_->template get<model_component>(ent);
+        auto& comp    = context_->registry.template get<model_component>(ent);
         auto identity = comp.model_->get_identity();
-        if (mesh_pool_->has(identity)) {
+        if (context_->mesh_pool->has(identity)) {
             it = pending_entities_.erase(it);
-            registry_->template notify_changed<model_component>(ent);
+            context_->registry.template notify_changed<model_component>(ent);
         } else {
             ++it;
         }
     }
 }
 
-template <typename... Cs>
-model_system<Cs...>::model_modifier::model_modifier(
+template <typename WC>
+model_system<WC>::model_modifier::model_modifier(
     model_system& system, model_component* component, entity entity_id
 )
     : system_(&system), component_(component), entity_(entity_id) {}
 
-template <typename... Cs>
-auto model_system<Cs...>::model_modifier::get_model() const -> std::shared_ptr<model> {
+template <typename WC>
+auto model_system<WC>::model_modifier::get_model() const -> std::shared_ptr<model> {
     return component_->model_;
 }
 
-template <typename... Cs>
-void model_system<Cs...>::model_modifier::set_model(
+template <typename WC>
+void model_system<WC>::model_modifier::set_model(
     std::shared_ptr<model> model_ptr
 ) {
     component_->model_ = std::move(model_ptr);
-    system_->registry_->template request_change<model_component>(entity_);
+    system_->context_->registry.template request_change<model_component>(entity_);
 }
 
-template <typename... Cs>
-void model_system<Cs...>::model_modifier::set_voxel(
+template <typename WC>
+void model_system<WC>::model_modifier::set_voxel(
     int x, int y, int z, const voxel& v
 ) {
     if (component_->model_) {
         component_->model_->set_voxel(x, y, z, v);
-        system_->registry_->template request_change<model_component>(entity_);
+        system_->context_->registry.template request_change<model_component>(entity_);
     }
 }
 
-template <typename... Cs>
-void model_system<Cs...>::model_modifier::set_voxel(
+template <typename WC>
+void model_system<WC>::model_modifier::set_voxel(
     vec3i pos, const voxel& v
 ) {
     if (component_->model_) {
         component_->model_->set_voxel(pos.x, pos.y, pos.z, v);
-        system_->registry_->template request_change<model_component>(entity_);
+        system_->context_->registry.template request_change<model_component>(entity_);
     }
 }
 
-template <typename... Cs>
-void model_system<Cs...>::model_modifier::fill(
+template <typename WC>
+void model_system<WC>::model_modifier::fill(
     const voxel& v
 ) {
     if (component_->model_) {
         component_->model_->fill(v);
-        system_->registry_->template request_change<model_component>(entity_);
+        system_->context_->registry.template request_change<model_component>(entity_);
     }
 }
 

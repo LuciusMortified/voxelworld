@@ -97,7 +97,7 @@ private:
         world_grid_    = std::make_shared<gfx::world_grid<>>(
             world, std::move(generator), generator_params_.voxel_scale
         );
-        grid_system.set_world_grid(world_grid_);
+        world.set_world_grid(world_grid_);
 
         viewer_ = std::make_unique<gfx::entity_guard<>>(world);
         viewer_->with<gfx::transform_component>();

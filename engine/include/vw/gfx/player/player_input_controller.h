@@ -1,10 +1,10 @@
 #pragma once
 
-#ifndef VW_GFX_CAMERA_PLAYER_INPUT_CONTROLLER_H
-#define VW_GFX_CAMERA_PLAYER_INPUT_CONTROLLER_H
+#ifndef VW_GFX_PLAYER_PLAYER_INPUT_CONTROLLER_H
+#define VW_GFX_PLAYER_PLAYER_INPUT_CONTROLLER_H
 
 #include "vw/core.h"
-#include "vw/gfx/camera/player_actions.h"
+#include "vw/gfx/player/player_input_state.h"
 #include "vw/gfx/window/event.h"
 #include "vw/gfx/window/input.h"
 
@@ -54,6 +54,6 @@ private:
 
 }  // namespace vw::gfx
 
-#include "vw/gfx/camera/player_input_controller.inl.h"
+#include "vw/gfx/player/player_input_controller.inl.h"
 
-#endif  // VW_GFX_CAMERA_PLAYER_INPUT_CONTROLLER_H
+#endif  // VW_GFX_PLAYER_PLAYER_INPUT_CONTROLLER_H

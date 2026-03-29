@@ -19,22 +19,22 @@
 #include "vw/gfx/world/components/hierarchy_component.h"
 #include "vw/gfx/world/components/transform_component.h"
 #include "vw/gfx/world/entity_registry.h"
+#include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
 
-template <typename... Cs>
+template <typename>
 class transform_system;
 
-// Система анимаций - управляет воспроизведением анимаций
-// Оптимизирована для работы только с активными анимациями
-template <typename... Cs>
+template <typename WC>
 class animation_system final {
 public:
-    using registry_type         = entity_registry<Cs...>;
-    using transform_system_type = transform_system<Cs...>;
+    using registry_type         = entity_registry_from_tuple<WC>::type;
+    using context_type          = world_context<WC>;
+    using transform_system_type = transform_system<WC>;
 
     explicit animation_system(
-        registry_type& registry,
+        context_type& context,
         transform_system_type& transform_sys,
         animation_clip_registry& clip_registry
     );
@@ -133,17 +133,9 @@ private:
         const animation_layer& layer, const std::string& target_name
     ) const -> std::optional<transform>;
 
-    registry_type* registry_;
+    context_type* context_;
     transform_system_type* transform_system_;
     animation_clip_registry* clip_registry_;
-};
-
-template <typename... Cs>
-struct animation_system_from_tuple;
-
-template <typename... Cs>
-struct animation_system_from_tuple<std::tuple<Cs...>> {
-    using type = animation_system<Cs...>;
 };
 
 }  // namespace vw::gfx

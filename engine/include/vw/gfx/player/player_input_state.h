@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef VW_GFX_CAMERA_PLAYER_INPUT_STATE_H
-#define VW_GFX_CAMERA_PLAYER_INPUT_STATE_H
+#ifndef VW_GFX_PLAYER_PLAYER_ACTIONS_H
+#define VW_GFX_PLAYER_PLAYER_ACTIONS_H
 
 #include "vw/core.h"
 
@@ -17,4 +17,4 @@ struct player_input_state {
 
 }  // namespace vw::gfx
 
-#endif  // VW_GFX_CAMERA_PLAYER_INPUT_STATE_H
+#endif  // VW_GFX_PLAYER_PLAYER_ACTIONS_H

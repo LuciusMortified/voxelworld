@@ -10,6 +10,7 @@
 
 #include "vw/gfx/world/components/world_view_component.h"
 #include "vw/gfx/world/entity_registry.h"
+#include "vw/gfx/world/world_context.h"
 #include "vw/gfx/world_grid/world_grid.h"
 
 namespace vw::gfx {
@@ -25,14 +26,14 @@ struct world_grid_system_stats {
     uint32 deferred_remesh_count = 0;
 };
 
-template <typename WC, typename... Cs>
+template <typename WC>
 class world_grid_system {
 public:
-    using registry_type = entity_registry<Cs...>;
+    using registry_type = entity_registry_from_tuple<WC>::type;
+    using context_type = world_context<WC>;
 
-    explicit world_grid_system(registry_type& registry);
+    explicit world_grid_system(context_type& context);
 
-    void set_world_grid(std::shared_ptr<world_grid<WC>> grid);
     [[nodiscard]] auto get_world_grid() const -> std::shared_ptr<world_grid<WC>>;
 
     void update();
@@ -63,20 +64,11 @@ private:
 
     void rebuild_pending_requests(vec2i camera_column);
 
-    registry_type* registry_;
-    std::shared_ptr<world_grid<WC>> world_grid_;
+    context_type* context_;
     std::unordered_set<vec2i> active_columns_;
     std::unordered_set<vec2i> pending_active_columns_;
     std::vector<vec2i> pending_requests_;
     world_grid_system_stats stats_;
-};
-
-template <typename WC, typename... Cs>
-struct world_grid_system_from_tuple;
-
-template <typename WC, typename... Cs>
-struct world_grid_system_from_tuple<WC, std::tuple<Cs...>> {
-    using type = world_grid_system<WC, Cs...>;
 };
 
 }  // namespace vw::gfx

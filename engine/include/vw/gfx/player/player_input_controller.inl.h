@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef VW_GFX_CAMERA_PLAYER_INPUT_CONTROLLER_INL_H
-#define VW_GFX_CAMERA_PLAYER_INPUT_CONTROLLER_INL_H
+#ifndef VW_GFX_PLAYER_PLAYER_INPUT_CONTROLLER_INL_H
+#define VW_GFX_PLAYER_PLAYER_INPUT_CONTROLLER_INL_H
 
 #include "vw/gfx/window/window.h"
 
@@ -107,4 +107,4 @@ inline auto player_input_controller::is_mouse_captured() const -> bool {
 
 }  // namespace vw::gfx
 
-#endif  // VW_GFX_CAMERA_PLAYER_INPUT_CONTROLLER_INL_H
+#endif  // VW_GFX_PLAYER_PLAYER_INPUT_CONTROLLER_INL_H

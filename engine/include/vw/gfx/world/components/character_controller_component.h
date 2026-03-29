@@ -7,7 +7,7 @@
 
 namespace vw::gfx {
 
-template <typename...>
+template <typename>
 class character_controller_system;
 
 struct character_controller_component final {
@@ -15,11 +15,11 @@ private:
     vec3f move_input_{0.0f, 0.0f, 0.0f};
     vec3f facing_direction_{0.0f, 0.0f, 1.0f};
     float32 move_speed_     = 50.0f;
-    float32 jump_impulse_   = 50.0f;
+    float32 jump_impulse_   = 100.0f;
     float32 rotation_speed_ = 10.0f;
     bool jump_requested_    = false;
 
-    template <typename...>
+    template <typename>
     friend class character_controller_system;
 
 public:
