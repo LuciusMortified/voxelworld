@@ -4,6 +4,7 @@
 #define VW_CORE_MATH_H
 
 #include <expected>
+#include <limits>
 
 #include "vw/core/color.h"
 #include "vw/core/mat4.h"
