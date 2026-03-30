@@ -22,9 +22,10 @@ class world_context {
 public:
     using registry_type   = entity_registry_from_tuple<WC>::type;
     using world_grid_type = world_grid<WC>;
+    using mesh_pool_type = mesh_pool;
 
-    world_context(
-        registry_type& reg, mesh_pool* mp, std::shared_ptr<world_grid_type> wg = nullptr
+    explicit world_context(
+        registry_type& reg, mesh_pool* mp = nullptr, std::shared_ptr<world_grid_type> wg = nullptr
     )
         : registry_(&reg), mesh_pool_(mp), world_grid_(std::move(wg)) {}
 
