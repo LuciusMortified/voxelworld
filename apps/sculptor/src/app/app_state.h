@@ -88,6 +88,7 @@ struct animation_state {
     bool need_delete_keyframe = false;
     bool need_step_forward    = false;
     bool need_step_backward   = false;
+    bool need_apply_pose      = false;
 
     std::unordered_map<std::string, bool> unsaved_clips;
     std::unordered_map<std::string, size_t> clip_to_layer;

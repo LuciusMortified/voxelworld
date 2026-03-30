@@ -43,6 +43,7 @@ chunk<WC>::chunk(
         .set_position(world_pos)
         .set_scale({vs, vs, vs});
     world.get_model_system().modify(guard_.get_entity()).set_model(model_);
+    world.get_spatial_system().modify(guard_.get_entity()).set_layer(spatial_layer::terrain);
 }
 
 template <typename WC>

@@ -11,14 +11,14 @@
 
 namespace vw::gfx {
 
-template <typename... Cs>
+template <typename>
 class model_system;
 
 struct model_component final {
 private:
     std::shared_ptr<model> model_;
 
-    template <typename... Cs>
+    template <typename>
     friend class model_system;
 
 public:

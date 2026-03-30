@@ -11,7 +11,7 @@
 
 namespace vw::gfx {
 
-template <typename... Cs>
+template <typename>
 class socket_system;
 
 struct socket_point {
@@ -34,7 +34,7 @@ public:
 private:
     std::vector<socket_point> sockets_;
 
-    template <typename... Cs>
+    template <typename>
     friend class socket_system;
 };
 

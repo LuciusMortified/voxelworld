@@ -30,6 +30,10 @@ private:
 
     add_model_component_modal add_model_modal_;
 
+    mutable std::string cached_rotation_entity_;
+    mutable quat cached_rotation_quat_;
+    mutable vec3f cached_rotation_deg_;
+
     void render_components_section();
 
     void render_position() const;

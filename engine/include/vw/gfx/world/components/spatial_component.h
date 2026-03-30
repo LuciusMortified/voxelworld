@@ -5,23 +5,26 @@
 
 #include "vw/core.h"
 #include "vw/gfx/spatial/aabb.h"
+#include "vw/gfx/world/spatial_layer.h"
 
 namespace vw::gfx {
 
-template <typename... Cs>
+template <typename>
 class spatial_system;
 
 struct spatial_component final {
 private:
-    aabb bounds_;        // Реальный AABB
-    aabb fat_bounds_;    // Расширенный AABB для оптимизации обновлений дерева
-    bool dirty_ = true;  // Флаг для первоначальной вставки
+    aabb bounds_;
+    aabb fat_bounds_;
+    spatial_layer_mask layer_ = spatial_layer::prop;
+    bool dirty_   = true;
 
 public:
     [[nodiscard]] auto get_bounds() const -> const aabb&;
+    [[nodiscard]] auto get_layer() const -> spatial_layer_mask;
     [[nodiscard]] auto is_dirty() const -> bool;
 
-    template <typename... Cs>
+    template <typename>
     friend class spatial_system;
 };
 

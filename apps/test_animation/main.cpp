@@ -14,7 +14,7 @@ public:
         auto& window = get_engine().get_window();
         auto& camera = get_engine().get_camera();
 
-        camera_controller_ = std::make_unique<gfx::fps_camera_controller>(0.1f, 5.0f);
+        camera_controller_ = std::make_unique<gfx::free_camera_controller>(0.1f, 5.0f);
         camera_controller_->setup(window, camera);
 
         window.sub<gfx::key_press_event>([this](const gfx::key_press_event& event) {
@@ -61,13 +61,13 @@ private:
         auto& animation_system = world.get_animation_system();
 
         auto red_cube_model = model_registry.create("red_cube", 3, 3, 3);
-        red_cube_model->fill(voxel{colors::red});
+        red_cube_model->fill(voxel{blocks::red_3});
 
         auto green_cube_model = model_registry.create("green_cube", 3, 3, 3);
-        green_cube_model->fill(voxel{colors::green});
+        green_cube_model->fill(voxel{blocks::green_3});
 
         auto blue_cube_model = model_registry.create("blue_cube", 3, 3, 3);
-        blue_cube_model->fill(voxel{colors::blue});
+        blue_cube_model->fill(voxel{blocks::blue_3});
 
         root_ = std::make_unique<gfx::entity_guard<>>(world);
         root_->with<gfx::transform_component>();
@@ -559,7 +559,7 @@ private:
         ImGui::End();
     }
 
-    std::unique_ptr<gfx::fps_camera_controller> camera_controller_;
+    std::unique_ptr<gfx::free_camera_controller> camera_controller_;
     std::unique_ptr<gfx::entity_guard<>> root_;
     std::unique_ptr<gfx::entity_guard<>> red_;
     std::unique_ptr<gfx::entity_guard<>> green_;

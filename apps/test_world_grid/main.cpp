@@ -18,7 +18,7 @@ public:
         auto& window = get_engine().get_window();
         auto& camera = get_engine().get_camera();
 
-        camera_controller_ = std::make_unique<gfx::fps_camera_controller>(0.1f, 60.0f);
+        camera_controller_ = std::make_unique<gfx::free_camera_controller>(0.1f, 60.0f);
         camera_controller_->setup(window, camera);
 
         window.sub<gfx::key_press_event>([this](const gfx::key_press_event& event) -> bool {
@@ -97,7 +97,7 @@ private:
         world_grid_    = std::make_shared<gfx::world_grid<>>(
             world, std::move(generator), generator_params_.voxel_scale
         );
-        grid_system.set_world_grid(world_grid_);
+        world.set_world_grid(world_grid_);
 
         viewer_ = std::make_unique<gfx::entity_guard<>>(world);
         viewer_->with<gfx::transform_component>();
@@ -163,7 +163,7 @@ private:
         }
     }
 
-    std::unique_ptr<gfx::fps_camera_controller> camera_controller_;
+    std::unique_ptr<gfx::free_camera_controller> camera_controller_;
     std::shared_ptr<gfx::world_grid<>> world_grid_;
     std::unique_ptr<gfx::entity_guard<>> viewer_;
     gfx::perlin_terrain_generator* generator_ = nullptr;

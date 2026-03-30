@@ -145,7 +145,7 @@ public:
         event_sub<E> id
     ) {
         auto& callbacks = get_callbacks<E>();
-        callbacks.erase(id);
+        callbacks.erase(id.value);
     }
 
     template <event_type E>

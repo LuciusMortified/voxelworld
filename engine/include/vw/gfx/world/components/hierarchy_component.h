@@ -21,10 +21,10 @@ public:
     [[nodiscard]] auto has_child(entity child) const -> bool;
     [[nodiscard]] auto get_children() const -> const std::vector<entity>&;
 
-    template <typename... Cs>
+    template <typename>
     friend class hierarchy_system;
 
-    template <typename... Cs>
+    template <typename>
     friend class transform_system;
 };
 

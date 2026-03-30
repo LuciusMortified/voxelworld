@@ -23,7 +23,7 @@ public:
         auto& window = get_engine().get_window();
         auto& camera = get_engine().get_camera();
 
-        camera_controller_ = std::make_unique<gfx::fps_camera_controller>(0.1f, 15.0f);
+        camera_controller_ = std::make_unique<gfx::free_camera_controller>(0.1f, 15.0f);
         camera_controller_->setup(window, camera);
 
         window.sub<gfx::key_press_event>([this](const gfx::key_press_event& event) {
@@ -68,8 +68,8 @@ private:
         floor_model_ = model_registry.create("floor", 80, 1, 80);
         for (uint32 x = 0; x < 80; ++x) {
             for (uint32 z = 0; z < 80; ++z) {
-                auto gray = ((x + z) % 2 == 0) ? color(0x666688FF) : color(0x8888AAFF);
-                floor_model_->set_voxel(x, 0, z, gray);
+                auto v = ((x + z) % 2 == 0) ? voxel{blocks::gray_3} : voxel{blocks::gray_5};
+                floor_model_->set_voxel(x, 0, z, v);
             }
         }
 
@@ -89,8 +89,8 @@ private:
         for (uint32 x = 0; x < 6; ++x) {
             for (uint32 y = 0; y < 20; ++y) {
                 for (uint32 z = 0; z < 6; ++z) {
-                    auto c = (y < 2 || y > 17) ? color(0x666688FF) : color(0x8888AAFF);
-                    pillar_model_->set_voxel(x, y, z, c);
+                    auto v = (y < 2 || y > 17) ? voxel{blocks::gray_3} : voxel{blocks::gray_5};
+                    pillar_model_->set_voxel(x, y, z, v);
                 }
             }
         }
@@ -256,7 +256,7 @@ private:
         }
     }
 
-    std::unique_ptr<gfx::fps_camera_controller> camera_controller_;
+    std::unique_ptr<gfx::free_camera_controller> camera_controller_;
 
     std::shared_ptr<gfx::model> floor_model_;
     std::shared_ptr<gfx::model> pillar_model_;

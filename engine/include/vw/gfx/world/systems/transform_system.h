@@ -5,7 +5,7 @@
 
 #include <vector>
 
-#include "vw/gfx/world/entity_registry.h"
+#include "vw/gfx/world/world_context.h"
 
 namespace vw {
 struct transform;
@@ -15,15 +15,17 @@ namespace vw::gfx {
 
 struct transform_component;
 
-template <typename... Cs>
+template <typename>
 class hierarchy_system;
 
-template <typename... Cs>
+template <typename WC>
 class transform_system final {
 public:
-    using registry_type = entity_registry<Cs...>;
+    using context_type  = world_context<WC>;
+    using registry_type = entity_registry_from_tuple<WC>::type;
+    using hierarchy_system_type = hierarchy_system<WC>;
 
-    explicit transform_system(registry_type& registry, hierarchy_system<Cs...>& hierarchy_sys);
+    explicit transform_system(context_type& context, hierarchy_system_type& hierarchy_sys);
 
     void update();
 
@@ -57,18 +59,10 @@ private:
 
     void update_entity_world_matrix(entity ent, const transform_component& transform_comp);
 
-    registry_type* registry_;
-    hierarchy_system<Cs...>* hierarchy_system_;
+    context_type* context_;
+    hierarchy_system_type* hierarchy_system_;
 
     std::vector<entity> sorted_entities_;
-};
-
-template <typename... Cs>
-struct transform_system_from_tuple;
-
-template <typename... Cs>
-struct transform_system_from_tuple<std::tuple<Cs...>> {
-    using type = transform_system<Cs...>;
 };
 
 }  // namespace vw::gfx

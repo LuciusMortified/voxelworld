@@ -15,7 +15,7 @@ public:
         auto& window = get_engine().get_window();
         auto& camera = get_engine().get_camera();
 
-        camera_controller_ = std::make_unique<gfx::fps_camera_controller>(0.1f, 5.0f);
+        camera_controller_ = std::make_unique<gfx::free_camera_controller>(0.1f, 5.0f);
         camera_controller_->setup(window, camera);
 
         window.sub<gfx::key_press_event>([this](const gfx::key_press_event& event) {
@@ -97,17 +97,17 @@ private:
 
         // Создаем модель и регистрируем ее
         model_ = model_registry.create("flower", 3, 6, 3);
-        model_->set_voxel(1, 0, 1, colors::green);
-        model_->set_voxel(1, 1, 1, colors::green);
-        model_->set_voxel(1, 2, 1, colors::green);
-        model_->set_voxel(1, 3, 1, colors::green);
-        model_->set_voxel(1, 4, 1, colors::green);
-        model_->set_voxel(1, 5, 1, colors::yellow);
-        model_->set_voxel(1, 4, 0, colors::white);
-        model_->set_voxel(1, 4, 1, colors::white);
-        model_->set_voxel(1, 4, 2, colors::white);
-        model_->set_voxel(0, 4, 1, colors::white);
-        model_->set_voxel(2, 4, 1, colors::white);
+        model_->set_voxel(1, 0, 1, voxel{blocks::green_3});
+        model_->set_voxel(1, 1, 1, voxel{blocks::green_3});
+        model_->set_voxel(1, 2, 1, voxel{blocks::green_3});
+        model_->set_voxel(1, 3, 1, voxel{blocks::green_3});
+        model_->set_voxel(1, 4, 1, voxel{blocks::green_3});
+        model_->set_voxel(1, 5, 1, voxel{blocks::orange_3});
+        model_->set_voxel(1, 4, 0, voxel{blocks::white});
+        model_->set_voxel(1, 4, 1, voxel{blocks::white});
+        model_->set_voxel(1, 4, 2, voxel{blocks::white});
+        model_->set_voxel(0, 4, 1, voxel{blocks::white});
+        model_->set_voxel(2, 4, 1, voxel{blocks::white});
 
         flower_ = std::make_unique<gfx::entity_guard<>>(world);
         flower_->with<gfx::transform_component>();
@@ -268,7 +268,7 @@ private:
         }
     }
 
-    std::unique_ptr<gfx::fps_camera_controller> camera_controller_;
+    std::unique_ptr<gfx::free_camera_controller> camera_controller_;
 
     std::shared_ptr<gfx::model> model_;
     float object_rotation_{};

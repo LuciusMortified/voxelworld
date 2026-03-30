@@ -8,5 +8,6 @@ add_subdirectory(test_window)
 add_subdirectory(test_animation)
 add_subdirectory(test_lighting)
 add_subdirectory(test_world_grid)
+add_subdirectory(test_player_controller)
 
 add_subdirectory(sculptor)

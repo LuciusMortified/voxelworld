@@ -4,6 +4,7 @@
 #define VW_CORE_MATH_H
 
 #include <expected>
+#include <limits>
 
 #include "vw/core/color.h"
 #include "vw/core/mat4.h"
@@ -36,6 +37,8 @@ enum class interpolation_type : uint8 {
 constexpr float pi         = 3.14159265359f;
 constexpr float deg_to_rad = pi / 180.0f;
 constexpr float rad_to_deg = 180.0f / pi;
+
+constexpr float epsilon = std::numeric_limits<float>::epsilon();
 
 constexpr auto radians(float degrees) -> float;
 constexpr auto degrees(float radians) -> float;
@@ -147,6 +150,8 @@ auto interpolate(
     float control1 = 0.0f,
     float control2 = 1.0f
 ) -> quat;
+
+auto quat_look_y(const vec3f& direction) -> quat;
 
 auto perpendicular(const vec3f& eye, const vec3f& target) -> vec3f;
 auto is_safe_zero(float a, float epsilon = 1e-5f) -> bool;

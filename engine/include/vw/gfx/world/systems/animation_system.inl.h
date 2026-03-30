@@ -1,33 +1,32 @@
 #pragma once
 
-#include <unordered_set>
 #include <vector>
 
 namespace vw::gfx {
 
-template <typename... Cs>
-animation_system<Cs...>::animation_system(
-    registry_type& registry,
+template <typename WC>
+animation_system<WC>::animation_system(
+    context_type& context,
     transform_system_type& transform_sys,
     animation_clip_registry& clip_registry
 )
-    : registry_(&registry), transform_system_(&transform_sys), clip_registry_(&clip_registry) {}
+    : context_(&context), transform_system_(&transform_sys), clip_registry_(&clip_registry) {}
 
-template <typename... Cs>
-auto animation_system<Cs...>::get_target_fps() const -> float32 {
+template <typename WC>
+auto animation_system<WC>::get_target_fps() const -> float32 {
     return 1.0f / target_frame_time_;
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::set_target_fps(
+template <typename WC>
+void animation_system<WC>::set_target_fps(
     float32 fps
 ) {
     target_frame_time_ = 1.0f / fps;
 }
 
 
-template <typename... Cs>
-void animation_system<Cs...>::update(
+template <typename WC>
+void animation_system<WC>::update(
     float32 delta_time
 ) {
     accumulated_delta_time_ += delta_time;
@@ -45,12 +44,12 @@ void animation_system<Cs...>::update(
     to_remove_.clear();
 
     for (entity ent : active_entities_) {
-        if (!registry_->template has<animation_player_component>(ent)) {
+        if (!context_->registry().template has<animation_player_component>(ent)) {
             to_remove_.push_back(ent);
             continue;
         }
 
-        auto& anim_comp = registry_->template get<animation_player_component>(ent);
+        auto& anim_comp = context_->registry().template get<animation_player_component>(ent);
 
         process_animation(ent, anim_comp, effective_delta);
 
@@ -64,8 +63,8 @@ void animation_system<Cs...>::update(
     }
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::add_active_entity(
+template <typename WC>
+void animation_system<WC>::add_active_entity(
     entity root_ent
 ) {
     auto [it, inserted] = active_entities_.insert(root_ent);
@@ -75,16 +74,16 @@ void animation_system<Cs...>::add_active_entity(
     }
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::remove_active_entity(
+template <typename WC>
+void animation_system<WC>::remove_active_entity(
     entity root_ent
 ) {
     active_entities_.erase(root_ent);
     target_maps_.erase(root_ent);
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::build_and_cache_target_map(
+template <typename WC>
+void animation_system<WC>::build_and_cache_target_map(
     entity root_ent
 ) {
     std::unordered_map<std::string, entity> target_map;
@@ -96,13 +95,13 @@ void animation_system<Cs...>::build_and_cache_target_map(
         entity current = to_visit_.front();
         to_visit_.pop_front();
 
-        if (registry_->template has<animation_target_component>(current)) {
-            const auto& target_comp = registry_->template get<animation_target_component>(current);
+        if (context_->registry().template has<animation_target_component>(current)) {
+            const auto& target_comp = context_->registry().template get<animation_target_component>(current);
             target_map[target_comp.get_name()] = current;
         }
 
-        if (registry_->template has<hierarchy_component>(current)) {
-            const auto& hierarchy = registry_->template get<hierarchy_component>(current);
+        if (context_->registry().template has<hierarchy_component>(current)) {
+            const auto& hierarchy = context_->registry().template get<hierarchy_component>(current);
             for (entity child : hierarchy.get_children()) {
                 to_visit_.push_back(child);
             }
@@ -112,8 +111,8 @@ void animation_system<Cs...>::build_and_cache_target_map(
     target_maps_[root_ent] = std::move(target_map);
 }
 
-template <typename... Cs>
-auto animation_system<Cs...>::get_cached_target_map(
+template <typename WC>
+auto animation_system<WC>::get_cached_target_map(
     entity root_ent
 ) const -> const std::unordered_map<std::string, entity>* {
     auto it = target_maps_.find(root_ent);
@@ -123,8 +122,8 @@ auto animation_system<Cs...>::get_cached_target_map(
     return nullptr;
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::update_layer_time(
+template <typename WC>
+void animation_system<WC>::update_layer_time(
     animation_layer& layer, float32 delta_time
 ) {
     layer.time += delta_time * layer.playback_speed * layer.direction;
@@ -158,8 +157,8 @@ void animation_system<Cs...>::update_layer_time(
     }
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::process_layer(
+template <typename WC>
+void animation_system<WC>::process_layer(
     animation_layer& layer, float32 delta_time, bool is_base
 ) {
     if (!layer.clip) {
@@ -241,8 +240,8 @@ void animation_system<Cs...>::process_layer(
     }
 }
 
-template <typename... Cs>
-auto animation_system<Cs...>::compute_layer_transform(
+template <typename WC>
+auto animation_system<WC>::compute_layer_transform(
     const animation_layer& layer, const std::string& target_name
 ) const -> std::optional<transform> {
     if (!layer.clip) {
@@ -290,8 +289,8 @@ auto animation_system<Cs...>::compute_layer_transform(
     return t;
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::process_animation(
+template <typename WC>
+void animation_system<WC>::process_animation(
     entity ent, animation_player_component& anim_comp, float32 delta_time
 ) {
     for (size_t i = 0; i < anim_comp.layers_.size(); ++i) {
@@ -301,8 +300,8 @@ void animation_system<Cs...>::process_animation(
     apply_animation(ent, anim_comp);
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::apply_animation(
+template <typename WC>
+void animation_system<WC>::apply_animation(
     entity root_ent, const animation_player_component& anim_comp
 ) {
     const auto* target_map = get_cached_target_map(root_ent);
@@ -386,7 +385,7 @@ void animation_system<Cs...>::apply_animation(
         }
 
         entity target_ent = it->second;
-        if (!registry_->template has<transform_component>(target_ent)) {
+        if (!context_->registry().template has<transform_component>(target_ent)) {
             continue;
         }
 
@@ -395,24 +394,22 @@ void animation_system<Cs...>::apply_animation(
     }
 }
 
-// --- player_modifier ---
-
-template <typename... Cs>
-animation_system<Cs...>::player_modifier::player_modifier(
+template <typename WC>
+animation_system<WC>::player_modifier::player_modifier(
     animation_system* system, entity ent, animation_player_component* component
 )
     : system_(system), entity_(ent), component_(component) {}
 
-template <typename... Cs>
-auto animation_system<Cs...>::modify_player(
+template <typename WC>
+auto animation_system<WC>::modify_player(
     entity ent
 ) -> player_modifier {
-    auto& comp = registry_->template get<animation_player_component>(ent);
+    auto& comp = context_->registry().template get<animation_player_component>(ent);
     return player_modifier(this, ent, &comp);
 }
 
-template <typename... Cs>
-auto animation_system<Cs...>::player_modifier::layer(
+template <typename WC>
+auto animation_system<WC>::player_modifier::layer(
     size_t index
 ) -> layer_modifier {
     if (index >= component_->layers_.size()) {
@@ -421,29 +418,27 @@ auto animation_system<Cs...>::player_modifier::layer(
     return layer_modifier(system_, entity_, &component_->layers_[index]);
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::player_modifier::apply_pose() {
+template <typename WC>
+void animation_system<WC>::player_modifier::apply_pose() {
     if (!system_->get_cached_target_map(entity_)) {
         system_->build_and_cache_target_map(entity_);
     }
     system_->apply_animation(entity_, *component_);
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::player_modifier::rebuild_target_map() {
+template <typename WC>
+void animation_system<WC>::player_modifier::rebuild_target_map() {
     system_->build_and_cache_target_map(entity_);
 }
 
-// --- layer_modifier ---
-
-template <typename... Cs>
-animation_system<Cs...>::layer_modifier::layer_modifier(
+template <typename WC>
+animation_system<WC>::layer_modifier::layer_modifier(
     animation_system* system, entity ent, animation_layer* layer
 )
     : system_(system), entity_(ent), layer_(layer) {}
 
-template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::play() const {
+template <typename WC>
+void animation_system<WC>::layer_modifier::play() const {
     if (layer_->state != animation_state::playing) {
         layer_->state          = animation_state::playing;
         layer_->time           = 0.0f;
@@ -456,8 +451,8 @@ void animation_system<Cs...>::layer_modifier::play() const {
     }
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::play(
+template <typename WC>
+void animation_system<WC>::layer_modifier::play(
     const transition& fade_in
 ) const {
     layer_->fade_in        = fade_in;
@@ -474,28 +469,28 @@ void animation_system<Cs...>::layer_modifier::play(
     }
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::pause() const {
+template <typename WC>
+void animation_system<WC>::layer_modifier::pause() const {
     if (layer_->state == animation_state::playing) {
         layer_->state = animation_state::paused;
     }
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::stop() const {
+template <typename WC>
+void animation_system<WC>::layer_modifier::stop() const {
     layer_->state          = animation_state::stopped;
     layer_->time           = 0.0f;
     layer_->fade_influence = 0.0f;
     layer_->fade_is_out    = false;
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::clear() const {
+template <typename WC>
+void animation_system<WC>::layer_modifier::clear() const {
     *layer_ = animation_layer{};
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::stop(
+template <typename WC>
+void animation_system<WC>::layer_modifier::stop(
     const transition& fade_out
 ) const {
     layer_->fade_out     = fade_out;
@@ -503,51 +498,51 @@ void animation_system<Cs...>::layer_modifier::stop(
     layer_->fade_elapsed = 0.0f;
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::resume() const {
+template <typename WC>
+void animation_system<WC>::layer_modifier::resume() const {
     if (layer_->state == animation_state::paused) {
         layer_->state = animation_state::playing;
         system_->add_active_entity(entity_);
     }
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::set_time(
+template <typename WC>
+void animation_system<WC>::layer_modifier::set_time(
     float32 time
 ) const {
     layer_->time = time;
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::set_playback_speed(
+template <typename WC>
+void animation_system<WC>::layer_modifier::set_playback_speed(
     float32 speed
 ) const {
     layer_->playback_speed = speed;
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::set_loop_mode(
+template <typename WC>
+void animation_system<WC>::layer_modifier::set_loop_mode(
     animation_loop_mode mode
 ) const {
     layer_->loop_mode = mode;
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::set_fade_in(
+template <typename WC>
+void animation_system<WC>::layer_modifier::set_fade_in(
     const transition& t
 ) const {
     layer_->fade_in = t;
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::set_fade_out(
+template <typename WC>
+void animation_system<WC>::layer_modifier::set_fade_out(
     const transition& t
 ) const {
     layer_->fade_out = t;
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::blend_to(
+template <typename WC>
+void animation_system<WC>::layer_modifier::blend_to(
     std::shared_ptr<animation_clip> clip, std::optional<transition> t
 ) const {
     transition trans = t.value_or(layer_->blend_transition);
@@ -624,8 +619,8 @@ void animation_system<Cs...>::layer_modifier::blend_to(
     system_->add_active_entity(entity_);
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::layer_modifier::blend_to_by_name(
+template <typename WC>
+void animation_system<WC>::layer_modifier::blend_to_by_name(
     std::string_view name, std::optional<transition> t
 ) {
     auto clip = system_->clip_registry_->get(name);
@@ -634,24 +629,22 @@ void animation_system<Cs...>::layer_modifier::blend_to_by_name(
     }
 }
 
-// --- target_modifier ---
-
-template <typename... Cs>
-animation_system<Cs...>::target_modifier::target_modifier(
+template <typename WC>
+animation_system<WC>::target_modifier::target_modifier(
     entity ent, animation_target_component* component
 )
     : entity_(ent), component_(component) {}
 
-template <typename... Cs>
-auto animation_system<Cs...>::modify_target(
+template <typename WC>
+auto animation_system<WC>::modify_target(
     entity ent
 ) -> target_modifier {
-    auto& comp = registry_->template get<animation_target_component>(ent);
+    auto& comp = context_->registry().template get<animation_target_component>(ent);
     return target_modifier(ent, &comp);
 }
 
-template <typename... Cs>
-void animation_system<Cs...>::target_modifier::set_target_name(
+template <typename WC>
+void animation_system<WC>::target_modifier::set_target_name(
     std::string name
 ) const {
     component_->target_name_ = std::move(name);

@@ -3,33 +3,38 @@
 #ifndef VW_GFX_WORLD_H
 #define VW_GFX_WORLD_H
 
-#include <chrono>
 #include <optional>
 #include <unordered_set>
 
 #include "vw/gfx/animation/animation_clip_registry.h"
 #include "vw/gfx/model/model_registry.h"
+#include "vw/gfx/resource/mesh_pool.h"
 #include "vw/gfx/spatial/ray.h"
 #include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/systems/animation_system.h"
+#include "vw/gfx/world/systems/character_controller_system.h"
 #include "vw/gfx/world/systems/hierarchy_system.h"
 #include "vw/gfx/world/systems/light_system.h"
 #include "vw/gfx/world/systems/model_system.h"
+#include "vw/gfx/world/systems/physics_system.h"
 #include "vw/gfx/world/systems/socket_system.h"
 #include "vw/gfx/world/systems/spatial_system.h"
 #include "vw/gfx/world/systems/transform_system.h"
 #include "vw/gfx/world/systems/world_grid_system.h"
 #include "vw/gfx/world/world_components.h"
+#include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
 
 struct world_update_stats {
-    float32 transform_ms   = 0.0f;
-    float32 model_ms       = 0.0f;
-    float32 spatial_ms     = 0.0f;
-    float32 light_ms       = 0.0f;
-    float32 world_grid_ms  = 0.0f;
-    float32 animation_ms   = 0.0f;
+    float32 character_controller_ms = 0.0f;
+    float32 physics_ms              = 0.0f;
+    float32 transform_ms            = 0.0f;
+    float32 model_ms                = 0.0f;
+    float32 spatial_ms              = 0.0f;
+    float32 light_ms                = 0.0f;
+    float32 world_grid_ms           = 0.0f;
+    float32 animation_ms            = 0.0f;
 };
 
 template <typename WC>
@@ -46,15 +51,18 @@ class world final {
     friend class entity_guard_group<WC>;
 
 public:
-    using registry_type         = registry_from_tuple<WC>::type;
-    using transform_system_type = transform_system_from_tuple<WC>::type;
-    using hierarchy_system_type = hierarchy_system_from_tuple<WC>::type;
-    using model_system_type     = model_system_from_tuple<WC>::type;
-    using spatial_system_type   = spatial_system_from_tuple<WC>::type;
-    using light_system_type     = light_system_from_tuple<WC>::type;
-    using socket_system_type    = socket_system_from_tuple<WC>::type;
-    using animation_system_type   = animation_system_from_tuple<WC>::type;
-    using world_grid_system_type  = world_grid_system_from_tuple<WC, WC>::type;
+    using registry_type                    = entity_registry_from_tuple<WC>::type;
+    using context_type                     = world_context<WC>;
+    using transform_system_type            = transform_system<WC>;
+    using hierarchy_system_type            = hierarchy_system<WC>;
+    using model_system_type                = model_system<WC>;
+    using spatial_system_type              = spatial_system<WC>;
+    using light_system_type                = light_system<WC>;
+    using socket_system_type               = socket_system<WC>;
+    using animation_system_type            = animation_system<WC>;
+    using character_controller_system_type = character_controller_system<WC>;
+    using physics_system_type              = physics_system<WC>;
+    using world_grid_system_type           = world_grid_system<WC>;
 
     explicit world(vulkan_context& context, const block_registry& registry);
     ~world()                               = default;
@@ -95,17 +103,22 @@ public:
 
     [[nodiscard]] auto get_animation_clip_registry() -> animation_clip_registry&;
 
+    void set_world_grid(std::shared_ptr<world_grid<WC>> grid);
+    [[nodiscard]] auto get_world_grid() const -> std::shared_ptr<world_grid<WC>>;
+
     [[nodiscard]] auto get_world_grid_system() -> world_grid_system_type&;
+
+    [[nodiscard]] auto get_character_controller_system() -> character_controller_system_type&;
+
+    [[nodiscard]] auto get_physics_system() -> physics_system_type&;
 
     [[nodiscard]] auto get_registry() -> registry_type&;
 
     template <typename T>
     [[nodiscard]] auto changed() -> std::unordered_set<entity>&;
 
-    [[nodiscard]] auto voxel_ray_cast(
-        const ray& r,
-        std::unordered_set<entity>& candidates
-    ) const -> std::optional<voxel_ray_hit>;
+    [[nodiscard]] auto voxel_ray_cast(const ray& r, std::unordered_set<entity>& candidates) const
+        -> std::optional<voxel_ray_hit>;
 
     [[nodiscard]] auto destroyed() const -> const std::vector<entity>&;
 
@@ -126,6 +139,7 @@ private:
 
     registry_type registry_;
     mesh_pool mesh_pool_;
+    context_type context_;
     spatial_system_type spatial_system_;
     transform_system_type transform_system_;
     hierarchy_system_type hierarchy_system_;
@@ -135,6 +149,8 @@ private:
     socket_system_type socket_system_;
     animation_clip_registry animation_clip_registry_;
     animation_system_type animation_system_;
+    character_controller_system_type character_controller_system_;
+    physics_system_type physics_system_;
     world_grid_system_type world_grid_system_;
     world_update_stats update_stats_;
 };

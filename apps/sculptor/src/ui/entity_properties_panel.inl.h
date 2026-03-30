@@ -86,25 +86,34 @@ inline void entity_properties_panel::render_position() const {
 }
 
 inline void entity_properties_panel::render_rotation() const {
-    const auto ent             = state_->scene.name_to_entity[state_->scene.selected_name];
+    const auto& name           = state_->scene.selected_name;
+    const auto ent             = state_->scene.name_to_entity[name];
     auto& world                = engine_->get_world();
     const auto& transform_comp = world.get_component<gfx::transform_component>(ent);
-    const vec3f rotation_euler = transform_comp.get_rotation_euler();
-    vec3f rotation_deg         = {
-        math::degrees(rotation_euler.x),
-        math::degrees(rotation_euler.y),
-        math::degrees(rotation_euler.z),
-    };
-    if (imgui_drag_vec3f("Rot", rotation_deg)) {
+
+    const auto& current_quat = transform_comp.get_rotation();
+    if (cached_rotation_entity_ != name || cached_rotation_quat_ != current_quat) {
+        cached_rotation_entity_ = name;
+        cached_rotation_quat_   = current_quat;
+        const vec3f euler       = transform_comp.get_rotation_euler();
+        cached_rotation_deg_    = {
+            math::degrees(euler.x),
+            math::degrees(euler.y),
+            math::degrees(euler.z),
+        };
+    }
+
+    if (imgui_drag_vec3f("Rot", cached_rotation_deg_)) {
         const vec3f rotation_rad = {
-            math::radians(rotation_deg.x),
-            math::radians(rotation_deg.y),
-            math::radians(rotation_deg.z),
+            math::radians(cached_rotation_deg_.x),
+            math::radians(cached_rotation_deg_.y),
+            math::radians(cached_rotation_deg_.z),
         };
         transform new_transform = transform_comp.get_transform();
         new_transform.set_rotation_euler(rotation_rad);
+        cached_rotation_quat_ = new_transform.get_rotation();
         set_transform_params params = {
-            .name          = state_->scene.selected_name,
+            .name          = name,
             .new_transform = new_transform,
         };
         op_manager_->execute(std::make_unique<set_transform_operation>(*engine_, *state_, params));
@@ -159,6 +168,10 @@ inline void entity_properties_panel::render_components_section() {
     ImGui::TextUnformatted("Model");
     ImGui::SameLine(100.f);
     if (has_model) {
+        const auto& model_comp = world.get_component<gfx::model_component>(ent);
+        const auto model_size  = model_comp.size();
+        ImGui::TextDisabled("(%dx%dx%d)", model_size.x, model_size.y, model_size.z);
+        ImGui::SameLine();
         if (ImGui::Button("Remove##model")) {
             op_manager_->execute(std::make_unique<remove_model_component_operation>(
                 *engine_, *state_, remove_model_component_params{.name = name}

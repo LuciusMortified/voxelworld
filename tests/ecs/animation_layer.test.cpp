@@ -15,33 +15,37 @@
 using namespace vw;
 using namespace vw::gfx;
 
+using test_components = std::tuple<
+    hierarchy_component, transform_component, spatial_component,
+    animation_player_component, animation_target_component>;
+
 using test_registry = entity_registry<
     hierarchy_component, transform_component, spatial_component,
     animation_player_component, animation_target_component>;
 
+using test_context = world_context<
+    test_components>;
+
 using test_spatial_sys = spatial_system<
-    hierarchy_component, transform_component, spatial_component,
-    animation_player_component, animation_target_component>;
+    test_components>;
 
 using test_transform_sys = transform_system<
-    hierarchy_component, transform_component, spatial_component,
-    animation_player_component, animation_target_component>;
+    test_components>;
 
 using test_hierarchy_sys = hierarchy_system<
-    hierarchy_component, transform_component, spatial_component,
-    animation_player_component, animation_target_component>;
+    test_components>;
 
 using test_anim_sys = animation_system<
-    hierarchy_component, transform_component, spatial_component,
-    animation_player_component, animation_target_component>;
+    test_components>;
 
 struct anim_test_fixture {
     test_registry reg;
-    test_spatial_sys spatial_sys{reg};
-    test_transform_sys transform_sys{reg, hierarchy_sys};
-    test_hierarchy_sys hierarchy_sys{reg, transform_sys};
+    test_context ctx{reg};
+    test_spatial_sys spatial_sys{ctx};
+    test_transform_sys transform_sys{ctx, hierarchy_sys};
+    test_hierarchy_sys hierarchy_sys{ctx, transform_sys};
     animation_clip_registry clip_reg;
-    test_anim_sys anim_sys{reg, transform_sys, clip_reg};
+    test_anim_sys anim_sys{ctx, transform_sys, clip_reg};
 
     auto create_root() -> entity {
         auto ent = reg.create();

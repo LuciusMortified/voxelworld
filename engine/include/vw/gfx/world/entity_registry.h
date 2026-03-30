@@ -206,9 +206,9 @@ public:
             advance_();
         }
 
-        [[nodiscard]] auto operator*() const -> std::tuple<const entity&, const Cs&...> {
-            const entity& ent = (*view->entities_)[index];
-            return std::tuple<const entity&, const Cs&...>{
+        [[nodiscard]] auto operator*() const -> std::tuple<entity, Cs&...> {
+            entity ent = (*view->entities_)[index];
+            return std::tuple<entity, Cs&...>{
                 ent,
                 view->registry_->template get<Cs>(ent)...
             };
@@ -273,10 +273,10 @@ private:
 };
 
 template <typename... Ts>
-struct registry_from_tuple;
+struct entity_registry_from_tuple;
 
 template <typename... Ts>
-struct registry_from_tuple<std::tuple<Ts...>> {
+struct entity_registry_from_tuple<std::tuple<Ts...>> {
     using type = entity_registry<Ts...>;
 };
 

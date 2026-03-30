@@ -4,25 +4,26 @@
 #define VW_GFX_WORLD_SYSTEMS_SOCKET_SYSTEM_H
 
 #include "vw/gfx/world/components/socket_component.h"
-#include "vw/gfx/world/entity_registry.h"
+#include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
 
-template <typename... Cs>
+template <typename>
 class hierarchy_system;
 
-template <typename... Cs>
+template <typename>
 class transform_system;
 
-template <typename... Cs>
+template <typename WC>
 class socket_system final {
 public:
-    using registry_type         = entity_registry<Cs...>;
-    using hierarchy_system_type = hierarchy_system<Cs...>;
-    using transform_system_type = transform_system<Cs...>;
+    using registry_type         = entity_registry_from_tuple<WC>::type;
+    using context_type          = world_context<WC>;
+    using hierarchy_system_type = hierarchy_system<WC>;
+    using transform_system_type = transform_system<WC>;
 
     explicit socket_system(
-        registry_type& registry,
+        context_type& context,
         hierarchy_system_type& hierarchy_system,
         transform_system_type& transform_system
     );
@@ -52,17 +53,9 @@ public:
     void update();
 
 private:
-    registry_type* registry_;
+    context_type* context_;
     hierarchy_system_type* hierarchy_system_;
     transform_system_type* transform_system_;
-};
-
-template <typename... Cs>
-struct socket_system_from_tuple;
-
-template <typename... Cs>
-struct socket_system_from_tuple<std::tuple<Cs...>> {
-    using type = socket_system<Cs...>;
 };
 
 }  // namespace vw::gfx
