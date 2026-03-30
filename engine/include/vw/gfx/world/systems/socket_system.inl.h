@@ -28,10 +28,10 @@ template <typename WC>
 void socket_system<WC>::cleanup(
     entity ent
 ) {
-    if (!context_->registry.template has<socket_component>(ent)) {
+    if (!context_->registry().template has<socket_component>(ent)) {
         return;
     }
-    auto& comp = context_->registry.template get<socket_component>(ent);
+    auto& comp = context_->registry().template get<socket_component>(ent);
     for (auto& slot : comp.sockets_) {
         if (slot.attached.is_valid()) {
             hierarchy_system_->modify(slot.attached).remove_parent();
@@ -57,10 +57,10 @@ template <typename WC>
 auto socket_system<WC>::socket_modifier::attach(
     const std::string& socket_name, entity child
 ) -> socket_modifier& {
-    if (!system_->context_->registry.template has<socket_component>(entity_)) {
+    if (!system_->context_->registry().template has<socket_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry.template get<socket_component>(entity_);
+    auto& comp = system_->context_->registry().template get<socket_component>(entity_);
     auto it    = std::ranges::find_if(comp.sockets_, [&](const socket_point& sp) {
         return sp.name == socket_name;
     });
@@ -80,10 +80,10 @@ template <typename WC>
 auto socket_system<WC>::socket_modifier::detach(
     const std::string& socket_name
 ) -> socket_modifier& {
-    if (!system_->context_->registry.template has<socket_component>(entity_)) {
+    if (!system_->context_->registry().template has<socket_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry.template get<socket_component>(entity_);
+    auto& comp = system_->context_->registry().template get<socket_component>(entity_);
     auto it    = std::ranges::find_if(comp.sockets_, [&](const socket_point& sp) {
         return sp.name == socket_name;
     });
@@ -100,10 +100,10 @@ template <typename WC>
 auto socket_system<WC>::socket_modifier::add_socket(
     const std::string& name, const vec3f& position, const quat& rotation, const vec3f& scale
 ) -> socket_modifier& {
-    if (!system_->context_->registry.template has<socket_component>(entity_)) {
+    if (!system_->context_->registry().template has<socket_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry.template get<socket_component>(entity_);
+    auto& comp = system_->context_->registry().template get<socket_component>(entity_);
     comp.sockets_.push_back(socket_point{name, position, rotation, scale, invalid_entity});
     return *this;
 }
@@ -112,10 +112,10 @@ template <typename WC>
 auto socket_system<WC>::socket_modifier::remove_socket(
     const std::string& name
 ) -> socket_modifier& {
-    if (!system_->context_->registry.template has<socket_component>(entity_)) {
+    if (!system_->context_->registry().template has<socket_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry.template get<socket_component>(entity_);
+    auto& comp = system_->context_->registry().template get<socket_component>(entity_);
     auto it    = std::ranges::find_if(comp.sockets_, [&](const socket_point& sp) -> auto {
         return sp.name == name;
     });

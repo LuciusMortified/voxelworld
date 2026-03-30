@@ -44,12 +44,12 @@ void animation_system<WC>::update(
     to_remove_.clear();
 
     for (entity ent : active_entities_) {
-        if (!context_->registry.template has<animation_player_component>(ent)) {
+        if (!context_->registry().template has<animation_player_component>(ent)) {
             to_remove_.push_back(ent);
             continue;
         }
 
-        auto& anim_comp = context_->registry.template get<animation_player_component>(ent);
+        auto& anim_comp = context_->registry().template get<animation_player_component>(ent);
 
         process_animation(ent, anim_comp, effective_delta);
 
@@ -95,13 +95,13 @@ void animation_system<WC>::build_and_cache_target_map(
         entity current = to_visit_.front();
         to_visit_.pop_front();
 
-        if (context_->registry.template has<animation_target_component>(current)) {
-            const auto& target_comp = context_->registry.template get<animation_target_component>(current);
+        if (context_->registry().template has<animation_target_component>(current)) {
+            const auto& target_comp = context_->registry().template get<animation_target_component>(current);
             target_map[target_comp.get_name()] = current;
         }
 
-        if (context_->registry.template has<hierarchy_component>(current)) {
-            const auto& hierarchy = context_->registry.template get<hierarchy_component>(current);
+        if (context_->registry().template has<hierarchy_component>(current)) {
+            const auto& hierarchy = context_->registry().template get<hierarchy_component>(current);
             for (entity child : hierarchy.get_children()) {
                 to_visit_.push_back(child);
             }
@@ -385,7 +385,7 @@ void animation_system<WC>::apply_animation(
         }
 
         entity target_ent = it->second;
-        if (!context_->registry.template has<transform_component>(target_ent)) {
+        if (!context_->registry().template has<transform_component>(target_ent)) {
             continue;
         }
 
@@ -404,7 +404,7 @@ template <typename WC>
 auto animation_system<WC>::modify_player(
     entity ent
 ) -> player_modifier {
-    auto& comp = context_->registry.template get<animation_player_component>(ent);
+    auto& comp = context_->registry().template get<animation_player_component>(ent);
     return player_modifier(this, ent, &comp);
 }
 
@@ -639,7 +639,7 @@ template <typename WC>
 auto animation_system<WC>::modify_target(
     entity ent
 ) -> target_modifier {
-    auto& comp = context_->registry.template get<animation_target_component>(ent);
+    auto& comp = context_->registry().template get<animation_target_component>(ent);
     return target_modifier(ent, &comp);
 }
 

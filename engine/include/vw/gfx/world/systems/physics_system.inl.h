@@ -27,7 +27,7 @@ template <typename WC>
 void physics_system<WC>::update(
     float32 delta_time
 ) {
-    if (!context_->world_grid) {
+    if (!context_->world_grid()) {
         return;
     }
 
@@ -50,13 +50,13 @@ void physics_system<WC>::step(
     constexpr float32 impulse_epsilon = 0.01f;
 
     for (auto [ent, rb, tc] :
-         context_->registry.template view<rigid_body_component, transform_component>()) {
+         context_->registry().template view<rigid_body_component, transform_component>()) {
         auto position = tc.get_position();
 
         rb.velocity_.y += gravity_ * rb.gravity_scale_ * dt;
 
-        if (context_->registry.template has<movement_intent_component>(ent)) {
-            const auto& mi = context_->registry.template get<movement_intent_component>(ent);
+        if (context_->registry().template has<movement_intent_component>(ent)) {
+            const auto& mi = context_->registry().template get<movement_intent_component>(ent);
             auto axes = mi.wish_axes_;
 
             if (axes & axis_flag::x) { rb.velocity_.x = mi.wish_velocity_.x; }
@@ -77,8 +77,8 @@ void physics_system<WC>::step(
 
         auto new_position = position + rb.velocity_ * dt;
 
-        if (context_->registry.template has<box_collider_component>(ent)) {
-            const auto& col = context_->registry.template get<box_collider_component>(ent);
+        if (context_->registry().template has<box_collider_component>(ent)) {
+            const auto& col = context_->registry().template get<box_collider_component>(ent);
             auto half = col.extents_ * 0.5f;
             auto box_center = new_position + col.offset_;
 
@@ -103,7 +103,7 @@ template <typename WC>
 auto physics_system<WC>::are_chunks_loaded(
     const vec3f& position, const vec3f& extents
 ) const -> bool {
-    const auto vs = static_cast<float32>(context_->world_grid->voxel_scale());
+    const auto vs = static_cast<float32>(context_->world_grid()->voxel_scale());
     auto half = extents * 0.5f;
 
     auto min_world = vec3i{
@@ -117,12 +117,12 @@ auto physics_system<WC>::are_chunks_loaded(
         static_cast<int32>(std::floor((position.z + half.z) / vs) * vs)
     };
 
-    auto min_chunk = context_->world_grid->world_to_chunk_coord(min_world);
-    auto max_chunk = context_->world_grid->world_to_chunk_coord(max_world);
+    auto min_chunk = context_->world_grid()->world_to_chunk_coord(min_world);
+    auto max_chunk = context_->world_grid()->world_to_chunk_coord(max_world);
 
     for (int32 cx = min_chunk.x; cx <= max_chunk.x; ++cx) {
         for (int32 cz = min_chunk.z; cz <= max_chunk.z; ++cz) {
-            if (!context_->world_grid->has_column({cx, cz})) {
+            if (!context_->world_grid()->has_column({cx, cz})) {
                 return false;
             }
         }
@@ -135,8 +135,8 @@ template <typename WC>
 auto physics_system<WC>::resolve_box_voxel(
     vec3f center, const vec3f& half_extents, vec3f& velocity
 ) const -> collision_result {
-    auto vs = static_cast<float32>(context_->world_grid->voxel_scale());
-    auto vs_i = context_->world_grid->voxel_scale();
+    auto vs = static_cast<float32>(context_->world_grid()->voxel_scale());
+    auto vs_i = context_->world_grid()->voxel_scale();
     bool grounded = false;
 
     for (int32 iter = 0; iter < max_collision_iterations; ++iter) {
@@ -158,7 +158,7 @@ auto physics_system<WC>::resolve_box_voxel(
             for (int32 vy = min_vy; vy <= max_vy; ++vy) {
                 for (int32 vz = min_vz; vz <= max_vz; ++vz) {
                     auto world_pos = vec3i{vx * vs_i, vy * vs_i, vz * vs_i};
-                    auto v = context_->world_grid->get_voxel(world_pos);
+                    auto v = context_->world_grid()->get_voxel(world_pos);
                     if (v.is_empty()) {
                         continue;
                     }
@@ -244,10 +244,10 @@ template <typename WC>
 auto physics_system<WC>::rigid_body_modifier::set_velocity(
     const vec3f& vel
 ) -> rigid_body_modifier& {
-    if (!system_->context_->registry.template has<rigid_body_component>(entity_)) {
+    if (!system_->context_->registry().template has<rigid_body_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry.template get<rigid_body_component>(entity_);
+    auto& comp = system_->context_->registry().template get<rigid_body_component>(entity_);
     comp.velocity_ = vel;
     return *this;
 }
@@ -256,10 +256,10 @@ template <typename WC>
 auto physics_system<WC>::rigid_body_modifier::set_gravity_scale(
     float32 scale
 ) -> rigid_body_modifier& {
-    if (!system_->context_->registry.template has<rigid_body_component>(entity_)) {
+    if (!system_->context_->registry().template has<rigid_body_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry.template get<rigid_body_component>(entity_);
+    auto& comp = system_->context_->registry().template get<rigid_body_component>(entity_);
     comp.gravity_scale_ = scale;
     return *this;
 }
@@ -268,10 +268,10 @@ template <typename WC>
 auto physics_system<WC>::rigid_body_modifier::add_impulse(
     const vec3f& impulse
 ) -> rigid_body_modifier& {
-    if (!system_->context_->registry.template has<rigid_body_component>(entity_)) {
+    if (!system_->context_->registry().template has<rigid_body_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry.template get<rigid_body_component>(entity_);
+    auto& comp = system_->context_->registry().template get<rigid_body_component>(entity_);
     comp.velocity_ = comp.velocity_ + impulse;
     return *this;
 }
@@ -280,10 +280,10 @@ template <typename WC>
 auto physics_system<WC>::rigid_body_modifier::add_external_impulse(
     const vec3f& impulse
 ) -> rigid_body_modifier& {
-    if (!system_->context_->registry.template has<rigid_body_component>(entity_)) {
+    if (!system_->context_->registry().template has<rigid_body_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry.template get<rigid_body_component>(entity_);
+    auto& comp = system_->context_->registry().template get<rigid_body_component>(entity_);
     comp.impulse_ = comp.impulse_ + impulse;
     return *this;
 }
@@ -292,10 +292,10 @@ template <typename WC>
 auto physics_system<WC>::rigid_body_modifier::set_drag(
     float32 drag
 ) -> rigid_body_modifier& {
-    if (!system_->context_->registry.template has<rigid_body_component>(entity_)) {
+    if (!system_->context_->registry().template has<rigid_body_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry.template get<rigid_body_component>(entity_);
+    auto& comp = system_->context_->registry().template get<rigid_body_component>(entity_);
     comp.drag_ = drag;
     return *this;
 }
@@ -317,10 +317,10 @@ template <typename WC>
 auto physics_system<WC>::collider_modifier::set_extents(
     const vec3f& ext
 ) -> collider_modifier& {
-    if (!system_->context_->registry.template has<box_collider_component>(entity_)) {
+    if (!system_->context_->registry().template has<box_collider_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry.template get<box_collider_component>(entity_);
+    auto& comp = system_->context_->registry().template get<box_collider_component>(entity_);
     comp.extents_ = ext;
     return *this;
 }
@@ -329,10 +329,10 @@ template <typename WC>
 auto physics_system<WC>::collider_modifier::set_offset(
     const vec3f& offset
 ) -> collider_modifier& {
-    if (!system_->context_->registry.template has<box_collider_component>(entity_)) {
+    if (!system_->context_->registry().template has<box_collider_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry.template get<box_collider_component>(entity_);
+    auto& comp = system_->context_->registry().template get<box_collider_component>(entity_);
     comp.offset_ = offset;
     return *this;
 }

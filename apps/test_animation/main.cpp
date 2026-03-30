@@ -61,13 +61,13 @@ private:
         auto& animation_system = world.get_animation_system();
 
         auto red_cube_model = model_registry.create("red_cube", 3, 3, 3);
-        red_cube_model->fill(voxel{colors::red});
+        red_cube_model->fill(voxel{blocks::red_3});
 
         auto green_cube_model = model_registry.create("green_cube", 3, 3, 3);
-        green_cube_model->fill(voxel{colors::green});
+        green_cube_model->fill(voxel{blocks::green_3});
 
         auto blue_cube_model = model_registry.create("blue_cube", 3, 3, 3);
-        blue_cube_model->fill(voxel{colors::blue});
+        blue_cube_model->fill(voxel{blocks::blue_3});
 
         root_ = std::make_unique<gfx::entity_guard<>>(world);
         root_->with<gfx::transform_component>();

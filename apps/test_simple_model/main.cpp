@@ -97,17 +97,17 @@ private:
 
         // Создаем модель и регистрируем ее
         model_ = model_registry.create("flower", 3, 6, 3);
-        model_->set_voxel(1, 0, 1, colors::green);
-        model_->set_voxel(1, 1, 1, colors::green);
-        model_->set_voxel(1, 2, 1, colors::green);
-        model_->set_voxel(1, 3, 1, colors::green);
-        model_->set_voxel(1, 4, 1, colors::green);
-        model_->set_voxel(1, 5, 1, colors::yellow);
-        model_->set_voxel(1, 4, 0, colors::white);
-        model_->set_voxel(1, 4, 1, colors::white);
-        model_->set_voxel(1, 4, 2, colors::white);
-        model_->set_voxel(0, 4, 1, colors::white);
-        model_->set_voxel(2, 4, 1, colors::white);
+        model_->set_voxel(1, 0, 1, voxel{blocks::green_3});
+        model_->set_voxel(1, 1, 1, voxel{blocks::green_3});
+        model_->set_voxel(1, 2, 1, voxel{blocks::green_3});
+        model_->set_voxel(1, 3, 1, voxel{blocks::green_3});
+        model_->set_voxel(1, 4, 1, voxel{blocks::green_3});
+        model_->set_voxel(1, 5, 1, voxel{blocks::orange_3});
+        model_->set_voxel(1, 4, 0, voxel{blocks::white});
+        model_->set_voxel(1, 4, 1, voxel{blocks::white});
+        model_->set_voxel(1, 4, 2, voxel{blocks::white});
+        model_->set_voxel(0, 4, 1, voxel{blocks::white});
+        model_->set_voxel(2, 4, 1, voxel{blocks::white});
 
         flower_ = std::make_unique<gfx::entity_guard<>>(world);
         flower_->with<gfx::transform_component>();

@@ -12,7 +12,7 @@ world<Cs>::world(
     vulkan_context& context, const block_registry& registry
 )
     : mesh_pool_{context, registry}
-    , context_{registry_, &mesh_pool_, nullptr}
+    , context_{registry_, &mesh_pool_}
     , spatial_system_(context_)
     , transform_system_(context_, hierarchy_system_)
     , hierarchy_system_(context_, transform_system_)
@@ -123,12 +123,12 @@ auto world<C>::get_animation_clip_registry() -> animation_clip_registry& {
 
 template <typename C>
 void world<C>::set_world_grid(std::shared_ptr<world_grid<C>> grid) {
-    context_.world_grid_ptr = std::move(grid);
+    context_.world_grid_ = std::move(grid);
 }
 
 template <typename C>
 auto world<C>::get_world_grid() const -> std::shared_ptr<world_grid<C>> {
-    return context_.world_grid_ptr;
+    return context_.world_grid_;
 }
 
 template <typename C>

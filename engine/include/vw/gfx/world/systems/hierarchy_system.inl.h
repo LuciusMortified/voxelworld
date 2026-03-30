@@ -26,25 +26,25 @@ template <typename WC>
 void hierarchy_system<WC>::cleanup(
     entity ent
 ) {
-    if (!context_->registry.template has<hierarchy_component>(ent)) {
+    if (!context_->registry().template has<hierarchy_component>(ent)) {
         return;
     }
 
-    auto& hierarchy_comp = context_->registry.template get<hierarchy_component>(ent);
+    auto& hierarchy_comp = context_->registry().template get<hierarchy_component>(ent);
     auto parent = invalid_entity;
 
     if (hierarchy_comp.has_parent()) {
         parent = hierarchy_comp.get_parent();
-        if (context_->registry.template has<hierarchy_component>(parent)) {
-            auto& parent_comp = context_->registry.template get<hierarchy_component>(parent);
+        if (context_->registry().template has<hierarchy_component>(parent)) {
+            auto& parent_comp = context_->registry().template get<hierarchy_component>(parent);
             std::erase(parent_comp.children_, ent);
         }
     }
 
     const auto& children = hierarchy_comp.get_children();
     for (entity child : children) {
-        if (context_->registry.template has<hierarchy_component>(child)) {
-            auto& child_comp = context_->registry.template get<hierarchy_component>(child);
+        if (context_->registry().template has<hierarchy_component>(child)) {
+            auto& child_comp = context_->registry().template get<hierarchy_component>(child);
             child_comp.parent_ = invalid_entity;
 
             transform_system_->modify(child).mark_world_dirty();
@@ -66,8 +66,8 @@ auto hierarchy_system<WC>::get_hierarchy_depth(
     int depth      = 0;
     entity current = ent;
 
-    while (context_->registry.template has<hierarchy_component>(current)) {
-        const auto& hierarchy_comp = context_->registry.template get<hierarchy_component>(current);
+    while (context_->registry().template has<hierarchy_component>(current)) {
+        const auto& hierarchy_comp = context_->registry().template get<hierarchy_component>(current);
         if (!hierarchy_comp.has_parent()) {
             break;
         }
@@ -101,13 +101,13 @@ auto hierarchy_system<WC>::hierarchy_modifier::set_parent(entity parent)
         throw std::invalid_argument("setting parent to child would create a hierarchy cycle");
     }
 
-    if (system_->context_->registry.template has<hierarchy_component>(parent)) {
-        auto& parent_component = system_->context_->registry.template get<hierarchy_component>(parent);
+    if (system_->context_->registry().template has<hierarchy_component>(parent)) {
+        auto& parent_component = system_->context_->registry().template get<hierarchy_component>(parent);
         parent_component.children_.push_back(entity_);
     }
 
-    if (system_->context_->registry.template has<hierarchy_component>(entity_)) {
-        auto& child_component   = system_->context_->registry.template get<hierarchy_component>(entity_);
+    if (system_->context_->registry().template has<hierarchy_component>(entity_)) {
+        auto& child_component   = system_->context_->registry().template get<hierarchy_component>(entity_);
         child_component.parent_ = parent;
 
         system_->transform_system_->modify(entity_).mark_world_dirty();
@@ -118,12 +118,12 @@ auto hierarchy_system<WC>::hierarchy_modifier::set_parent(entity parent)
 
 template <typename WC>
 auto hierarchy_system<WC>::hierarchy_modifier::remove_parent() -> hierarchy_modifier& {
-    if (system_->context_->registry.template has<hierarchy_component>(entity_)) {
-        auto& child_component = system_->context_->registry.template get<hierarchy_component>(entity_);
+    if (system_->context_->registry().template has<hierarchy_component>(entity_)) {
+        auto& child_component = system_->context_->registry().template get<hierarchy_component>(entity_);
 
-        if (system_->context_->registry.template has<hierarchy_component>(child_component.parent_)) {
+        if (system_->context_->registry().template has<hierarchy_component>(child_component.parent_)) {
             auto& parent_component =
-                system_->context_->registry.template get<hierarchy_component>(child_component.parent_);
+                system_->context_->registry().template get<hierarchy_component>(child_component.parent_);
             std::erase_if(parent_component.children_, [this](entity e) {
                 return e == entity_;
             });
@@ -141,8 +141,8 @@ template <typename WC>
 auto hierarchy_system<WC>::check_hierarchy_cycle(entity parent, entity child) const -> bool {
     entity current = parent;
 
-    while (current.is_valid() && context_->registry.template has<hierarchy_component>(current)) {
-        const auto& current_component = context_->registry.template get<hierarchy_component>(current);
+    while (current.is_valid() && context_->registry().template has<hierarchy_component>(current)) {
+        const auto& current_component = context_->registry().template get<hierarchy_component>(current);
         if (current_component.get_parent() == child) {
             return true;
         }
