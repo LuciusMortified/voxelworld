@@ -35,16 +35,16 @@ public:
     [[nodiscard]] auto registry() const -> const registry_type& {
         return *registry_;
     }
-    [[nodiscard]] auto mesh_pool() -> mesh_pool* {
+    [[nodiscard]] auto get_mesh_pool() -> mesh_pool_type* {
         return mesh_pool_;
     }
-    [[nodiscard]] auto mesh_pool() const -> const class mesh_pool* {
+    [[nodiscard]] auto get_mesh_pool() const -> const mesh_pool_type* {
         return mesh_pool_;
     }
-    [[nodiscard]] auto world_grid() -> std::shared_ptr<world_grid_type> {
+    [[nodiscard]] auto get_world_grid() -> std::shared_ptr<world_grid_type> {
         return world_grid_;
     }
-    [[nodiscard]] auto world_grid() const -> std::shared_ptr<world_grid_type> {
+    [[nodiscard]] auto get_world_grid() const -> std::shared_ptr<world_grid_type> {
         return world_grid_;
     }
 
@@ -52,7 +52,7 @@ private:
     friend class world<WC>;
 
     registry_type* registry_    = nullptr;
-    class mesh_pool* mesh_pool_ = nullptr;
+    mesh_pool_type* mesh_pool_ = nullptr;
     std::shared_ptr<world_grid_type> world_grid_;
 };
 

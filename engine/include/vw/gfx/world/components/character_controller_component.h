@@ -16,7 +16,7 @@ private:
     vec3f facing_direction_{0.0f, 0.0f, 1.0f};
     float32 move_speed_     = 50.0f;
     float32 jump_impulse_   = 100.0f;
-    float32 rotation_speed_ = 10.0f;
+    float32 rotation_speed_ = 5.0f;
     bool jump_requested_    = false;
 
     template <typename>

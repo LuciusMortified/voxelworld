@@ -27,7 +27,10 @@ void third_person_player_controller<WC>::update(
 
     auto modifier = world_->get_character_controller_system().modify(target);
     modifier.set_move_input(move_dir);
-    modifier.set_facing_direction(move_dir);
+
+    if (math::length(move_dir) > math::epsilon) {
+        modifier.set_facing_direction(forward);
+    }
 
     if (input.jump_requested) {
         modifier.request_jump();

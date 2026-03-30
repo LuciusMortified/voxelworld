@@ -107,8 +107,10 @@ inline void timeline_panel::render(
         state_->anim.timeline_cursor    = std::max(state_->anim.timeline_cursor - step, 0.f);
     }
 
-    if (!is_current_layer_playing() &&
-        std::abs(state_->anim.timeline_cursor - prev_cursor_time_) > 0.0001f) {
+    const bool cursor_changed =
+        std::abs(state_->anim.timeline_cursor - prev_cursor_time_) > 0.0001f;
+
+    if (!is_current_layer_playing() && (cursor_changed || state_->anim.need_apply_pose)) {
         if (const auto root = try_get_root_entity()) {
             ensure_clip_on_layer(*root);
             auto& anim_sys       = engine_->get_world().get_animation_system();
@@ -117,7 +119,8 @@ inline void timeline_panel::render(
             player.layer(layer_idx).set_time(state_->anim.timeline_cursor);
             player.apply_pose();
         }
-        prev_cursor_time_ = state_->anim.timeline_cursor;
+        prev_cursor_time_            = state_->anim.timeline_cursor;
+        state_->anim.need_apply_pose = false;
     }
 
     render_toolbar(clip_duration);

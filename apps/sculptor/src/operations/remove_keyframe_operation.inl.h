@@ -33,6 +33,7 @@ inline void remove_keyframe_operation::execute() {
     std::visit([remove_id](auto& channel) { channel.remove(remove_id); }, *channel_var);
 
     track->mark_dirty();
+    state_->anim.need_apply_pose                  = true;
     state_->anim.selected_keyframe_id             = gfx::invalid_keyframe_id;
     state_->anim.unsaved_clips[params_.clip_name] = true;
 }
@@ -63,6 +64,7 @@ inline void remove_keyframe_operation::undo() {
     }
 
     track->mark_dirty();
+    state_->anim.need_apply_pose                  = true;
     state_->anim.unsaved_clips[params_.clip_name] = true;
 }
 

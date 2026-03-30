@@ -27,7 +27,7 @@ template <typename WC>
 void physics_system<WC>::update(
     float32 delta_time
 ) {
-    if (!context_->world_grid()) {
+    if (!context_->get_world_grid()) {
         return;
     }
 
@@ -103,7 +103,7 @@ template <typename WC>
 auto physics_system<WC>::are_chunks_loaded(
     const vec3f& position, const vec3f& extents
 ) const -> bool {
-    const auto vs = static_cast<float32>(context_->world_grid()->voxel_scale());
+    const auto vs = static_cast<float32>(context_->get_world_grid()->voxel_scale());
     auto half = extents * 0.5f;
 
     auto min_world = vec3i{
@@ -117,12 +117,12 @@ auto physics_system<WC>::are_chunks_loaded(
         static_cast<int32>(std::floor((position.z + half.z) / vs) * vs)
     };
 
-    auto min_chunk = context_->world_grid()->world_to_chunk_coord(min_world);
-    auto max_chunk = context_->world_grid()->world_to_chunk_coord(max_world);
+    auto min_chunk = context_->get_world_grid()->world_to_chunk_coord(min_world);
+    auto max_chunk = context_->get_world_grid()->world_to_chunk_coord(max_world);
 
     for (int32 cx = min_chunk.x; cx <= max_chunk.x; ++cx) {
         for (int32 cz = min_chunk.z; cz <= max_chunk.z; ++cz) {
-            if (!context_->world_grid()->has_column({cx, cz})) {
+            if (!context_->get_world_grid()->has_column({cx, cz})) {
                 return false;
             }
         }
@@ -135,8 +135,8 @@ template <typename WC>
 auto physics_system<WC>::resolve_box_voxel(
     vec3f center, const vec3f& half_extents, vec3f& velocity
 ) const -> collision_result {
-    auto vs = static_cast<float32>(context_->world_grid()->voxel_scale());
-    auto vs_i = context_->world_grid()->voxel_scale();
+    auto vs = static_cast<float32>(context_->get_world_grid()->voxel_scale());
+    auto vs_i = context_->get_world_grid()->voxel_scale();
     bool grounded = false;
 
     for (int32 iter = 0; iter < max_collision_iterations; ++iter) {
@@ -158,7 +158,7 @@ auto physics_system<WC>::resolve_box_voxel(
             for (int32 vy = min_vy; vy <= max_vy; ++vy) {
                 for (int32 vz = min_vz; vz <= max_vz; ++vz) {
                     auto world_pos = vec3i{vx * vs_i, vy * vs_i, vz * vs_i};
-                    auto v = context_->world_grid()->get_voxel(world_pos);
+                    auto v = context_->get_world_grid()->get_voxel(world_pos);
                     if (v.is_empty()) {
                         continue;
                     }

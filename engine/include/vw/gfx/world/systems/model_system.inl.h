@@ -25,7 +25,7 @@ void model_system<WC>::update() {
     };
 
     auto t0 = clock::now();
-    context_->mesh_pool()->process_completed();
+    context_->get_mesh_pool()->process_completed();
     auto t1 = clock::now();
     update_completed_meshes();
     auto t2 = clock::now();
@@ -36,7 +36,7 @@ void model_system<WC>::update() {
     stats_.update_completed_ms   = ms(t1, t2);
     stats_.process_dirty_ms      = ms(t2, t3);
     stats_.pending_entities_count = static_cast<uint32>(pending_entities_.size());
-    stats_.pending_meshes_count   = context_->mesh_pool()->get_pending_count();
+    stats_.pending_meshes_count   = context_->get_mesh_pool()->get_pending_count();
 }
 
 template <typename WC>
@@ -66,8 +66,8 @@ void model_system<WC>::process_dirty_entities() {
         }
 
         auto identity = comp.model_->get_identity();
-        if (!context_->mesh_pool()->has(identity) && !context_->mesh_pool()->is_pending(identity)) {
-            context_->mesh_pool()->request_mesh(comp.model_);
+        if (!context_->get_mesh_pool()->has(identity) && !context_->get_mesh_pool()->is_pending(identity)) {
+            context_->get_mesh_pool()->request_mesh(comp.model_);
             pending_entities_.insert(ent);
         }
 
@@ -88,7 +88,7 @@ void model_system<WC>::update_completed_meshes() {
 
         auto& comp    = context_->registry().template get<model_component>(ent);
         auto identity = comp.model_->get_identity();
-        if (context_->mesh_pool()->has(identity)) {
+        if (context_->get_mesh_pool()->has(identity)) {
             it = pending_entities_.erase(it);
             context_->registry().template notify_changed<model_component>(ent);
         } else {

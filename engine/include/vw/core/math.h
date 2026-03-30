@@ -37,6 +37,8 @@ constexpr float pi         = 3.14159265359f;
 constexpr float deg_to_rad = pi / 180.0f;
 constexpr float rad_to_deg = 180.0f / pi;
 
+constexpr float epsilon = std::numeric_limits<float>::epsilon();
+
 constexpr auto radians(float degrees) -> float;
 constexpr auto degrees(float radians) -> float;
 

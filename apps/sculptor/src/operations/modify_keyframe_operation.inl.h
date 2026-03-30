@@ -49,6 +49,7 @@ inline void modify_keyframe_operation::apply(
     }
 
     track->mark_dirty();
+    state_->anim.need_apply_pose                  = true;
     state_->anim.unsaved_clips[params_.clip_name] = true;
 }
 

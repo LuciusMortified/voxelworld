@@ -32,9 +32,8 @@ void third_person_camera_controller<WC>::update(
     const auto player_pos = tc.get_position();
     const auto focus      = player_pos + params_.target_offset;
 
-    constexpr float32 deg_to_rad = 3.14159265f / 180.0f;
-    float32 yaw_rad              = yaw_ * deg_to_rad;
-    float32 pitch_rad            = pitch_ * deg_to_rad;
+    const float32 yaw_rad   = math::radians(yaw_);
+    const float32 pitch_rad = math::radians(pitch_);
 
     const vec3f arm_dir{
         std::sin(yaw_rad) * std::cos(pitch_rad),

@@ -56,6 +56,7 @@ inline void add_track_operation::execute() {
         }
     }
 
+    state_->anim.need_apply_pose                  = true;
     state_->anim.unsaved_clips[params_.clip_name] = true;
 }
 
@@ -67,6 +68,7 @@ inline void add_track_operation::undo() {
     }
 
     clip->remove_track(params_.track_name);
+    state_->anim.need_apply_pose                  = true;
     state_->anim.unsaved_clips[params_.clip_name] = true;
 }
 
