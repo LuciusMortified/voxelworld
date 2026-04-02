@@ -111,11 +111,9 @@ private:
         assets_.load_clip("a_sword_attack", "assets/animations/a_sword_attack_2.voxa");
     }
 
-    auto create_body_part(
-        const gfx::vox_entity_data& ent_data,
-        const std::shared_ptr<gfx::model>& part_model,
-        gfx::entity parent_ent
-    ) -> std::unique_ptr<gfx::entity_guard<>> {
+    [[nodiscard]] auto create_body_part(
+        std::string_view prefab_name, std::string_view part_name
+    ) const -> std::unique_ptr<gfx::entity_guard<>> {
         auto& world            = get_engine().get_world();
         auto& hierarchy_system = world.get_hierarchy_system();
         auto& transform_system = world.get_transform_system();
@@ -129,13 +127,14 @@ private:
         guard->with<gfx::model_component>();
         guard->with<gfx::animation_target_component>();
 
+        auto& ent_data = assets_.get_entity(prefab_name, part_name);
         if (ent_data.has_sockets) {
             guard->with<gfx::socket_component>();
         }
 
         const auto ent = guard->get_entity();
 
-        hierarchy_system.modify(ent).set_parent(parent_ent);
+        hierarchy_system.modify(ent).set_parent(player_->get_entity());
 
         transform_system.modify(ent)
             .set_position(ent_data.position)
@@ -143,7 +142,8 @@ private:
             .set_scale(ent_data.scale)
             .set_origin(ent_data.origin);
 
-        model_system.modify(ent).set_model(part_model);
+        const auto model = assets_.get_model(prefab_name, part_name);
+        model_system.modify(ent).set_model(model);
 
         animation_system.modify_target(ent).set_target_name(ent_data.name);
 
@@ -205,25 +205,19 @@ private:
 
         world.get_spatial_system().modify(player_ent).set_layer(gfx::spatial_layer::character);
 
-        auto make_part = [&](std::string_view name) {
-            return create_body_part(
-                assets_.get_entity("m_human", name), assets_.get_model("m_human", name), player_ent
-            );
-        };
-
-        body_       = make_part("body");
-        head_       = make_part("head");
-        hand_right_ = make_part("hand_right");
-        hand_left_  = make_part("hand_left");
-        foot_right_ = make_part("foot_right");
-        foot_left_  = make_part("foot_left");
+        body_       = create_body_part("m_human", "body");
+        head_       = create_body_part("m_human", "head");
+        hand_right_ = create_body_part("m_human", "hand_right");
+        hand_left_  = create_body_part("m_human", "hand_left");
+        foot_right_ = create_body_part("m_human", "foot_right");
+        foot_left_  = create_body_part("m_human", "foot_left");
 
         setup_animation_fsm(player_ent);
     }
 
     void setup_animation_fsm(
         gfx::entity player_ent
-    ) {
+    ) const {
         auto& world = get_engine().get_world();
         auto& rb    = world.get_component<gfx::rigid_body_component>(player_ent);
         auto& move  = world.get_component<gfx::movement_intent_component>(player_ent);
@@ -397,16 +391,16 @@ private:
 
     void render_ui() const {
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImVec2 window_pos             = ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
+        const auto window_pos         = ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
         ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.0f, 0.0f));
 
-        ImGuiWindowFlags window_flags =          //
-            ImGuiWindowFlags_NoCollapse |        //
-            ImGuiWindowFlags_NoResize |          //
-            ImGuiWindowFlags_NoScrollbar |       //
-            ImGuiWindowFlags_AlwaysAutoResize |  //
-            ImGuiWindowFlags_NoSavedSettings |   //
-            ImGuiWindowFlags_NoNav |             //
+        constexpr ImGuiWindowFlags window_flags =  //
+            ImGuiWindowFlags_NoCollapse |          //
+            ImGuiWindowFlags_NoResize |            //
+            ImGuiWindowFlags_NoScrollbar |         //
+            ImGuiWindowFlags_AlwaysAutoResize |    //
+            ImGuiWindowFlags_NoSavedSettings |     //
+            ImGuiWindowFlags_NoNav |               //
             ImGuiWindowFlags_NoFocusOnAppearing;
 
         ImGui::Begin("Player Controller Test", nullptr, window_flags);
@@ -512,7 +506,7 @@ private:
 
     void handle_mouse_press(
         gfx::mouse::buttons button
-    ) {
+    ) const {
         switch (button) {
             case gfx::mouse::buttons::LEFT:
                 if (player_ && sword_) {
