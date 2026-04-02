@@ -16,6 +16,7 @@ public:
     clip_service(engine_type& eng, app_state& state, operation_manager& op_manager);
 
     auto save_clip(const std::string& clip_name) const -> bool;
+    auto save_clip_as(const std::string& clip_name, const std::string& new_name) const -> bool;
     void save_all_clips() const;
     auto load_clip(const std::string& filename) const -> bool;
     void close_clip(const std::string& clip_name) const;

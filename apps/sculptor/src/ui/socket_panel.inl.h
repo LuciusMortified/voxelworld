@@ -6,6 +6,7 @@
 #include <filesystem>
 
 #include "vw/gfx/world/serializers/vox_deserializer.h"
+#include "vw/gfx/world/serializers/vox_parser_plain.h"
 
 namespace vw::sculptor {
 
@@ -337,7 +338,8 @@ inline void socket_panel::load_preview_(
 
     namespace fs = std::filesystem;
 
-    gfx::vox_deserializer deserializer{engine_->get_world(), engine_->get_block_registry()};
+    gfx::vox_parser_plain parser{engine_->get_block_registry()};
+    gfx::vox_deserializer deserializer{engine_->get_world(), parser};
     const fs::path filepath = fs::path{app_state::asset_dir_name} / fs::path{filename};
 
     const gfx::vox_deserializer<>::options opts{

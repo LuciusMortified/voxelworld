@@ -164,6 +164,8 @@ void engine<WC>::render(
     renderer_->end_frame();
     auto r4 = clock::now();
 
+    world_->clear_changed();
+
     stats_.begin_frame_ms  = ms(r0, r1);
     stats_.app_render_ms   = ms(r1, r2);
     stats_.renderer_ms     = ms(r2, r3);

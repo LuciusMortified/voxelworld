@@ -42,6 +42,7 @@ struct animation_layer {
     std::unordered_set<std::string> mask;
 
     [[nodiscard]] auto is_active() const -> bool;
+    [[nodiscard]] auto is_blending() const -> bool;
     [[nodiscard]] auto affects_target(const std::string& name) const -> bool;
 };
 

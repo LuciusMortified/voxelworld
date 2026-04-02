@@ -37,6 +37,47 @@ inline auto clip_service::save_clip(
     return result.has_value();
 }
 
+inline auto clip_service::save_clip_as(
+    const std::string& clip_name, const std::string& new_name
+) const -> bool {
+    namespace fs = std::filesystem;
+
+    auto& registry = engine_->get_world().get_animation_clip_registry();
+    auto clip      = registry.get(clip_name);
+    if (!clip) {
+        return false;
+    }
+
+    const auto old_name = clip->get_name();
+    registry.remove(old_name);
+    clip->set_name(new_name);
+    registry.add(new_name, clip);
+
+    const fs::path asset_dir_path{app_state::asset_dir_name};
+    const fs::path filepath = asset_dir_path / std::format("{}.voxa", new_name);
+    gfx::voxa_serializer serializer(*clip);
+    const auto result = serializer.serialize(filepath);
+
+    state_->anim.unsaved_clips.erase(old_name);
+    state_->anim.unsaved_clips[new_name] = !result.has_value();
+
+    if (state_->anim.clip_to_layer.contains(old_name)) {
+        state_->anim.clip_to_layer[new_name] = state_->anim.clip_to_layer[old_name];
+        state_->anim.clip_to_layer.erase(old_name);
+    }
+
+    if (state_->anim.clip_settings_map.contains(old_name)) {
+        state_->anim.clip_settings_map[new_name] = state_->anim.clip_settings_map[old_name];
+        state_->anim.clip_settings_map.erase(old_name);
+    }
+
+    if (state_->anim.selected_clip_name == old_name) {
+        state_->anim.selected_clip_name = new_name;
+    }
+
+    return result.has_value();
+}
+
 inline void clip_service::save_all_clips() const {
     namespace fs = std::filesystem;
 

@@ -8,6 +8,7 @@
 #include "app/app_state.h"
 #include "create_clip_modal.h"
 #include "layer_blend_modal.h"
+#include "save_clip_as_modal.h"
 #include "operations/operation_manager.h"
 #include "services/clip_service.h"
 
@@ -34,6 +35,7 @@ private:
 
     create_clip_modal create_modal_;
     layer_blend_modal layer_blend_modal_;
+    save_clip_as_modal save_clip_as_modal_;
 
     bool need_load_popup_          = false;
     bool need_close_confirm_popup_ = false;

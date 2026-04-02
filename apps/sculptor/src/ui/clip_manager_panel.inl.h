@@ -16,7 +16,8 @@ inline clip_manager_panel::clip_manager_panel(
     , op_manager_(&op_manager)
     , clip_service_(&clip_svc)
     , create_modal_(eng, st, op_manager)
-    , layer_blend_modal_(st) {}
+    , layer_blend_modal_(st)
+    , save_clip_as_modal_(eng, st, clip_svc) {}
 
 inline void clip_manager_panel::render(
     float delta_time
@@ -94,6 +95,13 @@ inline void clip_manager_panel::render(
 
     ImGui::SameLine();
     ImGui::BeginDisabled(!has_selected);
+    if (ImGui::Button("Save As")) {
+        save_clip_as_modal_.open();
+    }
+    ImGui::EndDisabled();
+
+    ImGui::SameLine();
+    ImGui::BeginDisabled(!has_selected);
     if (ImGui::Button("Close")) {
         if (state_->anim.has_unsaved_clip(state_->anim.selected_clip_name)) {
             need_close_confirm_popup_ = true;
@@ -102,13 +110,6 @@ inline void clip_manager_panel::render(
         }
     }
     ImGui::EndDisabled();
-
-    if (state_->anim.animation_mode) {
-        ImGui::SameLine();
-        if (ImGui::Button("Reset All")) {
-            clip_service_->reset_all();
-        }
-    }
 
     if (need_close_confirm_popup_) {
         ImGui::OpenPopup("Close Animation?");
@@ -197,10 +198,18 @@ inline void clip_manager_panel::render(
                 layer_blend_modal_.open();
             }
         }
+
+        if (state_->anim.animation_mode) {
+            ImGui::Spacing();
+            if (ImGui::Button("Reset All")) {
+                clip_service_->reset_all();
+            }
+        }
     }
 
     create_modal_.render(delta_time);
     layer_blend_modal_.render(delta_time);
+    save_clip_as_modal_.render(delta_time);
 
     ImGui::Dummy({200.0f, 0.0f});
 

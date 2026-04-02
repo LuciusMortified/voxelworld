@@ -27,6 +27,7 @@ public:
     void remove_track(std::string_view target_name);
     [[nodiscard]] auto get_duration() const -> float32;
     [[nodiscard]] auto get_name() const -> const std::string&;
+    void set_name(std::string name);
     [[nodiscard]] auto get_target_names() const -> std::unordered_set<std::string>;
 
 private:

@@ -76,6 +76,10 @@ inline auto animation_clip::get_name() const -> const std::string& {
     return name_;
 }
 
+inline void animation_clip::set_name(std::string name) {
+    name_ = std::move(name);
+}
+
 inline auto animation_clip::get_target_names() const -> std::unordered_set<std::string> {
     std::unordered_set<std::string> names;
     for (const auto& track : tracks_) {

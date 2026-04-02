@@ -409,17 +409,25 @@ auto animation_system<WC>::modify_player(
 }
 
 template <typename WC>
-auto animation_system<WC>::player_modifier::layer(
+void animation_system<WC>::player_modifier::add_layer(
     size_t index
-) -> layer_modifier {
+) const {
     if (index >= component_->layers_.size()) {
         component_->layers_.resize(index + 1);
     }
+}
+
+
+template <typename WC>
+auto animation_system<WC>::player_modifier::layer(
+    size_t index
+) -> layer_modifier {
+    add_layer(index);
     return layer_modifier(system_, entity_, &component_->layers_[index]);
 }
 
 template <typename WC>
-void animation_system<WC>::player_modifier::apply_pose() {
+void animation_system<WC>::player_modifier::apply_pose() const {
     if (!system_->get_cached_target_map(entity_)) {
         system_->build_and_cache_target_map(entity_);
     }
@@ -427,7 +435,7 @@ void animation_system<WC>::player_modifier::apply_pose() {
 }
 
 template <typename WC>
-void animation_system<WC>::player_modifier::rebuild_target_map() {
+void animation_system<WC>::player_modifier::rebuild_target_map() const {
     system_->build_and_cache_target_map(entity_);
 }
 

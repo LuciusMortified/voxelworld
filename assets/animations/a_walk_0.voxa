@@ -1,0 +1,100 @@
+# Voxa File Version 1.0
+clip a_walk_0
+
+track body 60
+  channel origin
+    k 0 -7.5 -6.5 -5.5 linear 0 1
+  channel position
+    k 0 0 1 0 linear 0 1
+  channel rotation
+    k 0 0.0610485 0 0 0.998135 linear 0 1
+    k 0.2 0.0828082 0 0 0.996566 linear 0 1
+    k 0.4 0.0610485 0 0 0.998135 linear 0 1
+    k 0.6 0.0828082 0 0 0.996566 linear 0 1
+    k 0.8 0.0610485 0 0 0.998135 linear 0 1
+  channel scale
+    k 0 1 1 1 linear 0 1
+    k 0.2 1.02 1.02 1.02 linear 0 1
+    k 0.4 1 1 1 linear 0 1
+    k 0.6 1.02 1.02 1.02 linear 0 1
+    k 0.8 1 1 1 linear 0 1
+
+track hand_left 60
+  channel origin
+    k 0 -2.5 -3.5 -2.5 linear 0 1
+  channel rotation
+    k 0 -0.766044 0 0 0.642788 linear 0 1
+    k 0.2 -0.707107 0 0 0.707107 linear 0 1
+    k 0.4 -0.642788 0 0 0.766044 linear 0 1
+    k 0.6 -0.707107 0 0 0.707107 linear 0 1
+    k 0.8 -0.766044 0 0 0.642788 linear 0 1
+  channel position
+    k 0 -10 3.5 5.5 linear 0 1
+    k 0.2 -10 2 0 linear 0 1
+    k 0.4 -10 3.5 -5.5 linear 0 1
+    k 0.6 -10 2 0 linear 0 1
+    k 0.8 -10 3.5 5.5 linear 0 1
+
+track hand_right 60
+  channel position
+    k 0 10 3.5 -5.5 linear 0 1
+    k 0.2 10 2 0 linear 0 1
+    k 0.4 10 3.5 5.5 linear 0 1
+    k 0.6 10 2 0 linear 0 1
+    k 0.8 10 3.5 -5.5 linear 0 1
+  channel origin
+    k 0 -2.5 -3.5 -2.5 linear 0 1
+  channel rotation
+    k 0 -0.642788 0 0 0.766044 linear 0 1
+    k 0.2 -0.707107 0 0 0.707107 linear 0 1
+    k 0.4 -0.766044 0 0 0.642788 linear 0 1
+    k 0.6 -0.707107 0 0 0.707107 linear 0 1
+    k 0.8 -0.642788 0 0 0.766044 linear 0 1
+
+track head 60
+  channel origin
+    k 0 -6.5 -5.5 -7.5 linear 0 1
+  channel position
+    k 0 0 12.5 1.5 linear 0 1
+    k 0.2 0 12 1.5 linear 0 1
+    k 0.4 0 12.5 1.5 linear 0 1
+    k 0.6 0 12 1.5 linear 0 1
+    k 0.8 0 12.5 1.5 linear 0 1
+  channel rotation
+    k 0 0 0 0 1 linear 0 1
+    k 0.2 0.0174524 0 0 0.999848 linear 0 1
+    k 0.4 0 0 0 1 linear 0 1
+    k 0.6 0.0174524 0 0 0.999848 linear 0 1
+    k 0.8 0 0 0 1 linear 0 1
+
+track foot_left 60
+  channel origin
+    k 0 -3.5 -4.5 -5.5 linear 0 1
+  channel position
+    k 0 -5 -8 -5 linear 0 1
+    k 0.2 -5 -9 0 linear 0 1
+    k 0.4 -5 -7 6.5 linear 0 1
+    k 0.6 -5 -9 0 linear 0 1
+    k 0.8 -5 -8 -5 linear 0 1
+  channel rotation
+    k 0 0.258819 0 0 0.965926 linear 0 1
+    k 0.2 0 0 0 1 linear 0 1
+    k 0.4 -0.258819 0 0 0.965926 linear 0 1
+    k 0.6 0 0 0 1 linear 0 1
+    k 0.8 0.258819 0 0 0.965926 linear 0 1
+
+track foot_right 60
+  channel position
+    k 0 5 -7 6.5 linear 0 1
+    k 0.2 5 -9 0 linear 0 1
+    k 0.4 5 -8 -5 linear 0 1
+    k 0.6 5 -9 0 linear 0 1
+    k 0.8 5 -7 6.5 linear 0 1
+  channel rotation
+    k 0 -0.258819 0 0 0.965926 linear 0 1
+    k 0.2 0 0 0 1 linear 0 1
+    k 0.4 0.258819 0 0 0.965926 linear 0 1
+    k 0.6 0 0 0 1 linear 0 1
+    k 0.8 -0.258819 0 0 0.965926 linear 0 1
+  channel origin
+    k 0 -3.5 -4.5 -5.5 linear 0 1

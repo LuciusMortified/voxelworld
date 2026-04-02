@@ -38,10 +38,20 @@ function(vw_setup_shaders TARGET)
 
     add_custom_command(TARGET ${TARGET} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${TARGET}>/shaders
-            COMMAND ${CMAKE_COMMAND} -E copy_directory ${VW_SHADERS_SRC_DIR} $<TARGET_FILE_DIR:${TARGET}>/shaders
-            COMMAND ${CMAKE_COMMAND} -E copy_directory ${VW_SHADERS_BIN_DIR} $<TARGET_FILE_DIR:${TARGET}>/shaders
-            COMMENT "Copying shaders to ${TARGET} build directory"
+            VERBATIM
     )
+
+    file(GLOB SHADER_SPVS CONFIGURE_DEPENDS ${VW_SHADERS_BIN_DIR}/*.spv)
+    set(ALL_SHADERS ${SHADER_SPVS})
+
+    foreach(SHADER ${ALL_SHADERS})
+        get_filename_component(SHADER_NAME ${SHADER} NAME)
+        add_custom_command(TARGET ${TARGET} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E echo "Copying shader ${SHADER_NAME}"
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SHADER} $<TARGET_FILE_DIR:${TARGET}>/shaders/${SHADER_NAME}
+                VERBATIM
+        )
+    endforeach()
 
     add_dependencies(${TARGET} vw_compile_shaders)
 endfunction()

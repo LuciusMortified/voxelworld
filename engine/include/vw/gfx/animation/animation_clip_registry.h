@@ -16,20 +16,17 @@ namespace vw::gfx {
 struct string_hash {
     using is_transparent = void;
 
-    [[nodiscard]] auto operator()(std::string_view sv) const noexcept -> size_t {
+    [[nodiscard]] auto operator()(
+        std::string_view sv
+    ) const noexcept -> size_t {
         return std::hash<std::string_view>{}(sv);
     }
 };
 
-// Реестр анимационных клипов
-// Хранит и управляет всеми анимационными клипами в движке
-// Аналог model_registry для анимаций
 class animation_clip_registry final {
 public:
-    using map_type = std::unordered_map<std::string, std::shared_ptr<animation_clip>,
-                                        string_hash, std::equal_to<>>;
-
-    animation_clip_registry() = default;
+    using map_type = std::
+        unordered_map<std::string, std::shared_ptr<animation_clip>, string_hash, std::equal_to<>>;
 
     [[nodiscard]] auto create(std::string_view name) -> std::shared_ptr<animation_clip>;
     void add(std::string_view name, std::shared_ptr<animation_clip> clip);
