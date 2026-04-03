@@ -206,7 +206,7 @@ private:
     void recreate_swapchain();
 
     [[nodiscard]]
-    auto get_max_usable_sample_count() -> VkSampleCountFlagBits;
+    auto get_max_usable_sample_count() const -> VkSampleCountFlagBits;
 
     void create_point_lights_descriptor_set_layout();
     void cleanup_point_lights_resources();

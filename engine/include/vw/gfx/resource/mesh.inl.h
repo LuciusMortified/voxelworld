@@ -8,17 +8,23 @@ namespace vw::gfx {
 // ==================== vertex ====================
 
 inline auto vertex::pack(
-    int x, int y, int z, uint8 normal_id, uint8 ao, block_id block_id
+    int x, int y, int z, uint8 normal_id, block_id block_id,
+    const std::array<uint8, 4>& ao_quad, uint8 corner
 ) -> vertex {
     vertex v;
-    v.data0 =                                              //
-        (static_cast<uint32>(x) & 0x7Fu) |                 //
-        ((static_cast<uint32>(y) & 0x7Fu) << 7) |          //
-        ((static_cast<uint32>(z) & 0x7Fu) << 14) |         //
-        ((static_cast<uint32>(normal_id) & 0x7u) << 21) |  //
-        ((static_cast<uint32>(ao) & 0x3u) << 24);
+    v.data0 =
+        (static_cast<uint32>(x) & 0x7Fu) |
+        ((static_cast<uint32>(y) & 0x7Fu) << 7) |
+        ((static_cast<uint32>(z) & 0x7Fu) << 14) |
+        ((static_cast<uint32>(normal_id) & 0x7u) << 21);
 
-    v.data1 = static_cast<uint32>(block_id.value);
+    v.data1 =
+        static_cast<uint32>(block_id.value) |
+        ((static_cast<uint32>(ao_quad[0]) & 0x3u) << 8) |
+        ((static_cast<uint32>(ao_quad[1]) & 0x3u) << 10) |
+        ((static_cast<uint32>(ao_quad[2]) & 0x3u) << 12) |
+        ((static_cast<uint32>(ao_quad[3]) & 0x3u) << 14) |
+        ((static_cast<uint32>(corner) & 0x3u) << 16);
 
     return v;
 }
@@ -340,6 +346,20 @@ inline void add_quad(
         {{1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 0}},  // -Z
     };
 
+    static constexpr uint8 winding_to_corner[6][4] = {
+        {0, 1, 3, 2},  // +X
+        {0, 2, 3, 1},  // -X
+        {0, 1, 3, 2},  // +Y
+        {0, 2, 3, 1},  // -Y
+        {0, 2, 3, 1},  // +Z
+        {1, 3, 2, 0},  // -Z
+    };
+
+    std::array<uint8, 4> canonical_ao;
+    for (int k = 0; k < 4; k++) {
+        canonical_ao[canonical_to_winding[face_direction][k]] = ao[k];
+    }
+
     const auto normal_id   = static_cast<uint8>(face_direction);
     const auto base_vertex = static_cast<uint32>(vertices.size());
 
@@ -347,7 +367,10 @@ inline void add_quad(
         int x = face_verts[face_direction][i][0] ? max_pos.x : min_pos.x;
         int y = face_verts[face_direction][i][1] ? max_pos.y : min_pos.y;
         int z = face_verts[face_direction][i][2] ? max_pos.z : min_pos.z;
-        vertices.push_back(vertex::pack(x, y, z, normal_id, ao[i], block_id));
+        vertices.push_back(vertex::pack(
+            x, y, z, normal_id, block_id,
+            canonical_ao, winding_to_corner[face_direction][i]
+        ));
     }
 
     if (ao[0] + ao[2] > ao[1] + ao[3]) {

@@ -143,7 +143,7 @@ inline void mesh_pool::process_completed() {
         sweep_counter_ = 0;
     }
 
-    constexpr uint32 max_meshes_per_frame = 8;
+    constexpr uint32 max_meshes_per_frame = 4;
     uint32 completed = 0;
 
     for (auto iter = pending_meshes_.begin();

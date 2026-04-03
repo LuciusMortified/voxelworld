@@ -108,7 +108,7 @@ private:
         assets_.load_clip("a_walk", "assets/animations/a_walk_0.voxa");
         assets_.load_clip("a_jump_left", "assets/animations/a_jump_left_1.voxa");
         assets_.load_clip("a_jump_right", "assets/animations/a_jump_right_1.voxa");
-        assets_.load_clip("a_sword_attack", "assets/animations/a_sword_attack_2.voxa");
+        assets_.load_clip("a_sword_attack", "assets/animations/a_sword_attack_3.voxa");
     }
 
     [[nodiscard]] auto create_body_part(

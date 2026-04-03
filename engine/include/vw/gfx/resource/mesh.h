@@ -20,13 +20,17 @@ struct vertex {
     uint32 data0 = 0;
     uint32 data1 = 0;
 
-    // data0: pos.x[6:0] | pos.y[13:7] | pos.z[20:14] | normal_id[23:21] | ao[25:24] |
-    // reserved[31:26] data1: palette_index[7:0] | reserved[31:8]
+    // data0: pos.x[6:0] | pos.y[13:7] | pos.z[20:14] | normal_id[23:21] | reserved[31:24]
+    // data1: palette_index[7:0] | ao_c0[9:8] | ao_c1[11:10] | ao_c2[13:12] | ao_c3[15:14] |
+    //        corner[17:16] | reserved[31:18]
+    // ao_c0..c3: AO at canonical corners (0,0),(1,0),(1,1),(0,1)
+    // corner: encoded corner of this vertex (bit0=u, bit1=v)
 
     vertex() = default;
 
     [[nodiscard]] static auto pack(
-        int x, int y, int z, uint8 normal_id, uint8 ao, block_id block_id
+        int x, int y, int z, uint8 normal_id, block_id block_id,
+        const std::array<uint8, 4>& ao_quad, uint8 corner
     ) -> vertex;
 
     [[nodiscard]] static auto get_binding_descriptions()
