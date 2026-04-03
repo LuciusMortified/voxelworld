@@ -27,8 +27,15 @@ inline mesh_pool::mesh_pool(
 }
 
 inline mesh_pool::~mesh_pool() {
+    stop_gen_threads();
+}
+
+inline void mesh_pool::stop_gen_threads() {
     {
         std::scoped_lock lock(gen_mutex_);
+        if (!gen_running_) {
+            return;
+        }
         gen_running_ = false;
     }
     gen_cv_.notify_all();

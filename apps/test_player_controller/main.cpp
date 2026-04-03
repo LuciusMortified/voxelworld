@@ -278,13 +278,11 @@ private:
                         .target_state     = "jump_left",
                         .condition        = is_jump_left,
                         .blend            = blend_fast,
-                        .wait_until_blend = false,
                     },
                     {
                         .target_state     = "jump_right",
                         .condition        = is_jump_right,
                         .blend            = blend_fast,
-                        .wait_until_blend = false,
                     },
                 },
         });

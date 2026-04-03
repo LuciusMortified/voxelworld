@@ -68,7 +68,8 @@ public:
     using world_grid_system_type           = world_grid_system<WC>;
 
     explicit world(vulkan_context& context, const block_registry& registry);
-    ~world()                               = default;
+    ~world();
+
     world(const world&)                    = delete;
     auto operator=(const world&) -> world& = delete;
     world(world&&)                         = delete;

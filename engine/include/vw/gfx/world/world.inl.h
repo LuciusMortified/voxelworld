@@ -8,6 +8,12 @@
 namespace vw::gfx {
 
 template <typename Cs>
+world<Cs>::~world() {
+    mesh_pool_.stop_gen_threads();
+    context_.world_grid_.reset();
+}
+
+template <typename Cs>
 world<Cs>::world(
     vulkan_context& context, const block_registry& registry
 )
@@ -29,15 +35,16 @@ template <typename Cs>
 void world<Cs>::update(
     float32 delta_time
 ) {
-    update_stats_.character_controller_ms    = measure_ms([&] { character_controller_system_.update(delta_time); });
+    update_stats_.character_controller_ms =
+        measure_ms([&] { character_controller_system_.update(delta_time); });
     update_stats_.animation_fsm_ms = measure_ms([&] { animation_fsm_system_.update(); });
-    update_stats_.physics_ms                 = measure_ms([&] { physics_system_.update(delta_time); });
-    update_stats_.transform_ms            = measure_ms([&] { transform_system_.update(); });
-    update_stats_.model_ms                = measure_ms([&] { model_system_.update(); });
-    update_stats_.spatial_ms              = measure_ms([&] { spatial_system_.update(); });
-    update_stats_.light_ms                = measure_ms([&] { light_system_.update(); });
-    update_stats_.world_grid_ms           = measure_ms([&] { world_grid_system_.update(); });
-    update_stats_.animation_ms            = measure_ms([&] { animation_system_.update(delta_time); });
+    update_stats_.physics_ms       = measure_ms([&] { physics_system_.update(delta_time); });
+    update_stats_.transform_ms     = measure_ms([&] { transform_system_.update(); });
+    update_stats_.model_ms         = measure_ms([&] { model_system_.update(); });
+    update_stats_.spatial_ms       = measure_ms([&] { spatial_system_.update(); });
+    update_stats_.light_ms         = measure_ms([&] { light_system_.update(); });
+    update_stats_.world_grid_ms    = measure_ms([&] { world_grid_system_.update(); });
+    update_stats_.animation_ms     = measure_ms([&] { animation_system_.update(delta_time); });
 }
 
 template <typename Cs>
@@ -146,7 +153,9 @@ auto world<C>::get_animation_clip_registry() -> animation_clip_registry& {
 }
 
 template <typename C>
-void world<C>::set_world_grid(std::shared_ptr<world_grid<C>> grid) {
+void world<C>::set_world_grid(
+    std::shared_ptr<world_grid<C>> grid
+) {
     context_.world_grid_ = std::move(grid);
 }
 

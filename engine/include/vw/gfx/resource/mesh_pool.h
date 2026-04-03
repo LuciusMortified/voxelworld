@@ -42,6 +42,7 @@ public:
     mesh_pool(mesh_pool&&)                         = delete;
     auto operator=(mesh_pool&&) -> mesh_pool&      = delete;
 
+    void stop_gen_threads();
     [[nodiscard]] auto has(const model_identity& identity) const -> bool;
     [[nodiscard]] auto is_pending(const model_identity& identity) const -> bool;
     void request_mesh(const std::shared_ptr<model>& model_ptr);
