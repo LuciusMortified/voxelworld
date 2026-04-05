@@ -127,7 +127,7 @@ private:
         guard->with<gfx::model_component>();
         guard->with<gfx::animation_target_component>();
 
-        auto& ent_data = assets_.get_entity(prefab_name, part_name);
+        const auto& ent_data = assets_.get_entity(prefab_name, part_name);
         if (ent_data.has_sockets) {
             guard->with<gfx::socket_component>();
         }
