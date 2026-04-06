@@ -10,6 +10,7 @@
 #include "tools/color_picker_tool.h"
 #include "tools/paint_tool.h"
 #include "tools/remove_voxel_tool.h"
+#include "tools/select_entity_tool.h"
 
 namespace vw::sculptor {
 
@@ -43,10 +44,11 @@ inline app::app(
     auto& camera   = eng.get_camera();
     auto& renderer = eng.get_renderer();
 
-    tools_[tools::add_voxel]    = std::make_unique<add_voxel_tool>(eng, state_, op_manager_);
-    tools_[tools::remove_voxel] = std::make_unique<remove_voxel_tool>(eng, state_, op_manager_);
-    tools_[tools::paint_voxel]  = std::make_unique<paint_tool>(eng, state_, op_manager_);
-    tools_[tools::color_picker] = std::make_unique<color_picker_tool>(eng, state_, op_manager_);
+    tools_[tools::select_entity] = std::make_unique<select_entity_tool>(eng, state_);
+    tools_[tools::add_voxel]     = std::make_unique<add_voxel_tool>(eng, state_, op_manager_);
+    tools_[tools::remove_voxel]  = std::make_unique<remove_voxel_tool>(eng, state_, op_manager_);
+    tools_[tools::paint_voxel]   = std::make_unique<paint_tool>(eng, state_, op_manager_);
+    tools_[tools::color_picker]  = std::make_unique<color_picker_tool>(eng, state_, op_manager_);
 
     camera_controller_.setup(window, camera);
     camera_controller_.set_camera_speed(20.f);
@@ -195,6 +197,9 @@ inline void app::handle_key_press(
         op_manager_.redo();
     }
 
+    if (ev.key == keys::KEY_0) {
+        state_.tool.selected_tool = tools::select_entity;
+    }
     if (ev.key == keys::KEY_1) {
         state_.tool.selected_tool = tools::add_voxel;
     }

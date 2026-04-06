@@ -18,6 +18,7 @@ using entity_guard_type = gfx::entity_guard<>;
 
 enum class tools : uint8 {
     invalid,
+    select_entity,
     add_voxel,
     remove_voxel,
     paint_voxel,

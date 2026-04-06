@@ -30,7 +30,7 @@ private:
     app_state* state_;
     operation_manager* op_manager_;
 
-    std::unordered_set<gfx::entity> ray_cast_entities_;
+    std::vector<gfx::entity> ray_cast_entities_;
     vec3i hovered_voxel_ = vec3i{-1, -1, -1};
 };
 

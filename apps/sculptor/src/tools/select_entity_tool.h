@@ -1,21 +1,20 @@
 #pragma once
 
-#ifndef VW_SCULPTOR_ADD_VOXEL_TOOL_H
-#define VW_SCULPTOR_ADD_VOXEL_TOOL_H
+#ifndef VW_SCULPTOR_SELECT_ENTITY_TOOL_H
+#define VW_SCULPTOR_SELECT_ENTITY_TOOL_H
 
 #include <vw/gfx/engine/engine.h>
 
 #include "app/app_state.h"
 #include "base_tool.h"
-#include "operations/operation_manager.h"
 
 namespace vw::sculptor {
 
-class add_voxel_tool final : public base_tool {
+class select_entity_tool final : public base_tool {
 public:
     using engine_type = gfx::engine<>;
 
-    add_voxel_tool(engine_type& eng, app_state& st, operation_manager& op_manager);
+    select_entity_tool(engine_type& eng, app_state& st);
 
     void render(float delta_time) override;
     void on_key_press(const gfx::key_press_event& ev) override;
@@ -25,18 +24,18 @@ public:
     void on_activate() override;
 
 private:
-    void update_hovered_voxel_();
+    void update_hovered_entity_();
+    void draw_entity_box_(gfx::entity ent, color col);
 
     engine_type* engine_;
     app_state* state_;
-    operation_manager* op_manager_;
 
     std::vector<gfx::entity> ray_cast_entities_;
-    vec3i hovered_voxel_ = vec3i{-1, -1, -1};
+    gfx::entity hovered_entity_;
 };
 
 }  // namespace vw::sculptor
 
-#include "add_voxel_tool.inl.h"
+#include "select_entity_tool.inl.h"
 
-#endif  // VW_SCULPTOR_ADD_VOXEL_TOOL_H
+#endif  // VW_SCULPTOR_SELECT_ENTITY_TOOL_H
