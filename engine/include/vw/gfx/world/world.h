@@ -11,6 +11,7 @@
 #include "vw/gfx/resource/mesh_pool.h"
 #include "vw/gfx/spatial/ray.h"
 #include "vw/gfx/world/entity_registry.h"
+#include "vw/gfx/world/systems/animation_fsm_system.h"
 #include "vw/gfx/world/systems/animation_system.h"
 #include "vw/gfx/world/systems/character_controller_system.h"
 #include "vw/gfx/world/systems/hierarchy_system.h"
@@ -34,7 +35,8 @@ struct world_update_stats {
     float32 spatial_ms              = 0.0f;
     float32 light_ms                = 0.0f;
     float32 world_grid_ms           = 0.0f;
-    float32 animation_ms            = 0.0f;
+    float32 animation_fsm_ms = 0.0f;
+    float32 animation_ms               = 0.0f;
 };
 
 template <typename WC>
@@ -59,13 +61,15 @@ public:
     using spatial_system_type              = spatial_system<WC>;
     using light_system_type                = light_system<WC>;
     using socket_system_type               = socket_system<WC>;
-    using animation_system_type            = animation_system<WC>;
-    using character_controller_system_type = character_controller_system<WC>;
+    using animation_system_type                = animation_system<WC>;
+    using animation_fsm_system_type = animation_fsm_system<WC>;
+    using character_controller_system_type     = character_controller_system<WC>;
     using physics_system_type              = physics_system<WC>;
     using world_grid_system_type           = world_grid_system<WC>;
 
     explicit world(vulkan_context& context, const block_registry& registry);
-    ~world()                               = default;
+    ~world();
+
     world(const world&)                    = delete;
     auto operator=(const world&) -> world& = delete;
     world(world&&)                         = delete;
@@ -78,6 +82,9 @@ public:
 
     template <typename T>
     [[nodiscard]] auto get_component(entity ent) -> T&;
+
+    template <typename T>
+    [[nodiscard]] auto get_component(entity ent) const -> const T&;
 
     [[nodiscard]] auto get_mesh_pool() const -> const mesh_pool&;
     [[nodiscard]] auto get_mesh_pool() -> mesh_pool&;
@@ -101,6 +108,10 @@ public:
 
     [[nodiscard]] auto get_animation_system() -> animation_system_type&;
 
+    [[nodiscard]] auto get_animation_fsm_system() -> animation_fsm_system_type&;
+
+    [[nodiscard]] auto get_animation_fsm_system() const -> const animation_fsm_system_type&;
+
     [[nodiscard]] auto get_animation_clip_registry() -> animation_clip_registry&;
 
     void set_world_grid(std::shared_ptr<world_grid<WC>> grid);
@@ -123,6 +134,8 @@ public:
     [[nodiscard]] auto destroyed() const -> const std::vector<entity>&;
 
     [[nodiscard]] auto get_update_stats() const -> const world_update_stats&;
+
+    void clear_changed();
 
 private:
     template <typename T>
@@ -149,6 +162,7 @@ private:
     socket_system_type socket_system_;
     animation_clip_registry animation_clip_registry_;
     animation_system_type animation_system_;
+    animation_fsm_system_type animation_fsm_system_;
     character_controller_system_type character_controller_system_;
     physics_system_type physics_system_;
     world_grid_system_type world_grid_system_;

@@ -5,14 +5,12 @@
 
 #include <expected>
 #include <filesystem>
-#include <string_view>
 #include <unordered_set>
 
+#include "vw/gfx/world/serializers/vox_writer.h"
 #include "vw/gfx/world/world.h"
 
 namespace vw::gfx {
-
-inline constexpr std::string_view vox_file_version = "1.0";
 
 template <typename WC = base_world_components>
 class vox_serializer final {
@@ -20,24 +18,25 @@ public:
     using world_type        = world<WC>;
     using entity_names_type = std::unordered_map<entity, std::string>;
 
-    enum class error_type : uint8 { file_open_failed, write_failed };
+    using error_type = vox_writer::error_type;
 
     struct options {
         std::optional<entity_names_type> entity_names;
         std::unordered_set<entity> excluded;
     };
 
-    vox_serializer(world_type& world, entity root, options opts = {});
+    vox_serializer(world_type& world, vox_writer& writer, entity root, options opts = {});
 
     auto serialize(const std::filesystem::path& filepath) -> std::expected<void, error_type>;
 
+    [[nodiscard]] auto extract() const -> vox_prefab_data;
+
 private:
     void generate_entity_names_();
-    void write_header_(std::ofstream& file);
-    void write_entity_(std::ofstream& file, entity ent);
-    void write_model_(std::ofstream& file, entity ent);
+    [[nodiscard]] auto extract_entity_(entity ent) const -> vox_entity_data;
 
     world_type* world_;
+    vox_writer* writer_;
     entity root_;
     entity_names_type entity_names_;
     std::unordered_set<entity> excluded_;

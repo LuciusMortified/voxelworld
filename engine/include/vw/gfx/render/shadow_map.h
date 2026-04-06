@@ -68,7 +68,7 @@ private:
 
     uint32 size_;
     float split_lambda_ = 0.5f;
-    float shadow_far_   = 500.f;
+    float shadow_far_   = 1000.f;
 };
 
 }  // namespace vw::gfx

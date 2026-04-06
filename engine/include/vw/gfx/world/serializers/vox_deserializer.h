@@ -4,8 +4,8 @@
 #define VW_GFX_VOX_DESERIALIZER_H
 #include <expected>
 #include <filesystem>
-#include <optional>
 
+#include "vw/gfx/world/serializers/vox_parser.h"
 #include "vw/gfx/world/world.h"
 
 namespace vw::gfx {
@@ -15,7 +15,7 @@ public:
     using world_type        = world<WC>;
     using entity_guard_type = entity_guard<WC>;
 
-    enum class error_type : uint8 { file_open_failed, parse_error };
+    using error_type = vox_parser::error_type;
 
     struct options {
         bool skip_sockets = false;
@@ -29,32 +29,16 @@ public:
         std::vector<std::unique_ptr<entity_guard_type>> entities;
     };
 
-    vox_deserializer(world_type& world, const block_registry& block_registry);
+    vox_deserializer(world_type& world, vox_parser& parser);
 
     auto deserialize(const std::filesystem::path& filepath, const options& opts = {})
         -> std::expected<result, error_type>;
 
 private:
-    void process_root_(std::istringstream& iss);
-    void process_entity_(std::istringstream& iss);
-    void process_parent_(std::istringstream& iss);
-    void process_transform_(std::istringstream& iss);
-    void process_target_(std::istringstream& iss);
-    void process_sockets_();
-    void process_socket_(std::istringstream& iss);
-    void process_model_(std::istringstream& iss);
-    void process_voxel_(std::istringstream& iss);
+    void apply_entity_(const vox_entity_data& data, result& res, const options& opts);
 
     world_type* world_;
-    const block_registry* block_registry_;
-    options options_;
-
-    result result_;
-    std::optional<error_type> error_;
-
-    entity current_entity_ = invalid_entity;
-    std::unique_ptr<entity_guard_type> current_entity_guard_;
-    std::shared_ptr<model> current_model_;
+    vox_parser* parser_;
 };
 
 }  // namespace vw::gfx

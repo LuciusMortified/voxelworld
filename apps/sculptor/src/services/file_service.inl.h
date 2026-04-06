@@ -6,6 +6,7 @@
 #include <filesystem>
 
 #include "vw/gfx/world/serializers/vox_serializer.h"
+#include "vw/gfx/world/serializers/vox_writer_plain.h"
 
 namespace vw::sculptor {
 
@@ -20,8 +21,10 @@ inline auto file_service::save() -> bool {
         return false;
     }
 
+    gfx::vox_writer_plain writer;
     gfx::vox_serializer serializer{
         engine_->get_world(),
+        writer,
         state_->scene.name_to_entity.at(state_->scene.root_name),
         {.entity_names = state_->scene.entity_to_name,
          .excluded     = state_->sockets.get_preview_entities()}
@@ -47,8 +50,10 @@ inline auto file_service::save_as(
         return false;
     }
 
+    gfx::vox_writer_plain writer;
     gfx::vox_serializer serializer{
         engine_->get_world(),
+        writer,
         state_->scene.name_to_entity.at(state_->scene.root_name),
         {.entity_names = state_->scene.entity_to_name,
          .excluded     = state_->sockets.get_preview_entities()}

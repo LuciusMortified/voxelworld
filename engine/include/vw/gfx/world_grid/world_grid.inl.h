@@ -234,9 +234,14 @@ auto world_grid<WC>::get_completed_stats() const -> const completed_stats& {
 
 template <typename WC>
 void world_grid<WC>::process_completed() {
-    static constexpr int32 max_columns_per_frame = 4;
+    static constexpr int32 max_columns_per_frame = 1;
     static constexpr vec3i neighbor_offsets[6]   = {
-        {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}
+        {1, 0, 0},   //
+        {-1, 0, 0},  //
+        {0, 1, 0},   //
+        {0, -1, 0},  //
+        {0, 0, 1},   //
+        {0, 0, -1}
     };
 
     float32 boundary_from_total = 0.0f;
@@ -359,7 +364,9 @@ void world_grid<WC>::gen_thread_function() {
         auto col = std::make_unique<gen_column>(task.coord.x, task.coord.y);
 
         terrain_context ctx{
-            .cx = task.coord.x, .cz = task.coord.y, .create_chunk = [&col](int32 y) -> chunk_data& {
+            .cx           = task.coord.x,
+            .cz           = task.coord.y,
+            .create_chunk = [&col](int32 y) -> chunk_data& {
                 return col->create_chunk(y, chunk_data{});
             }
         };

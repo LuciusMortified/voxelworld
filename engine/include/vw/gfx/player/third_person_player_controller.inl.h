@@ -29,7 +29,7 @@ void third_person_player_controller<WC>::update(
     modifier.set_move_input(move_dir);
 
     if (math::length(move_dir) > math::epsilon) {
-        modifier.set_facing_direction(forward);
+        modifier.set_facing_direction(move_dir);
     }
 
     if (input.jump_requested) {

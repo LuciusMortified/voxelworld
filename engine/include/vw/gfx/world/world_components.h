@@ -6,6 +6,7 @@
 #include <tuple>
 
 #include "vw/gfx/world/components/animation_player_component.h"
+#include "vw/gfx/world/components/animation_fsm_component.h"
 #include "vw/gfx/world/components/animation_target_component.h"
 #include "vw/gfx/world/components/character_controller_component.h"
 #include "vw/gfx/world/components/hierarchy_component.h"
@@ -30,6 +31,7 @@ using base_world_components = std::tuple<
     socket_component,
     animation_player_component,
     animation_target_component,
+    animation_fsm_component,
     world_view_component,
     rigid_body_component,
     box_collider_component,

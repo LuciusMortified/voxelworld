@@ -65,7 +65,9 @@ renderer<C>::renderer(
     cull_pipeline_ = std::make_unique<cull_pipeline>(*context_, descriptor_pool_);
 
     combined_buffer_pool_ = std::make_unique<combined_buffer_pool_type>(
-        *context_, descriptor_pool_, storage_descriptor_set_layout_,
+        *context_,
+        descriptor_pool_,
+        storage_descriptor_set_layout_,
         cull_pipeline_->get_buffer_descriptor_set_layout()
     );
 
@@ -217,10 +219,12 @@ auto renderer<C>::get_fog_settings() -> fog_settings& {
 }
 
 template <typename C>
-void renderer<C>::draw_colliders(world<C>& w, color col) {
+void renderer<C>::draw_colliders(
+    world<C>& w, color col
+) {
     for (auto [ent, box, tc] :
          w.get_registry().template view<box_collider_component, transform_component>()) {
-        auto pos = tc.get_position() + box.get_offset();
+        auto pos  = tc.get_position() + box.get_offset();
         auto half = box.get_extents() * 0.5f;
         draw_box(pos - half, box.get_extents(), col);
     }
@@ -275,16 +279,13 @@ void renderer<C>::render(
         throw std::runtime_error("Failed to begin recording command buffer!");
     }
 
-    stats_.timing.shadow_map_update_ms = measure_ms([&] {
-        shadow_map_->update(camera, directional_light_settings_.direction);
-    });
+    stats_.timing.shadow_map_update_ms =
+        measure_ms([&] { shadow_map_->update(camera, directional_light_settings_.direction); });
 
     const auto& cascade_frustums = shadow_map_->get_cascade_frustums();
 
     stats_.timing.buffer_pool_update_ms = measure_ms([&] {
-        combined_buffer_pool_->update(
-            world, camera, command_buffers_[current_image_index_]
-        );
+        combined_buffer_pool_->update(world, camera, command_buffers_[current_image_index_]);
     });
 
     stats_.timing.compute_cull_ms = measure_ms([&] {
@@ -306,7 +307,13 @@ void renderer<C>::render(
                 command_buffers_[current_image_index_],
                 VK_PIPELINE_STAGE_TRANSFER_BIT,
                 stage_mask,
-                0, 1, &barrier, 0, nullptr, 0, nullptr
+                0,
+                1,
+                &barrier,
+                0,
+                nullptr,
+                0,
+                nullptr
             );
         }
 
@@ -330,18 +337,20 @@ void renderer<C>::render(
                 command_buffers_[current_image_index_],
                 VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                 VK_PIPELINE_STAGE_DRAW_INDIRECT_BIT,
-                0, 1, &compute_barrier, 0, nullptr, 0, nullptr
+                0,
+                1,
+                &compute_barrier,
+                0,
+                nullptr,
+                0,
+                nullptr
             );
         }
     });
 
-    stats_.timing.shadow_pass_ms = measure_ms([&] {
-        render_shadow_pass(world, camera);
-    });
+    stats_.timing.shadow_pass_ms = measure_ms([&] { render_shadow_pass(world, camera); });
 
-    stats_.timing.world_pass_ms = measure_ms([&] {
-        render_world_pass(world, camera);
-    });
+    stats_.timing.world_pass_ms = measure_ms([&] { render_world_pass(world, camera); });
 
     if (vkEndCommandBuffer(command_buffers_[current_image_index_]) != VK_SUCCESS) {
         throw std::runtime_error("Failed to record command buffer!");
@@ -651,7 +660,8 @@ void renderer<C>::create_descriptor_set_layouts() {
         throw std::runtime_error("failed to create uniform descriptor set layout");
     }
 
-    // Storage buffer descriptor set layout (set 1: binding 0 = model matrices, binding 1 = normal matrices)
+    // Storage buffer descriptor set layout (set 1: binding 0 = model matrices, binding 1 = normal
+    // matrices)
     std::array<VkDescriptorSetLayoutBinding, 2> storage_layout_bindings{};
     storage_layout_bindings[0].binding            = 0;
     storage_layout_bindings[0].descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -1465,9 +1475,7 @@ template <typename WC>
 void renderer<WC>::render_world_pass(
     world_type& world, const camera& camera
 ) {
-    stats_.timing.world_pass_uniform_ms = measure_ms([&] {
-        update_uniform_buffer(camera);
-    });
+    stats_.timing.world_pass_uniform_ms = measure_ms([&] { update_uniform_buffer(camera); });
 
     VkRenderPassBeginInfo render_pass_info{};
     render_pass_info.sType             = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -1503,21 +1511,15 @@ void renderer<WC>::render_world_pass(
 
     vkCmdSetScissor(command_buffers_[current_image_index_], 0, 1, &scissor);
 
-    stats_.timing.world_pass_geometry_ms = measure_ms([&] {
-        render_world(world, camera);
-    });
+    stats_.timing.world_pass_geometry_ms = measure_ms([&] { render_world(world, camera); });
 
     vkCmdNextSubpass(command_buffers_[current_image_index_], VK_SUBPASS_CONTENTS_INLINE);
 
-    stats_.timing.world_pass_debug_ms = measure_ms([&] {
-        render_debug_primitives();
-    });
+    stats_.timing.world_pass_debug_ms = measure_ms([&] { render_debug_primitives(); });
 
     vkCmdNextSubpass(command_buffers_[current_image_index_], VK_SUBPASS_CONTENTS_INLINE);
 
-    stats_.timing.world_pass_imgui_ms = measure_ms([&] {
-        render_imgui();
-    });
+    stats_.timing.world_pass_imgui_ms = measure_ms([&] { render_imgui(); });
 
     vkCmdEndRenderPass(command_buffers_[current_image_index_]);
 }
@@ -1941,15 +1943,18 @@ VkExtent2D renderer<C>::choose_swap_extent(
 }
 
 template <typename C>
-auto renderer<C>::get_max_usable_sample_count() -> VkSampleCountFlagBits {
+auto renderer<C>::get_max_usable_sample_count() const -> VkSampleCountFlagBits {
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(context_->get_physical_device(), &props);
 
-    VkSampleCountFlags counts = props.limits.framebufferColorSampleCounts &
-                                props.limits.framebufferDepthSampleCounts;
+    const VkSampleCountFlags counts =                //
+        props.limits.framebufferColorSampleCounts &  //
+        props.limits.framebufferDepthSampleCounts;
 
-    if (counts & VK_SAMPLE_COUNT_4_BIT) return VK_SAMPLE_COUNT_4_BIT;
-    if (counts & VK_SAMPLE_COUNT_2_BIT) return VK_SAMPLE_COUNT_2_BIT;
+    if (counts & VK_SAMPLE_COUNT_4_BIT)
+        return VK_SAMPLE_COUNT_4_BIT;
+    if (counts & VK_SAMPLE_COUNT_2_BIT)
+        return VK_SAMPLE_COUNT_2_BIT;
     return VK_SAMPLE_COUNT_1_BIT;
 }
 

@@ -27,8 +27,15 @@ inline mesh_pool::mesh_pool(
 }
 
 inline mesh_pool::~mesh_pool() {
+    stop_gen_threads();
+}
+
+inline void mesh_pool::stop_gen_threads() {
     {
         std::scoped_lock lock(gen_mutex_);
+        if (!gen_running_) {
+            return;
+        }
         gen_running_ = false;
     }
     gen_cv_.notify_all();
@@ -136,7 +143,7 @@ inline void mesh_pool::process_completed() {
         sweep_counter_ = 0;
     }
 
-    constexpr uint32 max_meshes_per_frame = 8;
+    constexpr uint32 max_meshes_per_frame = 4;
     uint32 completed = 0;
 
     for (auto iter = pending_meshes_.begin();

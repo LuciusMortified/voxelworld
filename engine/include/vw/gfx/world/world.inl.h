@@ -8,6 +8,12 @@
 namespace vw::gfx {
 
 template <typename Cs>
+world<Cs>::~world() {
+    mesh_pool_.stop_gen_threads();
+    context_.world_grid_.reset();
+}
+
+template <typename Cs>
 world<Cs>::world(
     vulkan_context& context, const block_registry& registry
 )
@@ -20,6 +26,7 @@ world<Cs>::world(
     , light_system_(context_)
     , socket_system_(context_, hierarchy_system_, transform_system_)
     , animation_system_(context_, transform_system_, animation_clip_registry_)
+    , animation_fsm_system_(context_, animation_system_)
     , character_controller_system_(context_, transform_system_)
     , physics_system_(context_, transform_system_)
     , world_grid_system_(context_) {}
@@ -28,20 +35,26 @@ template <typename Cs>
 void world<Cs>::update(
     float32 delta_time
 ) {
-    registry_.clear_changed();
-    update_stats_.character_controller_ms = measure_ms([&] { character_controller_system_.update(delta_time); });
-    update_stats_.physics_ms              = measure_ms([&] { physics_system_.update(delta_time); });
-    update_stats_.transform_ms            = measure_ms([&] { transform_system_.update(); });
-    update_stats_.model_ms                = measure_ms([&] { model_system_.update(); });
-    update_stats_.spatial_ms              = measure_ms([&] { spatial_system_.update(); });
-    update_stats_.light_ms                = measure_ms([&] { light_system_.update(); });
-    update_stats_.world_grid_ms           = measure_ms([&] { world_grid_system_.update(); });
-    update_stats_.animation_ms            = measure_ms([&] { animation_system_.update(delta_time); });
+    update_stats_.character_controller_ms =
+        measure_ms([&] { character_controller_system_.update(delta_time); });
+    update_stats_.animation_fsm_ms = measure_ms([&] { animation_fsm_system_.update(); });
+    update_stats_.physics_ms       = measure_ms([&] { physics_system_.update(delta_time); });
+    update_stats_.transform_ms     = measure_ms([&] { transform_system_.update(); });
+    update_stats_.model_ms         = measure_ms([&] { model_system_.update(); });
+    update_stats_.spatial_ms       = measure_ms([&] { spatial_system_.update(); });
+    update_stats_.light_ms         = measure_ms([&] { light_system_.update(); });
+    update_stats_.world_grid_ms    = measure_ms([&] { world_grid_system_.update(); });
+    update_stats_.animation_ms     = measure_ms([&] { animation_system_.update(delta_time); });
 }
 
 template <typename Cs>
 auto world<Cs>::get_update_stats() const -> const world_update_stats& {
     return update_stats_;
+}
+
+template <typename Cs>
+void world<Cs>::clear_changed() {
+    registry_.clear_changed();
 }
 
 template <typename Cs>
@@ -57,6 +70,14 @@ template <typename T>
 auto world<Cs>::get_component(
     entity ent
 ) -> T& {
+    return registry_.template get<T>(ent);
+}
+
+template <typename Cs>
+template <typename T>
+auto world<Cs>::get_component(
+    entity ent
+) const -> const T& {
     return registry_.template get<T>(ent);
 }
 
@@ -117,12 +138,24 @@ auto world<C>::get_animation_system() -> animation_system_type& {
 }
 
 template <typename C>
+auto world<C>::get_animation_fsm_system() -> animation_fsm_system_type& {
+    return animation_fsm_system_;
+}
+
+template <typename C>
+auto world<C>::get_animation_fsm_system() const -> const animation_fsm_system_type& {
+    return animation_fsm_system_;
+}
+
+template <typename C>
 auto world<C>::get_animation_clip_registry() -> animation_clip_registry& {
     return animation_clip_registry_;
 }
 
 template <typename C>
-void world<C>::set_world_grid(std::shared_ptr<world_grid<C>> grid) {
+void world<C>::set_world_grid(
+    std::shared_ptr<world_grid<C>> grid
+) {
     context_.world_grid_ = std::move(grid);
 }
 

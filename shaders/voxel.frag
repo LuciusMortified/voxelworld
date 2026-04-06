@@ -3,8 +3,9 @@
 layout(location = 0) in vec3 fragPos;
 layout(location = 1) in vec3 fragNormal;
 layout(location = 2) in vec3 fragColor;
-layout(location = 3) in float fragAo;
+layout(location = 3) flat in uint fragAoPacked;
 layout(location = 4) in float viewDepth;
+layout(location = 5) in vec2 fragUV;
 
 struct DirectionalLightData {
     mat4 light_space_matrices[4];
@@ -227,7 +228,19 @@ void main() {
     float hemisphereStrength = 0.15;
     vec3 hemisphereAmbient = calculateHemisphereAmbient(normal) * hemisphereStrength;
 
-    vec3 ambient = (baseAmbient + hemisphereAmbient) * mix(1.0, fragAo, 0.9);
+    float ao_c0 = float(fragAoPacked & 0x3u) / 3.0;
+    float ao_c1 = float((fragAoPacked >> 2u) & 0x3u) / 3.0;
+    float ao_c2 = float((fragAoPacked >> 4u) & 0x3u) / 3.0;
+    float ao_c3 = float((fragAoPacked >> 6u) & 0x3u) / 3.0;
+    vec2 aoUV = smoothstep(0.0, 1.0, fragUV);
+    float ao = mix(
+        mix(ao_c0, ao_c1, aoUV.x),
+        mix(ao_c3, ao_c2, aoUV.x),
+        aoUV.y
+    );
+    float aoFactor = mix(1.0, ao, 0.9);
+
+    vec3 ambient = (baseAmbient + hemisphereAmbient) * aoFactor;
 
     // Directional light с sun_factor
     vec3 directional = calculateDirectionalLight(normal, viewDir, shadow);
@@ -251,7 +264,7 @@ void main() {
     float edgeEnhancement = (1.0 - edgeFactor) * edgeIntensity * (1.0 - shadow);
 
     // Комбинируем все освещение
-    vec3 lighting = ambient + (directional + pointLighting + rimColor) * mix(1.0, fragAo, 0.9);
+    vec3 lighting = ambient + (directional + pointLighting + rimColor) * aoFactor;
     vec3 result = lighting * fragColor;
 
     // Применяем edge enhancement

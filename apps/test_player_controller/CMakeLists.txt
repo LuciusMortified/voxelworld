@@ -13,3 +13,6 @@ target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
 
 include(shaders)
 vw_setup_shaders(${PROJECT_NAME})
+
+include(assets)
+vw_setup_assets(${PROJECT_NAME})

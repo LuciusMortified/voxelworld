@@ -74,9 +74,10 @@ public:
 
     class player_modifier {
     public:
+        void add_layer(size_t index) const;
         auto layer(size_t index) -> layer_modifier;
-        void apply_pose();
-        void rebuild_target_map();
+        void apply_pose() const;
+        void rebuild_target_map() const;
 
     private:
         friend class animation_system;

@@ -35,8 +35,9 @@ layout(set = 4, binding = 0, std430) readonly buffer PaletteBuffer {
 layout(location = 0) out vec3 fragPos;
 layout(location = 1) out vec3 fragNormal;
 layout(location = 2) out vec3 fragColor;
-layout(location = 3) out float fragAo;
+layout(location = 3) flat out uint fragAoPacked;
 layout(location = 4) out float viewDepth;
+layout(location = 5) out vec2 fragUV;
 
 const vec3 NORMALS[6] = vec3[6](
     vec3( 1,  0,  0),
@@ -59,8 +60,13 @@ void main() {
     uint py = (inData0 >> 7) & 0x7Fu;
     uint pz = (inData0 >> 14) & 0x7Fu;
     uint normal_id = (inData0 >> 21) & 0x7u;
-    uint ao = (inData0 >> 24) & 0x3u;
     uint palette_idx = inData1 & 0xFFu;
+
+    uint ao_c0 = (inData1 >> 8) & 0x3u;
+    uint ao_c1 = (inData1 >> 10) & 0x3u;
+    uint ao_c2 = (inData1 >> 12) & 0x3u;
+    uint ao_c3 = (inData1 >> 14) & 0x3u;
+    uint corner = (inData1 >> 16) & 0x3u;
 
     mat4 model = modelMatrices.models[inInstanceIndex];
 
@@ -71,7 +77,8 @@ void main() {
     fragNormal = normalize(mat3(normalMatrices.normals[inInstanceIndex]) * NORMALS[normal_id]);
 
     fragColor = unpackPaletteColor(palette[palette_idx]);
-    fragAo = float(ao) / 3.0;
+    fragAoPacked = (ao_c0) | (ao_c1 << 2u) | (ao_c2 << 4u) | (ao_c3 << 6u);
+    fragUV = vec2(float(corner & 1u), float(corner >> 1u));
 
     viewDepth = -(ubo.view * worldPos).z;
 
