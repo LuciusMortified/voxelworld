@@ -1,0 +1,160 @@
+#pragma once
+
+#include <random>
+
+#include "debug_hud.h"
+#include "world_setup.h"
+
+namespace vw::arena {
+
+inline arena_app::arena_app(
+    gfx::engine<>& eng
+)
+    : app{eng}
+    , parser_(eng.get_block_registry())
+    , assets_(parser_, eng.get_world().get_model_registry())
+    , input_controller_(get_engine().get_window())
+    , camera_controller_(
+          get_engine().get_camera(),
+          get_engine().get_world(),
+          gfx::third_person_camera_params{
+              .arm_length     = 80.0f,
+              .arm_length_min = 10.0f,
+              .arm_length_max = 200.0f,
+              .target_offset  = {0.0f, 24.0f, 0.0f},
+              .pitch_min      = -30.0f,
+              .pitch_max      = 80.0f,
+              .zoom_speed     = 5.0f,
+              .collision_skin = 2.0f
+          }
+      )
+    , player_controller_(get_engine().get_camera(), get_engine().get_world()) {
+    auto& window = get_engine().get_window();
+    window.sub<gfx::key_press_event>([this](const gfx::key_press_event& event) -> bool {
+        handle_key_press(event.key);
+        return true;
+    });
+    window.sub<gfx::mouse_press_event>([this](const gfx::mouse_press_event& event) -> bool {
+        handle_mouse_press(event.button);
+        return true;
+    });
+    window.sub<gfx::window_close_event>([this](gfx::window_close_event&) -> bool {
+        get_engine().shutdown();
+        return true;
+    });
+
+    get_engine().get_renderer().set_clear_color(0.4f, 0.6f, 0.9f, 1.0f);
+    get_engine().get_debug_tool().set_visible(true);
+
+    input_controller_.set_mouse_captured(true);
+
+    load_assets();
+
+    const auto result = setup_world_grid(get_engine());
+    generator_params_ = result.generator_params;
+
+    player_ = std::make_unique<player>(get_engine(), assets_);
+
+    constexpr int32 enemy_count   = 10;
+    constexpr float32 spawn_range = 400.0f;
+
+    std::mt19937 rng{std::random_device{}()};
+    std::uniform_real_distribution dist{-spawn_range, spawn_range};
+
+    enemies_.reserve(enemy_count);
+    for (int32 i = 0; i < enemy_count; ++i) {
+        enemies_.push_back(
+            std::make_unique<dummy_enemy>(get_engine(), vec2f{dist(rng), dist(rng)})
+        );
+    }
+
+    auto& fog         = get_engine().get_renderer().get_fog_settings();
+    fog.color         = {0.4f, 0.6f, 0.9f};
+    fog.near_distance = 6 * 64 * generator_params_.voxel_scale;
+    fog.far_distance  = 9 * 64 * generator_params_.voxel_scale;
+}
+
+inline void arena_app::render(
+    float delta_time
+) {
+    if (!player_->is_placed()) {
+        player_->try_place(static_cast<float32>(generator_params_.voxel_scale));
+    }
+
+    for (const auto& enemy : enemies_) {
+        if (!enemy->is_placed()) {
+            enemy->try_place();
+        }
+    }
+
+    const auto input = input_controller_.get_input_state();
+
+    if (player_->is_placed()) {
+        const auto player_ent = player_->get_entity();
+        player_controller_.update(input, player_ent);
+        camera_controller_.update(input, player_ent);
+        player_->update(input);
+    }
+
+    if (show_colliders_) {
+        get_engine().get_renderer().draw_colliders(get_engine().get_world());
+    }
+
+    render_debug_hud(get_engine(), *player_, camera_controller_, show_colliders_);
+}
+
+inline auto arena_app::load_assets() -> void {
+    assets_.load_prefab("m_human", "assets/models/m_human.vox");
+    assets_.load_prefab("m_sword", "assets/models/m_sword.vox");
+    assets_.load_clip("a_idle", "assets/animations/a_idle_0.voxa");
+    assets_.load_clip("a_walk", "assets/animations/a_walk_0.voxa");
+    assets_.load_clip("a_jump_left", "assets/animations/a_jump_left_1.voxa");
+    assets_.load_clip("a_jump_right", "assets/animations/a_jump_right_1.voxa");
+    assets_.load_clip("a_sword_attack", "assets/animations/a_sword_attack_3.voxa");
+}
+
+inline auto arena_app::handle_key_press(
+    gfx::keyboard::keys key
+) -> void {
+    switch (key) {
+        case gfx::keyboard::keys::ESCAPE:
+            get_engine().shutdown();
+            break;
+        case gfx::keyboard::keys::KEY_1:
+            player_->toggle_sword();
+            break;
+        case gfx::keyboard::keys::F:
+            if (player_->is_placed()) {
+                get_engine()
+                    .get_world()
+                    .get_physics_system()
+                    .modify(player_->get_entity())
+                    .add_external_impulse({0.0f, 0.0f, 500.0f});
+            }
+            break;
+        case gfx::keyboard::keys::F1:
+            input_controller_.set_mouse_captured(!input_controller_.is_mouse_captured());
+            break;
+        case gfx::keyboard::keys::F2:
+            show_colliders_ = !show_colliders_;
+            break;
+        default:
+            break;
+    }
+}
+
+inline auto arena_app::handle_mouse_press(
+    gfx::mouse::buttons button
+) const -> void {
+    switch (button) {
+        case gfx::mouse::buttons::LEFT:
+            if (player_->is_placed()) {
+                player_->handle_attack();
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+}  // namespace vw::arena
