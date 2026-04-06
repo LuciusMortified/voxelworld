@@ -33,6 +33,7 @@ add_executable(ecs_tests
     ecs/registry.test.cpp
     ecs/socket.test.cpp
     ecs/animation_layer.test.cpp
+    ecs/dynamic_aabb_tree.test.cpp
 )
 
 target_link_libraries(ecs_tests PRIVATE

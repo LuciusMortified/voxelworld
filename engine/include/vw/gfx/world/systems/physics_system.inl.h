@@ -3,15 +3,20 @@
 #ifndef VW_GFX_WORLD_SYSTEMS_PHYSICS_SYSTEM_INL_H
 #define VW_GFX_WORLD_SYSTEMS_PHYSICS_SYSTEM_INL_H
 
+#include <chrono>
 #include <cmath>
 
 namespace vw::gfx {
 
 template <typename WC>
 physics_system<WC>::physics_system(
-    context_type& context, transform_system_type& transform_system
+    context_type& context,
+    transform_system_type& transform_system,
+    spatial_system_type& spatial_system
 )
-    : context_(&context), transform_system_(&transform_system) {}
+    : context_(&context)
+    , transform_system_(&transform_system)
+    , spatial_system_(&spatial_system) {}
 
 template <typename WC>
 void physics_system<WC>::set_gravity(float32 g) {
@@ -31,22 +36,36 @@ void physics_system<WC>::update(
         return;
     }
 
+    stats_ = {};
+
     accumulated_time_ += delta_time;
     auto max_accumulated = fixed_dt * static_cast<float32>(max_steps_per_frame);
     if (accumulated_time_ > max_accumulated) {
         accumulated_time_ = max_accumulated;
     }
 
+    using clock = std::chrono::high_resolution_clock;
+    const auto step_start = clock::now();
+
     while (accumulated_time_ >= fixed_dt) {
         step(fixed_dt);
         accumulated_time_ -= fixed_dt;
+        ++stats_.step_count;
     }
+
+    stats_.step_ms = std::chrono::duration<float32>(clock::now() - step_start).count() * 1000.0f;
+}
+
+template <typename WC>
+auto physics_system<WC>::get_stats() const -> const physics_stats& {
+    return stats_;
 }
 
 template <typename WC>
 void physics_system<WC>::step(
     float32 dt
 ) {
+    using clock = std::chrono::high_resolution_clock;
     constexpr float32 impulse_epsilon = 0.01f;
 
     for (auto [ent, rb, tc] :
@@ -90,9 +109,17 @@ void physics_system<WC>::step(
             }
 
             rb.frozen_ = false;
+
+            const auto voxel_start = clock::now();
             auto result = resolve_box_voxel(box_center, half, rb.velocity_);
+            stats_.voxel_collision_ms += std::chrono::duration<float32>(clock::now() - voxel_start).count() * 1000.0f;
+
             new_position = result.resolved_position - col.offset_;
             rb.grounded_ = result.grounded;
+
+            const auto entity_start = clock::now();
+            resolve_entity_collisions(ent, new_position, rb.velocity_, half, col.offset_);
+            stats_.entity_collision_ms += std::chrono::duration<float32>(clock::now() - entity_start).count() * 1000.0f;
         }
 
         transform_system_->modify(ent).set_position(new_position);
@@ -225,6 +252,77 @@ auto physics_system<WC>::resolve_box_voxel(
     }
 
     return {center, grounded};
+}
+
+template <typename WC>
+auto physics_system<WC>::resolve_entity_collisions(
+    entity ent, vec3f& position, vec3f& velocity,
+    const vec3f& half_extents, const vec3f& offset
+) -> void {
+    using clock = std::chrono::high_resolution_clock;
+    auto center = position + offset;
+    aabb entity_aabb{center - half_extents, center + half_extents};
+
+    const auto q_start = clock::now();
+    spatial_system_->query_all(entity_aabb, entity_query_cache_, spatial_layer::character);
+    stats_.entity_query_ms += std::chrono::duration<float32>(clock::now() - q_start).count() * 1000.0f;
+    stats_.entity_query_results += static_cast<int32>(entity_query_cache_.size());
+
+    const auto r_start = clock::now();
+    for (const auto other : entity_query_cache_) {
+        if (other == ent) {
+            continue;
+        }
+
+        if (!context_->registry().template has<box_collider_component>(other) ||
+            !context_->registry().template has<transform_component>(other)) {
+            continue;
+        }
+
+        const auto& other_col = context_->registry().template get<box_collider_component>(other);
+        const auto& other_tc  = context_->registry().template get<transform_component>(other);
+
+        auto other_half   = other_col.extents_ * 0.5f;
+        auto other_center = other_tc.get_position() + other_col.offset_;
+
+        auto overlap_x = std::min(center.x + half_extents.x, other_center.x + other_half.x)
+                       - std::max(center.x - half_extents.x, other_center.x - other_half.x);
+        auto overlap_y = std::min(center.y + half_extents.y, other_center.y + other_half.y)
+                       - std::max(center.y - half_extents.y, other_center.y - other_half.y);
+        auto overlap_z = std::min(center.z + half_extents.z, other_center.z + other_half.z)
+                       - std::max(center.z - half_extents.z, other_center.z - other_half.z);
+
+        if (overlap_x <= 0.0f || overlap_y <= 0.0f || overlap_z <= 0.0f) {
+            continue;
+        }
+
+        auto dir = center - other_center;
+
+        vec3f push{0.0f, 0.0f, 0.0f};
+        float32 penetration = 0.0f;
+
+        if (overlap_x <= overlap_y && overlap_x <= overlap_z) {
+            penetration = overlap_x;
+            push.x = dir.x >= 0.0f ? 1.0f : -1.0f;
+        } else if (overlap_y <= overlap_x && overlap_y <= overlap_z) {
+            penetration = overlap_y;
+            push.y = dir.y >= 0.0f ? 1.0f : -1.0f;
+        } else {
+            penetration = overlap_z;
+            push.z = dir.z >= 0.0f ? 1.0f : -1.0f;
+        }
+
+        center = center + push * penetration;
+        entity_aabb = {center - half_extents, center + half_extents};
+
+        auto vel_along = math::dot(velocity, push);
+        if (vel_along < 0.0f) {
+            velocity = velocity - push * vel_along;
+        }
+    }
+
+    stats_.entity_resolve_ms += std::chrono::duration<float32>(clock::now() - r_start).count() * 1000.0f;
+    position = center - offset;
 }
 
 template <typename WC>

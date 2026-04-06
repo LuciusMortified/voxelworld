@@ -2144,7 +2144,7 @@ entity hand_right
 	t 10 2 0	1.5707963 -0 -0	1 1 1	-2.5 -3.5 -2.5
 	target hand_right
 	sockets
-		socket hand_right 0 0 1.8 -1.570796 -0 -0 0.99 0.99 0.99
+		socket hand_right 0 0 0 -1.570796 -0 -0 0.99 0.99 0.99
 	m 5 7 5
 		v 2 1 0 0x18
 		v 3 1 0 0x17
@@ -2263,7 +2263,7 @@ entity hand_left
 	t -10 2 0	1.5707963 -0 -0	1 1 1	-2.5 -3.5 -2.5
 	target hand_left
 	sockets
-		socket hand_left 0 0 1.8 -1.570796 -0 -0 0.99 0.99 0.99
+		socket hand_left 0 0 0 -1.570796 -0 -0 0.99 0.99 0.99
 	m 5 7 5
 		v 1 1 0 0x17
 		v 2 1 0 0x18

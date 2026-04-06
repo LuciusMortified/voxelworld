@@ -77,7 +77,7 @@ void spatial_system<WC>::update_entity(
     const auto& transform_comp = context_->registry().template get<transform_component>(ent);
     aabb new_bounds            = calculate_aabb_from_model(ent, model_comp, transform_comp);
 
-    bool bounds_changed =  //
+    const bool bounds_changed =  //
         spatial.bounds_.min != new_bounds.min || spatial.bounds_.max != new_bounds.max;
 
     if (bounds_changed) {
@@ -92,9 +92,9 @@ void spatial_system<WC>::update_entity(
             aabb new_fat_bounds = expand_aabb_for_fat(new_bounds);
 
             if (!spatial.dirty_) {
-                tree_.update(ent, new_fat_bounds);
+                tree_.update(ent, new_fat_bounds, spatial.layer_);
             } else {
-                tree_.insert(ent, new_fat_bounds);
+                tree_.insert(ent, new_fat_bounds, spatial.layer_);
             }
 
             spatial.bounds_     = new_bounds;
@@ -112,7 +112,7 @@ void spatial_system<WC>::update_entity(
 template <typename WC>
 auto spatial_system<WC>::expand_aabb_for_fat(
     const aabb& bounds
-) const -> aabb {
+) -> aabb {
     constexpr float expansion_factor = 0.1f;
     constexpr float min_expansion    = 0.1f;
 
@@ -179,23 +179,9 @@ auto spatial_system<WC>::calculate_aabb_from_model(
 
 template <typename WC>
 void spatial_system<WC>::query_all(
-    const frustum& f, std::unordered_set<entity>& result_out, spatial_layer_mask layer_mask
+    const frustum& f, std::vector<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
-    tree_.query_all(f, result_out);
-
-    for (auto it = result_out.begin(), ite = result_out.end(); it != ite;) {
-        if (!context_->registry().template has<spatial_component>(*it)) {
-            it = result_out.erase(it);
-            continue;
-        }
-
-        const auto& spatial = context_->registry().template get<spatial_component>(*it);
-        if (!(spatial.get_layer() & layer_mask) || !f.intersects(spatial.get_bounds())) {
-            it = result_out.erase(it);
-        } else {
-            ++it;
-        }
-    }
+    tree_.query_all(f, result_out, layer_mask);
 }
 
 template <typename WC>
@@ -208,44 +194,16 @@ void spatial_system<WC>::query_all_any(
 
 template <typename WC>
 void spatial_system<WC>::query_all(
-    const ray& r, std::unordered_set<entity>& result_out, spatial_layer_mask layer_mask
+    const ray& r, std::vector<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
-    tree_.query_all(r, result_out);
-
-    for (auto it = result_out.begin(), ite = result_out.end(); it != ite;) {
-        if (!context_->registry().template has<spatial_component>(*it)) {
-            it = result_out.erase(it);
-            continue;
-        }
-
-        const auto& spatial = context_->registry().template get<spatial_component>(*it);
-        if (!(spatial.get_layer() & layer_mask) || !spatial.get_bounds().intersects(r)) {
-            it = result_out.erase(it);
-        } else {
-            ++it;
-        }
-    }
+    tree_.query_all(r, result_out, layer_mask);
 }
 
 template <typename WC>
 void spatial_system<WC>::query_all(
-    const aabb& bounds, std::unordered_set<entity>& result_out, spatial_layer_mask layer_mask
+    const aabb& bounds, std::vector<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
-    tree_.query_all(bounds, result_out);
-
-    for (auto it = result_out.begin(), ite = result_out.end(); it != ite;) {
-        if (!context_->registry().template has<spatial_component>(*it)) {
-            it = result_out.erase(it);
-            continue;
-        }
-
-        const auto& spatial = context_->registry().template get<spatial_component>(*it);
-        if (!(spatial.get_layer() & layer_mask) || !spatial.get_bounds().intersects(bounds)) {
-            it = result_out.erase(it);
-        } else {
-            ++it;
-        }
-    }
+    tree_.query_all(bounds, result_out, layer_mask);
 }
 
 template <typename WC>
@@ -257,7 +215,7 @@ void spatial_system<WC>::cleanup(
 
 template <typename WC>
 auto spatial_system<WC>::voxel_ray_cast(
-    const ray& r, std::unordered_set<entity>& candidates, spatial_layer_mask layer_mask
+    const ray& r, std::vector<entity>& candidates, spatial_layer_mask layer_mask
 ) const -> std::optional<voxel_ray_hit> {
     query_all(r, candidates, layer_mask);
 

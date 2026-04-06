@@ -277,7 +277,7 @@ private:
     std::unique_ptr<gfx::entity_guard<>> flower_;
     std::unique_ptr<gfx::entity_guard_group<>> stress_group_;
 
-    std::unordered_set<gfx::entity> selected_entities_;
+    std::vector<gfx::entity> selected_entities_;
     gfx::entity selected_entity_ = gfx::invalid_entity;
     vec3i selected_voxel_{-1, -1, -1};
     vec3i selected_empty_pos_{-1, -1, -1};

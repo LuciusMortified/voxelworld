@@ -6,7 +6,6 @@
 #include <algorithm>
 #include <optional>
 #include <span>
-#include <unordered_set>
 #include <vector>
 
 #include "vw/gfx/spatial/aabb.h"
@@ -36,19 +35,19 @@ public:
 
     void query_all(
         const frustum& f,
-        std::unordered_set<entity>& result_out,
+        std::vector<entity>& result_out,
         spatial_layer_mask layer_mask = spatial_layer::all
     ) const;
 
     void query_all(
         const ray& r,
-        std::unordered_set<entity>& result_out,
+        std::vector<entity>& result_out,
         spatial_layer_mask layer_mask = spatial_layer::all
     ) const;
 
     void query_all(
         const aabb& bounds,
-        std::unordered_set<entity>& result_out,
+        std::vector<entity>& result_out,
         spatial_layer_mask layer_mask = spatial_layer::all
     ) const;
 
@@ -59,7 +58,7 @@ public:
 
     [[nodiscard]] auto voxel_ray_cast(
         const ray& r,
-        std::unordered_set<entity>& candidates,
+        std::vector<entity>& candidates,
         spatial_layer_mask layer_mask = spatial_layer::all
     ) const -> std::optional<voxel_ray_hit>;
 
@@ -86,7 +85,7 @@ private:
         const model_component& model_comp,
         const transform_component& transform_comp
     ) const -> aabb;
-    auto expand_aabb_for_fat(const aabb& bounds) const -> aabb;
+    static auto expand_aabb_for_fat(const aabb& bounds) -> aabb;
 
     context_type* context_;
     dynamic_aabb_tree tree_;

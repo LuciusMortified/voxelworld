@@ -30,6 +30,7 @@ namespace vw::gfx {
 struct world_update_stats {
     float32 character_controller_ms = 0.0f;
     float32 physics_ms              = 0.0f;
+    physics_stats physics_detail;
     float32 transform_ms            = 0.0f;
     float32 model_ms                = 0.0f;
     float32 spatial_ms              = 0.0f;
@@ -128,7 +129,7 @@ public:
     template <typename T>
     [[nodiscard]] auto changed() -> std::unordered_set<entity>&;
 
-    [[nodiscard]] auto voxel_ray_cast(const ray& r, std::unordered_set<entity>& candidates) const
+    [[nodiscard]] auto voxel_ray_cast(const ray& r, std::vector<entity>& candidates) const
         -> std::optional<voxel_ray_hit>;
 
     [[nodiscard]] auto destroyed() const -> const std::vector<entity>&;

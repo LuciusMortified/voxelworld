@@ -163,6 +163,23 @@ void debug_window<WC>::render_systems_detail() {
             );
         };
 
+        row("char_ctrl", s.character_controller_ms);
+        row("anim_fsm", s.animation_fsm_ms);
+
+        row("physics", s.physics_ms);
+        ImGui::Indent();
+        row("voxel_col", s.physics_detail.voxel_collision_ms);
+        row("entity_col", s.physics_detail.entity_collision_ms);
+        row("  query", s.physics_detail.entity_query_ms);
+        row("  resolve", s.physics_detail.entity_resolve_ms);
+        auto& max_qr = metric_max_["query_results"];
+        if (static_cast<float32>(s.physics_detail.entity_query_results) > max_qr) {
+            max_qr = static_cast<float32>(s.physics_detail.entity_query_results);
+        }
+        ImGui::Text("query results: %d  max %d", s.physics_detail.entity_query_results, static_cast<int32>(max_qr));
+        ImGui::Text("steps: %d", s.physics_detail.step_count);
+        ImGui::Unindent();
+
         row("transform", s.transform_ms);
         row("model", s.model_ms);
 

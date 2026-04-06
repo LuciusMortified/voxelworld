@@ -28,7 +28,7 @@ world<Cs>::world(
     , animation_system_(context_, transform_system_, animation_clip_registry_)
     , animation_fsm_system_(context_, animation_system_)
     , character_controller_system_(context_, transform_system_)
-    , physics_system_(context_, transform_system_)
+    , physics_system_(context_, transform_system_, spatial_system_)
     , world_grid_system_(context_) {}
 
 template <typename Cs>
@@ -39,6 +39,7 @@ void world<Cs>::update(
         measure_ms([&] { character_controller_system_.update(delta_time); });
     update_stats_.animation_fsm_ms = measure_ms([&] { animation_fsm_system_.update(); });
     update_stats_.physics_ms       = measure_ms([&] { physics_system_.update(delta_time); });
+    update_stats_.physics_detail   = physics_system_.get_stats();
     update_stats_.transform_ms     = measure_ms([&] { transform_system_.update(); });
     update_stats_.model_ms         = measure_ms([&] { model_system_.update(); });
     update_stats_.spatial_ms       = measure_ms([&] { spatial_system_.update(); });
@@ -197,7 +198,7 @@ auto world<C>::destroyed() const -> const std::vector<entity>& {
 
 template <typename WC>
 auto world<WC>::voxel_ray_cast(
-    const ray& r, std::unordered_set<entity>& candidates
+    const ray& r, std::vector<entity>& candidates
 ) const -> std::optional<voxel_ray_hit> {
     return spatial_system_.voxel_ray_cast(r, candidates);
 }
