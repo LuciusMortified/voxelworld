@@ -60,7 +60,16 @@ void vox_deserializer<WC>::apply_entity_(
     if (data.animation_target_name.has_value() && !opts.skip_targets) {
         ent_guard->template with<animation_target_component>();
         auto& animation_system = world_->get_animation_system();
-        animation_system.modify_target(ent).set_target_name(*data.animation_target_name);
+        auto target_mod = animation_system.modify_target(ent);
+        target_mod.set_target_name(*data.animation_target_name);
+        if (data.has_transform) {
+            transform rest;
+            rest.set_position(data.position);
+            rest.set_rotation_euler(data.rotation);
+            rest.set_scale(data.scale);
+            rest.set_origin(data.origin);
+            target_mod.set_rest_transform(rest);
+        }
     }
 
     if (data.has_sockets && !opts.skip_sockets) {

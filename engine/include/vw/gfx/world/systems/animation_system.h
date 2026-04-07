@@ -93,6 +93,7 @@ public:
     class target_modifier {
     public:
         void set_target_name(std::string name) const;
+        void set_rest_transform(const transform& rest) const;
 
     private:
         friend class animation_system;
@@ -131,8 +132,12 @@ private:
     void apply_animation(entity root_ent, const animation_player_component& anim_comp);
 
     [[nodiscard]] auto compute_layer_transform(
-        const animation_layer& layer, const std::string& target_name
+        const animation_layer& layer, const std::string& target_name, const transform& rest
     ) const -> std::optional<transform>;
+
+    static auto merge_with_rest(
+        const transform& anim, const animation_track& track, const transform& rest
+    ) -> transform;
 
     context_type* context_;
     transform_system_type* transform_system_;

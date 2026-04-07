@@ -65,7 +65,13 @@ inline void remove_animation_target_operation::undo() {
     }
 
     guard->with<gfx::animation_target_component>();
-    anim_sys.modify_target(ent).set_target_name(saved_target_name_);
+    auto target_mod = anim_sys.modify_target(ent);
+    target_mod.set_target_name(saved_target_name_);
+    if (world.has_component<gfx::transform_component>(ent)) {
+        target_mod.set_rest_transform(
+            world.get_component<gfx::transform_component>(ent).get_transform()
+        );
+    }
 
     const auto root = find_animation_root_(ent);
     if (root.is_valid()) {

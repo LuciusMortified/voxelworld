@@ -84,16 +84,6 @@ inline auto render_debug_hud(
         ImGui::Text("Pending columns: %u", grid->get_pending_column_count());
     }
 
-    const auto& stats = engine.get_world().get_update_stats();
-    ImGui::Separator();
-    ImGui::Text("Character Controller: %.2f ms", stats.character_controller_ms);
-    ImGui::Text("Physics: %.2f ms", stats.physics_ms);
-    ImGui::Text("  Steps: %d", stats.physics_detail.step_count);
-    ImGui::Text("  Voxel collision: %.2f ms", stats.physics_detail.voxel_collision_ms);
-    ImGui::Text("  Entity collision: %.2f ms", stats.physics_detail.entity_collision_ms);
-    ImGui::Text("    Query: %.2f ms (%d results)", stats.physics_detail.entity_query_ms, stats.physics_detail.entity_query_results);
-    ImGui::Text("    Resolve: %.2f ms", stats.physics_detail.entity_resolve_ms);
-
     ImGui::End();
 }
 

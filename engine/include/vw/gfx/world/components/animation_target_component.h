@@ -5,6 +5,8 @@
 
 #include <string>
 
+#include "vw/core.h"
+
 namespace vw::gfx {
 
 template <typename>
@@ -15,9 +17,11 @@ public:
     animation_target_component() = default;
 
     [[nodiscard]] auto get_name() const -> const std::string&;
+    [[nodiscard]] auto get_rest_transform() const -> const transform&;
 
 private:
     std::string target_name_;
+    transform rest_transform_;
 
     template <typename>
     friend class animation_system;

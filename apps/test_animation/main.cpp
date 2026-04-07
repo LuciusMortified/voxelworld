@@ -88,15 +88,20 @@ private:
         red_->with<gfx::animation_target_component>();
 
         auto red_ent = red_->get_entity();
+        transform red_rest;
+        red_rest.set_position({-4.0f, 0.0f, 0.0f});
         transform_system  //
             .modify(red_ent)
-            .set_position({-4.0f, 0.0f, 0.0f});
+            .set_transform(red_rest);
         model_system  //
             .modify(red_ent)
             .set_model(red_cube_model);
         animation_system  //
             .modify_target(red_ent)
             .set_target_name("red");
+        animation_system  //
+            .modify_target(red_ent)
+            .set_rest_transform(red_rest);
         hierarchy_system  //
             .modify(red_ent)
             .set_parent(root_ent);
@@ -130,15 +135,20 @@ private:
         blue_->with<gfx::animation_target_component>();
 
         auto blue_ent = blue_->get_entity();
+        transform blue_rest;
+        blue_rest.set_position({4.0f, 0.0f, 0.0f});
         transform_system  //
             .modify(blue_ent)
-            .set_position({4.0f, 0.0f, 0.0f});
+            .set_transform(blue_rest);
         model_system  //
             .modify(blue_ent)
             .set_model(blue_cube_model);
         animation_system  //
             .modify_target(blue_ent)
             .set_target_name("blue");
+        animation_system  //
+            .modify_target(blue_ent)
+            .set_rest_transform(blue_rest);
         hierarchy_system  //
             .modify(blue_ent)
             .set_parent(root_ent);

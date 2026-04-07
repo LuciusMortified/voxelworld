@@ -242,7 +242,7 @@ void animation_system<WC>::process_layer(
 
 template <typename WC>
 auto animation_system<WC>::compute_layer_transform(
-    const animation_layer& layer, const std::string& target_name
+    const animation_layer& layer, const std::string& target_name, const transform& rest
 ) const -> std::optional<transform> {
     if (!layer.clip) {
         return std::nullopt;
@@ -258,7 +258,7 @@ auto animation_system<WC>::compute_layer_transform(
         return std::nullopt;
     }
 
-    transform t = *transform_result;
+    transform t = merge_with_rest(*transform_result, *track, rest);
 
     bool is_blending = layer.blend_transition.duration > 0.0f &&
         (layer.blend_prev_clip || !layer.blend_snapshot.empty());
@@ -280,7 +280,8 @@ auto animation_system<WC>::compute_layer_transform(
             if (prev_track) {
                 auto prev_result = prev_track->get_transform(layer.blend_prev_time);
                 if (prev_result) {
-                    t = math::lerp(*prev_result, t, blend_factor);
+                    transform prev_merged = merge_with_rest(*prev_result, *prev_track, rest);
+                    t = math::lerp(prev_merged, t, blend_factor);
                 }
             }
         }
@@ -309,6 +310,17 @@ void animation_system<WC>::apply_animation(
         return;
     }
 
+    auto get_rest = [&](const std::string& name) -> transform {
+        auto it = target_map->find(name);
+        if (it != target_map->end() &&
+            context_->registry().template has<animation_target_component>(it->second)) {
+            return context_->registry()
+                .template get<animation_target_component>(it->second)
+                .get_rest_transform();
+        }
+        return {};
+    };
+
     std::unordered_map<std::string, transform> final_transforms;
 
     if (!anim_comp.layers_.empty()) {
@@ -316,7 +328,8 @@ void animation_system<WC>::apply_animation(
         if (base.clip) {
             for (const auto& track : base.clip->get_tracks()) {
                 const auto& name = track.get_target_name();
-                auto t           = compute_layer_transform(base, name);
+                auto rest        = get_rest(name);
+                auto t           = compute_layer_transform(base, name, rest);
                 if (t) {
                     final_transforms[name] = *t;
                 }
@@ -338,17 +351,19 @@ void animation_system<WC>::apply_animation(
                         continue;
                     }
 
+                    auto rest = get_rest(name);
+
                     auto snapshot_it = base.blend_snapshot.find(name);
                     if (snapshot_it != base.blend_snapshot.end()) {
-                        transform identity;
                         final_transforms[name] =
-                            math::lerp(snapshot_it->second, identity, blend_factor);
+                            math::lerp(snapshot_it->second, rest, blend_factor);
                     } else {
                         auto prev_result = prev_track.get_transform(base.blend_prev_time);
                         if (prev_result) {
-                            transform identity;
+                            transform prev_merged =
+                                merge_with_rest(*prev_result, prev_track, rest);
                             final_transforms[name] =
-                                math::lerp(*prev_result, identity, blend_factor);
+                                math::lerp(prev_merged, rest, blend_factor);
                         }
                     }
                 }
@@ -363,7 +378,8 @@ void animation_system<WC>::apply_animation(
         }
 
         for (const auto& target_name : layer.mask) {
-            auto t = compute_layer_transform(layer, target_name);
+            auto rest = get_rest(target_name);
+            auto t    = compute_layer_transform(layer, target_name, rest);
             if (!t) {
                 continue;
             }
@@ -372,8 +388,7 @@ void animation_system<WC>::apply_animation(
             if (base_it != final_transforms.end()) {
                 base_it->second = math::lerp(base_it->second, *t, layer.fade_influence);
             } else {
-                transform identity;
-                final_transforms[target_name] = math::lerp(identity, *t, layer.fade_influence);
+                final_transforms[target_name] = math::lerp(rest, *t, layer.fade_influence);
             }
         }
     }
@@ -566,6 +581,24 @@ void animation_system<WC>::layer_modifier::blend_to(
                 layer_->blend_transition.tangent_out
             );
 
+            const auto* target_map = system_->get_cached_target_map(entity_);
+
+            auto get_rest = [&](const std::string& name) -> transform {
+                if (!target_map) {
+                    return {};
+                }
+                auto it = target_map->find(name);
+                if (it != target_map->end() &&
+                    system_->context_->registry().template has<animation_target_component>(
+                        it->second
+                    )) {
+                    return system_->context_->registry()
+                        .template get<animation_target_component>(it->second)
+                        .get_rest_transform();
+                }
+                return {};
+            };
+
             auto old_snapshot = std::move(layer_->blend_snapshot);
             layer_->blend_snapshot.clear();
 
@@ -576,7 +609,8 @@ void animation_system<WC>::layer_modifier::blend_to(
                     continue;
                 }
 
-                transform blended = *cur_result;
+                auto rest             = get_rest(name);
+                transform blended = merge_with_rest(*cur_result, track, rest);
 
                 auto snapshot_it = old_snapshot.find(name);
                 if (snapshot_it != old_snapshot.end()) {
@@ -586,7 +620,9 @@ void animation_system<WC>::layer_modifier::blend_to(
                     if (prev_track) {
                         auto prev_result = prev_track->get_transform(layer_->blend_prev_time);
                         if (prev_result) {
-                            blended = math::lerp(*prev_result, blended, bf);
+                            transform prev_merged =
+                                merge_with_rest(*prev_result, *prev_track, rest);
+                            blended = math::lerp(prev_merged, blended, bf);
                         }
                     }
                 }
@@ -656,6 +692,43 @@ void animation_system<WC>::target_modifier::set_target_name(
     std::string name
 ) const {
     component_->target_name_ = std::move(name);
+}
+
+template <typename WC>
+void animation_system<WC>::target_modifier::set_rest_transform(
+    const transform& rest
+) const {
+    component_->rest_transform_ = rest;
+}
+
+template <typename WC>
+auto animation_system<WC>::merge_with_rest(
+    const transform& anim, const animation_track& track, const transform& rest
+) -> transform {
+    auto has_keyframes = [&](animation_property prop) -> bool {
+        const auto* ch = track.get_channel(prop);
+        if (!ch) {
+            return false;
+        }
+        return std::visit([](const auto& c) { return c.keyframe_count() > 0; }, *ch);
+    };
+
+    transform result = anim;
+
+    if (!has_keyframes(animation_property::position)) {
+        result.set_position(rest.get_position());
+    }
+    if (!has_keyframes(animation_property::rotation)) {
+        result.set_rotation(rest.get_rotation());
+    }
+    if (!has_keyframes(animation_property::scale)) {
+        result.set_scale(rest.get_scale());
+    }
+    if (!has_keyframes(animation_property::origin)) {
+        result.set_origin(rest.get_origin());
+    }
+
+    return result;
 }
 
 }  // namespace vw::gfx

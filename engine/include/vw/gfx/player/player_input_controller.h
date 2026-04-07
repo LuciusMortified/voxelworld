@@ -48,8 +48,11 @@ private:
     float32 accumulated_look_y_{0.0f};
     float32 accumulated_scroll_{0.0f};
 
+    bool attack_pressed_{false};
+
     event_sub<mouse_move_event> mouse_move_sub_;
     event_sub<mouse_scroll_event> mouse_scroll_sub_;
+    event_sub<mouse_press_event> mouse_press_sub_;
 };
 
 }  // namespace vw::gfx

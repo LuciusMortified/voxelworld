@@ -51,7 +51,45 @@ inline auto player::update(
 ) -> void {
     const auto ent = root_->get_entity();
     auto& world    = engine_.get_world();
+    auto& camera   = engine_.get_camera();
     const auto& rb = world.get_component<gfx::rigid_body_component>(ent);
+
+    auto forward = camera.get_forward();
+    forward.y    = 0.0f;
+    forward      = math::normalize(forward);
+
+    auto right = camera.get_right();
+    right.y    = 0.0f;
+    right      = math::normalize(right);
+
+    const vec3f move_dir =
+        math::normalize(forward * input.move_input.x + right * input.move_input.y);
+
+    auto modifier = world.get_character_controller_system().modify(ent);
+    modifier.set_move_input(move_dir);
+
+    const auto& anim_player  = world.get_component<gfx::animation_player_component>(ent);
+    const auto& action_layer = anim_player.get_layer(1);
+    is_attacking_            = action_layer.is_active();
+
+    if (is_attacking_) {
+        modifier.set_facing_direction(attack_facing_);
+        modifier.set_rotation_speed(attack_rotation_speed_);
+    } else {
+        modifier.set_rotation_speed(default_rotation_speed_);
+        if (math::length(move_dir) > math::epsilon) {
+            modifier.set_facing_direction(move_dir);
+        }
+    }
+
+    if (input.attack_requested && can_attack()) {
+        attack_facing_ = forward;
+        handle_attack();
+    }
+
+    if (input.jump_requested) {
+        modifier.request_jump();
+    }
 
     if (input.jump_requested && rb.is_grounded()) {
         need_update_jump_ = true;
@@ -114,20 +152,17 @@ inline auto player::toggle_sword() -> void {
     }
 }
 
-inline auto player::handle_attack() -> void {
-    if (!sword_) {
-        return;
-    }
+inline auto player::handle_attack() const -> void {
+    engine_.get_world()
+        .get_animation_fsm_system()
+        .modify(root_->get_entity())
+        .fire_trigger("attack");
+}
 
-    const auto ent = root_->get_entity();
-    auto& world    = engine_.get_world();
-
-    const auto& anim_player = world.get_component<gfx::animation_player_component>(ent);
-    const auto& layer       = anim_player.get_layer(1);
-
-    if (!layer.is_active()) {
-        world.get_animation_fsm_system().modify(ent).fire_trigger("attack");
-    }
+inline auto player::can_attack() const -> bool {
+    const auto& anim_player =
+        engine_.get_world().get_component<gfx::animation_player_component>(root_->get_entity());
+    return sword_ != nullptr && !anim_player.get_layer(1).is_active();
 }
 
 inline auto player::get_entity() const -> gfx::entity {
@@ -167,16 +202,20 @@ inline auto player::create_body_part(
 
     hierarchy_system.modify(ent).set_parent(root_->get_entity());
 
-    transform_system.modify(ent)
-        .set_position(ent_data.position)
-        .set_rotation_euler(ent_data.rotation)
-        .set_scale(ent_data.scale)
-        .set_origin(ent_data.origin);
+    transform rest;
+    rest.set_position(ent_data.position);
+    rest.set_rotation_euler(ent_data.rotation);
+    rest.set_scale(ent_data.scale);
+    rest.set_origin(ent_data.origin);
+
+    transform_system.modify(ent).set_transform(rest);
 
     const auto model = assets_.get_model(prefab_name, part_name);
     model_system.modify(ent).set_model(model);
 
-    animation_system.modify_target(ent).set_target_name(ent_data.name);
+    const auto target_mod = animation_system.modify_target(ent);
+    target_mod.set_target_name(ent_data.name);
+    target_mod.set_rest_transform(rest);
 
     if (ent_data.has_sockets) {
         auto& socket_system = world.get_socket_system();
@@ -212,7 +251,7 @@ inline auto player::setup_animation_fsm() const -> void {
         const auto& rb = world.get_component<gfx::rigid_body_component>(ent);
         return jump_counter_ == 1 && !rb.is_grounded();
     };
-    auto is_grounded   = [&, ent]() -> bool {
+    auto is_grounded = [&, ent]() -> bool {
         const auto& rb = world.get_component<gfx::rigid_body_component>(ent);
         return rb.is_grounded();
     };
@@ -320,6 +359,7 @@ inline auto player::setup_animation_fsm() const -> void {
         .name            = "sword_attack",
         .clip            = assets_.get_clip("a_sword_attack"),
         .loop_mode       = gfx::animation_loop_mode::once,
+        .playback_speed  = 2.f,
         .layer_blend_in  = blend_normal,
         .layer_blend_out = blend_slow,
         .transitions =

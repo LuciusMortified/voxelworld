@@ -27,15 +27,10 @@ inline arena_app::arena_app(
               .zoom_speed     = 5.0f,
               .collision_skin = 2.0f
           }
-      )
-    , player_controller_(get_engine().get_camera(), get_engine().get_world()) {
+      ) {
     auto& window = get_engine().get_window();
     window.sub<gfx::key_press_event>([this](const gfx::key_press_event& event) -> bool {
         handle_key_press(event.key);
-        return true;
-    });
-    window.sub<gfx::mouse_press_event>([this](const gfx::mouse_press_event& event) -> bool {
-        handle_mouse_press(event.button);
         return true;
     });
     window.sub<gfx::window_close_event>([this](gfx::window_close_event&) -> bool {
@@ -91,7 +86,6 @@ inline void arena_app::render(
 
     if (player_->is_placed()) {
         const auto player_ent = player_->get_entity();
-        player_controller_.update(input, player_ent);
         camera_controller_.update(input, player_ent);
         player_->update(input);
     }
@@ -106,11 +100,11 @@ inline void arena_app::render(
 inline auto arena_app::load_assets() -> void {
     assets_.load_prefab("m_human", "assets/models/m_human.vox");
     assets_.load_prefab("m_sword", "assets/models/m_sword.vox");
-    assets_.load_clip("a_idle", "assets/animations/a_idle_0.voxa");
-    assets_.load_clip("a_walk", "assets/animations/a_walk_0.voxa");
-    assets_.load_clip("a_jump_left", "assets/animations/a_jump_left_1.voxa");
-    assets_.load_clip("a_jump_right", "assets/animations/a_jump_right_1.voxa");
-    assets_.load_clip("a_sword_attack", "assets/animations/a_sword_attack_3.voxa");
+    assets_.load_clip("a_idle", "assets/animations/a_idle.voxa");
+    assets_.load_clip("a_walk", "assets/animations/a_walk.voxa");
+    assets_.load_clip("a_jump_left", "assets/animations/a_jump_left.voxa");
+    assets_.load_clip("a_jump_right", "assets/animations/a_jump_right.voxa");
+    assets_.load_clip("a_sword_attack", "assets/animations/a_sword_attack.voxa");
 }
 
 inline auto arena_app::handle_key_press(
@@ -143,18 +137,5 @@ inline auto arena_app::handle_key_press(
     }
 }
 
-inline auto arena_app::handle_mouse_press(
-    gfx::mouse::buttons button
-) const -> void {
-    switch (button) {
-        case gfx::mouse::buttons::LEFT:
-            if (player_->is_placed()) {
-                player_->handle_attack();
-            }
-            break;
-        default:
-            break;
-    }
-}
 
 }  // namespace vw::arena

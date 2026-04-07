@@ -15,7 +15,6 @@
 #include "vw/gfx/model/model_registry.h"
 #include "vw/gfx/player/player_input_controller.h"
 #include "vw/gfx/player/player_input_state.h"
-#include "vw/gfx/player/third_person_player_controller.h"
 #include "vw/gfx/render/renderer.h"
 #include "vw/gfx/render/vulkan_context.h"
 #include "vw/gfx/resource/buffer.h"

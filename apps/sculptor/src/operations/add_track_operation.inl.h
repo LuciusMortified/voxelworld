@@ -50,9 +50,14 @@ inline void add_track_operation::execute() {
         if (guard && !guard->has<gfx::animation_target_component>()) {
             added_target_component_ = true;
             guard->with<gfx::animation_target_component>();
-            engine_->get_world().get_animation_system().modify_target(ent).set_target_name(
-                params_.track_name
-            );
+            auto& world     = engine_->get_world();
+            auto target_mod = world.get_animation_system().modify_target(ent);
+            target_mod.set_target_name(params_.track_name);
+            if (world.has_component<gfx::transform_component>(ent)) {
+                target_mod.set_rest_transform(
+                    world.get_component<gfx::transform_component>(ent).get_transform()
+                );
+            }
         }
     }
 

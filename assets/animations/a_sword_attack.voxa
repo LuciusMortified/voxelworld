@@ -3,7 +3,6 @@ clip a_sword_attack_0
 
 track hand_right 60
   channel origin
-    k 0 -2.5 -3.5 -2.5 linear 0 1
   channel position
     k 0 10 2 0 linear 0 1
     k 0.2 9.5 8 10 linear 0 1
@@ -17,7 +16,6 @@ track hand_right 60
 
 track hand_left 60
   channel origin
-    k 0 -2.5 -3.5 -2.5 linear 0 1
   channel position
     k 0 -10 2 0 linear 0 1
     k 0.199807 -11 2 -3.4 linear 0 1
