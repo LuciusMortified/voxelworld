@@ -6,6 +6,7 @@
 #include "vw/gfx/animation/animation_fsm.h"
 #include "vw/gfx/world/components/animation_player_component.h"
 #include "vw/gfx/world/components/animation_fsm_component.h"
+#include "vw/gfx/world/system_trait.h"
 #include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/world_context.h"
 
@@ -17,16 +18,12 @@ class animation_system;
 template <typename WC>
 class animation_fsm_system final {
 public:
-    using registry_type         = entity_registry_from_tuple<WC>::type;
-    using context_type          = world_context<WC>;
-    using animation_system_type = animation_system<WC>;
+    using registry_type = entity_registry_from_tuple<WC>::type;
+    using context_type  = world_context<WC>;
 
-    explicit animation_fsm_system(
-        context_type& context,
-        animation_system_type& anim_system
-    );
+    explicit animation_fsm_system(context_type& context);
 
-    void update();
+    void update(float32 dt);
 
     class modifier {
     public:
@@ -44,10 +41,16 @@ public:
 
 private:
     context_type* context_;
-    animation_system_type* anim_system_;
 };
 
 }  // namespace vw::gfx
+
+template <>
+struct vw::gfx::system_trait<vw::gfx::animation_fsm_system> {
+    using components = std::tuple<vw::gfx::animation_fsm_component>;
+    using depends_on = vw::gfx::system_list<vw::gfx::animation_system>;
+    using resources  = std::tuple<>;
+};
 
 #include "vw/gfx/world/systems/animation_fsm_system.inl.h"
 

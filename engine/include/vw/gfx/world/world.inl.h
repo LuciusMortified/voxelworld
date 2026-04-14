@@ -20,16 +20,30 @@ world<Cs>::world(
     : mesh_pool_{context, registry}
     , context_{registry_, &mesh_pool_}
     , spatial_system_(context_)
-    , transform_system_(context_, hierarchy_system_)
-    , hierarchy_system_(context_, transform_system_)
+    , transform_system_(context_)
+    , hierarchy_system_(context_)
     , model_system_(context_)
     , light_system_(context_)
-    , socket_system_(context_, hierarchy_system_, transform_system_)
-    , animation_system_(context_, transform_system_, animation_clip_registry_)
-    , animation_fsm_system_(context_, animation_system_)
-    , character_controller_system_(context_, transform_system_)
-    , physics_system_(context_, transform_system_, spatial_system_)
-    , world_grid_system_(context_) {}
+    , socket_system_(context_)
+    , animation_system_(context_)
+    , animation_fsm_system_(context_)
+    , character_controller_system_(context_)
+    , physics_system_(context_)
+    , world_grid_system_(context_) {
+    context_.register_system_(&spatial_system_);
+    context_.register_system_(&transform_system_);
+    context_.register_system_(&hierarchy_system_);
+    context_.register_system_(&model_system_);
+    context_.register_system_(&light_system_);
+    context_.register_system_(&socket_system_);
+    context_.register_system_(&animation_system_);
+    context_.register_system_(&animation_fsm_system_);
+    context_.register_system_(&character_controller_system_);
+    context_.register_system_(&physics_system_);
+    context_.register_system_(&world_grid_system_);
+    context_.register_resource_(&model_registry_);
+    context_.register_resource_(&animation_clip_registry_);
+}
 
 template <typename Cs>
 void world<Cs>::update(
@@ -37,14 +51,14 @@ void world<Cs>::update(
 ) {
     update_stats_.character_controller_ms =
         measure_ms([&] { character_controller_system_.update(delta_time); });
-    update_stats_.animation_fsm_ms = measure_ms([&] { animation_fsm_system_.update(); });
+    update_stats_.animation_fsm_ms = measure_ms([&] { animation_fsm_system_.update(delta_time); });
     update_stats_.physics_ms       = measure_ms([&] { physics_system_.update(delta_time); });
     update_stats_.physics_detail   = physics_system_.get_stats();
-    update_stats_.transform_ms     = measure_ms([&] { transform_system_.update(); });
-    update_stats_.model_ms         = measure_ms([&] { model_system_.update(); });
-    update_stats_.spatial_ms       = measure_ms([&] { spatial_system_.update(); });
-    update_stats_.light_ms         = measure_ms([&] { light_system_.update(); });
-    update_stats_.world_grid_ms    = measure_ms([&] { world_grid_system_.update(); });
+    update_stats_.transform_ms     = measure_ms([&] { transform_system_.update(delta_time); });
+    update_stats_.model_ms         = measure_ms([&] { model_system_.update(delta_time); });
+    update_stats_.spatial_ms       = measure_ms([&] { spatial_system_.update(delta_time); });
+    update_stats_.light_ms         = measure_ms([&] { light_system_.update(delta_time); });
+    update_stats_.world_grid_ms    = measure_ms([&] { world_grid_system_.update(delta_time); });
     update_stats_.animation_ms     = measure_ms([&] { animation_system_.update(delta_time); });
 }
 

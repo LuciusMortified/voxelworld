@@ -18,7 +18,7 @@ model_system<WC>::model_system(
     : context_(&context) {}
 
 template <typename WC>
-void model_system<WC>::update() {
+void model_system<WC>::update(float32 /*dt*/) {
     using clock = std::chrono::high_resolution_clock;
     auto ms = [](auto start, auto end) -> float32 {
         return std::chrono::duration<float32>(end - start).count() * 1000.0f;

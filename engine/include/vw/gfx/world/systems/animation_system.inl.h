@@ -2,15 +2,13 @@
 
 #include <vector>
 
+#include "vw/gfx/world/systems/transform_system.h"
+
 namespace vw::gfx {
 
 template <typename WC>
-animation_system<WC>::animation_system(
-    context_type& context,
-    transform_system_type& transform_sys,
-    animation_clip_registry& clip_registry
-)
-    : context_(&context), transform_system_(&transform_sys), clip_registry_(&clip_registry) {}
+animation_system<WC>::animation_system(context_type& context)
+    : context_(&context) {}
 
 template <typename WC>
 auto animation_system<WC>::get_target_fps() const -> float32 {
@@ -404,7 +402,7 @@ void animation_system<WC>::apply_animation(
             continue;
         }
 
-        auto modifier = transform_system_->modify(target_ent);
+        auto modifier = context_->template get_system<transform_system>().modify(target_ent);
         modifier.set_transform_with_matrix(t, t.calc_matrix());
     }
 }
@@ -667,7 +665,7 @@ template <typename WC>
 void animation_system<WC>::layer_modifier::blend_to_by_name(
     std::string_view name, std::optional<transition> t
 ) {
-    auto clip = system_->clip_registry_->get(name);
+    auto clip = system_->context_->template get_resource<animation_clip_registry>().get(name);
     if (clip) {
         blend_to(std::move(clip), t);
     }

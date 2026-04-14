@@ -25,7 +25,7 @@ auto world_grid_system<WC>::get_stats() const -> const world_grid_system_stats& 
 }
 
 template <typename WC>
-void world_grid_system<WC>::update() {
+void world_grid_system<WC>::update(float32 /*dt*/) {
     if (!context_->get_world_grid()) {
         return;
     }

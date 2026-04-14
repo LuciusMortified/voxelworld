@@ -10,6 +10,7 @@
 
 #include "vw/gfx/world/components/world_view_component.h"
 #include "vw/gfx/world/entity_registry.h"
+#include "vw/gfx/world/system_trait.h"
 #include "vw/gfx/world/world_context.h"
 #include "vw/gfx/world_grid/world_grid.h"
 
@@ -36,7 +37,7 @@ public:
 
     [[nodiscard]] auto get_world_grid() const -> std::shared_ptr<world_grid<WC>>;
 
-    void update();
+    void update(float32 dt);
 
     [[nodiscard]] auto get_stats() const -> const world_grid_system_stats&;
 
@@ -72,6 +73,13 @@ private:
 };
 
 }  // namespace vw::gfx
+
+template <>
+struct vw::gfx::system_trait<vw::gfx::world_grid_system> {
+    using components = std::tuple<vw::gfx::world_view_component>;
+    using depends_on = vw::gfx::system_list<>;
+    using resources  = std::tuple<>;
+};
 
 #include "vw/gfx/world/systems/world_grid_system.inl.h"
 

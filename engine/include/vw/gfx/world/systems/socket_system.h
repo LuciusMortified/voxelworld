@@ -4,6 +4,7 @@
 #define VW_GFX_WORLD_SYSTEMS_SOCKET_SYSTEM_H
 
 #include "vw/gfx/world/components/socket_component.h"
+#include "vw/gfx/world/system_trait.h"
 #include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
@@ -17,16 +18,10 @@ class transform_system;
 template <typename WC>
 class socket_system final {
 public:
-    using registry_type         = entity_registry_from_tuple<WC>::type;
-    using context_type          = world_context<WC>;
-    using hierarchy_system_type = hierarchy_system<WC>;
-    using transform_system_type = transform_system<WC>;
+    using registry_type = entity_registry_from_tuple<WC>::type;
+    using context_type  = world_context<WC>;
 
-    explicit socket_system(
-        context_type& context,
-        hierarchy_system_type& hierarchy_system,
-        transform_system_type& transform_system
-    );
+    explicit socket_system(context_type& context);
 
     class socket_modifier {
     public:
@@ -50,15 +45,20 @@ public:
 
     auto modify(entity ent) -> socket_modifier;
     void cleanup(entity ent);
-    void update();
+    void update(float32 dt);
 
 private:
     context_type* context_;
-    hierarchy_system_type* hierarchy_system_;
-    transform_system_type* transform_system_;
 };
 
 }  // namespace vw::gfx
+
+template <>
+struct vw::gfx::system_trait<vw::gfx::socket_system> {
+    using components = std::tuple<vw::gfx::socket_component>;
+    using depends_on = vw::gfx::system_list<vw::gfx::hierarchy_system, vw::gfx::transform_system>;
+    using resources  = std::tuple<>;
+};
 
 #include "vw/gfx/world/systems/socket_system.inl.h"
 

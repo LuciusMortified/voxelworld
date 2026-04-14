@@ -12,17 +12,11 @@
 namespace vw::gfx {
 
 template <typename WC>
-socket_system<WC>::socket_system(
-    context_type& context,
-    hierarchy_system_type& hierarchy_system,
-    transform_system_type& transform_system
-)
-    : context_(&context)
-    , hierarchy_system_(&hierarchy_system)
-    , transform_system_(&transform_system) {}
+socket_system<WC>::socket_system(context_type& context)
+    : context_(&context) {}
 
 template <typename WC>
-void socket_system<WC>::update() {}
+void socket_system<WC>::update(float32 /*dt*/) {}
 
 template <typename WC>
 void socket_system<WC>::cleanup(
@@ -34,7 +28,7 @@ void socket_system<WC>::cleanup(
     auto& comp = context_->registry().template get<socket_component>(ent);
     for (auto& slot : comp.sockets_) {
         if (slot.attached.is_valid()) {
-            hierarchy_system_->modify(slot.attached).remove_parent();
+            context_->template get_system<hierarchy_system>().modify(slot.attached).remove_parent();
             slot.attached = invalid_entity;
         }
     }
@@ -68,8 +62,8 @@ auto socket_system<WC>::socket_modifier::attach(
         return *this;
     }
     it->attached = child;
-    system_->hierarchy_system_->modify(child).set_parent(entity_);
-    system_->transform_system_->modify(child)
+    system_->context_->template get_system<hierarchy_system>().modify(child).set_parent(entity_);
+    system_->context_->template get_system<transform_system>().modify(child)
         .set_position(it->position)
         .set_rotation(it->rotation)
         .set_scale(it->scale);
@@ -92,7 +86,7 @@ auto socket_system<WC>::socket_modifier::detach(
     }
     auto detached = it->attached;
     it->attached  = invalid_entity;
-    system_->hierarchy_system_->modify(detached).remove_parent();
+    system_->context_->template get_system<hierarchy_system>().modify(detached).remove_parent();
     return *this;
 }
 
@@ -125,7 +119,7 @@ auto socket_system<WC>::socket_modifier::remove_socket(
     if (it->attached.is_valid()) {
         auto detached = it->attached;
         it->attached  = invalid_entity;
-        system_->hierarchy_system_->modify(detached).remove_parent();
+        system_->context_->template get_system<hierarchy_system>().modify(detached).remove_parent();
     }
     comp.sockets_.erase(it);
     return *this;

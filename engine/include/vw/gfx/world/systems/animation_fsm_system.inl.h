@@ -8,13 +8,11 @@
 namespace vw::gfx {
 
 template <typename WC>
-animation_fsm_system<WC>::animation_fsm_system(
-    context_type& context, animation_system_type& anim_system
-)
-    : context_(&context), anim_system_(&anim_system) {}
+animation_fsm_system<WC>::animation_fsm_system(context_type& context)
+    : context_(&context) {}
 
 template <typename WC>
-void animation_fsm_system<WC>::update() {
+void animation_fsm_system<WC>::update(float32 /*dt*/) {
     auto view =
         context_->registry()
             .template view<animation_fsm_component, animation_player_component>();
@@ -22,7 +20,7 @@ void animation_fsm_system<WC>::update() {
     for (auto [ent, fsm_comp, player_comp] : view) {
         auto& triggers = fsm_comp.triggers_;
         for (size_t i = 0; i < fsm_comp.machine_count(); ++i) {
-            auto pm = anim_system_->modify_player(ent);
+            auto pm = context_->template get_system<animation_system>().modify_player(ent);
             if (!player_comp.has_layer(i)) {
                 pm.add_layer(i);
                 pm.rebuild_target_map();

@@ -46,7 +46,7 @@ auto spatial_system<WC>::spatial_modifier::set_layer(
 }
 
 template <typename WC>
-void spatial_system<WC>::update() {
+void spatial_system<WC>::update(float32 /*dt*/) {
     auto& requested = context_->registry().template requested<spatial_component>();
     if (requested.empty()) {
         return;

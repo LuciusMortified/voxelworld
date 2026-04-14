@@ -9,11 +9,8 @@
 namespace vw::gfx {
 
 template <typename WC>
-character_controller_system<WC>::character_controller_system(
-    context_type& context, transform_system_type& transform_system
-)
-    : context_(&context)
-    , transform_system_(&transform_system) {}
+character_controller_system<WC>::character_controller_system(context_type& context)
+    : context_(&context) {}
 
 template <typename WC>
 void character_controller_system<WC>::update(float32 delta_time) {
@@ -41,7 +38,7 @@ void character_controller_system<WC>::update(float32 delta_time) {
             auto target = math::quat_look_y(cc.facing_direction_);
             auto current = tc.get_rotation();
             float32 t = math::clamp(cc.rotation_speed_ * delta_time, 0.0f, 1.0f);
-            transform_system_->modify(ent).set_rotation(math::slerp(current, target, t));
+            context_->template get_system<transform_system>().modify(ent).set_rotation(math::slerp(current, target, t));
         }
 
         cc.jump_requested_ = false;

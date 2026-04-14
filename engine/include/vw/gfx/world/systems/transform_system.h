@@ -5,6 +5,7 @@
 
 #include <vector>
 
+#include "vw/gfx/world/system_trait.h"
 #include "vw/gfx/world/world_context.h"
 
 namespace vw {
@@ -23,11 +24,10 @@ class transform_system final {
 public:
     using context_type  = world_context<WC>;
     using registry_type = entity_registry_from_tuple<WC>::type;
-    using hierarchy_system_type = hierarchy_system<WC>;
 
-    explicit transform_system(context_type& context, hierarchy_system_type& hierarchy_sys);
+    explicit transform_system(context_type& context);
 
-    void update();
+    void update(float32 dt);
 
     class transform_modifier {
     public:
@@ -52,7 +52,7 @@ public:
         entity entity_;
     };
 
-    transform_modifier modify(entity ent);
+    [[nodiscard]] auto modify(entity ent) -> transform_modifier;
 
 private:
     void mark_children_world_dirty(entity ent);
@@ -60,12 +60,17 @@ private:
     void update_entity_world_matrix(entity ent, const transform_component& transform_comp);
 
     context_type* context_;
-    hierarchy_system_type* hierarchy_system_;
-
     std::vector<entity> sorted_entities_;
 };
 
 }  // namespace vw::gfx
+
+template <>
+struct vw::gfx::system_trait<vw::gfx::transform_system> {
+    using components = std::tuple<vw::gfx::transform_component>;
+    using depends_on = vw::gfx::system_list<vw::gfx::hierarchy_system>;
+    using resources  = std::tuple<>;
+};
 
 #include "vw/gfx/world/systems/transform_system.inl.h"
 

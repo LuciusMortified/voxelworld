@@ -13,6 +13,7 @@
 #include "vw/gfx/spatial/frustum.h"
 #include "vw/gfx/spatial/ray.h"
 #include "vw/gfx/world/components/spatial_component.h"
+#include "vw/gfx/world/system_trait.h"
 #include "vw/gfx/world/spatial_layer.h"
 #include "vw/gfx/world/world_context.h"
 
@@ -31,7 +32,7 @@ public:
         context_type& context
     );
 
-    void update();
+    void update(float32 dt);
 
     void query_all(
         const frustum& f,
@@ -92,6 +93,13 @@ private:
 };
 
 }  // namespace vw::gfx
+
+template <>
+struct vw::gfx::system_trait<vw::gfx::spatial_system> {
+    using components = std::tuple<vw::gfx::spatial_component>;
+    using depends_on = vw::gfx::system_list<>;
+    using resources  = std::tuple<>;
+};
 
 #include "vw/gfx/world/systems/spatial_system.inl.h"
 

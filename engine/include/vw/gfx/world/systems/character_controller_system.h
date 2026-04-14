@@ -5,6 +5,7 @@
 
 #include "vw/gfx/world/components/character_controller_component.h"
 #include "vw/gfx/world/components/movement_intent_component.h"
+#include "vw/gfx/world/system_trait.h"
 #include "vw/gfx/world/components/rigid_body_component.h"
 #include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/world_context.h"
@@ -17,13 +18,10 @@ class transform_system;
 template <typename WC>
 class character_controller_system final {
 public:
-    using context_type          = world_context<WC>;
-    using registry_type         = entity_registry_from_tuple<WC>::type;
-    using transform_system_type = transform_system<WC>;
+    using context_type  = world_context<WC>;
+    using registry_type = entity_registry_from_tuple<WC>::type;
 
-    explicit character_controller_system(
-        context_type& context, transform_system_type& transform_system
-    );
+    explicit character_controller_system(context_type& context);
 
     void update(float32 delta_time);
 
@@ -48,10 +46,18 @@ public:
 
 private:
     context_type* context_;
-    transform_system_type* transform_system_;
 };
 
 }  // namespace vw::gfx
+
+template <>
+struct vw::gfx::system_trait<vw::gfx::character_controller_system> {
+    using components = std::tuple<
+        vw::gfx::character_controller_component,
+        vw::gfx::movement_intent_component>;
+    using depends_on = vw::gfx::system_list<vw::gfx::transform_system>;
+    using resources  = std::tuple<>;
+};
 
 #include "vw/gfx/world/systems/character_controller_system.inl.h"
 

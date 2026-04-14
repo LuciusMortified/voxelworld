@@ -42,10 +42,18 @@ struct anim_test_fixture {
     test_registry reg;
     test_context ctx{reg};
     test_spatial_sys spatial_sys{ctx};
-    test_transform_sys transform_sys{ctx, hierarchy_sys};
-    test_hierarchy_sys hierarchy_sys{ctx, transform_sys};
+    test_transform_sys transform_sys{ctx};
+    test_hierarchy_sys hierarchy_sys{ctx};
     animation_clip_registry clip_reg;
-    test_anim_sys anim_sys{ctx, transform_sys, clip_reg};
+    test_anim_sys anim_sys{ctx};
+
+    anim_test_fixture() {
+        ctx.register_system_(&spatial_sys);
+        ctx.register_system_(&transform_sys);
+        ctx.register_system_(&hierarchy_sys);
+        ctx.register_system_(&anim_sys);
+        ctx.register_resource_(&clip_reg);
+    }
 
     auto create_root() -> entity {
         auto ent = reg.create();

@@ -6,6 +6,7 @@
 #include <unordered_set>
 
 #include "vw/gfx/world/components/light_component.h"
+#include "vw/gfx/world/system_trait.h"
 #include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
@@ -18,7 +19,7 @@ public:
 
     explicit light_system(context_type& context);
 
-    void update();
+    void update(float32 dt);
 
     class light_modifier {
     public:
@@ -42,6 +43,13 @@ private:
 };
 
 }  // namespace vw::gfx
+
+template <>
+struct vw::gfx::system_trait<vw::gfx::light_system> {
+    using components = std::tuple<vw::gfx::light_component>;
+    using depends_on = vw::gfx::system_list<>;
+    using resources  = std::tuple<>;
+};
 
 #include "vw/gfx/world/systems/light_system.inl.h"
 

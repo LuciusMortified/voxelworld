@@ -9,15 +9,13 @@
 #include "vw/gfx/world/components/hierarchy_component.h"
 #include "vw/gfx/world/components/spatial_component.h"
 #include "vw/gfx/world/components/transform_component.h"
+#include "vw/gfx/world/systems/hierarchy_system.h"
 
 namespace vw::gfx {
 
 template <typename WC>
-transform_system<WC>::transform_system(
-    context_type& context,
-    hierarchy_system<WC>& hierarchy_sys
-)
-    : context_(&context), hierarchy_system_(&hierarchy_sys) {}
+transform_system<WC>::transform_system(context_type& context)
+    : context_(&context) {}
 
 template <typename WC>
 transform_system<WC>::transform_modifier::transform_modifier(
@@ -240,7 +238,7 @@ auto transform_system<WC>::transform_modifier::set_transform_with_matrix(
 }
 
 template <typename WC>
-void transform_system<WC>::update() {
+void transform_system<WC>::update(float32 /*dt*/) {
     auto& requested = context_->registry().template requested<transform_component>();
     if (requested.empty()) {
         return;
@@ -249,8 +247,8 @@ void transform_system<WC>::update() {
     sorted_entities_.assign(requested.begin(), requested.end());
 
     std::ranges::sort(sorted_entities_, [this](entity lhs, entity rhs) {
-        return hierarchy_system_->get_hierarchy_depth(lhs) <
-               hierarchy_system_->get_hierarchy_depth(rhs);
+        return context_->template get_system<hierarchy_system>().get_hierarchy_depth(lhs) <
+               context_->template get_system<hierarchy_system>().get_hierarchy_depth(rhs);
     });
 
     for (entity ent : sorted_entities_) {

@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "vw/gfx/world/components/model_component.h"
+#include "vw/gfx/world/system_trait.h"
 #include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
@@ -48,7 +49,7 @@ public:
     };
 
     auto modify(entity e) -> model_modifier;
-    void update();
+    void update(float32 dt);
 
     [[nodiscard]] auto get_stats() const -> const model_system_stats&;
 
@@ -62,6 +63,15 @@ private:
 };
 
 }  // namespace vw::gfx
+
+namespace vw::gfx { class model_registry; }
+
+template <>
+struct vw::gfx::system_trait<vw::gfx::model_system> {
+    using components = std::tuple<vw::gfx::model_component>;
+    using depends_on = vw::gfx::system_list<>;
+    using resources  = std::tuple<vw::gfx::model_registry>;
+};
 
 #include "vw/gfx/world/systems/model_system.inl.h"
 

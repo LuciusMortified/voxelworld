@@ -12,7 +12,7 @@ light_system<WC>::light_system(context_type& context)
     : context_(&context) {}
 
 template <typename WC>
-void light_system<WC>::update() {
+void light_system<WC>::update(float32 /*dt*/) {
     auto& requested = context_->registry().template requested<light_component>();
     if (requested.empty()) {
         return;

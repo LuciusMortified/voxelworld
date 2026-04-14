@@ -6,14 +6,16 @@
 
 #include <stdexcept>
 
+#include "vw/gfx/world/systems/transform_system.h"
+
 namespace vw::gfx {
 
 template <typename WC>
-hierarchy_system<WC>::hierarchy_system(
-    context_type& context,
-    transform_system_type& transform_sys
-)
-    : context_{&context}, transform_system_{&transform_sys} {}
+hierarchy_system<WC>::hierarchy_system(context_type& context)
+    : context_{&context} {}
+
+template <typename WC>
+void hierarchy_system<WC>::update(float32 /*dt*/) {}
 
 template <typename WC>
 hierarchy_system<WC>::hierarchy_modifier::hierarchy_modifier(
@@ -47,7 +49,7 @@ void hierarchy_system<WC>::cleanup(
             auto& child_comp = context_->registry().template get<hierarchy_component>(child);
             child_comp.parent_ = invalid_entity;
 
-            transform_system_->modify(child).mark_world_dirty();
+            context_->template get_system<transform_system>().modify(child).mark_world_dirty();
         }
     }
 }
@@ -110,7 +112,7 @@ auto hierarchy_system<WC>::hierarchy_modifier::set_parent(entity parent)
         auto& child_component   = system_->context_->registry().template get<hierarchy_component>(entity_);
         child_component.parent_ = parent;
 
-        system_->transform_system_->modify(entity_).mark_world_dirty();
+        system_->context_->template get_system<transform_system>().modify(entity_).mark_world_dirty();
     }
 
     return *this;
@@ -131,7 +133,7 @@ auto hierarchy_system<WC>::hierarchy_modifier::remove_parent() -> hierarchy_modi
 
         child_component.parent_ = invalid_entity;
 
-        system_->transform_system_->modify(entity_).mark_world_dirty();
+        system_->context_->template get_system<transform_system>().modify(entity_).mark_world_dirty();
     }
 
     return *this;

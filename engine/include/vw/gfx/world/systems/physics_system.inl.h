@@ -6,17 +6,14 @@
 #include <chrono>
 #include <cmath>
 
+#include "vw/gfx/world/systems/spatial_system.h"
+#include "vw/gfx/world/systems/transform_system.h"
+
 namespace vw::gfx {
 
 template <typename WC>
-physics_system<WC>::physics_system(
-    context_type& context,
-    transform_system_type& transform_system,
-    spatial_system_type& spatial_system
-)
-    : context_(&context)
-    , transform_system_(&transform_system)
-    , spatial_system_(&spatial_system) {}
+physics_system<WC>::physics_system(context_type& context)
+    : context_(&context) {}
 
 template <typename WC>
 void physics_system<WC>::set_gravity(float32 g) {
@@ -122,7 +119,7 @@ void physics_system<WC>::step(
             stats_.entity_collision_ms += std::chrono::duration<float32>(clock::now() - entity_start).count() * 1000.0f;
         }
 
-        transform_system_->modify(ent).set_position(new_position);
+        context_->template get_system<transform_system>().modify(ent).set_position(new_position);
     }
 }
 
@@ -264,7 +261,7 @@ auto physics_system<WC>::resolve_entity_collisions(
     aabb entity_aabb{center - half_extents, center + half_extents};
 
     const auto q_start = clock::now();
-    spatial_system_->query_all(entity_aabb, entity_query_cache_, spatial_layer::character);
+    context_->template get_system<spatial_system>().query_all(entity_aabb, entity_query_cache_, spatial_layer::character);
     stats_.entity_query_ms += std::chrono::duration<float32>(clock::now() - q_start).count() * 1000.0f;
     stats_.entity_query_results += static_cast<int32>(entity_query_cache_.size());
 
