@@ -61,7 +61,8 @@ template <typename C>
 void combined_buffer_pool<C>::update(
     world_type& world,
     const camera& camera,
-    VkCommandBuffer cmd
+    VkCommandBuffer cmd,
+    mesh_pool& pool
 ) {
     staging_.begin_frame();
 
@@ -70,7 +71,7 @@ void combined_buffer_pool<C>::update(
     });
 
     stats_.timing.meshes_ms = measure_ms([&] {
-        update_meshes_(world, camera.get_position());
+        update_meshes_(world, camera.get_position(), pool);
     });
 
     stats_.timing.transforms_ms = measure_ms([&] {
@@ -150,7 +151,7 @@ combined_buffer* combined_buffer_pool<C>::get_or_create_buffer(
 
 template <typename C>
 void combined_buffer_pool<C>::update_meshes_(
-    world_type& world, const vec3f& camera_pos
+    world_type& world, const vec3f& camera_pos, mesh_pool& pool
 ) {
     auto& model_changed = world.template changed<model_component>();
     sorted_merge_range(mesh_pending_entities_, model_changed.begin(), model_changed.end());
@@ -219,7 +220,7 @@ void combined_buffer_pool<C>::update_meshes_(
         }
 
         auto model_id = model_comp.get_identity();
-        auto mesh_ptr = world.get_mesh_pool().get(model_id);
+        auto mesh_ptr = pool.get(model_id);
         if (!mesh_ptr) {
             merge_buffer_.push_back(ent);
             continue;
@@ -254,7 +255,7 @@ void combined_buffer_pool<C>::update_meshes_(
                         continue;
                     }
                     buffer->write_mesh(model_id, *mesh_ptr);
-                    world.get_mesh_pool().evict(model_id);
+                    pool.evict(model_id);
                     ++mesh_writes;
                     continue;
                 }
@@ -288,7 +289,7 @@ void combined_buffer_pool<C>::update_meshes_(
             ent_bounds = world.template get_component<spatial_component>(ent).get_bounds();
         }
         buffer->allocate(ent, model_id, *mesh_ptr, transform_matrix, ent_bounds);
-        world.get_mesh_pool().evict(model_id);
+        pool.evict(model_id);
 
         entity_buffer_infos_[ent] = entity_buffer_info{required_chunk_size, buffer_index};
         ++mesh_writes;

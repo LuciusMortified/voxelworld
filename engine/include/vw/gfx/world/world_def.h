@@ -65,7 +65,7 @@ struct world_def {
 
     using registry_type = typename entity_registry_from_tuple<components>::type;
 
-    using systems_tuple = std::tuple<Systems<components>...>;
+    using systems_tuple = std::tuple<Systems<world_def>...>;
 
     static constexpr std::size_t system_count = sizeof...(Systems);
 

@@ -3,31 +3,20 @@
 #ifndef VW_GFX_MODEL_SYSTEM_H
 #define VW_GFX_MODEL_SYSTEM_H
 
-#include <chrono>
-#include <set>
-#include <vector>
-
 #include "vw/gfx/world/components/model_component.h"
 #include "vw/gfx/world/system_trait.h"
 #include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
 
-struct model_system_stats {
-    float32 process_completed_ms  = 0.0f;
-    float32 update_completed_ms   = 0.0f;
-    float32 process_dirty_ms      = 0.0f;
-    uint32 pending_entities_count = 0;
-    uint32 pending_meshes_count   = 0;
-};
-
 class model;
 
-template <typename WC>
+template <typename WD>
 class model_system {
 public:
-    using registry_type = entity_registry_from_tuple<WC>::type;
-    using context_type = world_context<WC>;
+    using components = typename WD::components;
+    using registry_type = typename entity_registry_from_tuple<components>::type;
+    using context_type = world_context<WD>;
 
     explicit model_system(context_type& context);
 
@@ -51,15 +40,14 @@ public:
     auto modify(entity e) -> model_modifier;
     void update(float32 dt);
 
-    [[nodiscard]] auto get_stats() const -> const model_system_stats&;
+    template <typename C>
+        requires std::same_as<C, model_component>
+    void on_add(entity e) {
+        context_->registry().template request_change<model_component>(e);
+    }
 
 private:
-    void process_dirty_entities();
-    void update_completed_meshes();
-
     context_type* context_;
-    std::unordered_set<entity> pending_entities_;
-    model_system_stats stats_;
 };
 
 }  // namespace vw::gfx

@@ -3,8 +3,6 @@
 #ifndef VW_GFX_ENTITY_GUARD_INL_H
 #define VW_GFX_ENTITY_GUARD_INL_H
 
-#include "world.h"
-
 namespace vw::gfx {
 
 namespace detail {
@@ -26,130 +24,132 @@ void for_each_tuple_type(
 
 }  // namespace detail
 
-template <typename WC>
-entity_guard<WC>::entity_guard(
-    world_type& world
+template <typename WD>
+entity_guard<WD>::entity_guard(
+    context_type& ctx
 )
-    : world_(&world), ent_(world.create_entity()), archetype_{} {}
+    : context_(&ctx), ent_(ctx.create_entity()), archetype_{} {}
 
-template <typename WC>
-entity_guard<WC>::entity_guard(
-    world_type& world, entity ent, entity_archetype_type archetype
+template <typename WD>
+entity_guard<WD>::entity_guard(
+    context_type& ctx, entity ent, entity_archetype_type archetype
 )
-    : world_(&world), ent_(ent), archetype_(archetype) {}
+    : context_(&ctx), ent_(ent), archetype_(archetype) {}
 
-template <typename WC>
-entity_guard<WC>::~entity_guard() {
+template <typename WD>
+entity_guard<WD>::~entity_guard() {
     cleanup_();
 }
 
-template <typename WC>
-entity_guard<WC>::entity_guard(
+template <typename WD>
+entity_guard<WD>::entity_guard(
     entity_guard&& other
 ) noexcept
-    : world_(other.world_), ent_(other.ent_), archetype_(other.archetype_) {
-    other.world_     = nullptr;
+    : context_(other.context_), ent_(other.ent_), archetype_(other.archetype_) {
+    other.context_   = nullptr;
     other.ent_       = invalid_entity;
     other.archetype_ = {};
 }
 
-template <typename WC>
-auto entity_guard<WC>::operator=(
+template <typename WD>
+auto entity_guard<WD>::operator=(
     entity_guard&& other
 ) noexcept -> entity_guard& {
     if (this != &other) {
         cleanup_();
-        world_           = other.world_;
+        context_         = other.context_;
         ent_             = other.ent_;
         archetype_       = other.archetype_;
-        other.world_     = nullptr;
+        other.context_   = nullptr;
         other.ent_       = invalid_entity;
         other.archetype_ = {};
     }
     return *this;
 }
 
-template <typename WC>
+template <typename WD>
 template <typename C>
-auto entity_guard<WC>::with(
+auto entity_guard<WD>::with(
     C&& value
 ) -> entity_guard& {
-    world_->template add_component<C>(ent_, std::forward<C>(value));
+    context_->template add_component<C>(ent_, std::forward<C>(value));
     archetype_.template add<C>();
     return *this;
 }
 
-template <typename WC>
+template <typename WD>
 template <typename C>
-auto entity_guard<WC>::without() -> entity_guard& {
-    world_->template remove_component<C>(ent_);
+auto entity_guard<WD>::without() -> entity_guard& {
+    context_->template remove_component<C>(ent_);
     archetype_.template remove<C>();
     return *this;
 }
 
-template <typename WC>
+template <typename WD>
 template <typename C>
-auto entity_guard<WC>::has() const -> bool {
-    return world_->template has_component<C>(ent_);
+auto entity_guard<WD>::has() const -> bool {
+    return context_->template has_component<C>(ent_);
 }
 
-template <typename WC>
+template <typename WD>
 template <typename C>
-auto entity_guard<WC>::get() const -> const C& {
-    return world_->template get_component<C>(ent_);
+auto entity_guard<WD>::get() const -> const C& {
+    return context_->template get_component<C>(ent_);
 }
 
-template <typename WC>
-auto entity_guard<WC>::get_entity() const -> entity {
+template <typename WD>
+auto entity_guard<WD>::get_entity() const -> entity {
     return ent_;
 }
 
-template <typename WC>
-auto entity_guard<WC>::get_archetype() const -> entity_archetype_type {
+template <typename WD>
+auto entity_guard<WD>::get_archetype() const -> entity_archetype_type {
     return archetype_;
 }
 
-template <typename WC>
-auto entity_guard<WC>::is_valid() const -> bool {
-    return world_ != nullptr && ent_.is_valid();
+template <typename WD>
+auto entity_guard<WD>::is_valid() const -> bool {
+    return context_ != nullptr && ent_.is_valid();
 }
 
-template <typename WC>
-auto entity_guard<WC>::release() -> entity {
+template <typename WD>
+auto entity_guard<WD>::release() -> entity {
     auto ent   = ent_;
-    world_     = nullptr;
+    context_   = nullptr;
     ent_       = invalid_entity;
     archetype_ = {};
     return ent;
 }
 
-template <typename WC>
-void entity_guard<WC>::update_archetype() {
+template <typename WD>
+void entity_guard<WD>::update_archetype() {
+    using components = typename WD::components;
     entity_archetype_type new_archetype;
-    detail::for_each_tuple_type<WC>([&]<typename C, std::size_t I>() noexcept {
-        if (world_->template has_component<C>(ent_)) {
+    detail::for_each_tuple_type<components>([&]<typename C, std::size_t I>() noexcept {
+        if (context_->template has_component<C>(ent_)) {
             new_archetype.template add<C>();
         }
     });
     archetype_ = new_archetype;
 }
 
-template <typename WC>
-auto entity_guard<WC>::operator*() const -> entity {
+template <typename WD>
+auto entity_guard<WD>::operator*() const -> entity {
     return ent_;
 }
 
-template <typename WC>
-void entity_guard<WC>::cleanup_() noexcept {
-    if (world_ == nullptr || !ent_.is_valid()) {
+template <typename WD>
+void entity_guard<WD>::cleanup_() noexcept {
+    if (context_ == nullptr || !ent_.is_valid()) {
         return;
     }
-    detail::for_each_tuple_type<WC>([&]<typename C, std::size_t I>() noexcept {
+    using components = typename WD::components;
+    detail::for_each_tuple_type<components>([&]<typename C, std::size_t I>() noexcept {
         if (archetype_.template has<C>()) {
-            world_->template remove_component<C>(ent_);
+            context_->template remove_component<C>(ent_);
         }
     });
-    world_->destroy_entity(ent_);
+    context_->destroy_entity(ent_);
 }
 
 }  // namespace vw::gfx

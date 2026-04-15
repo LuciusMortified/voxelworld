@@ -175,7 +175,7 @@ inline bool create_keyframe_modal::create_keyframe() {
         return false;
     }
 
-    auto& clip_registry = engine_->get_world().get_animation_clip_registry();
+    auto& clip_registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
     auto clip           = clip_registry.get(state_->anim.selected_clip_name);
     if (!clip) {
         error_ = "Clip not found.";

@@ -25,7 +25,7 @@ private:
     auto create_model() -> std::shared_ptr<gfx::model>;
 
     gfx::engine<>& engine_;
-    std::unique_ptr<gfx::entity_guard<>> root_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> root_;
     vec2f spawn_xz_;
     bool placed_ = false;
 };

@@ -9,7 +9,7 @@
 #include "vw/gfx/world/world.h"
 
 namespace vw::gfx {
-template <typename WC = base_world_components>
+template <typename WC = base_world_def>
 class vox_deserializer final {
 public:
     using world_type        = world<WC>;

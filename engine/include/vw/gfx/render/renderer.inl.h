@@ -14,7 +14,10 @@ template <typename C>
 renderer<C>::renderer(
     vulkan_context& context, window& window, const block_registry& registry
 )
-    : context_(&context), window_(&window), block_registry_(&registry) {
+    : context_(&context)
+    , window_(&window)
+    , block_registry_(&registry)
+    , mesh_pool_(context, registry) {
     vertex_shader_ =
         std::make_unique<shader>(*context_, "shaders/voxel.vert.spv", shader_type::VERTEX);
     fragment_shader_ =
@@ -82,6 +85,7 @@ renderer<C>::renderer(
 
 template <typename C>
 renderer<C>::~renderer() {
+    mesh_pool_.stop_gen_threads();
     wait_idle();
 
     combined_buffer_pool_.reset();
@@ -267,6 +271,43 @@ render_mode renderer<WC>::get_render_mode() const {
 }
 
 template <typename C>
+void renderer<C>::sync_meshes_(world_type& world) {
+    mesh_pool_.process_completed();
+
+    auto& registry = world.get_registry();
+
+    for (auto it = pending_mesh_entities_.begin(); it != pending_mesh_entities_.end();) {
+        auto ent = *it;
+        if (!registry.template has<model_component>(ent)) {
+            it = pending_mesh_entities_.erase(it);
+            continue;
+        }
+        auto& comp = registry.template get<model_component>(ent);
+        if (!comp.has_model()) {
+            it = pending_mesh_entities_.erase(it);
+            continue;
+        }
+        if (mesh_pool_.has(comp.get_identity())) {
+            it = pending_mesh_entities_.erase(it);
+            registry.template notify_changed<model_component>(ent);
+        } else {
+            ++it;
+        }
+    }
+
+    for (auto ent : registry.template changed<model_component>()) {
+        if (!registry.template has<model_component>(ent)) continue;
+        auto& comp = registry.template get<model_component>(ent);
+        if (!comp.has_model()) continue;
+        auto identity = comp.get_identity();
+        if (!mesh_pool_.has(identity) && !mesh_pool_.is_pending(identity)) {
+            mesh_pool_.request_mesh(comp.get_model());
+            pending_mesh_entities_.insert(ent);
+        }
+    }
+}
+
+template <typename C>
 void renderer<C>::render(
     world_type& world, camera& camera
 ) {
@@ -279,13 +320,16 @@ void renderer<C>::render(
         throw std::runtime_error("Failed to begin recording command buffer!");
     }
 
+    sync_meshes_(world);
+
     stats_.timing.shadow_map_update_ms =
         measure_ms([&] { shadow_map_->update(camera, directional_light_settings_.direction); });
 
     const auto& cascade_frustums = shadow_map_->get_cascade_frustums();
 
     stats_.timing.buffer_pool_update_ms = measure_ms([&] {
-        combined_buffer_pool_->update(world, camera, command_buffers_[current_image_index_]);
+        combined_buffer_pool_->update(
+            world, camera, command_buffers_[current_image_index_], mesh_pool_);
     });
 
     stats_.timing.compute_cull_ms = measure_ms([&] {

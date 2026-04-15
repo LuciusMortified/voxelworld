@@ -33,7 +33,7 @@ inline auto remove_animation_target_operation::find_animation_root_(
 
 inline void remove_animation_target_operation::execute() {
     auto& world    = engine_->get_world();
-    auto& anim_sys = world.get_animation_system();
+    auto& anim_sys = world.template get_system<gfx::animation_system>();
 
     const auto ent          = state_->scene.name_to_entity[params_.entity_name];
     const auto& target_comp = world.get_component<gfx::animation_target_component>(ent);
@@ -56,7 +56,7 @@ inline void remove_animation_target_operation::execute() {
 
 inline void remove_animation_target_operation::undo() {
     auto& world    = engine_->get_world();
-    auto& anim_sys = world.get_animation_system();
+    auto& anim_sys = world.template get_system<gfx::animation_system>();
 
     const auto ent = state_->scene.name_to_entity[params_.entity_name];
     auto* guard    = state_->scene.find_guard(ent);

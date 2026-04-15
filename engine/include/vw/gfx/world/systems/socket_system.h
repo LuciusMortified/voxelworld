@@ -15,11 +15,12 @@ class hierarchy_system;
 template <typename>
 class transform_system;
 
-template <typename WC>
+template <typename WD>
 class socket_system final {
 public:
-    using registry_type = entity_registry_from_tuple<WC>::type;
-    using context_type  = world_context<WC>;
+    using components = typename WD::components;
+    using registry_type = typename entity_registry_from_tuple<components>::type;
+    using context_type  = world_context<WD>;
 
     explicit socket_system(context_type& context);
 
@@ -46,6 +47,12 @@ public:
     auto modify(entity ent) -> socket_modifier;
     void cleanup(entity ent);
     void update(float32 dt);
+
+    template <typename C>
+        requires std::same_as<C, socket_component>
+    void on_remove(entity e) {
+        cleanup(e);
+    }
 
 private:
     context_type* context_;

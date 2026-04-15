@@ -11,7 +11,7 @@ inline create_clip_operation::create_clip_operation(
     : base_operation(), engine_(&engine), state_(&state), params_(params) {}
 
 inline void create_clip_operation::execute() {
-    auto& registry = engine_->get_world().get_animation_clip_registry();
+    auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
     (void)registry.create(params_.name);
     state_->anim.selected_clip_name          = params_.name;
     state_->ui.show_timeline                 = true;
@@ -19,7 +19,7 @@ inline void create_clip_operation::execute() {
 }
 
 inline void create_clip_operation::undo() {
-    auto& registry = engine_->get_world().get_animation_clip_registry();
+    auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
     registry.remove(params_.name);
     state_->anim.selected_clip_name.clear();
     state_->anim.unsaved_clips.erase(params_.name);

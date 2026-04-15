@@ -29,10 +29,9 @@ struct engine_stats {
     float32 end_frame_ms    = 0.0f;
     uint64 ram_usage_bytes  = 0;
     uint64 vram_usage_bytes = 0;
-    world_update_stats systems;
 };
 
-template <typename WC = base_world_components>
+template <typename WC = base_world_def>
 class engine final {
 public:
     using renderer_type     = renderer<WC>;

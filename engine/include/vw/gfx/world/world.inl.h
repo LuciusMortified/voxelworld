@@ -3,279 +3,164 @@
 #ifndef VW_GFX_WORLD_WORLD_INL_H
 #define VW_GFX_WORLD_WORLD_INL_H
 
-#include "vw/core/timing.h"
+#include <tuple>
 
 namespace vw::gfx {
 
-template <typename Cs>
-world<Cs>::~world() {
-    mesh_pool_.stop_gen_threads();
+namespace detail {
+
+template <typename Tuple, typename Ctx, std::size_t... Is>
+auto make_system_tuple_impl(Ctx& ctx, std::index_sequence<Is...>) -> Tuple {
+    return Tuple{std::tuple_element_t<Is, Tuple>(ctx)...};
+}
+
+template <typename Tuple, typename Ctx>
+auto make_system_tuple(Ctx& ctx) -> Tuple {
+    return make_system_tuple_impl<Tuple>(
+        ctx, std::make_index_sequence<std::tuple_size_v<Tuple>>{});
+}
+
+}  // namespace detail
+
+template <typename WD>
+world<WD>::~world() {
     context_.world_grid_.reset();
 }
 
-template <typename Cs>
-world<Cs>::world(
-    vulkan_context& context, const block_registry& registry
-)
-    : mesh_pool_{context, registry}
-    , context_{registry_, &mesh_pool_}
-    , spatial_system_(context_)
-    , transform_system_(context_)
-    , hierarchy_system_(context_)
-    , model_system_(context_)
-    , light_system_(context_)
-    , socket_system_(context_)
-    , animation_system_(context_)
-    , animation_fsm_system_(context_)
-    , character_controller_system_(context_)
-    , physics_system_(context_)
-    , world_grid_system_(context_) {
-    context_.register_system_(&spatial_system_);
-    context_.register_system_(&transform_system_);
-    context_.register_system_(&hierarchy_system_);
-    context_.register_system_(&model_system_);
-    context_.register_system_(&light_system_);
-    context_.register_system_(&socket_system_);
-    context_.register_system_(&animation_system_);
-    context_.register_system_(&animation_fsm_system_);
-    context_.register_system_(&character_controller_system_);
-    context_.register_system_(&physics_system_);
-    context_.register_system_(&world_grid_system_);
-    context_.register_resource_(&model_registry_);
-    context_.register_resource_(&animation_clip_registry_);
+template <typename WD>
+world<WD>::world()
+    : context_{registry_}
+    , systems_{detail::make_system_tuple<systems_tuple>(context_)}
+    , resources_{}
+{
+    context_.systems_ = &systems_;
+    std::apply([this](auto&... r) { (context_.register_resource_(&r), ...); }, resources_);
 }
 
-template <typename Cs>
-void world<Cs>::update(
+template <typename WD>
+void world<WD>::update(
     float32 delta_time
 ) {
-    update_stats_.character_controller_ms =
-        measure_ms([&] { character_controller_system_.update(delta_time); });
-    update_stats_.animation_fsm_ms = measure_ms([&] { animation_fsm_system_.update(delta_time); });
-    update_stats_.physics_ms       = measure_ms([&] { physics_system_.update(delta_time); });
-    update_stats_.physics_detail   = physics_system_.get_stats();
-    update_stats_.transform_ms     = measure_ms([&] { transform_system_.update(delta_time); });
-    update_stats_.model_ms         = measure_ms([&] { model_system_.update(delta_time); });
-    update_stats_.spatial_ms       = measure_ms([&] { spatial_system_.update(delta_time); });
-    update_stats_.light_ms         = measure_ms([&] { light_system_.update(delta_time); });
-    update_stats_.world_grid_ms    = measure_ms([&] { world_grid_system_.update(delta_time); });
-    update_stats_.animation_ms     = measure_ms([&] { animation_system_.update(delta_time); });
+    std::apply([delta_time](auto&... s) {
+        (s.update(delta_time), ...);
+    }, systems_);
 }
 
-template <typename Cs>
-auto world<Cs>::get_update_stats() const -> const world_update_stats& {
-    return update_stats_;
-}
-
-template <typename Cs>
-void world<Cs>::clear_changed() {
+template <typename WD>
+void world<WD>::clear_changed() {
     registry_.clear_changed();
 }
 
-template <typename Cs>
+template <typename WD>
 template <typename T>
-auto world<Cs>::has_component(
+auto world<WD>::has_component(
     entity ent
 ) const -> bool {
     return registry_.template has<T>(ent);
 }
 
-template <typename Cs>
+template <typename WD>
 template <typename T>
-auto world<Cs>::get_component(
+auto world<WD>::get_component(
     entity ent
 ) -> T& {
     return registry_.template get<T>(ent);
 }
 
-template <typename Cs>
+template <typename WD>
 template <typename T>
-auto world<Cs>::get_component(
+auto world<WD>::get_component(
     entity ent
 ) const -> const T& {
     return registry_.template get<T>(ent);
 }
 
-template <typename WC>
-auto world<WC>::get_mesh_pool() const -> const mesh_pool& {
-    return mesh_pool_;
-}
-
-template <typename WC>
-auto world<WC>::get_mesh_pool() -> mesh_pool& {
-    return mesh_pool_;
-}
-
-template <typename C>
+template <typename WD>
 template <typename... Cs>
-auto world<C>::view_components() -> component_view<registry_type, Cs...> {
+auto world<WD>::view_components() -> component_view<registry_type, Cs...> {
     return registry_.template view<Cs...>();
 }
 
-template <typename C>
-auto world<C>::get_hierarchy_system() -> hierarchy_system_type& {
-    return hierarchy_system_;
-}
-
-template <typename C>
-auto world<C>::get_transform_system() -> transform_system_type& {
-    return transform_system_;
-}
-
-template <typename C>
-auto world<C>::get_model_registry() -> model_registry& {
-    return model_registry_;
-}
-
-template <typename C>
-auto world<C>::get_model_system() -> model_system_type& {
-    return model_system_;
-}
-
-template <typename C>
-auto world<C>::get_spatial_system() -> spatial_system_type& {
-    return spatial_system_;
-}
-
-template <typename C>
-auto world<C>::get_light_system() -> light_system_type& {
-    return light_system_;
-}
-
-template <typename C>
-auto world<C>::get_socket_system() -> socket_system_type& {
-    return socket_system_;
-}
-
-template <typename C>
-auto world<C>::get_animation_system() -> animation_system_type& {
-    return animation_system_;
-}
-
-template <typename C>
-auto world<C>::get_animation_fsm_system() -> animation_fsm_system_type& {
-    return animation_fsm_system_;
-}
-
-template <typename C>
-auto world<C>::get_animation_fsm_system() const -> const animation_fsm_system_type& {
-    return animation_fsm_system_;
-}
-
-template <typename C>
-auto world<C>::get_animation_clip_registry() -> animation_clip_registry& {
-    return animation_clip_registry_;
-}
-
-template <typename C>
-void world<C>::set_world_grid(
-    std::shared_ptr<world_grid<C>> grid
+template <typename WD>
+void world<WD>::set_world_grid(
+    std::shared_ptr<world_grid<WD>> grid
 ) {
     context_.world_grid_ = std::move(grid);
 }
 
-template <typename C>
-auto world<C>::get_world_grid() const -> std::shared_ptr<world_grid<C>> {
+template <typename WD>
+auto world<WD>::get_world_grid() const -> std::shared_ptr<world_grid<WD>> {
     return context_.world_grid_;
 }
 
-template <typename C>
-auto world<C>::get_world_grid_system() -> world_grid_system_type& {
-    return world_grid_system_;
-}
-
-template <typename C>
-auto world<C>::get_character_controller_system() -> character_controller_system_type& {
-    return character_controller_system_;
-}
-
-template <typename C>
-auto world<C>::get_physics_system() -> physics_system_type& {
-    return physics_system_;
-}
-
-template <typename C>
-auto world<C>::get_registry() -> registry_type& {
+template <typename WD>
+auto world<WD>::get_registry() -> registry_type& {
     return registry_;
 }
 
-template <typename C>
+template <typename WD>
 template <typename T>
-auto world<C>::changed() -> std::unordered_set<entity>& {
+auto world<WD>::changed() -> std::unordered_set<entity>& {
     return registry_.template changed<T>();
 }
 
-template <typename C>
-auto world<C>::destroyed() const -> const std::vector<entity>& {
+template <typename WD>
+auto world<WD>::destroyed() const -> const std::vector<entity>& {
     return registry_.destroyed();
 }
 
-template <typename WC>
-auto world<WC>::voxel_ray_cast(
+template <typename WD>
+auto world<WD>::voxel_ray_cast(
     const ray& r, std::vector<entity>& candidates
 ) const -> std::optional<voxel_ray_hit> {
-    return spatial_system_.voxel_ray_cast(r, candidates);
+    return std::get<spatial_system<WD>>(systems_).voxel_ray_cast(r, candidates);
 }
 
-template <typename Cs>
+template <typename WD>
 template <typename T>
-void world<Cs>::add_component(
+void world<WD>::add_component(
     entity ent, T&& value
 ) {
     registry_.add(ent, std::forward<T>(value));
 
-    if constexpr (std::same_as<T, transform_component>) {
-        registry_.template request_change<transform_component>(ent);
-    }
-    if constexpr (std::same_as<T, model_component>) {
-        registry_.template request_change<model_component>(ent);
-    }
-    if constexpr (std::same_as<T, spatial_component>) {
-        registry_.template request_change<transform_component>(ent);
-    }
-    if constexpr (std::same_as<T, light_component>) {
-        registry_.template request_change<light_component>(ent);
-    }
+    using C = std::remove_cvref_t<T>;
+    std::apply([&](auto&... systems) {
+        (detail::invoke_on_add<C>(systems, ent), ...);
+    }, systems_);
 }
 
-template <typename Cs>
+template <typename WD>
 template <typename T>
-void world<Cs>::remove_component(
+void world<WD>::remove_component(
     entity ent
 ) noexcept {
-    if constexpr (std::same_as<T, hierarchy_component>) {
-        hierarchy_system_.cleanup(ent);
-    }
-    if constexpr (std::same_as<T, spatial_component>) {
-        spatial_system_.cleanup(ent);
-    }
-    if constexpr (std::same_as<T, socket_component>) {
-        socket_system_.cleanup(ent);
-    }
+    std::apply([&](auto&... systems) {
+        (detail::invoke_on_remove<T>(systems, ent), ...);
+    }, systems_);
     registry_.template remove<T>(ent);
 }
 
-template <typename Cs>
-auto world<Cs>::create_entity() -> entity {
+template <typename WD>
+auto world<WD>::create_entity() -> entity {
     return registry_.create();
 }
 
-template <typename C>
-void world<C>::destroy_entity(
+template <typename WD>
+void world<WD>::destroy_entity(
     entity ent
 ) noexcept {
     registry_.destroy(ent);
 }
 
-template <typename C>
-auto world<C>::batch_create_entities(
+template <typename WD>
+auto world<WD>::batch_create_entities(
     uint32 count
 ) -> std::vector<entity> {
     return registry_.batch_create(count);
 }
 
-template <typename C>
-void world<C>::batch_destroy_entities(
+template <typename WD>
+void world<WD>::batch_destroy_entities(
     const std::vector<entity>& entities
 ) noexcept {
     registry_.batch_destroy(entities);

@@ -7,12 +7,12 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-light_system<WC>::light_system(context_type& context)
+template <typename WD>
+light_system<WD>::light_system(context_type& context)
     : context_(&context) {}
 
-template <typename WC>
-void light_system<WC>::update(float32 /*dt*/) {
+template <typename WD>
+void light_system<WD>::update(float32 /*dt*/) {
     auto& requested = context_->registry().template requested<light_component>();
     if (requested.empty()) {
         return;
@@ -25,19 +25,19 @@ void light_system<WC>::update(float32 /*dt*/) {
     context_->registry().template clear_requested<light_component>();
 }
 
-template <typename WC>
-light_system<WC>::light_modifier::light_modifier(
+template <typename WD>
+light_system<WD>::light_modifier::light_modifier(
     light_system* system, entity ent
 )
     : system_(system), entity_(ent) {}
 
-template <typename WC>
-auto light_system<WC>::modify(entity ent) -> light_modifier {
+template <typename WD>
+auto light_system<WD>::modify(entity ent) -> light_modifier {
     return light_modifier(this, ent);
 }
 
-template <typename WC>
-auto light_system<WC>::light_modifier::set_color(
+template <typename WD>
+auto light_system<WD>::light_modifier::set_color(
     const vec3f& color
 ) -> light_modifier& {
     if (!system_->context_->registry().template has<light_component>(entity_)) {
@@ -49,8 +49,8 @@ auto light_system<WC>::light_modifier::set_color(
     return *this;
 }
 
-template <typename WC>
-auto light_system<WC>::light_modifier::set_intensity(
+template <typename WD>
+auto light_system<WD>::light_modifier::set_intensity(
     float32 intensity
 ) -> light_modifier& {
     if (!system_->context_->registry().template has<light_component>(entity_)) {
@@ -62,8 +62,8 @@ auto light_system<WC>::light_modifier::set_intensity(
     return *this;
 }
 
-template <typename WC>
-auto light_system<WC>::light_modifier::set_range(
+template <typename WD>
+auto light_system<WD>::light_modifier::set_range(
     float32 range
 ) -> light_modifier& {
     if (!system_->context_->registry().template has<light_component>(entity_)) {
@@ -75,8 +75,8 @@ auto light_system<WC>::light_modifier::set_range(
     return *this;
 }
 
-template <typename WC>
-auto light_system<WC>::light_modifier::set_attenuation(
+template <typename WD>
+auto light_system<WD>::light_modifier::set_attenuation(
     float32 constant, float32 linear, float32 quadratic
 ) -> light_modifier& {
     if (!system_->context_->registry().template has<light_component>(entity_)) {

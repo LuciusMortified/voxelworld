@@ -6,11 +6,11 @@ inline dummy_enemy::dummy_enemy(gfx::engine<>& engine, const vec2f& spawn_xz)
     : engine_{engine}
     , spawn_xz_{spawn_xz} {
     auto& world            = engine_.get_world();
-    auto& transform_system = world.get_transform_system();
-    auto& physics_system   = world.get_physics_system();
-    auto& model_system     = world.get_model_system();
+    auto& transform_sys = world.template get_system<gfx::transform_system>();
+    auto& physics_sys = world.template get_system<gfx::physics_system>();
+    auto& model_sys = world.template get_system<gfx::model_system>();
 
-    root_ = std::make_unique<gfx::entity_guard<>>(world);
+    root_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
     root_->with<gfx::hierarchy_component>();
     root_->with<gfx::transform_component>();
     root_->with<gfx::spatial_component>();
@@ -20,17 +20,17 @@ inline dummy_enemy::dummy_enemy(gfx::engine<>& engine, const vec2f& spawn_xz)
 
     const auto ent = root_->get_entity();
 
-    transform_system.modify(ent)
+    transform_sys.modify(ent)
         .set_position({spawn_xz_.x, 500.0f, spawn_xz_.y})
         .set_origin({-8.0f, -16.0f, -8.0f});
 
-    physics_system.modify_collider(ent)
+    physics_sys.modify_collider(ent)
         .set_extents({16.0f, 32.0f, 16.0f})
         .set_offset({0.0f, 0.0f, 0.0f});
 
-    world.get_spatial_system().modify(ent).set_layer(gfx::spatial_layer::character);
+    world.template get_system<gfx::spatial_system>().modify(ent).set_layer(gfx::spatial_layer::character);
 
-    model_system.modify(ent).set_model(create_model());
+    model_sys.modify(ent).set_model(create_model());
 }
 
 inline auto dummy_enemy::try_place() -> void {
@@ -51,7 +51,7 @@ inline auto dummy_enemy::try_place() -> void {
     float32 spawn_y = (static_cast<float32>(*surface) + 6.0f) * vs;
 
     engine_.get_world()
-        .get_transform_system()
+        .template get_system<gfx::transform_system>()
         .modify(root_->get_entity())
         .set_position({spawn_xz_.x, spawn_y, spawn_xz_.y});
 
@@ -67,8 +67,8 @@ inline auto dummy_enemy::is_placed() const -> bool {
 }
 
 inline auto dummy_enemy::create_model() -> std::shared_ptr<gfx::model> {
-    auto& model_registry = engine_.get_world().get_model_registry();
-    auto model = model_registry.create_unnamed(16, 32, 16);
+    auto& model_reg = engine_.get_world().template get_resource<gfx::model_registry>();
+    auto model = model_reg.create_unnamed(16, 32, 16);
     model->fill(voxel{blocks::red_3});
     return model;
 }

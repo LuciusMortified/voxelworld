@@ -4,24 +4,22 @@
 #define VW_GFX_ENTITY_GUARD_H
 
 #include "entity_archetype.h"
-#include "world_components.h"
+#include "world_context.h"
 
 namespace vw::gfx {
 
-template <typename WC>
-class world;
-
-template <typename WC = base_world_components>
+template <typename WD>
 class entity_guard_group;
 
-template <typename WC = base_world_components>
+template <typename WD>
 class entity_guard final {
 public:
-    using world_type            = world<WC>;
-    using entity_archetype_type = entity_archetype_from_tuple<WC>::type;
+    using components            = typename WD::components;
+    using context_type          = world_context<WD>;
+    using entity_archetype_type = typename entity_archetype_from_tuple<components>::type;
 
-    explicit entity_guard(world_type& world);
-    entity_guard(world_type& world, entity ent, entity_archetype_type archetype);
+    explicit entity_guard(context_type& ctx);
+    entity_guard(context_type& ctx, entity ent, entity_archetype_type archetype);
     ~entity_guard();
 
     entity_guard(const entity_guard&)                    = delete;
@@ -53,8 +51,8 @@ public:
 private:
     void cleanup_() noexcept;
 
-    world_type* world_ = nullptr;
-    entity ent_        = invalid_entity;
+    context_type* context_ = nullptr;
+    entity ent_            = invalid_entity;
     entity_archetype_type archetype_;
 };
 

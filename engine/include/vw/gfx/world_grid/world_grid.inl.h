@@ -4,7 +4,7 @@
 #define VW_GFX_WORLD_GRID_INL_H
 
 #include "vw/core/timing.h"
-#include "vw/gfx/world/world.h"
+
 #include "vw/log/logger.h"
 
 namespace vw::gfx {
@@ -13,22 +13,22 @@ namespace {
 constexpr log::log_category lc_wg_{"world_grid"};
 }
 
-template <typename WC>
-world_grid<WC>::world_grid(
-    world_type& world, std::unique_ptr<terrain_generator> generator, int32 voxel_scale
+template <typename WD>
+world_grid<WD>::world_grid(
+    context_type& ctx, std::unique_ptr<terrain_generator> generator, int32 voxel_scale
 )
-    : world_(&world), voxel_scale_(voxel_scale), generator_(std::move(generator)) {
+    : context_(&ctx), voxel_scale_(voxel_scale), generator_(std::move(generator)) {
     auto count = std::min(std::thread::hardware_concurrency(), 4u);
     if (count == 0) {
         count = 1;
     }
     for (uint32 i = 0; i < count; ++i) {
-        gen_threads_.emplace_back(&world_grid<WC>::gen_thread_function, this);
+        gen_threads_.emplace_back(&world_grid<WD>::gen_thread_function, this);
     }
 }
 
-template <typename WC>
-world_grid<WC>::~world_grid() {
+template <typename WD>
+world_grid<WD>::~world_grid() {
     {
         std::scoped_lock lock(gen_mutex_);
         gen_running_ = false;
@@ -42,8 +42,8 @@ world_grid<WC>::~world_grid() {
     }
 }
 
-template <typename WC>
-auto world_grid<WC>::get_voxel(
+template <typename WD>
+auto world_grid<WD>::get_voxel(
     vec3i world_pos
 ) const -> voxel {
     auto cc = world_to_chunk_coord(world_pos);
@@ -55,11 +55,11 @@ auto world_grid<WC>::get_voxel(
     return it->second->get_voxel(lc / voxel_scale_);
 }
 
-template <typename WC>
-auto world_grid<WC>::get_surface_y(
+template <typename WD>
+auto world_grid<WD>::get_surface_y(
     int32 wx, int32 wz
 ) const -> std::optional<int32> {
-    constexpr int32 s = chunk<WC>::size;
+    constexpr int32 s = chunk<WD>::size;
 
     auto floor_div = [](int32 a, int32 b) -> int32 { return a >= 0 ? a / b : (a - b + 1) / b; };
     int32 cx       = floor_div(wx, s);
@@ -94,8 +94,8 @@ auto world_grid<WC>::get_surface_y(
     return std::nullopt;
 }
 
-template <typename WC>
-void world_grid<WC>::set_voxel(
+template <typename WD>
+void world_grid<WD>::set_voxel(
     vec3i world_pos, const voxel& v
 ) {
     auto cc = world_to_chunk_coord(world_pos);
@@ -107,70 +107,70 @@ void world_grid<WC>::set_voxel(
     it->second->set_voxel(lc / voxel_scale_, v);
 }
 
-template <typename WC>
-auto world_grid<WC>::has_chunk(
+template <typename WD>
+auto world_grid<WD>::has_chunk(
     vec3i chunk_coord
 ) const -> bool {
     return chunks_.contains(chunk_coord);
 }
 
-template <typename WC>
-auto world_grid<WC>::get_chunk(
+template <typename WD>
+auto world_grid<WD>::get_chunk(
     vec3i chunk_coord
-) -> chunk<WC>* {
+) -> chunk<WD>* {
     auto it = chunks_.find(chunk_coord);
     return it != chunks_.end() ? it->second.get() : nullptr;
 }
 
-template <typename WC>
-auto world_grid<WC>::has_column(
+template <typename WD>
+auto world_grid<WD>::has_column(
     vec2i coord
 ) const -> bool {
     return column_chunks_.contains(coord);
 }
 
-template <typename WC>
-auto world_grid<WC>::get_loaded_column_count() const -> uint32 {
+template <typename WD>
+auto world_grid<WD>::get_loaded_column_count() const -> uint32 {
     return static_cast<uint32>(column_chunks_.size());
 }
 
-template <typename WC>
-auto world_grid<WC>::get_loaded_chunk_count() const -> uint32 {
+template <typename WD>
+auto world_grid<WD>::get_loaded_chunk_count() const -> uint32 {
     return static_cast<uint32>(chunks_.size());
 }
 
-template <typename WC>
-auto world_grid<WC>::get_pending_column_count() const -> uint32 {
+template <typename WD>
+auto world_grid<WD>::get_pending_column_count() const -> uint32 {
     return static_cast<uint32>(pending_columns_.size());
 }
 
-template <typename WC>
-auto world_grid<WC>::get_deferred_remesh_count() const -> uint32 {
+template <typename WD>
+auto world_grid<WD>::get_deferred_remesh_count() const -> uint32 {
     return static_cast<uint32>(deferred_remeshes_.size());
 }
 
-template <typename WC>
-auto world_grid<WC>::is_column_pending(
+template <typename WD>
+auto world_grid<WD>::is_column_pending(
     vec2i coord
 ) const -> bool {
     return pending_columns_.contains(coord);
 }
 
-template <typename WC>
-auto world_grid<WC>::voxel_scale() const -> int32 {
+template <typename WD>
+auto world_grid<WD>::voxel_scale() const -> int32 {
     return voxel_scale_;
 }
 
-template <typename WC>
-auto world_grid<WC>::get_terrain_generator() const -> terrain_generator& {
+template <typename WD>
+auto world_grid<WD>::get_terrain_generator() const -> terrain_generator& {
     return *generator_;
 }
 
-template <typename WC>
-auto world_grid<WC>::world_to_chunk_coord(
+template <typename WD>
+auto world_grid<WD>::world_to_chunk_coord(
     vec3i world_pos
 ) const -> vec3i {
-    const int32 s = chunk<WC>::size * voxel_scale_;
+    const int32 s = chunk<WD>::size * voxel_scale_;
     return {
         world_pos.x >= 0 ? world_pos.x / s : (world_pos.x - s + 1) / s,
         world_pos.y >= 0 ? world_pos.y / s : (world_pos.y - s + 1) / s,
@@ -178,24 +178,24 @@ auto world_grid<WC>::world_to_chunk_coord(
     };
 }
 
-template <typename WC>
-auto world_grid<WC>::world_to_local_coord(
+template <typename WD>
+auto world_grid<WD>::world_to_local_coord(
     vec3i world_pos
 ) const -> vec3i {
-    const int32 s = chunk<WC>::size * voxel_scale_;
+    const int32 s = chunk<WD>::size * voxel_scale_;
     return {((world_pos.x % s) + s) % s, ((world_pos.y % s) + s) % s, ((world_pos.z % s) + s) % s};
 }
 
-template <typename WC>
-auto world_grid<WC>::chunk_to_world_coord(
+template <typename WD>
+auto world_grid<WD>::chunk_to_world_coord(
     vec3i chunk_coord
 ) const -> vec3i {
-    const int32 s = chunk<WC>::size * voxel_scale_;
+    const int32 s = chunk<WD>::size * voxel_scale_;
     return {chunk_coord.x * s, chunk_coord.y * s, chunk_coord.z * s};
 }
 
-template <typename WC>
-auto world_grid<WC>::request_column(
+template <typename WD>
+auto world_grid<WD>::request_column(
     vec2i coord
 ) -> bool {
     if (column_chunks_.contains(coord) || pending_columns_.contains(coord)) {
@@ -212,8 +212,8 @@ auto world_grid<WC>::request_column(
     return true;
 }
 
-template <typename WC>
-void world_grid<WC>::unload_column(
+template <typename WD>
+void world_grid<WD>::unload_column(
     vec2i coord
 ) {
     auto col_it = column_chunks_.find(coord);
@@ -227,13 +227,13 @@ void world_grid<WC>::unload_column(
     pending_columns_.erase(coord);
 }
 
-template <typename WC>
-auto world_grid<WC>::get_completed_stats() const -> const completed_stats& {
+template <typename WD>
+auto world_grid<WD>::get_completed_stats() const -> const completed_stats& {
     return completed_stats_;
 }
 
-template <typename WC>
-void world_grid<WC>::process_completed() {
+template <typename WD>
+void world_grid<WD>::process_completed() {
     static constexpr int32 max_columns_per_frame = 1;
     static constexpr vec3i neighbor_offsets[6]   = {
         {1, 0, 0},   //
@@ -283,8 +283,8 @@ void world_grid<WC>::process_completed() {
             chunk_create_total += measure_ms([&] -> auto {
                 chunks_.emplace(
                     cd.coord,
-                    std::make_unique<chunk<WC>>(
-                        *world_, cd.coord, std::move(cd.chunk_model), voxel_scale_
+                    std::make_unique<chunk<WD>>(
+                        *context_, cd.coord, std::move(cd.chunk_model), voxel_scale_
                     )
                 );
             });
@@ -320,8 +320,8 @@ void world_grid<WC>::process_completed() {
     completed_stats_.remeshes_processed = 0;
 }
 
-template <typename WC>
-void world_grid<WC>::process_deferred_remeshes() {
+template <typename WD>
+void world_grid<WD>::process_deferred_remeshes() {
     static constexpr int32 max_remeshes_per_frame = 4;
     int32 processed                               = 0;
 
@@ -335,13 +335,13 @@ void world_grid<WC>::process_deferred_remeshes() {
 
         auto model = chunk_ptr->get_model();
         model->invalidate();
-        world_->get_model_system().modify(chunk_ptr->get_entity()).set_model(model);
+        context_->template get_system<model_system>().modify(chunk_ptr->get_entity()).set_model(model);
         ++processed;
     }
 }
 
-template <typename WC>
-void world_grid<WC>::gen_thread_function() {
+template <typename WD>
+void world_grid<WD>::gen_thread_function() {
     while (true) {
         gen_task task{};
 

@@ -8,12 +8,12 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-character_controller_system<WC>::character_controller_system(context_type& context)
+template <typename WD>
+character_controller_system<WD>::character_controller_system(context_type& context)
     : context_(&context) {}
 
-template <typename WC>
-void character_controller_system<WC>::update(float32 delta_time) {
+template <typename WD>
+void character_controller_system<WD>::update(float32 delta_time) {
     for (auto [ent, cc, rb, mi] :
          context_->registry().template view<character_controller_component, rigid_body_component, movement_intent_component>()) {
 
@@ -46,21 +46,21 @@ void character_controller_system<WC>::update(float32 delta_time) {
     }
 }
 
-template <typename WC>
-character_controller_system<WC>::controller_modifier::controller_modifier(
+template <typename WD>
+character_controller_system<WD>::controller_modifier::controller_modifier(
     character_controller_system* system, entity ent
 )
     : system_(system), entity_(ent) {}
 
-template <typename WC>
-auto character_controller_system<WC>::modify(
+template <typename WD>
+auto character_controller_system<WD>::modify(
     entity ent
 ) -> controller_modifier {
     return controller_modifier(this, ent);
 }
 
-template <typename WC>
-auto character_controller_system<WC>::controller_modifier::set_move_input(
+template <typename WD>
+auto character_controller_system<WD>::controller_modifier::set_move_input(
     const vec3f& input
 ) -> controller_modifier& {
     if (!system_->context_->registry().template has<character_controller_component>(entity_)) {
@@ -71,8 +71,8 @@ auto character_controller_system<WC>::controller_modifier::set_move_input(
     return *this;
 }
 
-template <typename WC>
-auto character_controller_system<WC>::controller_modifier::set_facing_direction(
+template <typename WD>
+auto character_controller_system<WD>::controller_modifier::set_facing_direction(
     const vec3f& direction
 ) -> controller_modifier& {
     if (!system_->context_->registry().template has<character_controller_component>(entity_)) {
@@ -83,8 +83,8 @@ auto character_controller_system<WC>::controller_modifier::set_facing_direction(
     return *this;
 }
 
-template <typename WC>
-auto character_controller_system<WC>::controller_modifier::set_move_speed(
+template <typename WD>
+auto character_controller_system<WD>::controller_modifier::set_move_speed(
     float32 speed
 ) -> controller_modifier& {
     if (!system_->context_->registry().template has<character_controller_component>(entity_)) {
@@ -95,8 +95,8 @@ auto character_controller_system<WC>::controller_modifier::set_move_speed(
     return *this;
 }
 
-template <typename WC>
-auto character_controller_system<WC>::controller_modifier::set_jump_impulse(
+template <typename WD>
+auto character_controller_system<WD>::controller_modifier::set_jump_impulse(
     float32 impulse
 ) -> controller_modifier& {
     if (!system_->context_->registry().template has<character_controller_component>(entity_)) {
@@ -107,8 +107,8 @@ auto character_controller_system<WC>::controller_modifier::set_jump_impulse(
     return *this;
 }
 
-template <typename WC>
-auto character_controller_system<WC>::controller_modifier::set_rotation_speed(
+template <typename WD>
+auto character_controller_system<WD>::controller_modifier::set_rotation_speed(
     float32 speed
 ) -> controller_modifier& {
     if (!system_->context_->registry().template has<character_controller_component>(entity_)) {
@@ -119,8 +119,8 @@ auto character_controller_system<WC>::controller_modifier::set_rotation_speed(
     return *this;
 }
 
-template <typename WC>
-auto character_controller_system<WC>::controller_modifier::request_jump(
+template <typename WD>
+auto character_controller_system<WD>::controller_modifier::request_jump(
 ) -> controller_modifier& {
     if (!system_->context_->registry().template has<character_controller_component>(entity_)) {
         return *this;

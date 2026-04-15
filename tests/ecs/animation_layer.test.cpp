@@ -11,47 +11,29 @@
 #include <vw/gfx/world/systems/hierarchy_system.h>
 #include <vw/gfx/world/systems/spatial_system.h>
 #include <vw/gfx/world/systems/transform_system.h>
+#include <vw/gfx/world/world_def.h>
 
 using namespace vw;
 using namespace vw::gfx;
 
-using test_components = std::tuple<
-    hierarchy_component, transform_component, spatial_component,
-    animation_player_component, animation_target_component>;
-
-using test_registry = entity_registry<
-    hierarchy_component, transform_component, spatial_component,
-    animation_player_component, animation_target_component>;
-
-using test_context = world_context<
-    test_components>;
-
-using test_spatial_sys = spatial_system<
-    test_components>;
-
-using test_transform_sys = transform_system<
-    test_components>;
-
-using test_hierarchy_sys = hierarchy_system<
-    test_components>;
-
-using test_anim_sys = animation_system<
-    test_components>;
+using test_def = world_def<hierarchy_system, transform_system, spatial_system, animation_system>;
 
 struct anim_test_fixture {
-    test_registry reg;
-    test_context ctx{reg};
-    test_spatial_sys spatial_sys{ctx};
-    test_transform_sys transform_sys{ctx};
-    test_hierarchy_sys hierarchy_sys{ctx};
+    test_def::registry_type reg;
+    world_context<test_def> ctx{reg};
+    test_def::systems_tuple systems_{
+        hierarchy_system<test_def>{ctx},
+        transform_system<test_def>{ctx},
+        spatial_system<test_def>{ctx},
+        animation_system<test_def>{ctx}};
     animation_clip_registry clip_reg;
-    test_anim_sys anim_sys{ctx};
+
+    animation_system<test_def>& anim_sys = std::get<animation_system<test_def>>(systems_);
+    hierarchy_system<test_def>& hierarchy_sys = std::get<hierarchy_system<test_def>>(systems_);
+    transform_system<test_def>& transform_sys = std::get<transform_system<test_def>>(systems_);
 
     anim_test_fixture() {
-        ctx.register_system_(&spatial_sys);
-        ctx.register_system_(&transform_sys);
-        ctx.register_system_(&hierarchy_sys);
-        ctx.register_system_(&anim_sys);
+        ctx.set_systems_ptr_(&systems_);
         ctx.register_resource_(&clip_reg);
     }
 

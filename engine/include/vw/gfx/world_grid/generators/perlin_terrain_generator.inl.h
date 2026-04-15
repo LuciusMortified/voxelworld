@@ -207,7 +207,7 @@ inline auto perlin_terrain_generator::surface_height_at(
 inline void perlin_terrain_generator::generate(
     terrain_context& ctx
 ) {
-    constexpr int32 s      = chunk<>::size;
+    constexpr int32 s      = 64;
     constexpr int32 margin = 10;
 
     int32 wx0 = ctx.cx * s;
@@ -242,7 +242,7 @@ inline void perlin_terrain_generator::generate(
 inline void perlin_terrain_generator::generate_chunk(
     terrain_context& ctx, int32 chunk_y
 ) {
-    constexpr int32 s = chunk<>::size;
+    constexpr int32 s = 64;
 
     auto mdl = std::make_shared<model>(*identity_pool_, *page_pool_, s, s, s, params_.voxel_scale);
 

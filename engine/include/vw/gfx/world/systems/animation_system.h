@@ -27,11 +27,12 @@ namespace vw::gfx {
 template <typename>
 class transform_system;
 
-template <typename WC>
+template <typename WD>
 class animation_system final {
 public:
-    using registry_type = entity_registry_from_tuple<WC>::type;
-    using context_type  = world_context<WC>;
+    using components = typename WD::components;
+    using registry_type = typename entity_registry_from_tuple<components>::type;
+    using context_type  = world_context<WD>;
 
     explicit animation_system(context_type& context);
 

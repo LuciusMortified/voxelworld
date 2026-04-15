@@ -30,7 +30,7 @@ engine<WC>::engine(
     renderer_       = std::make_unique<renderer_type>(*vulkan_context_, *window_, block_registry_);
     camera_ =
         std::make_unique<camera>(45.0f, static_cast<float>(width) / static_cast<float>(height));
-    world_      = std::make_unique<world_type>(*vulkan_context_, block_registry_);
+    world_      = std::make_unique<world_type>();
     debug_tool_ = std::make_unique<debug_window_type>(*this);
 
     // Default empty app to avoid null checks
@@ -146,7 +146,6 @@ void engine<WC>::render(
     stats_.world_update_ms =
         std::chrono::duration<float32>(world_update_end - world_update_start_time_).count() *
         1000.0f;
-    stats_.systems = world_->get_update_stats();
 
     using clock = std::chrono::high_resolution_clock;
     auto ms = [](auto a, auto b) -> float32 {

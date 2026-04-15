@@ -67,9 +67,9 @@ static_assert(test_def::system_index<system_gamma> == 2);
 static_assert(std::is_same_v<
     test_def::systems_tuple,
     std::tuple<
-        system_alpha<test_def::components>,
-        system_beta<test_def::components>,
-        system_gamma<test_def::components>>>);
+        system_alpha<test_def>,
+        system_beta<test_def>,
+        system_gamma<test_def>>>);
 
 TEST_CASE("world_def collects components from system traits", "[world_def]") {
     STATIC_REQUIRE(std::is_same_v<test_def::components, std::tuple<comp_a, comp_b, comp_c>>);

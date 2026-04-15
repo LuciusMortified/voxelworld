@@ -14,12 +14,12 @@ inline void paint_voxel_operation::execute() {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
-    auto& model_system = world.get_model_system();
+    auto& model_sys = world.template get_system<gfx::model_system>();
 
     auto& model_comp = world.get_component<gfx::model_component>(ent);
     previous_block_  = model_comp.get_voxel(params_.position).id;
 
-    model_system.modify(ent).set_voxel(params_.position, voxel{params_.new_block});
+    model_sys.modify(ent).set_voxel(params_.position, voxel{params_.new_block});
     state_->file.has_unsaved_changes = true;
 }
 
@@ -27,9 +27,9 @@ inline void paint_voxel_operation::undo() {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
-    auto& model_system = world.get_model_system();
+    auto& model_sys = world.template get_system<gfx::model_system>();
 
-    model_system.modify(ent).set_voxel(params_.position, voxel{previous_block_});
+    model_sys.modify(ent).set_voxel(params_.position, voxel{previous_block_});
     state_->file.has_unsaved_changes = true;
 }
 

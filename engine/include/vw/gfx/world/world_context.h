@@ -9,28 +9,26 @@
 #include <unordered_map>
 
 #include "vw/gfx/world/entity_registry.h"
+#include "vw/gfx/world/system_trait.h"
 
 namespace vw::gfx {
 
-class mesh_pool;
-
-template <typename WC>
+template <typename WD>
 class world_grid;
 
-template <typename WC>
+template <typename WD>
 class world;
 
-template <typename WC>
+template <typename WD>
 class world_context {
 public:
-    using registry_type   = entity_registry_from_tuple<WC>::type;
-    using world_grid_type = world_grid<WC>;
-    using mesh_pool_type  = mesh_pool;
+    using components      = typename WD::components;
+    using registry_type   = typename entity_registry_from_tuple<components>::type;
+    using systems_tuple   = typename WD::systems_tuple;
+    using world_grid_type = world_grid<WD>;
 
-    explicit world_context(
-        registry_type& reg, mesh_pool* mp = nullptr, std::shared_ptr<world_grid_type> wg = nullptr
-    )
-        : registry_(&reg), mesh_pool_(mp), world_grid_(std::move(wg)) {}
+    explicit world_context(registry_type& reg)
+        : registry_(&reg) {}
 
     [[nodiscard]] auto registry() -> registry_type& {
         return *registry_;
@@ -38,12 +36,7 @@ public:
     [[nodiscard]] auto registry() const -> const registry_type& {
         return *registry_;
     }
-    [[nodiscard]] auto get_mesh_pool() -> mesh_pool_type* {
-        return mesh_pool_;
-    }
-    [[nodiscard]] auto get_mesh_pool() const -> const mesh_pool_type* {
-        return mesh_pool_;
-    }
+
     [[nodiscard]] auto get_world_grid() -> std::shared_ptr<world_grid_type> {
         return world_grid_;
     }
@@ -52,10 +45,13 @@ public:
     }
 
     template <template <typename> class S>
-    [[nodiscard]] auto get_system() -> S<WC>& {
-        auto it = systems_.find(std::type_index(typeid(S<WC>)));
-        assert(it != systems_.end());
-        return *static_cast<S<WC>*>(it->second);
+    [[nodiscard]] auto get_system() -> S<WD>& {
+        return std::get<S<WD>>(*systems_);
+    }
+
+    template <template <typename> class S>
+    [[nodiscard]] auto get_system() const -> const S<WD>& {
+        return std::get<S<WD>>(*systems_);
     }
 
     template <typename R>
@@ -65,23 +61,67 @@ public:
         return *static_cast<R*>(it->second);
     }
 
-    template <template <typename> class S>
-    void register_system_(S<WC>* ptr) {
-        systems_[std::type_index(typeid(S<WC>))] = ptr;
-    }
-
     template <typename R>
     void register_resource_(R* ptr) {
         resources_[std::type_index(typeid(R))] = ptr;
     }
 
-private:
-    friend class world<WC>;
+    auto create_entity() -> entity {
+        return registry_->create();
+    }
 
-    registry_type*                    registry_   = nullptr;
-    mesh_pool_type*                   mesh_pool_  = nullptr;
+    void destroy_entity(entity ent) noexcept {
+        registry_->destroy(ent);
+    }
+
+    auto batch_create_entities(uint32 count) -> std::vector<entity> {
+        return registry_->batch_create(count);
+    }
+
+    void batch_destroy_entities(const std::vector<entity>& entities) noexcept {
+        registry_->batch_destroy(entities);
+    }
+
+    template <typename T>
+    void add_component(entity ent, T&& value) {
+        registry_->add(ent, std::forward<T>(value));
+        using C = std::remove_cvref_t<T>;
+        std::apply([ent](auto&... systems) {
+            (detail::invoke_on_add<C>(systems, ent), ...);
+        }, *systems_);
+    }
+
+    template <typename T>
+    void remove_component(entity ent) noexcept {
+        std::apply([ent](auto&... systems) {
+            (detail::invoke_on_remove<T>(systems, ent), ...);
+        }, *systems_);
+        registry_->template remove<T>(ent);
+    }
+
+    template <typename T>
+    [[nodiscard]] auto has_component(entity ent) const -> bool {
+        return registry_->template has<T>(ent);
+    }
+
+    template <typename T>
+    [[nodiscard]] auto get_component(entity ent) -> T& {
+        return registry_->template get<T>(ent);
+    }
+
+    template <typename T>
+    [[nodiscard]] auto get_component(entity ent) const -> const T& {
+        return registry_->template get<T>(ent);
+    }
+
+    void set_systems_ptr_(systems_tuple* ptr) { systems_ = ptr; }
+
+private:
+    template <typename> friend class world;
+
+    registry_type*                    registry_    = nullptr;
+    systems_tuple*                    systems_     = nullptr;
     std::shared_ptr<world_grid_type>  world_grid_;
-    std::unordered_map<std::type_index, void*> systems_;
     std::unordered_map<std::type_index, void*> resources_;
 };
 

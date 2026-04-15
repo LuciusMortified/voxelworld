@@ -9,10 +9,10 @@ inline player::player(
 )
     : engine_{engine}, assets_{assets} {
     auto& world            = engine_.get_world();
-    auto& transform_system = world.get_transform_system();
-    auto& physics_system   = world.get_physics_system();
+    auto& transform_sys = world.template get_system<gfx::transform_system>();
+    auto& physics_sys = world.template get_system<gfx::physics_system>();
 
-    root_ = std::make_unique<gfx::entity_guard<>>(world);
+    root_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
     root_->with<gfx::hierarchy_component>();
     root_->with<gfx::transform_component>();
     root_->with<gfx::spatial_component>();
@@ -26,15 +26,15 @@ inline player::player(
 
     const auto ent = root_->get_entity();
 
-    transform_system.modify(ent)
+    transform_sys.modify(ent)
         .set_position({0.0f, 500.0f, 0.0f})
         .set_origin({-6.0f, -6.0f, -6.0f});
 
-    physics_system.modify_collider(ent)
+    physics_sys.modify_collider(ent)
         .set_extents({12.0f, 28.0f, 12.0f})
         .set_offset({0.0f, 2.0f, 0.0f});
 
-    world.get_spatial_system().modify(ent).set_layer(gfx::spatial_layer::character);
+    world.template get_system<gfx::spatial_system>().modify(ent).set_layer(gfx::spatial_layer::character);
 
     body_       = create_body_part("m_human", "body");
     head_       = create_body_part("m_human", "head");
@@ -65,7 +65,7 @@ inline auto player::update(
     const vec3f move_dir =
         math::normalize(forward * input.move_input.x + right * input.move_input.y);
 
-    auto modifier = world.get_character_controller_system().modify(ent);
+    auto modifier = world.template get_system<gfx::character_controller_system>().modify(ent);
     modifier.set_move_input(move_dir);
 
     const auto& anim_player  = world.get_component<gfx::animation_player_component>(ent);
@@ -117,7 +117,7 @@ inline auto player::try_place(
     float32 spawn_y = (static_cast<float32>(*surface) + 6.0f) * voxel_scale;
 
     engine_.get_world()
-        .get_transform_system()
+        .template get_system<gfx::transform_system>()
         .modify(root_->get_entity())
         .set_position({0.0f, spawn_y, 0.0f});
 
@@ -133,10 +133,10 @@ inline auto player::toggle_sword() -> void {
     const auto hand_ent = hand_right_->get_entity();
 
     if (sword_) {
-        world.get_socket_system().modify(hand_ent).detach("hand_right");
+        world.template get_system<gfx::socket_system>().modify(hand_ent).detach("hand_right");
         sword_ = nullptr;
     } else {
-        sword_ = std::make_unique<gfx::entity_guard<>>(world);
+        sword_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
         sword_->with<gfx::hierarchy_component>();
         sword_->with<gfx::transform_component>();
         sword_->with<gfx::spatial_component>();
@@ -145,16 +145,16 @@ inline auto player::toggle_sword() -> void {
         const auto sword_ent = sword_->get_entity();
         const auto& ent_data = assets_.get_entity("m_sword", "root");
 
-        world.get_transform_system().modify(sword_ent).set_origin(ent_data.origin);
-        world.get_model_system().modify(sword_ent).set_model(assets_.get_model("m_sword", "root"));
-        world.get_socket_system().modify(hand_ent).attach("hand_right", sword_ent);
-        world.get_spatial_system().modify(sword_ent).set_layer(gfx::spatial_layer::character);
+        world.template get_system<gfx::transform_system>().modify(sword_ent).set_origin(ent_data.origin);
+        world.template get_system<gfx::model_system>().modify(sword_ent).set_model(assets_.get_model("m_sword", "root"));
+        world.template get_system<gfx::socket_system>().modify(hand_ent).attach("hand_right", sword_ent);
+        world.template get_system<gfx::spatial_system>().modify(sword_ent).set_layer(gfx::spatial_layer::character);
     }
 }
 
 inline auto player::handle_attack() const -> void {
     engine_.get_world()
-        .get_animation_fsm_system()
+        .template get_system<gfx::animation_fsm_system>()
         .modify(root_->get_entity())
         .fire_trigger("attack");
 }
@@ -179,14 +179,14 @@ inline auto player::is_placed() const -> bool {
 
 inline auto player::create_body_part(
     std::string_view prefab_name, std::string_view part_name
-) const -> std::unique_ptr<gfx::entity_guard<>> {
+) const -> std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> {
     auto& world            = engine_.get_world();
-    auto& hierarchy_system = world.get_hierarchy_system();
-    auto& transform_system = world.get_transform_system();
-    auto& model_system     = world.get_model_system();
-    auto& animation_system = world.get_animation_system();
+    auto& hierarchy_sys = world.template get_system<gfx::hierarchy_system>();
+    auto& transform_sys = world.template get_system<gfx::transform_system>();
+    auto& model_sys = world.template get_system<gfx::model_system>();
+    auto& anim_sys = world.template get_system<gfx::animation_system>();
 
-    auto guard = std::make_unique<gfx::entity_guard<>>(world);
+    auto guard = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
     guard->with<gfx::hierarchy_component>();
     guard->with<gfx::transform_component>();
     guard->with<gfx::spatial_component>();
@@ -200,7 +200,7 @@ inline auto player::create_body_part(
 
     const auto ent = guard->get_entity();
 
-    hierarchy_system.modify(ent).set_parent(root_->get_entity());
+    hierarchy_sys.modify(ent).set_parent(root_->get_entity());
 
     transform rest;
     rest.set_position(ent_data.position);
@@ -208,19 +208,19 @@ inline auto player::create_body_part(
     rest.set_scale(ent_data.scale);
     rest.set_origin(ent_data.origin);
 
-    transform_system.modify(ent).set_transform(rest);
+    transform_sys.modify(ent).set_transform(rest);
 
     const auto model = assets_.get_model(prefab_name, part_name);
-    model_system.modify(ent).set_model(model);
+    model_sys.modify(ent).set_model(model);
 
-    const auto target_mod = animation_system.modify_target(ent);
+    const auto target_mod = anim_sys.modify_target(ent);
     target_mod.set_target_name(ent_data.name);
     target_mod.set_rest_transform(rest);
 
     if (ent_data.has_sockets) {
-        auto& socket_system = world.get_socket_system();
+        auto& socket_sys = world.template get_system<gfx::socket_system>();
         for (const auto& sp : ent_data.sockets) {
-            socket_system.modify(ent).add_socket(
+            socket_sys.modify(ent).add_socket(
                 sp.name, sp.position, math::euler_to_quat(sp.rotation), sp.scale
             );
         }
@@ -339,7 +339,7 @@ inline auto player::setup_animation_fsm() const -> void {
 
     fsm_movement.set_entry_state("idle");
 
-    world.get_animation_fsm_system().modify(ent).add_machine(0, std::move(fsm_movement));
+    world.template get_system<gfx::animation_fsm_system>().modify(ent).add_machine(0, std::move(fsm_movement));
 
     gfx::animation_fsm fsm_action;
 
@@ -375,7 +375,7 @@ inline auto player::setup_animation_fsm() const -> void {
 
     fsm_action.set_entry_state("none");
 
-    world.get_animation_fsm_system().modify(ent).add_machine(1, std::move(fsm_action));
+    world.template get_system<gfx::animation_fsm_system>().modify(ent).add_machine(1, std::move(fsm_action));
 }
 
 }  // namespace vw::arena

@@ -10,11 +10,12 @@
 
 namespace vw::gfx {
 
-template <typename WC>
+template <typename WD>
 class hierarchy_system final {
 public:
-    using context_type  = world_context<WC>;
-    using registry_type = entity_registry_from_tuple<WC>::type;
+    using context_type  = world_context<WD>;
+    using components = typename WD::components;
+    using registry_type = typename entity_registry_from_tuple<components>::type;
 
     explicit hierarchy_system(context_type& context);
 
@@ -34,6 +35,12 @@ public:
     };
 
     void cleanup(entity ent);
+
+    template <typename C>
+        requires std::same_as<C, hierarchy_component>
+    void on_remove(entity e) {
+        cleanup(e);
+    }
 
     [[nodiscard]] auto modify(entity ent) -> hierarchy_modifier;
 

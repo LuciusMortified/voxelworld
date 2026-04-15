@@ -13,25 +13,25 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-transform_system<WC>::transform_system(context_type& context)
+template <typename WD>
+transform_system<WD>::transform_system(context_type& context)
     : context_(&context) {}
 
-template <typename WC>
-transform_system<WC>::transform_modifier::transform_modifier(
+template <typename WD>
+transform_system<WD>::transform_modifier::transform_modifier(
     transform_system* system, entity ent
 )
     : system_(system), entity_(ent) {}
 
-template <typename WC>
-auto transform_system<WC>::modify(
+template <typename WD>
+auto transform_system<WD>::modify(
     entity ent
 ) -> transform_modifier {
     return transform_modifier(this, ent);
 }
 
-template <typename WC>
-auto transform_system<WC>::transform_modifier::set_position(
+template <typename WD>
+auto transform_system<WD>::transform_modifier::set_position(
     const vec3f& position
 ) -> transform_modifier& {
     if (!system_->context_->registry().template has<transform_component>(entity_)) {
@@ -49,8 +49,8 @@ auto transform_system<WC>::transform_modifier::set_position(
     return *this;
 }
 
-template <typename WC>
-auto transform_system<WC>::transform_modifier::set_rotation(
+template <typename WD>
+auto transform_system<WD>::transform_modifier::set_rotation(
     const quat& rotation
 ) -> transform_modifier& {
     if (!system_->context_->registry().template has<transform_component>(entity_)) {
@@ -68,8 +68,8 @@ auto transform_system<WC>::transform_modifier::set_rotation(
     return *this;
 }
 
-template <typename WC>
-auto transform_system<WC>::transform_modifier::set_rotation_euler(
+template <typename WD>
+auto transform_system<WD>::transform_modifier::set_rotation_euler(
     const vec3f& euler
 ) -> transform_modifier& {
     if (!system_->context_->registry().template has<transform_component>(entity_)) {
@@ -87,8 +87,8 @@ auto transform_system<WC>::transform_modifier::set_rotation_euler(
     return *this;
 }
 
-template <typename WC>
-auto transform_system<WC>::transform_modifier::set_scale(
+template <typename WD>
+auto transform_system<WD>::transform_modifier::set_scale(
     const vec3f& scale
 ) -> transform_modifier& {
     if (!system_->context_->registry().template has<transform_component>(entity_)) {
@@ -106,8 +106,8 @@ auto transform_system<WC>::transform_modifier::set_scale(
     return *this;
 }
 
-template <typename WC>
-auto transform_system<WC>::transform_modifier::set_origin(
+template <typename WD>
+auto transform_system<WD>::transform_modifier::set_origin(
     const vec3f& origin
 ) -> transform_modifier& {
     if (!system_->context_->registry().template has<transform_component>(entity_)) {
@@ -125,8 +125,8 @@ auto transform_system<WC>::transform_modifier::set_origin(
     return *this;
 }
 
-template <typename WC>
-auto transform_system<WC>::transform_modifier::translate(
+template <typename WD>
+auto transform_system<WD>::transform_modifier::translate(
     const vec3f& offset
 ) -> transform_modifier& {
     if (!system_->context_->registry().template has<transform_component>(entity_)) {
@@ -144,8 +144,8 @@ auto transform_system<WC>::transform_modifier::translate(
     return *this;
 }
 
-template <typename WC>
-auto transform_system<WC>::transform_modifier::rotate(
+template <typename WD>
+auto transform_system<WD>::transform_modifier::rotate(
     const vec3f& angles
 ) -> transform_modifier& {
     if (!system_->context_->registry().template has<transform_component>(entity_)) {
@@ -163,8 +163,8 @@ auto transform_system<WC>::transform_modifier::rotate(
     return *this;
 }
 
-template <typename WC>
-auto transform_system<WC>::transform_modifier::scale(
+template <typename WD>
+auto transform_system<WD>::transform_modifier::scale(
     const vec3f& factor
 ) -> transform_modifier& {
     if (!system_->context_->registry().template has<transform_component>(entity_)) {
@@ -182,8 +182,8 @@ auto transform_system<WC>::transform_modifier::scale(
     return *this;
 }
 
-template <typename WC>
-auto transform_system<WC>::transform_modifier::mark_world_dirty() -> transform_modifier& {
+template <typename WD>
+auto transform_system<WD>::transform_modifier::mark_world_dirty() -> transform_modifier& {
     if (!system_->context_->registry().template has<transform_component>(entity_)) {
         return *this;
     }
@@ -197,8 +197,8 @@ auto transform_system<WC>::transform_modifier::mark_world_dirty() -> transform_m
     return *this;
 }
 
-template <typename WC>
-auto transform_system<WC>::transform_modifier::set_transform(
+template <typename WD>
+auto transform_system<WD>::transform_modifier::set_transform(
     const transform& transform
 ) -> transform_modifier& {
     if (!system_->context_->registry().template has<transform_component>(entity_)) {
@@ -216,8 +216,8 @@ auto transform_system<WC>::transform_modifier::set_transform(
     return *this;
 }
 
-template <typename WC>
-auto transform_system<WC>::transform_modifier::set_transform_with_matrix(
+template <typename WD>
+auto transform_system<WD>::transform_modifier::set_transform_with_matrix(
     const transform& transform,
     const mat4f& local_matrix
 ) -> transform_modifier& {
@@ -237,8 +237,8 @@ auto transform_system<WC>::transform_modifier::set_transform_with_matrix(
     return *this;
 }
 
-template <typename WC>
-void transform_system<WC>::update(float32 /*dt*/) {
+template <typename WD>
+void transform_system<WD>::update(float32 /*dt*/) {
     auto& requested = context_->registry().template requested<transform_component>();
     if (requested.empty()) {
         return;
@@ -275,8 +275,8 @@ void transform_system<WC>::update(float32 /*dt*/) {
     context_->registry().template clear_requested<transform_component>();
 }
 
-template <typename WC>
-void transform_system<WC>::mark_children_world_dirty(
+template <typename WD>
+void transform_system<WD>::mark_children_world_dirty(
     entity ent
 ) {
     if (!context_->registry().template has<hierarchy_component>(ent)) {
@@ -295,8 +295,8 @@ void transform_system<WC>::mark_children_world_dirty(
         mark_children_world_dirty(child);
     }
 }
-template <typename WC>
-void transform_system<WC>::update_entity_world_matrix(
+template <typename WD>
+void transform_system<WD>::update_entity_world_matrix(
     entity ent, const transform_component& transform_comp
 ) {
     mat4f local_matrix           = transform_comp.get_local_matrix();

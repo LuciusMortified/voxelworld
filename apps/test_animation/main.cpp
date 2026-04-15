@@ -54,33 +54,33 @@ public:
 private:
     void setup_scene() {
         auto& world            = get_engine().get_world();
-        auto& model_registry   = world.get_model_registry();
-        auto& transform_system = world.get_transform_system();
-        auto& model_system     = world.get_model_system();
-        auto& hierarchy_system = world.get_hierarchy_system();
-        auto& animation_system = world.get_animation_system();
+        auto& model_reg = world.template get_resource<gfx::model_registry>();
+        auto& transform_sys = world.template get_system<gfx::transform_system>();
+        auto& model_sys = world.template get_system<gfx::model_system>();
+        auto& hierarchy_sys = world.template get_system<gfx::hierarchy_system>();
+        auto& anim_sys = world.template get_system<gfx::animation_system>();
 
-        auto red_cube_model = model_registry.create("red_cube", 3, 3, 3);
+        auto red_cube_model = model_reg.create("red_cube", 3, 3, 3);
         red_cube_model->fill(voxel{blocks::red_3});
 
-        auto green_cube_model = model_registry.create("green_cube", 3, 3, 3);
+        auto green_cube_model = model_reg.create("green_cube", 3, 3, 3);
         green_cube_model->fill(voxel{blocks::green_3});
 
-        auto blue_cube_model = model_registry.create("blue_cube", 3, 3, 3);
+        auto blue_cube_model = model_reg.create("blue_cube", 3, 3, 3);
         blue_cube_model->fill(voxel{blocks::blue_3});
 
-        root_ = std::make_unique<gfx::entity_guard<>>(world);
+        root_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
         root_->with<gfx::transform_component>();
         root_->with<gfx::hierarchy_component>();
         root_->with<gfx::animation_player_component>();
         root_->with<gfx::animation_target_component>();
         auto root_ent = root_->get_entity();
 
-        animation_system  //
+        anim_sys  //
             .modify_target(root_ent)
             .set_target_name("root");
 
-        red_ = std::make_unique<gfx::entity_guard<>>(world);
+        red_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
         red_->with<gfx::transform_component>();
         red_->with<gfx::hierarchy_component>();
         red_->with<gfx::spatial_component>();
@@ -90,23 +90,23 @@ private:
         auto red_ent = red_->get_entity();
         transform red_rest;
         red_rest.set_position({-4.0f, 0.0f, 0.0f});
-        transform_system  //
+        transform_sys  //
             .modify(red_ent)
             .set_transform(red_rest);
-        model_system  //
+        model_sys  //
             .modify(red_ent)
             .set_model(red_cube_model);
-        animation_system  //
+        anim_sys  //
             .modify_target(red_ent)
             .set_target_name("red");
-        animation_system  //
+        anim_sys  //
             .modify_target(red_ent)
             .set_rest_transform(red_rest);
-        hierarchy_system  //
+        hierarchy_sys  //
             .modify(red_ent)
             .set_parent(root_ent);
 
-        green_ = std::make_unique<gfx::entity_guard<>>(world);
+        green_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
         green_->with<gfx::transform_component>();
         green_->with<gfx::hierarchy_component>();
         green_->with<gfx::spatial_component>();
@@ -114,20 +114,20 @@ private:
         green_->with<gfx::animation_target_component>();
 
         auto green_ent = green_->get_entity();
-        transform_system  //
+        transform_sys  //
             .modify(green_ent)
             .set_position({0.0f, 0.0f, 0.0f});
-        model_system  //
+        model_sys  //
             .modify(green_ent)
             .set_model(green_cube_model);
-        animation_system  //
+        anim_sys  //
             .modify_target(green_ent)
             .set_target_name("green");
-        hierarchy_system  //
+        hierarchy_sys  //
             .modify(green_ent)
             .set_parent(root_ent);
 
-        blue_ = std::make_unique<gfx::entity_guard<>>(world);
+        blue_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
         blue_->with<gfx::transform_component>();
         blue_->with<gfx::hierarchy_component>();
         blue_->with<gfx::spatial_component>();
@@ -137,19 +137,19 @@ private:
         auto blue_ent = blue_->get_entity();
         transform blue_rest;
         blue_rest.set_position({4.0f, 0.0f, 0.0f});
-        transform_system  //
+        transform_sys  //
             .modify(blue_ent)
             .set_transform(blue_rest);
-        model_system  //
+        model_sys  //
             .modify(blue_ent)
             .set_model(blue_cube_model);
-        animation_system  //
+        anim_sys  //
             .modify_target(blue_ent)
             .set_target_name("blue");
-        animation_system  //
+        anim_sys  //
             .modify_target(blue_ent)
             .set_rest_transform(blue_rest);
-        hierarchy_system  //
+        hierarchy_sys  //
             .modify(blue_ent)
             .set_parent(root_ent);
     }
@@ -163,7 +163,7 @@ private:
 
     void create_bounce_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.get_animation_clip_registry();
+        auto& clip_registry = world.template get_resource<gfx::animation_clip_registry>();
         auto clip           = clip_registry.create("bounce");
 
         {
@@ -214,8 +214,8 @@ private:
             clip->add_track(track);
         }
 
-        auto& animation_system = world.get_animation_system();
-        auto layer_mod = animation_system.modify_player(root_->get_entity()).layer(0);
+        auto& anim_sys = world.template get_system<gfx::animation_system>();
+        auto layer_mod = anim_sys.modify_player(root_->get_entity()).layer(0);
         layer_mod.blend_to_by_name("bounce");
         layer_mod.set_loop_mode(gfx::animation_loop_mode::loop);
         layer_mod.play();
@@ -223,7 +223,7 @@ private:
 
     void create_rotation_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.get_animation_clip_registry();
+        auto& clip_registry = world.template get_resource<gfx::animation_clip_registry>();
         auto clip           = clip_registry.create("rotation");
 
         {
@@ -289,7 +289,7 @@ private:
 
     void create_wave_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.get_animation_clip_registry();
+        auto& clip_registry = world.template get_resource<gfx::animation_clip_registry>();
         auto clip           = clip_registry.create("wave");
 
         {
@@ -347,7 +347,7 @@ private:
 
     void create_scale_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.get_animation_clip_registry();
+        auto& clip_registry = world.template get_resource<gfx::animation_clip_registry>();
         auto clip           = clip_registry.create("scale");
 
         {
@@ -446,8 +446,8 @@ private:
         ImGui::Separator();
 
         auto& world            = get_engine().get_world();
-        auto& animation_system = world.get_animation_system();
-        auto modifier = animation_system.modify_player(root_->get_entity()).layer(0);
+        auto& anim_sys = world.template get_system<gfx::animation_system>();
+        auto modifier = anim_sys.modify_player(root_->get_entity()).layer(0);
         auto& animation_comp =
             world.get_component<gfx::animation_player_component>(root_->get_entity());
 
@@ -522,9 +522,9 @@ private:
             modifier.set_playback_speed(speed);
         }
 
-        float32 fps = animation_system.get_target_fps();
+        float32 fps = anim_sys.get_target_fps();
         if (ImGui::SliderFloat("Target FPS", &fps, 10.0f, 120.0f)) {
-            animation_system.set_target_fps(fps);
+            anim_sys.set_target_fps(fps);
         }
 
         ImGui::Separator();
@@ -570,10 +570,10 @@ private:
     }
 
     std::unique_ptr<gfx::free_camera_controller> camera_controller_;
-    std::unique_ptr<gfx::entity_guard<>> root_;
-    std::unique_ptr<gfx::entity_guard<>> red_;
-    std::unique_ptr<gfx::entity_guard<>> green_;
-    std::unique_ptr<gfx::entity_guard<>> blue_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> root_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> red_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> green_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> blue_;
     std::string current_animation_ = "bounce";
 };
 

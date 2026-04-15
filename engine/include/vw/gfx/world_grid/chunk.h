@@ -13,13 +13,15 @@ namespace vw::gfx {
 
 class model;
 
-template <typename WC = base_world_components>
+template <typename WD>
 class chunk {
 public:
+    using context_type = world_context<WD>;
+
     static constexpr int32 size = 64;
     static constexpr int32 volume = size * size * size;
 
-    chunk(world<WC>& world, vec3i coord, std::shared_ptr<model> model, int32 voxel_scale = 1);
+    chunk(context_type& ctx, vec3i coord, std::shared_ptr<model> model, int32 voxel_scale = 1);
     ~chunk() = default;
 
     chunk(const chunk&) = delete;
@@ -41,7 +43,7 @@ public:
     }
 
 private:
-    entity_guard<WC> guard_;
+    entity_guard<WD> guard_;
     std::shared_ptr<model> model_;
 };
 

@@ -14,7 +14,6 @@
 #include "vw/gfx/world/spatial_layer.h"
 #include "vw/gfx/world/system_trait.h"
 #include "vw/gfx/world/world_context.h"
-#include "vw/gfx/world_grid/world_grid.h"
 
 namespace vw::gfx {
 
@@ -23,6 +22,9 @@ class transform_system;
 
 template <typename>
 class spatial_system;
+
+template <typename>
+class world_grid;
 
 class debug_primitives;
 
@@ -36,11 +38,12 @@ struct physics_stats {
     int32 entity_query_results   = 0;
 };
 
-template <typename WC>
+template <typename WD>
 class physics_system final {
 public:
-    using context_type  = world_context<WC>;
-    using registry_type = entity_registry_from_tuple<WC>::type;
+    using context_type  = world_context<WD>;
+    using components = typename WD::components;
+    using registry_type = typename entity_registry_from_tuple<components>::type;
 
     static constexpr int32 max_collision_iterations = 4;
     static constexpr float32 fixed_dt = 1.0f / 60.0f;

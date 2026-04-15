@@ -11,15 +11,15 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-socket_system<WC>::socket_system(context_type& context)
+template <typename WD>
+socket_system<WD>::socket_system(context_type& context)
     : context_(&context) {}
 
-template <typename WC>
-void socket_system<WC>::update(float32 /*dt*/) {}
+template <typename WD>
+void socket_system<WD>::update(float32 /*dt*/) {}
 
-template <typename WC>
-void socket_system<WC>::cleanup(
+template <typename WD>
+void socket_system<WD>::cleanup(
     entity ent
 ) {
     if (!context_->registry().template has<socket_component>(ent)) {
@@ -34,21 +34,21 @@ void socket_system<WC>::cleanup(
     }
 }
 
-template <typename WC>
-socket_system<WC>::socket_modifier::socket_modifier(
+template <typename WD>
+socket_system<WD>::socket_modifier::socket_modifier(
     socket_system* system, entity ent
 )
     : system_(system), entity_(ent) {}
 
-template <typename WC>
-auto socket_system<WC>::modify(
+template <typename WD>
+auto socket_system<WD>::modify(
     entity ent
 ) -> socket_modifier {
     return socket_modifier(this, ent);
 }
 
-template <typename WC>
-auto socket_system<WC>::socket_modifier::attach(
+template <typename WD>
+auto socket_system<WD>::socket_modifier::attach(
     const std::string& socket_name, entity child
 ) -> socket_modifier& {
     if (!system_->context_->registry().template has<socket_component>(entity_)) {
@@ -70,8 +70,8 @@ auto socket_system<WC>::socket_modifier::attach(
     return *this;
 }
 
-template <typename WC>
-auto socket_system<WC>::socket_modifier::detach(
+template <typename WD>
+auto socket_system<WD>::socket_modifier::detach(
     const std::string& socket_name
 ) -> socket_modifier& {
     if (!system_->context_->registry().template has<socket_component>(entity_)) {
@@ -90,8 +90,8 @@ auto socket_system<WC>::socket_modifier::detach(
     return *this;
 }
 
-template <typename WC>
-auto socket_system<WC>::socket_modifier::add_socket(
+template <typename WD>
+auto socket_system<WD>::socket_modifier::add_socket(
     const std::string& name, const vec3f& position, const quat& rotation, const vec3f& scale
 ) -> socket_modifier& {
     if (!system_->context_->registry().template has<socket_component>(entity_)) {
@@ -102,8 +102,8 @@ auto socket_system<WC>::socket_modifier::add_socket(
     return *this;
 }
 
-template <typename WC>
-auto socket_system<WC>::socket_modifier::remove_socket(
+template <typename WD>
+auto socket_system<WD>::socket_modifier::remove_socket(
     const std::string& name
 ) -> socket_modifier& {
     if (!system_->context_->registry().template has<socket_component>(entity_)) {

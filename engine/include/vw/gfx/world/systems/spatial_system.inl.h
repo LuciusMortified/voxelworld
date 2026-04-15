@@ -15,26 +15,26 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-spatial_system<WC>::spatial_system(
+template <typename WD>
+spatial_system<WD>::spatial_system(
     context_type& context
 )
     : context_(&context) {}
 
-template <typename WC>
-auto spatial_system<WC>::modify(entity ent) -> spatial_modifier {
+template <typename WD>
+auto spatial_system<WD>::modify(entity ent) -> spatial_modifier {
     return spatial_modifier(this, ent);
 }
 
-template <typename WC>
-spatial_system<WC>::spatial_modifier::spatial_modifier(
+template <typename WD>
+spatial_system<WD>::spatial_modifier::spatial_modifier(
     spatial_system* system, entity ent
 )
     : system_(system)
     , entity_(ent) {}
 
-template <typename WC>
-auto spatial_system<WC>::spatial_modifier::set_layer(
+template <typename WD>
+auto spatial_system<WD>::spatial_modifier::set_layer(
     spatial_layer_mask layer
 ) -> spatial_modifier& {
     if (!system_->context_->registry().template has<spatial_component>(entity_)) {
@@ -45,8 +45,8 @@ auto spatial_system<WC>::spatial_modifier::set_layer(
     return *this;
 }
 
-template <typename WC>
-void spatial_system<WC>::update(float32 /*dt*/) {
+template <typename WD>
+void spatial_system<WD>::update(float32 /*dt*/) {
     auto& requested = context_->registry().template requested<spatial_component>();
     if (requested.empty()) {
         return;
@@ -67,8 +67,8 @@ void spatial_system<WC>::update(float32 /*dt*/) {
     context_->registry().template clear_requested<spatial_component>();
 }
 
-template <typename WC>
-void spatial_system<WC>::update_entity(
+template <typename WD>
+void spatial_system<WD>::update_entity(
     entity ent
 ) {
     auto& spatial = context_->registry().template get<spatial_component>(ent);
@@ -109,8 +109,8 @@ void spatial_system<WC>::update_entity(
     }
 }
 
-template <typename WC>
-auto spatial_system<WC>::expand_aabb_for_fat(
+template <typename WD>
+auto spatial_system<WD>::expand_aabb_for_fat(
     const aabb& bounds
 ) -> aabb {
     constexpr float expansion_factor = 0.1f;
@@ -129,8 +129,8 @@ auto spatial_system<WC>::expand_aabb_for_fat(
     };
 }
 
-template <typename WC>
-auto spatial_system<WC>::calculate_aabb_from_model(
+template <typename WD>
+auto spatial_system<WD>::calculate_aabb_from_model(
     entity ent, const model_component& model_comp, const transform_component& transform_comp
 ) const -> aabb {
     if (!model_comp.has_model()) {
@@ -177,44 +177,44 @@ auto spatial_system<WC>::calculate_aabb_from_model(
     return aabb{min_point, max_point};
 }
 
-template <typename WC>
-void spatial_system<WC>::query_all(
+template <typename WD>
+void spatial_system<WD>::query_all(
     const frustum& f, std::vector<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
     tree_.query_all(f, result_out, layer_mask);
 }
 
-template <typename WC>
-void spatial_system<WC>::query_all_any(
+template <typename WD>
+void spatial_system<WD>::query_all_any(
     std::span<const frustum> frustums, std::vector<entity>& result_out
 ) const {
     tree_.query_all_any(frustums, result_out);
     std::sort(result_out.begin(), result_out.end());
 }
 
-template <typename WC>
-void spatial_system<WC>::query_all(
+template <typename WD>
+void spatial_system<WD>::query_all(
     const ray& r, std::vector<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
     tree_.query_all(r, result_out, layer_mask);
 }
 
-template <typename WC>
-void spatial_system<WC>::query_all(
+template <typename WD>
+void spatial_system<WD>::query_all(
     const aabb& bounds, std::vector<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
     tree_.query_all(bounds, result_out, layer_mask);
 }
 
-template <typename WC>
-void spatial_system<WC>::cleanup(
+template <typename WD>
+void spatial_system<WD>::cleanup(
     entity ent
 ) {
     tree_.remove(ent);
 }
 
-template <typename WC>
-auto spatial_system<WC>::voxel_ray_cast(
+template <typename WD>
+auto spatial_system<WD>::voxel_ray_cast(
     const ray& r, std::vector<entity>& candidates, spatial_layer_mask layer_mask
 ) const -> std::optional<voxel_ray_hit> {
     query_all(r, candidates, layer_mask);

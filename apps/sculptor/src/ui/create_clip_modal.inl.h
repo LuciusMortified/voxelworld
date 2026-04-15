@@ -16,7 +16,7 @@ inline create_clip_modal::create_clip_modal(
 
 inline void create_clip_modal::open() {
     need_open_ = true;
-    auto& registry = engine_->get_world().get_animation_clip_registry();
+    auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
     name_ = std::format("clip_{}", registry.count());
     error_.clear();
     need_overwrite_confirmation_ = false;
@@ -86,7 +86,7 @@ inline bool create_clip_modal::create_clip() {
         return false;
     }
 
-    auto& registry = engine_->get_world().get_animation_clip_registry();
+    auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
     if (registry.has(name_)) {
         error_ = "A clip with this name already exists.";
         return false;

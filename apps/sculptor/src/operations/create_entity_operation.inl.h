@@ -12,12 +12,12 @@ inline create_entity_operation::create_entity_operation(
 
 inline void create_entity_operation::execute() {
     auto& world            = engine_->get_world();
-    auto& hierarchy_system = world.get_hierarchy_system();
-    auto& transform_system = world.get_transform_system();
-    auto& model_registry   = world.get_model_registry();
-    auto& model_system     = world.get_model_system();
+    auto& hierarchy_sys = world.template get_system<gfx::hierarchy_system>();
+    auto& transform_sys = world.template get_system<gfx::transform_system>();
+    auto& model_reg = world.template get_resource<gfx::model_registry>();
+    auto& model_sys = world.template get_system<gfx::model_system>();
 
-    auto ent_guard = std::make_unique<gfx::entity_guard<>>(world);
+    auto ent_guard = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
     ent_guard->with<gfx::hierarchy_component>();
     ent_guard->with<gfx::transform_component>();
     ent_guard->with<gfx::spatial_component>();
@@ -26,7 +26,7 @@ inline void create_entity_operation::execute() {
     if (params_.with_model) {
         ent_guard->with<gfx::model_component>();
 
-        model = model_registry.create(params_.name, params_.size);
+        model = model_reg.create(params_.name, params_.size);
         model->fill(voxel{state_->tool.selected_block});
     }
 
@@ -36,16 +36,16 @@ inline void create_entity_operation::execute() {
 
     auto ent = ent_guard->get_entity();
 
-    transform_system.modify(ent)
+    transform_sys.modify(ent)
         .set_origin(vec3f{-params_.size.x / 2.f, -params_.size.y / 2.f, -params_.size.z / 2.f});
 
     if (model) {
-        model_system.modify(ent).set_model(model);
+        model_sys.modify(ent).set_model(model);
     }
 
     if (!params_.parent_name.empty() && state_->scene.name_to_entity.contains(params_.parent_name)) {
         auto parent_ent = state_->scene.name_to_entity[params_.parent_name];
-        hierarchy_system.modify(ent).set_parent(parent_ent);
+        hierarchy_sys.modify(ent).set_parent(parent_ent);
     }
 
     state_->scene.name_to_entity[params_.name] = ent;

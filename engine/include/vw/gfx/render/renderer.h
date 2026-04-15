@@ -7,6 +7,7 @@
 
 #include <chrono>
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 #include "vw/core.h"
@@ -16,6 +17,7 @@
 #include "vw/gfx/render/shadow_map.h"
 #include "vw/gfx/resource/combined_buffer_pool.h"
 #include "vw/gfx/resource/light_buffer.h"
+#include "vw/gfx/resource/mesh_pool.h"
 #include "vw/gfx/resource/palette_buffer.h"
 #include "vw/gfx/resource/shader.h"
 #include "vw/gfx/window/window.h"
@@ -103,7 +105,7 @@ struct renderer_stats {
     render_timing_stats timing;
 };
 
-template <typename WC = base_world_components>
+template <typename WC = base_world_def>
 class renderer final {
 public:
     using world_type                = world<WC>;
@@ -161,6 +163,9 @@ public:
 
     [[nodiscard]] auto get_directional_light_settings() -> directional_light_settings&;
     [[nodiscard]] auto get_fog_settings() -> fog_settings&;
+
+    [[nodiscard]] auto get_mesh_pool() -> mesh_pool& { return mesh_pool_; }
+    [[nodiscard]] auto get_mesh_pool() const -> const mesh_pool& { return mesh_pool_; }
 
     void draw_colliders(world_type& w, color col = colors::green);
 
@@ -220,6 +225,8 @@ private:
     void update_uniform_buffer(const camera& camera) const;
     void render_world_pass(world_type& world, const camera& camera);
     void render_world(world_type& world, const camera& camera);
+
+    void sync_meshes_(world_type& world);
 
     void render_debug_primitives();
     void update_debug_vertex_buffer();
@@ -340,6 +347,10 @@ private:
 
     std::unique_ptr<shader> debug_vertex_shader_;
     std::unique_ptr<shader> debug_fragment_shader_;
+
+    // Mesh pool для генерации мешей
+    mesh_pool mesh_pool_;
+    std::unordered_set<entity> pending_mesh_entities_;
 
     // Combined buffer pool для indirect drawing
     std::unique_ptr<combined_buffer_pool_type> combined_buffer_pool_;

@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "vw/gfx/resource/combined_buffer.h"
+#include "vw/gfx/resource/mesh_pool.h"
 #include "vw/gfx/resource/staging_buffer.h"
 #include "vw/gfx/world/entity.h"
 #include "vw/gfx/world/world.h"
@@ -68,7 +69,8 @@ public:
     void update(
         world_type& world,
         const camera& camera,
-        VkCommandBuffer cmd
+        VkCommandBuffer cmd,
+        mesh_pool& pool
     );
 
     [[nodiscard]] auto get_buffers() const -> const std::vector<std::unique_ptr<combined_buffer>>&;
@@ -83,7 +85,7 @@ private:
     auto get_or_create_buffer(const buffer_chunk_size& chunk_size) -> combined_buffer*;
 
     void process_destroyed_(world_type& world);
-    void update_meshes_(world_type& world, const vec3f& camera_pos);
+    void update_meshes_(world_type& world, const vec3f& camera_pos, mesh_pool& pool);
     void update_transforms_(world_type& world);
 
     vulkan_context* context_;

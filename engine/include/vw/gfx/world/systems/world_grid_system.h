@@ -12,9 +12,11 @@
 #include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/system_trait.h"
 #include "vw/gfx/world/world_context.h"
-#include "vw/gfx/world_grid/world_grid.h"
 
 namespace vw::gfx {
+
+template <typename>
+class world_grid;
 
 struct world_grid_system_stats {
     float32 process_completed_ms = 0.0f;
@@ -27,15 +29,16 @@ struct world_grid_system_stats {
     uint32 deferred_remesh_count = 0;
 };
 
-template <typename WC>
+template <typename WD>
 class world_grid_system {
 public:
-    using registry_type = entity_registry_from_tuple<WC>::type;
-    using context_type = world_context<WC>;
+    using components = typename WD::components;
+    using registry_type = typename entity_registry_from_tuple<components>::type;
+    using context_type = world_context<WD>;
 
     explicit world_grid_system(context_type& context);
 
-    [[nodiscard]] auto get_world_grid() const -> std::shared_ptr<world_grid<WC>>;
+    [[nodiscard]] auto get_world_grid() const -> std::shared_ptr<world_grid<WD>>;
 
     void update(float32 dt);
 

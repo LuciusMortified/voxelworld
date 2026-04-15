@@ -32,7 +32,7 @@ public:
 private:
     [[nodiscard]] auto create_body_part(
         std::string_view prefab_name, std::string_view part_name
-    ) const -> std::unique_ptr<gfx::entity_guard<>>;
+    ) const -> std::unique_ptr<gfx::entity_guard<gfx::base_world_def>>;
 
     auto handle_attack() const -> void;
     [[nodiscard]] auto can_attack() const -> bool;
@@ -41,14 +41,14 @@ private:
     gfx::engine<>& engine_;
     gfx::asset_storage& assets_;
 
-    std::unique_ptr<gfx::entity_guard<>> root_;
-    std::unique_ptr<gfx::entity_guard<>> body_;
-    std::unique_ptr<gfx::entity_guard<>> head_;
-    std::unique_ptr<gfx::entity_guard<>> hand_right_;
-    std::unique_ptr<gfx::entity_guard<>> hand_left_;
-    std::unique_ptr<gfx::entity_guard<>> foot_right_;
-    std::unique_ptr<gfx::entity_guard<>> foot_left_;
-    std::unique_ptr<gfx::entity_guard<>> sword_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> root_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> body_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> head_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> hand_right_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> hand_left_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> foot_right_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> foot_left_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> sword_;
 
     static constexpr float32 default_rotation_speed_ = 5.0f;
     static constexpr float32 attack_rotation_speed_  = 25.0f;

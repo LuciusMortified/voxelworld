@@ -12,7 +12,7 @@
 
 namespace vw::gfx {
 
-template <typename WC = base_world_components>
+template <typename WC = base_world_def>
 class vox_serializer final {
 public:
     using world_type        = world<WC>;

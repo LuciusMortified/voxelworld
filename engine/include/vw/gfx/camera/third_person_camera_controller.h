@@ -26,7 +26,7 @@ struct third_person_camera_params {
 };
 
 /// Third-person camera that follows an entity with arm length, offset, and voxel collision.
-template <typename WC = base_world_components>
+template <typename WC = base_world_def>
 class third_person_camera_controller {
 public:
     using world_type = world<WC>;

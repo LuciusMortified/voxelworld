@@ -12,7 +12,7 @@ inline remove_socket_operation::remove_socket_operation(
 
 inline void remove_socket_operation::execute() {
     auto& world         = engine_->get_world();
-    auto& socket_system = world.get_socket_system();
+    auto& socket_sys = world.template get_system<gfx::socket_system>();
 
     auto ent = state_->scene.name_to_entity[params_.entity_name];
 
@@ -26,16 +26,16 @@ inline void remove_socket_operation::execute() {
 
     const auto pkey = socket_state::socket_preview_key(params_.entity_name, params_.socket_name);
     state_->sockets.socket_previews.erase(pkey);
-    socket_system.modify(ent).remove_socket(params_.socket_name);
+    socket_sys.modify(ent).remove_socket(params_.socket_name);
     state_->file.has_unsaved_changes = true;
 }
 
 inline void remove_socket_operation::undo() {
     auto& world         = engine_->get_world();
-    auto& socket_system = world.get_socket_system();
+    auto& socket_sys = world.template get_system<gfx::socket_system>();
 
     auto ent = state_->scene.name_to_entity[params_.entity_name];
-    socket_system.modify(ent).add_socket(params_.socket_name, saved_position_, saved_rotation_,
+    socket_sys.modify(ent).add_socket(params_.socket_name, saved_position_, saved_rotation_,
                                             saved_scale_);
     state_->file.has_unsaved_changes = true;
 }

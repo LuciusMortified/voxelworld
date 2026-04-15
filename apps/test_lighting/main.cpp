@@ -61,11 +61,11 @@ public:
 private:
     void setup_scene() {
         auto& world = get_engine().get_world();
-        auto& model_registry = world.get_model_registry();
-        auto& transform_system = world.get_transform_system();
-        auto& model_system = world.get_model_system();
+        auto& model_reg = world.template get_resource<gfx::model_registry>();
+        auto& transform_sys = world.template get_system<gfx::transform_system>();
+        auto& model_sys = world.template get_system<gfx::model_system>();
 
-        floor_model_ = model_registry.create("floor", 80, 1, 80);
+        floor_model_ = model_reg.create("floor", 80, 1, 80);
         for (uint32 x = 0; x < 80; ++x) {
             for (uint32 z = 0; z < 80; ++z) {
                 auto v = ((x + z) % 2 == 0) ? voxel{blocks::gray_3} : voxel{blocks::gray_5};
@@ -73,19 +73,19 @@ private:
             }
         }
 
-        floor_entity_ = std::make_unique<gfx::entity_guard<>>(world);
+        floor_entity_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
         floor_entity_->with<gfx::transform_component>();
         floor_entity_->with<gfx::model_component>();
         floor_entity_->with<gfx::hierarchy_component>();
         floor_entity_->with<gfx::spatial_component>();
 
-        transform_system.modify(floor_entity_->get_entity())
+        transform_sys.modify(floor_entity_->get_entity())
             .set_origin({-40.0f, -0.5f, -40.0f})
             .set_position({0.0f, 0.0f, 0.0f});
 
-        model_system.modify(floor_entity_->get_entity()).set_model(floor_model_);
+        model_sys.modify(floor_entity_->get_entity()).set_model(floor_model_);
 
-        pillar_model_ = model_registry.create("pillar", 6, 20, 6);
+        pillar_model_ = model_reg.create("pillar", 6, 20, 6);
         for (uint32 x = 0; x < 6; ++x) {
             for (uint32 y = 0; y < 20; ++y) {
                 for (uint32 z = 0; z < 6; ++z) {
@@ -95,17 +95,17 @@ private:
             }
         }
 
-        pillar_entity_ = std::make_unique<gfx::entity_guard<>>(world);
+        pillar_entity_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
         pillar_entity_->with<gfx::transform_component>();
         pillar_entity_->with<gfx::model_component>();
         pillar_entity_->with<gfx::hierarchy_component>();
         pillar_entity_->with<gfx::spatial_component>();
 
-        transform_system.modify(pillar_entity_->get_entity())
+        transform_sys.modify(pillar_entity_->get_entity())
             .set_origin({-3.0f, 0.0f, -3.0f})
             .set_position({0.0f, 0.0f, 0.0f});
 
-        model_system.modify(pillar_entity_->get_entity()).set_model(pillar_model_);
+        model_sys.modify(pillar_entity_->get_entity()).set_model(pillar_model_);
 
         sync_light_count();
     }
@@ -134,8 +134,8 @@ private:
         }
 
         auto& world = get_engine().get_world();
-        auto& transform_system = world.get_transform_system();
-        auto& light_system = world.get_light_system();
+        auto& transform_sys = world.template get_system<gfx::transform_system>();
+        auto& light_sys = world.template get_system<gfx::light_system>();
 
         if (target > current) {
             light_infos_.resize(target);
@@ -149,7 +149,7 @@ private:
             light_entities_.reserve(target);
             for (uint32 i = current; i < target; ++i) {
                 auto& guard = light_entities_.emplace_back(
-                    std::make_unique<gfx::entity_guard<>>(world));
+                    std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context()));
                 guard->with<gfx::transform_component>();
                 guard->with<gfx::light_component>();
                 guard->with<gfx::hierarchy_component>();
@@ -160,9 +160,9 @@ private:
                 float32 angle = info.phase + orbit_angle_;
                 float32 x = info.radius * std::cos(angle);
                 float32 z = info.radius * std::sin(angle);
-                transform_system.modify(ent).set_position({x, info.height, z});
+                transform_sys.modify(ent).set_position({x, info.height, z});
 
-                light_system.modify(ent)
+                light_sys.modify(ent)
                     .set_color(info.color)
                     .set_range(20.0f);
             }
@@ -177,7 +177,7 @@ private:
 
     void update_point_lights() {
         auto& world = get_engine().get_world();
-        auto& transform_system = world.get_transform_system();
+        auto& transform_sys = world.template get_system<gfx::transform_system>();
         auto& renderer = get_engine().get_renderer();
 
         for (uint32 i = 0; i < light_entities_.size(); ++i) {
@@ -189,7 +189,7 @@ private:
             float32 z = info.radius * std::sin(angle);
             float32 y = info.height + 2.0f * std::sin(elapsed_time_ * 0.5f + info.phase);
 
-            transform_system.modify(ent).set_position({x, y, z});
+            transform_sys.modify(ent).set_position({x, y, z});
 
             auto line_color = color(
                 static_cast<uint8>(info.color.x * 255.0f),
@@ -260,10 +260,10 @@ private:
 
     std::shared_ptr<gfx::model> floor_model_;
     std::shared_ptr<gfx::model> pillar_model_;
-    std::unique_ptr<gfx::entity_guard<>> floor_entity_;
-    std::unique_ptr<gfx::entity_guard<>> pillar_entity_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> floor_entity_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> pillar_entity_;
 
-    std::vector<std::unique_ptr<gfx::entity_guard<>>> light_entities_;
+    std::vector<std::unique_ptr<gfx::entity_guard<gfx::base_world_def>>> light_entities_;
     std::vector<point_light_info> light_infos_;
 
     float32 elapsed_time_{0.0f};

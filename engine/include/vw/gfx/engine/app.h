@@ -5,12 +5,14 @@
 
 #include <stdexcept>
 
+#include "vw/gfx/world/world_components.h"
+
 namespace vw::gfx {
 
 template <typename WC>
 class engine;
 
-template <typename WC = base_world_components>
+template <typename WC = base_world_def>
 class app {
 public:
     using engine_type = engine<WC>;

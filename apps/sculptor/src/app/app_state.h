@@ -14,7 +14,7 @@
 namespace vw::sculptor {
 
 using keyframe_value    = std::variant<gfx::keyframe_vec3f, gfx::keyframe_quat>;
-using entity_guard_type = gfx::entity_guard<>;
+using entity_guard_type = gfx::entity_guard<gfx::base_world_def>;
 
 enum class tools : uint8 {
     invalid,

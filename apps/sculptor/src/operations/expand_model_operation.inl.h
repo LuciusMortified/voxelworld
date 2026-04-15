@@ -13,9 +13,9 @@ inline void expand_model_operation::execute() {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
-    auto& model_registry = world.get_model_registry();
-    auto& model_system = world.get_model_system();
-    auto& transform_system = world.get_transform_system();
+    auto& model_reg = world.template get_resource<gfx::model_registry>();
+    auto& model_sys = world.template get_system<gfx::model_system>();
+    auto& transform_sys = world.template get_system<gfx::transform_system>();
 
     const auto& model_comp = world.get_component<gfx::model_component>(ent);
     const auto model = model_comp.get_model();
@@ -26,7 +26,7 @@ inline void expand_model_operation::execute() {
         size.y + std::abs(params_.dir.y),
         size.z + std::abs(params_.dir.z)
     };
-    const auto new_model = model_registry.create_unnamed(new_size);
+    const auto new_model = model_reg.create_unnamed(new_size);
 
     const auto zeroed_dir = vec3i{
         params_.dir.x < 0 ? 1 : 0,
@@ -48,7 +48,7 @@ inline void expand_model_operation::execute() {
         }
     }
 
-    model_system.modify(ent).set_model(new_model);
+    model_sys.modify(ent).set_model(new_model);
 
     auto& transform_comp = world.get_component<gfx::transform_component>(ent);
     auto new_origin = transform_comp.get_origin() - vec3f{
@@ -56,7 +56,7 @@ inline void expand_model_operation::execute() {
         static_cast<float>(zeroed_dir.y),
         static_cast<float>(zeroed_dir.z)
     };
-    transform_system.modify(ent).set_origin(new_origin);
+    transform_sys.modify(ent).set_origin(new_origin);
     state_->file.has_unsaved_changes = true;
 }
 
@@ -64,9 +64,9 @@ inline void expand_model_operation::undo() {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
-    auto& model_registry = world.get_model_registry();
-    auto& model_system = world.get_model_system();
-    auto& transform_system = world.get_transform_system();
+    auto& model_reg = world.template get_resource<gfx::model_registry>();
+    auto& model_sys = world.template get_system<gfx::model_system>();
+    auto& transform_sys = world.template get_system<gfx::transform_system>();
 
     auto& model_comp = world.get_component<gfx::model_component>(ent);
     auto model = model_comp.get_model();
@@ -77,7 +77,7 @@ inline void expand_model_operation::undo() {
         size.y - std::abs(params_.dir.y),
         size.z - std::abs(params_.dir.z)
     };
-    auto new_model = model_registry.create_unnamed(new_size);
+    auto new_model = model_reg.create_unnamed(new_size);
 
     const vec3i beg = vec3i{
         params_.dir.x < 0 ? 1 : 0,
@@ -109,7 +109,7 @@ inline void expand_model_operation::undo() {
         }
     }
 
-    model_system.modify(ent).set_model(new_model);
+    model_sys.modify(ent).set_model(new_model);
 
     auto& transform_comp = world.get_component<gfx::transform_component>(ent);
     auto new_origin = transform_comp.get_origin() + vec3f{
@@ -117,7 +117,7 @@ inline void expand_model_operation::undo() {
         static_cast<float>(zeroed_dir.y),
         static_cast<float>(zeroed_dir.z)
     };
-    transform_system.modify(ent).set_origin(new_origin);
+    transform_sys.modify(ent).set_origin(new_origin);
     state_->file.has_unsaved_changes = true;
 }
 

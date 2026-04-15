@@ -11,11 +11,12 @@
 
 namespace vw::gfx {
 
-template <typename WC>
+template <typename WD>
 class light_system final {
 public:
-    using registry_type = entity_registry_from_tuple<WC>::type;
-    using context_type = world_context<WC>;
+    using components = typename WD::components;
+    using registry_type = typename entity_registry_from_tuple<components>::type;
+    using context_type = world_context<WD>;
 
     explicit light_system(context_type& context);
 
@@ -37,6 +38,12 @@ public:
     };
 
     auto modify(entity ent) -> light_modifier;
+
+    template <typename C>
+        requires std::same_as<C, light_component>
+    void on_add(entity e) {
+        context_->registry().template request_change<light_component>(e);
+    }
 
 private:
     context_type* context_;

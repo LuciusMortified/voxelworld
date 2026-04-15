@@ -12,16 +12,16 @@ inline set_transform_operation::set_transform_operation(
 
 inline void set_transform_operation::execute() {
     auto& world            = engine_->get_world();
-    auto& transform_system = world.get_transform_system();
+    auto& transform_sys = world.template get_system<gfx::transform_system>();
 
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& transform_comp = world.template get_component<gfx::transform_component>(ent);
     previous_transform_  = transform_comp.get_transform();
-    transform_system.modify(ent).set_transform(params_.new_transform);
+    transform_sys.modify(ent).set_transform(params_.new_transform);
 
     if (world.has_component<gfx::animation_target_component>(ent)) {
-        world.get_animation_system().modify_target(ent).set_rest_transform(params_.new_transform);
+        world.template get_system<gfx::animation_system>().modify_target(ent).set_rest_transform(params_.new_transform);
     }
 
     state_->file.has_unsaved_changes = true;
@@ -29,13 +29,13 @@ inline void set_transform_operation::execute() {
 
 inline void set_transform_operation::undo() {
     auto& world            = engine_->get_world();
-    auto& transform_system = world.get_transform_system();
+    auto& transform_sys = world.template get_system<gfx::transform_system>();
 
     auto ent = state_->scene.name_to_entity[params_.name];
-    transform_system.modify(ent).set_transform(previous_transform_);
+    transform_sys.modify(ent).set_transform(previous_transform_);
 
     if (world.has_component<gfx::animation_target_component>(ent)) {
-        world.get_animation_system().modify_target(ent).set_rest_transform(previous_transform_);
+        world.template get_system<gfx::animation_system>().modify_target(ent).set_rest_transform(previous_transform_);
     }
 
     state_->file.has_unsaved_changes = true;

@@ -10,22 +10,22 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-hierarchy_system<WC>::hierarchy_system(context_type& context)
+template <typename WD>
+hierarchy_system<WD>::hierarchy_system(context_type& context)
     : context_{&context} {}
 
-template <typename WC>
-void hierarchy_system<WC>::update(float32 /*dt*/) {}
+template <typename WD>
+void hierarchy_system<WD>::update(float32 /*dt*/) {}
 
-template <typename WC>
-hierarchy_system<WC>::hierarchy_modifier::hierarchy_modifier(
+template <typename WD>
+hierarchy_system<WD>::hierarchy_modifier::hierarchy_modifier(
     hierarchy_system* system,
     entity ent
 )
     : system_{system}, entity_{ent} {}
 
-template <typename WC>
-void hierarchy_system<WC>::cleanup(
+template <typename WD>
+void hierarchy_system<WD>::cleanup(
     entity ent
 ) {
     if (!context_->registry().template has<hierarchy_component>(ent)) {
@@ -54,13 +54,13 @@ void hierarchy_system<WC>::cleanup(
     }
 }
 
-template <typename WC>
-auto hierarchy_system<WC>::modify(entity ent) -> hierarchy_modifier {
+template <typename WD>
+auto hierarchy_system<WD>::modify(entity ent) -> hierarchy_modifier {
     return hierarchy_modifier{this, ent};
 }
 
-template <typename WC>
-auto hierarchy_system<WC>::get_hierarchy_depth(
+template <typename WD>
+auto hierarchy_system<WD>::get_hierarchy_depth(
     entity ent
 ) const -> size_t {
     constexpr int MAX_HIERARCHY_DEPTH = 64;
@@ -84,8 +84,8 @@ auto hierarchy_system<WC>::get_hierarchy_depth(
     return depth;
 }
 
-template <typename WC>
-auto hierarchy_system<WC>::hierarchy_modifier::set_parent(entity parent)
+template <typename WD>
+auto hierarchy_system<WD>::hierarchy_modifier::set_parent(entity parent)
     -> hierarchy_modifier& {
     if (!parent.is_valid()) {
         throw std::invalid_argument("parent is not valid");
@@ -118,8 +118,8 @@ auto hierarchy_system<WC>::hierarchy_modifier::set_parent(entity parent)
     return *this;
 }
 
-template <typename WC>
-auto hierarchy_system<WC>::hierarchy_modifier::remove_parent() -> hierarchy_modifier& {
+template <typename WD>
+auto hierarchy_system<WD>::hierarchy_modifier::remove_parent() -> hierarchy_modifier& {
     if (system_->context_->registry().template has<hierarchy_component>(entity_)) {
         auto& child_component = system_->context_->registry().template get<hierarchy_component>(entity_);
 
@@ -139,8 +139,8 @@ auto hierarchy_system<WC>::hierarchy_modifier::remove_parent() -> hierarchy_modi
     return *this;
 }
 
-template <typename WC>
-auto hierarchy_system<WC>::check_hierarchy_cycle(entity parent, entity child) const -> bool {
+template <typename WD>
+auto hierarchy_system<WD>::check_hierarchy_cycle(entity parent, entity child) const -> bool {
     entity current = parent;
 
     while (current.is_valid() && context_->registry().template has<hierarchy_component>(current)) {

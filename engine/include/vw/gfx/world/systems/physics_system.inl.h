@@ -11,22 +11,22 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-physics_system<WC>::physics_system(context_type& context)
+template <typename WD>
+physics_system<WD>::physics_system(context_type& context)
     : context_(&context) {}
 
-template <typename WC>
-void physics_system<WC>::set_gravity(float32 g) {
+template <typename WD>
+void physics_system<WD>::set_gravity(float32 g) {
     gravity_ = g;
 }
 
-template <typename WC>
-auto physics_system<WC>::get_gravity() const -> float32 {
+template <typename WD>
+auto physics_system<WD>::get_gravity() const -> float32 {
     return gravity_;
 }
 
-template <typename WC>
-void physics_system<WC>::update(
+template <typename WD>
+void physics_system<WD>::update(
     float32 delta_time
 ) {
     if (!context_->get_world_grid()) {
@@ -53,13 +53,13 @@ void physics_system<WC>::update(
     stats_.step_ms = std::chrono::duration<float32>(clock::now() - step_start).count() * 1000.0f;
 }
 
-template <typename WC>
-auto physics_system<WC>::get_stats() const -> const physics_stats& {
+template <typename WD>
+auto physics_system<WD>::get_stats() const -> const physics_stats& {
     return stats_;
 }
 
-template <typename WC>
-void physics_system<WC>::step(
+template <typename WD>
+void physics_system<WD>::step(
     float32 dt
 ) {
     using clock = std::chrono::high_resolution_clock;
@@ -123,8 +123,8 @@ void physics_system<WC>::step(
     }
 }
 
-template <typename WC>
-auto physics_system<WC>::are_chunks_loaded(
+template <typename WD>
+auto physics_system<WD>::are_chunks_loaded(
     const vec3f& position, const vec3f& extents
 ) const -> bool {
     const auto vs = static_cast<float32>(context_->get_world_grid()->voxel_scale());
@@ -155,8 +155,8 @@ auto physics_system<WC>::are_chunks_loaded(
     return true;
 }
 
-template <typename WC>
-auto physics_system<WC>::resolve_box_voxel(
+template <typename WD>
+auto physics_system<WD>::resolve_box_voxel(
     vec3f center, const vec3f& half_extents, vec3f& velocity
 ) const -> collision_result {
     auto vs = static_cast<float32>(context_->get_world_grid()->voxel_scale());
@@ -251,8 +251,8 @@ auto physics_system<WC>::resolve_box_voxel(
     return {center, grounded};
 }
 
-template <typename WC>
-auto physics_system<WC>::resolve_entity_collisions(
+template <typename WD>
+auto physics_system<WD>::resolve_entity_collisions(
     entity ent, vec3f& position, vec3f& velocity,
     const vec3f& half_extents, const vec3f& offset
 ) -> void {
@@ -322,21 +322,21 @@ auto physics_system<WC>::resolve_entity_collisions(
     position = center - offset;
 }
 
-template <typename WC>
-physics_system<WC>::rigid_body_modifier::rigid_body_modifier(
+template <typename WD>
+physics_system<WD>::rigid_body_modifier::rigid_body_modifier(
     physics_system* system, entity ent
 )
     : system_(system), entity_(ent) {}
 
-template <typename WC>
-auto physics_system<WC>::modify(
+template <typename WD>
+auto physics_system<WD>::modify(
     entity ent
 ) -> rigid_body_modifier {
     return rigid_body_modifier(this, ent);
 }
 
-template <typename WC>
-auto physics_system<WC>::rigid_body_modifier::set_velocity(
+template <typename WD>
+auto physics_system<WD>::rigid_body_modifier::set_velocity(
     const vec3f& vel
 ) -> rigid_body_modifier& {
     if (!system_->context_->registry().template has<rigid_body_component>(entity_)) {
@@ -347,8 +347,8 @@ auto physics_system<WC>::rigid_body_modifier::set_velocity(
     return *this;
 }
 
-template <typename WC>
-auto physics_system<WC>::rigid_body_modifier::set_gravity_scale(
+template <typename WD>
+auto physics_system<WD>::rigid_body_modifier::set_gravity_scale(
     float32 scale
 ) -> rigid_body_modifier& {
     if (!system_->context_->registry().template has<rigid_body_component>(entity_)) {
@@ -359,8 +359,8 @@ auto physics_system<WC>::rigid_body_modifier::set_gravity_scale(
     return *this;
 }
 
-template <typename WC>
-auto physics_system<WC>::rigid_body_modifier::add_impulse(
+template <typename WD>
+auto physics_system<WD>::rigid_body_modifier::add_impulse(
     const vec3f& impulse
 ) -> rigid_body_modifier& {
     if (!system_->context_->registry().template has<rigid_body_component>(entity_)) {
@@ -371,8 +371,8 @@ auto physics_system<WC>::rigid_body_modifier::add_impulse(
     return *this;
 }
 
-template <typename WC>
-auto physics_system<WC>::rigid_body_modifier::add_external_impulse(
+template <typename WD>
+auto physics_system<WD>::rigid_body_modifier::add_external_impulse(
     const vec3f& impulse
 ) -> rigid_body_modifier& {
     if (!system_->context_->registry().template has<rigid_body_component>(entity_)) {
@@ -383,8 +383,8 @@ auto physics_system<WC>::rigid_body_modifier::add_external_impulse(
     return *this;
 }
 
-template <typename WC>
-auto physics_system<WC>::rigid_body_modifier::set_drag(
+template <typename WD>
+auto physics_system<WD>::rigid_body_modifier::set_drag(
     float32 drag
 ) -> rigid_body_modifier& {
     if (!system_->context_->registry().template has<rigid_body_component>(entity_)) {
@@ -395,21 +395,21 @@ auto physics_system<WC>::rigid_body_modifier::set_drag(
     return *this;
 }
 
-template <typename WC>
-physics_system<WC>::collider_modifier::collider_modifier(
+template <typename WD>
+physics_system<WD>::collider_modifier::collider_modifier(
     physics_system* system, entity ent
 )
     : system_(system), entity_(ent) {}
 
-template <typename WC>
-auto physics_system<WC>::modify_collider(
+template <typename WD>
+auto physics_system<WD>::modify_collider(
     entity ent
 ) -> collider_modifier {
     return collider_modifier(this, ent);
 }
 
-template <typename WC>
-auto physics_system<WC>::collider_modifier::set_extents(
+template <typename WD>
+auto physics_system<WD>::collider_modifier::set_extents(
     const vec3f& ext
 ) -> collider_modifier& {
     if (!system_->context_->registry().template has<box_collider_component>(entity_)) {
@@ -420,8 +420,8 @@ auto physics_system<WC>::collider_modifier::set_extents(
     return *this;
 }
 
-template <typename WC>
-auto physics_system<WC>::collider_modifier::set_offset(
+template <typename WD>
+auto physics_system<WD>::collider_modifier::set_offset(
     const vec3f& offset
 ) -> collider_modifier& {
     if (!system_->context_->registry().template has<box_collider_component>(entity_)) {

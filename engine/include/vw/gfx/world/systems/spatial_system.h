@@ -22,11 +22,12 @@ namespace vw::gfx {
 struct model_component;
 struct transform_component;
 
-template <typename WC>
+template <typename WD>
 class spatial_system {
 public:
-    using registry_type = entity_registry_from_tuple<WC>::type;
-    using context_type = world_context<WC>;
+    using components = typename WD::components;
+    using registry_type = typename entity_registry_from_tuple<components>::type;
+    using context_type = world_context<WD>;
 
     explicit spatial_system(
         context_type& context
@@ -64,6 +65,12 @@ public:
     ) const -> std::optional<voxel_ray_hit>;
 
     void cleanup(entity ent);
+
+    template <typename C>
+        requires std::same_as<C, spatial_component>
+    void on_remove(entity e) {
+        cleanup(e);
+    }
 
     class spatial_modifier {
     public:

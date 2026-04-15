@@ -20,22 +20,19 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-class world;
-
 template <typename>
 class world_grid_system;
 
-template <typename WC = base_world_components>
+template <typename WD>
 class world_grid {
-    using world_type = world<WC>;
-    using chunk_type = chunk<WC>;
+    using context_type = world_context<WD>;
+    using chunk_type   = chunk<WD>;
 
     template <typename>
     friend class world_grid_system;
 
 public:
-    explicit world_grid(world_type& world, std::unique_ptr<terrain_generator> generator,
+    explicit world_grid(context_type& ctx, std::unique_ptr<terrain_generator> generator,
                         int32 voxel_scale = 8);
     ~world_grid();
 
@@ -48,7 +45,7 @@ public:
     void set_voxel(vec3i world_pos, const voxel& v);
 
     [[nodiscard]] auto has_chunk(vec3i chunk_coord) const -> bool;
-    [[nodiscard]] auto get_chunk(vec3i chunk_coord) -> chunk<WC>*;
+    [[nodiscard]] auto get_chunk(vec3i chunk_coord) -> chunk<WD>*;
 
     [[nodiscard]] auto get_surface_y(int32 wx, int32 wz) const -> std::optional<int32>;
     [[nodiscard]] auto has_column(vec2i coord) const -> bool;
@@ -82,7 +79,7 @@ private:
     void process_completed();
     void gen_thread_function();
 
-    world_type* world_;
+    context_type* context_;
     int32 voxel_scale_{1};
     std::unordered_map<vec3i, std::unique_ptr<chunk_type>> chunks_;
     std::unordered_map<vec2i, std::vector<int32>> column_chunks_;

@@ -20,7 +20,7 @@ inline void keyframe_service::add_keyframe() {
     }
 
     auto& world    = engine_->get_world();
-    auto& clip_reg = world.get_animation_clip_registry();
+    auto& clip_reg = world.template get_resource<gfx::animation_clip_registry>();
     auto clip      = clip_reg.get(state_->anim.selected_clip_name);
     if (!clip) {
         return;
@@ -76,7 +76,7 @@ inline void keyframe_service::delete_keyframe() {
     }
 
     auto& world          = engine_->get_world();
-    const auto& clip_reg = world.get_animation_clip_registry();
+    const auto& clip_reg = world.template get_resource<gfx::animation_clip_registry>();
     const auto clip      = clip_reg.get(state_->anim.selected_clip_name);
     if (!clip) {
         return;

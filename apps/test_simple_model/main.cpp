@@ -91,12 +91,12 @@ public:
 private:
     void create_flower_model() {
         auto& world            = get_engine().get_world();
-        auto& model_registry   = world.get_model_registry();
-        auto& transform_system = world.get_transform_system();
-        auto& model_system     = world.get_model_system();
+        auto& model_reg = world.template get_resource<gfx::model_registry>();
+        auto& transform_sys = world.template get_system<gfx::transform_system>();
+        auto& model_sys = world.template get_system<gfx::model_system>();
 
         // Создаем модель и регистрируем ее
-        model_ = model_registry.create("flower", 3, 6, 3);
+        model_ = model_reg.create("flower", 3, 6, 3);
         model_->set_voxel(1, 0, 1, voxel{blocks::green_3});
         model_->set_voxel(1, 1, 1, voxel{blocks::green_3});
         model_->set_voxel(1, 2, 1, voxel{blocks::green_3});
@@ -109,33 +109,33 @@ private:
         model_->set_voxel(0, 4, 1, voxel{blocks::white});
         model_->set_voxel(2, 4, 1, voxel{blocks::white});
 
-        flower_ = std::make_unique<gfx::entity_guard<>>(world);
+        flower_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
         flower_->with<gfx::transform_component>();
         flower_->with<gfx::model_component>();
         flower_->with<gfx::hierarchy_component>();
         flower_->with<gfx::spatial_component>();
 
         // Настраиваем transform
-        transform_system.modify(flower_->get_entity())
+        transform_sys.modify(flower_->get_entity())
             .set_origin({-1.5f, 0.f, -1.5f})
             .set_position({0.f, 0.0f, 0.f})
             .set_scale({0.5f, 0.5f, 0.5f});
 
         // Настраиваем модель через model_system
-        model_system.modify(flower_->get_entity()).set_model(model_);
+        model_sys.modify(flower_->get_entity()).set_model(model_);
 
         object_rotation_       = 0.0f;
         object_rotation_speed_ = math::radians(5.0f);
 
 // Стресс-тест инстансами одной модели
 #if 0
-        stress_group_ = std::make_unique<gfx::entity_guard_group<>>(world, 9999);
+        stress_group_ = std::make_unique<gfx::entity_guard_group<gfx::base_world_def>>(world, 9999);
         stress_group_->with<gfx::transform_component>();
         stress_group_->with<gfx::model_component>();
         stress_group_->with<gfx::spatial_component>();
 
         for (auto ent : *stress_group_) {
-            transform_system.modify(ent)
+            transform_sys.modify(ent)
                 .set_position({
                     static_cast<float>(std::rand() % 100),
                     static_cast<float>(std::rand() % 100),
@@ -143,7 +143,7 @@ private:
                 })
                 .set_origin({1.5f, 3.0f, 1.5f});
 
-            model_system.modify(ent).set_model(model_);
+            model_sys.modify(ent).set_model(model_);
         }
 #endif
     }
@@ -158,8 +158,8 @@ private:
         }
 
         auto& world            = get_engine().get_world();
-        auto& transform_system = world.get_transform_system();
-        transform_system.modify(flower_->get_entity()).set_rotation(math::euler_to_quat({0.0f, object_rotation_, 0.0f}));
+        auto& transform_sys = world.template get_system<gfx::transform_system>();
+        transform_sys.modify(flower_->get_entity()).set_rotation(math::euler_to_quat({0.0f, object_rotation_, 0.0f}));
 
         if (world.has_component<gfx::transform_component>(flower_->get_entity())) {
             const auto matrix =
@@ -171,7 +171,7 @@ private:
 #if 0
         auto transform_view = world.view_components<gfx::transform_component>();
         for (const auto& [entity, transform_comp] : transform_view) {
-            transform_system.modify(entity).set_rotation(math::euler_to_quat({0.0f, object_rotation_, 0.0f}));
+            transform_sys.modify(entity).set_rotation(math::euler_to_quat({0.0f, object_rotation_, 0.0f}));
         }
 #endif
     }
@@ -274,8 +274,8 @@ private:
     float object_rotation_{};
     float object_rotation_speed_{};
 
-    std::unique_ptr<gfx::entity_guard<>> flower_;
-    std::unique_ptr<gfx::entity_guard_group<>> stress_group_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> flower_;
+    std::unique_ptr<gfx::entity_guard_group<gfx::base_world_def>> stress_group_;
 
     std::vector<gfx::entity> selected_entities_;
     gfx::entity selected_entity_ = gfx::invalid_entity;

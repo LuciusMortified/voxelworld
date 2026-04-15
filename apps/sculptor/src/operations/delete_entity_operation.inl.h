@@ -53,28 +53,28 @@ inline void delete_entity_operation::execute() {
 
 inline void delete_entity_operation::undo() {
     auto& world            = engine_->get_world();
-    auto& hierarchy_system = world.get_hierarchy_system();
-    auto& transform_system = world.get_transform_system();
+    auto& hierarchy_sys = world.template get_system<gfx::hierarchy_system>();
+    auto& transform_sys = world.template get_system<gfx::transform_system>();
 
-    auto ent_guard = std::make_unique<gfx::entity_guard<>>(world);
+    auto ent_guard = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
     ent_guard->with<gfx::hierarchy_component>();
     ent_guard->with<gfx::transform_component>();
     ent_guard->with<gfx::spatial_component>();
 
     auto ent = ent_guard->get_entity();
 
-    transform_system.modify(ent).set_transform(transform_);
+    transform_sys.modify(ent).set_transform(transform_);
 
     if (with_model_) {
         ent_guard->with<gfx::model_component>();
 
-        auto& model_system = world.get_model_system();
-        model_system.modify(ent).set_model(saved_model_);
+        auto& model_sys = world.template get_system<gfx::model_system>();
+        model_sys.modify(ent).set_model(saved_model_);
     }
 
     if (!parent_name_.empty()) {
         auto parent_ent = state_->scene.name_to_entity[parent_name_];
-        hierarchy_system.modify(ent).set_parent(parent_ent);
+        hierarchy_sys.modify(ent).set_parent(parent_ent);
     }
 
     state_->scene.name_to_entity[params_.name] = ent;

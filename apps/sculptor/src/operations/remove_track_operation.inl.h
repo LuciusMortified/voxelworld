@@ -11,7 +11,7 @@ inline remove_track_operation::remove_track_operation(
     : engine_(&eng), state_(&state), params_(std::move(params)) {}
 
 inline void remove_track_operation::execute() {
-    auto& registry = engine_->get_world().get_animation_clip_registry();
+    auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
     auto clip      = registry.get(params_.clip_name);
     if (!clip) {
         return;
@@ -33,7 +33,7 @@ inline void remove_track_operation::execute() {
 }
 
 inline void remove_track_operation::undo() {
-    auto& registry = engine_->get_world().get_animation_clip_registry();
+    auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
     auto clip      = registry.get(params_.clip_name);
     if (!clip || !saved_track_) {
         return;

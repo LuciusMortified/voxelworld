@@ -6,20 +6,18 @@
 #include <vector>
 
 #include "entity_archetype.h"
-#include "world_components.h"
+#include "world_context.h"
 
 namespace vw::gfx {
 
-template <typename WC>
-class world;
-
-template <typename WC>
+template <typename WD>
 class entity_guard_group final {
 public:
-    using world_type            = world<WC>;
-    using entity_archetype_type = typename entity_archetype_from_tuple<WC>::type;
+    using components            = typename WD::components;
+    using context_type          = world_context<WD>;
+    using entity_archetype_type = typename entity_archetype_from_tuple<components>::type;
 
-    entity_guard_group(world_type& world, uint32 count);
+    entity_guard_group(context_type& ctx, uint32 count);
     ~entity_guard_group();
 
     entity_guard_group(const entity_guard_group&)            = delete;
@@ -45,7 +43,7 @@ public:
 private:
     void cleanup_() noexcept;
 
-    world_type* world_ = nullptr;
+    context_type* context_ = nullptr;
     std::vector<entity> entities_;
     entity_archetype_type archetype_;
 };

@@ -12,14 +12,15 @@
 
 namespace vw::gfx {
 
-template <typename WC>
+template <typename WD>
 class animation_system;
 
-template <typename WC>
+template <typename WD>
 class animation_fsm_system final {
 public:
-    using registry_type = entity_registry_from_tuple<WC>::type;
-    using context_type  = world_context<WC>;
+    using components = typename WD::components;
+    using registry_type = typename entity_registry_from_tuple<components>::type;
+    using context_type  = world_context<WD>;
 
     explicit animation_fsm_system(context_type& context);
 

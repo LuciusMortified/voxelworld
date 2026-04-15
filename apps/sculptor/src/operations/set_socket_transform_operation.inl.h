@@ -71,8 +71,8 @@ inline void set_socket_transform_operation::update_attached_(
         return;
     }
 
-    auto& transform_system = world.get_transform_system();
-    transform_system.modify(sp->attached)
+    auto& transform_sys = world.template get_system<gfx::transform_system>();
+    transform_sys.modify(sp->attached)
         .set_position(position)
         .set_rotation(rotation)
         .set_scale(scale);
@@ -92,8 +92,8 @@ inline void set_socket_transform_operation::update_preview_(
         return;
     }
 
-    auto& transform_system = engine_->get_world().get_transform_system();
-    transform_system.modify(preview.guards[0]->get_entity())
+    auto& transform_sys = engine_->get_world().template get_system<gfx::transform_system>();
+    transform_sys.modify(preview.guards[0]->get_entity())
         .set_position(position)
         .set_rotation(rotation)
         .set_scale(scale);

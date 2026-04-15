@@ -7,12 +7,12 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-animation_fsm_system<WC>::animation_fsm_system(context_type& context)
+template <typename WD>
+animation_fsm_system<WD>::animation_fsm_system(context_type& context)
     : context_(&context) {}
 
-template <typename WC>
-void animation_fsm_system<WC>::update(float32 /*dt*/) {
+template <typename WD>
+void animation_fsm_system<WD>::update(float32 /*dt*/) {
     auto view =
         context_->registry()
             .template view<animation_fsm_component, animation_player_component>();
@@ -68,14 +68,14 @@ void animation_fsm_system<WC>::update(float32 /*dt*/) {
     }
 }
 
-template <typename WC>
-animation_fsm_system<WC>::modifier::modifier(
+template <typename WD>
+animation_fsm_system<WD>::modifier::modifier(
     animation_fsm_component* component
 )
     : component_(component) {}
 
-template <typename WC>
-void animation_fsm_system<WC>::modifier::add_machine(
+template <typename WD>
+void animation_fsm_system<WD>::modifier::add_machine(
     size_t index, animation_fsm machine
 ) const {
     if (index >= component_->machines_.size()) {
@@ -84,15 +84,15 @@ void animation_fsm_system<WC>::modifier::add_machine(
     component_->machines_[index] = std::move(machine);
 }
 
-template <typename WC>
-void animation_fsm_system<WC>::modifier::fire_trigger(
+template <typename WD>
+void animation_fsm_system<WD>::modifier::fire_trigger(
     std::string_view name
 ) const {
     component_->triggers_.emplace(name);
 }
 
-template <typename WC>
-auto animation_fsm_system<WC>::modify(
+template <typename WD>
+auto animation_fsm_system<WD>::modify(
     entity ent
 ) -> modifier {
     auto& comp = context_->registry().template get<animation_fsm_component>(ent);

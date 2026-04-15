@@ -55,8 +55,8 @@ public:
         const auto cam_pos = camera.get_position();
 
         auto& world            = get_engine().get_world();
-        auto& transform_system = world.get_transform_system();
-        transform_system.modify(viewer_->get_entity()).set_position(cam_pos);
+        auto& transform_sys = world.template get_system<gfx::transform_system>();
+        transform_sys.modify(viewer_->get_entity()).set_position(cam_pos);
 
         auto& renderer = get_engine().get_renderer();
         renderer.draw_line(vec3f{0, 0, 0}, vec3f{100, 0, 0}, colors::red);
@@ -85,21 +85,21 @@ private:
 
     void setup_world_grid() {
         auto& world       = get_engine().get_world();
-        auto& grid_system = world.get_world_grid_system();
+        auto& grid_system = world.template get_system<gfx::world_grid_system>();
 
         generator_params_ = {
             .voxel_scale = 8,
         };
-        auto& registry = world.get_model_registry();
+        auto& registry = world.template get_resource<gfx::model_registry>();
         auto generator = std::make_unique<gfx::perlin_terrain_generator>(
             registry.get_identity_pool(), registry.get_page_pool(), generator_params_);
         generator_     = generator.get();
-        world_grid_    = std::make_shared<gfx::world_grid<>>(
-            world, std::move(generator), generator_params_.voxel_scale
+        world_grid_    = std::make_shared<gfx::world_grid<gfx::base_world_def>>(
+            world.get_context(), std::move(generator), generator_params_.voxel_scale
         );
         world.set_world_grid(world_grid_);
 
-        viewer_ = std::make_unique<gfx::entity_guard<>>(world);
+        viewer_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
         viewer_->with<gfx::transform_component>();
         viewer_->with<gfx::world_view_component>();
     }
@@ -134,7 +134,7 @@ private:
             ImGui::Text("Loaded chunks: %u", world_grid_->get_loaded_chunk_count());
             ImGui::Text("Pending columns: %u", world_grid_->get_pending_column_count());
             ImGui::Text(
-                "Pending meshes: %u", get_engine().get_world().get_mesh_pool().get_pending_count()
+                "Pending meshes: %u", get_engine().get_renderer().get_mesh_pool().get_pending_count()
             );
         }
 
@@ -164,8 +164,8 @@ private:
     }
 
     std::unique_ptr<gfx::free_camera_controller> camera_controller_;
-    std::shared_ptr<gfx::world_grid<>> world_grid_;
-    std::unique_ptr<gfx::entity_guard<>> viewer_;
+    std::shared_ptr<gfx::world_grid<gfx::base_world_def>> world_grid_;
+    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> viewer_;
     gfx::perlin_terrain_generator* generator_ = nullptr;
     gfx::perlin_terrain_generator::params generator_params_;
     bool camera_placed_ = false;

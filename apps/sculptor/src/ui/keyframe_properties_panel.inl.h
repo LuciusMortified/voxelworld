@@ -21,7 +21,7 @@ inline void keyframe_properties_panel::render(
         return;
     }
 
-    const auto& clip_registry = engine_->get_world().get_animation_clip_registry();
+    const auto& clip_registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
     const auto clip           = clip_registry.get(state_->anim.selected_clip_name);
     if (!clip) {
         return;

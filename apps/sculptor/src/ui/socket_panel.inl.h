@@ -367,14 +367,14 @@ inline void socket_panel::load_preview_(
 
     if (result->name_to_entity.contains(result->root_name)) {
         const auto preview_root = result->name_to_entity[result->root_name];
-        auto& transform_system  = world.get_transform_system();
-        transform_system.modify(preview_root)
+        auto& transform_sys = world.template get_system<gfx::transform_system>();
+        transform_sys.modify(preview_root)
             .set_position(sp->position)
             .set_rotation(sp->rotation)
             .set_scale(sp->scale);
 
-        auto& hierarchy_system = world.get_hierarchy_system();
-        hierarchy_system.modify(preview_root).set_parent(parent_ent);
+        auto& hierarchy_sys = world.template get_system<gfx::hierarchy_system>();
+        hierarchy_sys.modify(preview_root).set_parent(parent_ent);
     }
 
     state_->sockets.socket_previews[pkey] = std::move(preview);
@@ -400,8 +400,8 @@ inline void socket_panel::update_preview_transform_(
     }
 
     const auto preview_root = preview.guards[0]->get_entity();
-    auto& transform_system  = engine_->get_world().get_transform_system();
-    transform_system.modify(preview_root)
+    auto& transform_sys = engine_->get_world().template get_system<gfx::transform_system>();
+    transform_sys.modify(preview_root)
         .set_position(position)
         .set_rotation(rotation)
         .set_scale(scale);

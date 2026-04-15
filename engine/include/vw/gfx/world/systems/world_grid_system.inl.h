@@ -8,24 +8,24 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-world_grid_system<WC>::world_grid_system(
+template <typename WD>
+world_grid_system<WD>::world_grid_system(
     context_type& context
 )
     : context_(&context) {}
 
-template <typename WC>
-auto world_grid_system<WC>::get_world_grid() const -> std::shared_ptr<world_grid<WC>> {
+template <typename WD>
+auto world_grid_system<WD>::get_world_grid() const -> std::shared_ptr<world_grid<WD>> {
     return context_->get_world_grid();
 }
 
-template <typename WC>
-auto world_grid_system<WC>::get_stats() const -> const world_grid_system_stats& {
+template <typename WD>
+auto world_grid_system<WD>::get_stats() const -> const world_grid_system_stats& {
     return stats_;
 }
 
-template <typename WC>
-void world_grid_system<WC>::update(float32 /*dt*/) {
+template <typename WD>
+void world_grid_system<WD>::update(float32 /*dt*/) {
     if (!context_->get_world_grid()) {
         return;
     }
@@ -50,8 +50,8 @@ void world_grid_system<WC>::update(float32 /*dt*/) {
     context_->registry().template clear_requested<world_view_component>();
 }
 
-template <typename WC>
-void world_grid_system<WC>::dispatch_column_requests() {
+template <typename WD>
+void world_grid_system<WD>::dispatch_column_requests() {
     static constexpr int32 max_requests_per_frame = 8;
     int32 requests = 0;
     while (!pending_requests_.empty() && requests < max_requests_per_frame) {
@@ -63,8 +63,8 @@ void world_grid_system<WC>::dispatch_column_requests() {
     }
 }
 
-template <typename WC>
-void world_grid_system<WC>::update_grid_stats() {
+template <typename WD>
+void world_grid_system<WD>::update_grid_stats() {
     stats_.active_count          = static_cast<uint32>(active_columns_.size());
     stats_.pending_count         = context_->get_world_grid()->get_pending_column_count();
     stats_.loaded_count          = context_->get_world_grid()->get_loaded_chunk_count();
@@ -73,8 +73,8 @@ void world_grid_system<WC>::update_grid_stats() {
     stats_.unload_ms             = 0.0f;
 }
 
-template <typename WC>
-auto world_grid_system<WC>::process_dirty_entities() -> bool {
+template <typename WD>
+auto world_grid_system<WD>::process_dirty_entities() -> bool {
     bool chunks_dirty = false;
     for (auto ent : context_->registry().template requested<world_view_component>()) {
         if (process_dirty_entity(ent)) {
@@ -85,8 +85,8 @@ auto world_grid_system<WC>::process_dirty_entities() -> bool {
     return chunks_dirty;
 }
 
-template <typename WC>
-auto world_grid_system<WC>::rebuild_active_set() -> vec2i {
+template <typename WD>
+auto world_grid_system<WD>::rebuild_active_set() -> vec2i {
     pending_active_columns_.clear();
     vec2i camera_column{};
 
@@ -113,8 +113,8 @@ auto world_grid_system<WC>::rebuild_active_set() -> vec2i {
     return camera_column;
 }
 
-template <typename WC>
-void world_grid_system<WC>::unload_inactive_columns() {
+template <typename WD>
+void world_grid_system<WD>::unload_inactive_columns() {
     for (const auto& coord : active_columns_) {
         if (!pending_active_columns_.contains(coord)) {
             context_->get_world_grid()->unload_column(coord);
@@ -122,8 +122,8 @@ void world_grid_system<WC>::unload_inactive_columns() {
     }
 }
 
-template <typename WC>
-auto world_grid_system<WC>::process_dirty_entity(
+template <typename WD>
+auto world_grid_system<WD>::process_dirty_entity(
     entity ent
 ) -> bool {
     if (!context_->registry().template has<world_view_component>(ent) ||
@@ -147,21 +147,21 @@ auto world_grid_system<WC>::process_dirty_entity(
     return changed;
 }
 
-template <typename WC>
-world_grid_system<WC>::view_modifier::view_modifier(
+template <typename WD>
+world_grid_system<WD>::view_modifier::view_modifier(
     world_grid_system* system, entity ent
 )
     : system_(system), entity_(ent) {}
 
-template <typename WC>
-auto world_grid_system<WC>::modify_view(
+template <typename WD>
+auto world_grid_system<WD>::modify_view(
     entity ent
 ) -> view_modifier {
     return view_modifier(this, ent);
 }
 
-template <typename WC>
-auto world_grid_system<WC>::view_modifier::set_view_distance(
+template <typename WD>
+auto world_grid_system<WD>::view_modifier::set_view_distance(
     uint32 distance
 ) -> view_modifier& {
     if (!system_->context_->registry().template has<world_view_component>(entity_)) {
@@ -175,8 +175,8 @@ auto world_grid_system<WC>::view_modifier::set_view_distance(
     return *this;
 }
 
-template <typename WC>
-void world_grid_system<WC>::rebuild_pending_requests(
+template <typename WD>
+void world_grid_system<WD>::rebuild_pending_requests(
     vec2i camera_column
 ) {
     pending_requests_.clear();

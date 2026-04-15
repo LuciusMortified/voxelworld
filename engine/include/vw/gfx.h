@@ -25,5 +25,6 @@
 #include "vw/gfx/window/input.h"
 #include "vw/gfx/window/window.h"
 #include "vw/gfx/world/world.h"
+#include "vw/gfx/world_grid/world_grid.h"
 
 #endif  //  VW_GFX_H

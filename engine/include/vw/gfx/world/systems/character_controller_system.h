@@ -15,11 +15,12 @@ namespace vw::gfx {
 template <typename>
 class transform_system;
 
-template <typename WC>
+template <typename WD>
 class character_controller_system final {
 public:
-    using context_type  = world_context<WC>;
-    using registry_type = entity_registry_from_tuple<WC>::type;
+    using context_type  = world_context<WD>;
+    using components = typename WD::components;
+    using registry_type = typename entity_registry_from_tuple<components>::type;
 
     explicit character_controller_system(context_type& context);
 

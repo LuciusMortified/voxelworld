@@ -36,7 +36,7 @@ inline void remove_socket_component_operation::execute() {
 
 inline void remove_socket_component_operation::undo() {
     auto& world         = engine_->get_world();
-    auto& socket_system = world.get_socket_system();
+    auto& socket_sys = world.template get_system<gfx::socket_system>();
 
     const auto ent = state_->scene.name_to_entity[params_.name];
     auto* guard    = state_->scene.find_guard(ent);
@@ -47,7 +47,7 @@ inline void remove_socket_component_operation::undo() {
     guard->with<gfx::socket_component>();
 
     for (const auto& ss : saved_sockets_) {
-        socket_system.modify(ent).add_socket(ss.name, ss.position, ss.rotation, ss.scale);
+        socket_sys.modify(ent).add_socket(ss.name, ss.position, ss.rotation, ss.scale);
     }
     state_->file.has_unsaved_changes = true;
 }
