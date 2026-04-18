@@ -232,13 +232,12 @@ void main() {
     float ao_c1 = float((fragAoPacked >> 2u) & 0x3u) / 3.0;
     float ao_c2 = float((fragAoPacked >> 4u) & 0x3u) / 3.0;
     float ao_c3 = float((fragAoPacked >> 6u) & 0x3u) / 3.0;
-    vec2 aoUV = smoothstep(0.0, 1.0, fragUV);
     float ao = mix(
-        mix(ao_c0, ao_c1, aoUV.x),
-        mix(ao_c3, ao_c2, aoUV.x),
-        aoUV.y
+        mix(ao_c0, ao_c1, fragUV.x),
+        mix(ao_c3, ao_c2, fragUV.x),
+        fragUV.y
     );
-    float aoFactor = mix(1.0, ao, 0.9);
+    float aoFactor = mix(1.0, ao, 0.4);
 
     vec3 ambient = (baseAmbient + hemisphereAmbient) * aoFactor;
 
