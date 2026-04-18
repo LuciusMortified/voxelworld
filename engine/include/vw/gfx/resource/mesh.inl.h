@@ -8,14 +8,14 @@ namespace vw::gfx {
 // ==================== vertex ====================
 
 inline auto vertex::pack(
-    int x, int y, int z, uint8 normal_id, block_id block_id, uint8 face_flags, uint8 corner
+    int x, int y, int z, uint8 normal_id, block_id block_id, uint8 corner_dark, uint8 corner
 ) -> vertex {
     vertex v;
     v.data0 = (static_cast<uint32>(x) & 0x7Fu) | ((static_cast<uint32>(y) & 0x7Fu) << 7) |
         ((static_cast<uint32>(z) & 0x7Fu) << 14) | ((static_cast<uint32>(normal_id) & 0x7u) << 21);
 
     v.data1 = static_cast<uint32>(block_id.value) |
-        (static_cast<uint32>(face_flags) << 8) | ((static_cast<uint32>(corner) & 0x3u) << 16);
+        (static_cast<uint32>(corner_dark) << 8) | ((static_cast<uint32>(corner) & 0x3u) << 16);
 
     return v;
 }
@@ -170,7 +170,7 @@ inline auto is_solid_at(const model& mdl, vec3i p) -> bool {
     return false;
 }
 
-inline auto compute_face_flags(
+inline auto compute_corner_darkness(
     const model& mdl, int x, int y, int z, int face
 ) -> uint8 {
     const vec3i n = vec3i{x, y, z} + ao_normal[face];
@@ -182,21 +182,24 @@ inline auto compute_face_flags(
     const bool edge_pv = is_solid_at(mdl, n + v);
     const bool edge_mu = is_solid_at(mdl, n - u);
 
-    const bool c0 = !edge_mu && !edge_mv && is_solid_at(mdl, n - u - v);
-    const bool c1 = !edge_pu && !edge_mv && is_solid_at(mdl, n + u - v);
-    const bool c2 = !edge_pu && !edge_pv && is_solid_at(mdl, n + u + v);
-    const bool c3 = !edge_mu && !edge_pv && is_solid_at(mdl, n - u + v);
+    const bool diag_c0 = is_solid_at(mdl, n - u - v);
+    const bool diag_c1 = is_solid_at(mdl, n + u - v);
+    const bool diag_c2 = is_solid_at(mdl, n + u + v);
+    const bool diag_c3 = is_solid_at(mdl, n - u + v);
 
-    uint8 flags = 0;
-    if (edge_mv) flags |= 0x01u;
-    if (edge_pu) flags |= 0x02u;
-    if (edge_pv) flags |= 0x04u;
-    if (edge_mu) flags |= 0x08u;
-    if (c0)      flags |= 0x10u;
-    if (c1)      flags |= 0x20u;
-    if (c2)      flags |= 0x40u;
-    if (c3)      flags |= 0x80u;
-    return flags;
+    auto corner = [](bool s1, bool s2, bool d) -> uint8 {
+        if (s1 && s2) {
+            return 3;
+        }
+        return static_cast<uint8>(s1) + static_cast<uint8>(s2) + static_cast<uint8>(d);
+    };
+
+    const uint8 c0 = corner(edge_mu, edge_mv, diag_c0);
+    const uint8 c1 = corner(edge_pu, edge_mv, diag_c1);
+    const uint8 c2 = corner(edge_pu, edge_pv, diag_c2);
+    const uint8 c3 = corner(edge_mu, edge_pv, diag_c3);
+
+    return static_cast<uint8>(c0 | (c1 << 2) | (c2 << 4) | (c3 << 6));
 }
 
 inline auto is_face_visible(
@@ -260,7 +263,7 @@ inline void build_face_mask(
                         auto [mx, my, mz] = axes.to_model_coords(u, v, layer);
                         if (is_face_visible(mdl, mx, my, mz, face_direction)) {
                             storage.mask[idx(u, v)] = {
-                                fid, compute_face_flags(mdl, mx, my, mz, face_direction)
+                                fid, compute_corner_darkness(mdl, mx, my, mz, face_direction)
                             };
                         } else {
                             storage.mask[idx(u, v)] = empty_cell;
@@ -278,7 +281,7 @@ inline void build_face_mask(
                     auto& vx = (*page)[lx + ly * ps + lz * ps * ps];
                     if (!vx.is_empty() && is_face_visible(mdl, mx, my, mz, face_direction)) {
                         storage.mask[idx(u, v)] = {
-                            vx.id, compute_face_flags(mdl, mx, my, mz, face_direction)
+                            vx.id, compute_corner_darkness(mdl, mx, my, mz, face_direction)
                         };
                     } else {
                         storage.mask[idx(u, v)] = empty_cell;
@@ -296,7 +299,7 @@ inline void add_quad(
     vec3i min_pos,
     vec3i max_pos,
     block_id block_id,
-    uint8 face_flags
+    uint8 corner_dark
 ) {
     static constexpr int face_verts[6][4][3] = {
         {{1, 0, 0}, {1, 0, 1}, {1, 1, 1}, {1, 1, 0}},  // +X
@@ -324,7 +327,7 @@ inline void add_quad(
         int y = face_verts[face_direction][i][1] ? max_pos.y : min_pos.y;
         int z = face_verts[face_direction][i][2] ? max_pos.z : min_pos.z;
         vertices.push_back(
-            vertex::pack(x, y, z, normal_id, block_id, face_flags, winding_to_corner[face_direction][i])
+            vertex::pack(x, y, z, normal_id, block_id, corner_dark, winding_to_corner[face_direction][i])
         );
     }
 
@@ -351,9 +354,9 @@ inline void emit_rect(
 ) {
     auto [min_pos, max_pos] = axes.to_local_min_max(u_start, v_start, w, h, layer);
     auto [cx, cy, cz]       = axes.to_model_coords(u_start, v_start, layer);
-    uint8 face_flags        = compute_face_flags(mdl, cx, cy, cz, face_direction);
+    uint8 corner_dark        = compute_corner_darkness(mdl, cx, cy, cz, face_direction);
 
-    add_quad(storage.vertices, storage.indices, face_direction, min_pos, max_pos, bid, face_flags);
+    add_quad(storage.vertices, storage.indices, face_direction, min_pos, max_pos, bid, corner_dark);
 }
 
 }  // namespace detail
@@ -400,9 +403,9 @@ inline void simple_mesh_generator::add_cube_face(
     block_id voxel_id,
     const block_registry& registry
 ) {
-    uint8 face_flags = detail::compute_face_flags(*model, x, y, z, face_direction);
+    uint8 corner_dark = detail::compute_corner_darkness(*model, x, y, z, face_direction);
     detail::add_quad(
-        vertices, indices, face_direction, {x, y, z}, {x + 1, y + 1, z + 1}, voxel_id, face_flags
+        vertices, indices, face_direction, {x, y, z}, {x + 1, y + 1, z + 1}, voxel_id, corner_dark
     );
 }
 
