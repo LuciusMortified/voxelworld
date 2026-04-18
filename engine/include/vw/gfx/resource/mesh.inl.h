@@ -8,24 +8,14 @@ namespace vw::gfx {
 // ==================== vertex ====================
 
 inline auto vertex::pack(
-    int x,
-    int y,
-    int z,
-    uint8 normal_id,
-    block_id block_id,
-    const std::array<uint8, 4>& ao_quad,
-    uint8 corner
+    int x, int y, int z, uint8 normal_id, block_id block_id, uint8 face_flags, uint8 corner
 ) -> vertex {
     vertex v;
     v.data0 = (static_cast<uint32>(x) & 0x7Fu) | ((static_cast<uint32>(y) & 0x7Fu) << 7) |
         ((static_cast<uint32>(z) & 0x7Fu) << 14) | ((static_cast<uint32>(normal_id) & 0x7u) << 21);
 
     v.data1 = static_cast<uint32>(block_id.value) |
-        ((static_cast<uint32>(ao_quad[0]) & 0x3u) << 8) |
-        ((static_cast<uint32>(ao_quad[1]) & 0x3u) << 10) |
-        ((static_cast<uint32>(ao_quad[2]) & 0x3u) << 12) |
-        ((static_cast<uint32>(ao_quad[3]) & 0x3u) << 14) |
-        ((static_cast<uint32>(corner) & 0x3u) << 16);
+        (static_cast<uint32>(face_flags) << 8) | ((static_cast<uint32>(corner) & 0x3u) << 16);
 
     return v;
 }
@@ -85,24 +75,6 @@ static constexpr std::array<vec3i, 6> ao_tangent_u = {
 static constexpr std::array<vec3i, 6> ao_tangent_v = {
     vec3i{0, 1, 0}, vec3i{0, 1, 0}, vec3i{0, 0, 1},
     vec3i{0, 0, 1}, vec3i{0, 1, 0}, vec3i{0, 1, 0},
-};
-
-static constexpr std::array ao_winding_signs = {
-    std::array{std::array{-1, -1}, std::array{1, -1}, std::array{1, 1}, std::array{-1, 1}},  // +X
-    std::array{std::array{-1, -1}, std::array{-1, 1}, std::array{1, 1}, std::array{1, -1}},  // -X
-    std::array{std::array{-1, -1}, std::array{1, -1}, std::array{1, 1}, std::array{-1, 1}},  // +Y
-    std::array{std::array{-1, -1}, std::array{-1, 1}, std::array{1, 1}, std::array{1, -1}},  // -Y
-    std::array{std::array{-1, -1}, std::array{-1, 1}, std::array{1, 1}, std::array{1, -1}},  // +Z
-    std::array{std::array{1, -1}, std::array{1, 1}, std::array{-1, 1}, std::array{-1, -1}},  // -Z
-};
-
-static constexpr std::array canonical_to_winding = {
-    std::array{0, 1, 2, 3},  // +X
-    std::array{0, 3, 2, 1},  // -X
-    std::array{0, 1, 2, 3},  // +Y
-    std::array{0, 3, 2, 1},  // -Y
-    std::array{0, 3, 2, 1},  // +Z
-    std::array{1, 2, 3, 0},  // -Z
 };
 
 // ==================== detail ====================
@@ -198,39 +170,33 @@ inline auto is_solid_at(const model& mdl, vec3i p) -> bool {
     return false;
 }
 
-inline auto compute_vertex_ao_int(
-    const model& mdl, int x, int y, int z, int face, int su, int sv
-) -> int {
-    const vec3i n = vec3i{x, y, z} + ao_normal[face];
-    const vec3i u = ao_tangent_u[face] * su;
-    const vec3i v = ao_tangent_v[face] * sv;
-
-    const bool side1 = is_solid_at(mdl, n + u);
-    const bool side2 = is_solid_at(mdl, n + v);
-
-    if (side1 && side2) {
-        return 0;
-    }
-
-    const bool corner = is_solid_at(mdl, n + u + v);
-
-    return 3 - static_cast<int>(side1) - static_cast<int>(side2) - static_cast<int>(corner);
-}
-
-inline auto compute_vertex_ao_float(
-    const model& mdl, int x, int y, int z, int face, int su, int sv
-) -> float32 {
-    return static_cast<float32>(compute_vertex_ao_int(mdl, x, y, z, face, su, sv)) / 3.0f;
-}
-
-inline auto compute_ao_key(
+inline auto compute_face_flags(
     const model& mdl, int x, int y, int z, int face
 ) -> uint8 {
-    int a0 = compute_vertex_ao_int(mdl, x, y, z, face, -1, -1);
-    int a1 = compute_vertex_ao_int(mdl, x, y, z, face, 1, -1);
-    int a2 = compute_vertex_ao_int(mdl, x, y, z, face, 1, 1);
-    int a3 = compute_vertex_ao_int(mdl, x, y, z, face, -1, 1);
-    return static_cast<uint8>(a0 | (a1 << 2) | (a2 << 4) | (a3 << 6));
+    const vec3i n = vec3i{x, y, z} + ao_normal[face];
+    const vec3i u = ao_tangent_u[face];
+    const vec3i v = ao_tangent_v[face];
+
+    const bool edge_mv = is_solid_at(mdl, n - v);
+    const bool edge_pu = is_solid_at(mdl, n + u);
+    const bool edge_pv = is_solid_at(mdl, n + v);
+    const bool edge_mu = is_solid_at(mdl, n - u);
+
+    const bool c0 = !edge_mu && !edge_mv && is_solid_at(mdl, n - u - v);
+    const bool c1 = !edge_pu && !edge_mv && is_solid_at(mdl, n + u - v);
+    const bool c2 = !edge_pu && !edge_pv && is_solid_at(mdl, n + u + v);
+    const bool c3 = !edge_mu && !edge_pv && is_solid_at(mdl, n - u + v);
+
+    uint8 flags = 0;
+    if (edge_mv) flags |= 0x01u;
+    if (edge_pu) flags |= 0x02u;
+    if (edge_pv) flags |= 0x04u;
+    if (edge_mu) flags |= 0x08u;
+    if (c0)      flags |= 0x10u;
+    if (c1)      flags |= 0x20u;
+    if (c2)      flags |= 0x40u;
+    if (c3)      flags |= 0x80u;
+    return flags;
 }
 
 inline auto is_face_visible(
@@ -294,7 +260,7 @@ inline void build_face_mask(
                         auto [mx, my, mz] = axes.to_model_coords(u, v, layer);
                         if (is_face_visible(mdl, mx, my, mz, face_direction)) {
                             storage.mask[idx(u, v)] = {
-                                fid, compute_ao_key(mdl, mx, my, mz, face_direction)
+                                fid, compute_face_flags(mdl, mx, my, mz, face_direction)
                             };
                         } else {
                             storage.mask[idx(u, v)] = empty_cell;
@@ -312,7 +278,7 @@ inline void build_face_mask(
                     auto& vx = (*page)[lx + ly * ps + lz * ps * ps];
                     if (!vx.is_empty() && is_face_visible(mdl, mx, my, mz, face_direction)) {
                         storage.mask[idx(u, v)] = {
-                            vx.id, compute_ao_key(mdl, mx, my, mz, face_direction)
+                            vx.id, compute_face_flags(mdl, mx, my, mz, face_direction)
                         };
                     } else {
                         storage.mask[idx(u, v)] = empty_cell;
@@ -330,7 +296,7 @@ inline void add_quad(
     vec3i min_pos,
     vec3i max_pos,
     block_id block_id,
-    const std::array<uint8, 4>& ao
+    uint8 face_flags
 ) {
     static constexpr int face_verts[6][4][3] = {
         {{1, 0, 0}, {1, 0, 1}, {1, 1, 1}, {1, 1, 0}},  // +X
@@ -350,11 +316,6 @@ inline void add_quad(
         {1, 3, 2, 0},  // -Z
     };
 
-    std::array<uint8, 4> canonical_ao;
-    for (int k = 0; k < 4; k++) {
-        canonical_ao[canonical_to_winding[face_direction][k]] = ao[k];
-    }
-
     const auto normal_id   = static_cast<uint8>(face_direction);
     const auto base_vertex = static_cast<uint32>(vertices.size());
 
@@ -363,27 +324,16 @@ inline void add_quad(
         int y = face_verts[face_direction][i][1] ? max_pos.y : min_pos.y;
         int z = face_verts[face_direction][i][2] ? max_pos.z : min_pos.z;
         vertices.push_back(
-            vertex::pack(
-                x, y, z, normal_id, block_id, canonical_ao, winding_to_corner[face_direction][i]
-            )
+            vertex::pack(x, y, z, normal_id, block_id, face_flags, winding_to_corner[face_direction][i])
         );
     }
 
-    if (ao[0] + ao[2] > ao[1] + ao[3]) {
-        indices.push_back(base_vertex + 0);
-        indices.push_back(base_vertex + 1);
-        indices.push_back(base_vertex + 2);
-        indices.push_back(base_vertex + 2);
-        indices.push_back(base_vertex + 3);
-        indices.push_back(base_vertex + 0);
-    } else {
-        indices.push_back(base_vertex + 1);
-        indices.push_back(base_vertex + 2);
-        indices.push_back(base_vertex + 3);
-        indices.push_back(base_vertex + 3);
-        indices.push_back(base_vertex + 0);
-        indices.push_back(base_vertex + 1);
-    }
+    indices.push_back(base_vertex + 0);
+    indices.push_back(base_vertex + 1);
+    indices.push_back(base_vertex + 2);
+    indices.push_back(base_vertex + 2);
+    indices.push_back(base_vertex + 3);
+    indices.push_back(base_vertex + 0);
 }
 
 inline void emit_rect(
@@ -400,25 +350,10 @@ inline void emit_rect(
     const block_registry& registry
 ) {
     auto [min_pos, max_pos] = axes.to_local_min_max(u_start, v_start, w, h, layer);
+    auto [cx, cy, cz]       = axes.to_model_coords(u_start, v_start, layer);
+    uint8 face_flags        = compute_face_flags(mdl, cx, cy, cz, face_direction);
 
-    auto [c0x, c0y, c0z] = axes.to_model_coords(u_start, v_start, layer);
-    auto [c1x, c1y, c1z] = axes.to_model_coords(u_start + w - 1, v_start, layer);
-    auto [c2x, c2y, c2z] = axes.to_model_coords(u_start + w - 1, v_start + h - 1, layer);
-    auto [c3x, c3y, c3z] = axes.to_model_coords(u_start, v_start + h - 1, layer);
-
-    std::array canonical_ao = {
-        static_cast<uint8>(compute_vertex_ao_int(mdl, c0x, c0y, c0z, face_direction, -1, -1)),
-        static_cast<uint8>(compute_vertex_ao_int(mdl, c1x, c1y, c1z, face_direction, 1, -1)),
-        static_cast<uint8>(compute_vertex_ao_int(mdl, c2x, c2y, c2z, face_direction, 1, 1)),
-        static_cast<uint8>(compute_vertex_ao_int(mdl, c3x, c3y, c3z, face_direction, -1, 1)),
-    };
-
-    std::array<uint8, 4> winding_ao;
-    for (int k = 0; k < 4; k++) {
-        winding_ao[k] = canonical_ao[canonical_to_winding[face_direction][k]];
-    }
-
-    add_quad(storage.vertices, storage.indices, face_direction, min_pos, max_pos, bid, winding_ao);
+    add_quad(storage.vertices, storage.indices, face_direction, min_pos, max_pos, bid, face_flags);
 }
 
 }  // namespace detail
@@ -465,21 +400,9 @@ inline void simple_mesh_generator::add_cube_face(
     block_id voxel_id,
     const block_registry& registry
 ) {
-    std::array<uint8, 4> ao_values;
-    for (int i = 0; i < 4; i++) {
-        ao_values[i] = static_cast<uint8>(detail::compute_vertex_ao_int(
-            *model,
-            x,
-            y,
-            z,
-            face_direction,
-            ao_winding_signs[face_direction][i][0],
-            ao_winding_signs[face_direction][i][1]
-        ));
-    }
-
+    uint8 face_flags = detail::compute_face_flags(*model, x, y, z, face_direction);
     detail::add_quad(
-        vertices, indices, face_direction, {x, y, z}, {x + 1, y + 1, z + 1}, voxel_id, ao_values
+        vertices, indices, face_direction, {x, y, z}, {x + 1, y + 1, z + 1}, voxel_id, face_flags
     );
 }
 

@@ -228,16 +228,39 @@ void main() {
     float hemisphereStrength = 0.15;
     vec3 hemisphereAmbient = calculateHemisphereAmbient(normal) * hemisphereStrength;
 
-    float ao_c0 = float(fragAoPacked & 0x3u) / 3.0;
-    float ao_c1 = float((fragAoPacked >> 2u) & 0x3u) / 3.0;
-    float ao_c2 = float((fragAoPacked >> 4u) & 0x3u) / 3.0;
-    float ao_c3 = float((fragAoPacked >> 6u) & 0x3u) / 3.0;
-    float ao = mix(
-        mix(ao_c0, ao_c1, fragUV.x),
-        mix(ao_c3, ao_c2, fragUV.x),
-        fragUV.y
+    float edge_mv = float((fragAoPacked & 0x01u) != 0u);
+    float edge_pu = float((fragAoPacked & 0x02u) != 0u);
+    float edge_pv = float((fragAoPacked & 0x04u) != 0u);
+    float edge_mu = float((fragAoPacked & 0x08u) != 0u);
+    float corn_c0 = float((fragAoPacked & 0x10u) != 0u);
+    float corn_c1 = float((fragAoPacked & 0x20u) != 0u);
+    float corn_c2 = float((fragAoPacked & 0x40u) != 0u);
+    float corn_c3 = float((fragAoPacked & 0x80u) != 0u);
+
+    float falloff = 0.75;
+    float grad_bot   = max(0.0, 1.0 - fragUV.y / falloff);
+    float grad_top   = max(0.0, 1.0 - (1.0 - fragUV.y) / falloff);
+    float grad_left  = max(0.0, 1.0 - fragUV.x / falloff);
+    float grad_right = max(0.0, 1.0 - (1.0 - fragUV.x) / falloff);
+
+    float spot_c0 = max(0.0, 1.0 - length(fragUV - vec2(0.0, 0.0)) / falloff);
+    float spot_c1 = max(0.0, 1.0 - length(fragUV - vec2(1.0, 0.0)) / falloff);
+    float spot_c2 = max(0.0, 1.0 - length(fragUV - vec2(1.0, 1.0)) / falloff);
+    float spot_c3 = max(0.0, 1.0 - length(fragUV - vec2(0.0, 1.0)) / falloff);
+
+    float darkness = max(
+        max(
+            max(edge_mv * grad_bot, edge_pu * grad_right),
+            max(edge_pv * grad_top, edge_mu * grad_left)
+        ),
+        max(
+            max(corn_c0 * spot_c0, corn_c1 * spot_c1),
+            max(corn_c2 * spot_c2, corn_c3 * spot_c3)
+        )
     );
-    float aoFactor = mix(1.0, ao, 0.3);
+
+    float aoStrength = 0.2;
+    float aoFactor = 1.0 - darkness * aoStrength;
 
     vec3 ambient = (baseAmbient + hemisphereAmbient) * aoFactor;
 
