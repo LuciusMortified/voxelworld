@@ -239,8 +239,22 @@ void main() {
         fragUV.y
     );
 
+    float c0_bright = float((fragAoPacked >> 8u)  & 0x3u) / 3.0;
+    float c1_bright = float((fragAoPacked >> 10u) & 0x3u) / 3.0;
+    float c2_bright = float((fragAoPacked >> 12u) & 0x3u) / 3.0;
+    float c3_bright = float((fragAoPacked >> 14u) & 0x3u) / 3.0;
+
+    float ao_bright = mix(
+        mix(c0_bright, c1_bright, fragUV.x),
+        mix(c3_bright, c2_bright, fragUV.x),
+        fragUV.y
+    );
+
+    float upFactor = max(0.0, normal.y);
+
     float aoStrength = 0.3;
-    float aoFactor = 1.0 - ao_dark * aoStrength;
+    float brightStrength = 0.35;
+    float aoFactor = 1.0 - ao_dark * aoStrength + ao_bright * brightStrength * upFactor;
 
     vec3 ambient = (baseAmbient + hemisphereAmbient) * aoFactor;
 

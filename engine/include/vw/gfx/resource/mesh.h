@@ -21,14 +21,16 @@ struct vertex {
     uint32 data1 = 0;
 
     // data0: pos.x[6:0] | pos.y[13:7] | pos.z[20:14] | normal_id[23:21] | reserved[31:24]
-    // data1: palette_index[7:0] | corner_dark[15:8] | corner[17:16] | reserved[31:18]
+    // data1: palette_index[7:0] | corner_dark[15:8] | corner[17:16] | corner_bright[25:18] | reserved[31:26]
     // corner_dark: 4 quad corner AO darkness levels, 2 bits each (0=bright..3=full dark)
     // corner: encoded corner of this vertex (bit0=u, bit1=v)
+    // corner_bright: 4 convex brightness levels, 2 bits each (0=flat..3=fully exposed)
 
     vertex() = default;
 
     [[nodiscard]] static auto pack(
-        int x, int y, int z, uint8 normal_id, block_id block_id, uint8 corner_dark, uint8 corner
+        int x, int y, int z, uint8 normal_id, block_id block_id,
+        uint8 corner_dark, uint8 corner_bright, uint8 corner
     ) -> vertex;
 
     [[nodiscard]] static auto get_binding_descriptions()
@@ -77,6 +79,7 @@ private:
 struct face_mask_cell {
     block_id voxel_id;
     uint8 corner_dark;
+    uint8 corner_bright;
 
     [[nodiscard]]
     auto operator==(const face_mask_cell&) const -> bool = default;
@@ -133,7 +136,8 @@ void add_quad(
     vec3i min_pos,
     vec3i max_pos,
     uint8 palette_index,
-    uint8 corner_dark
+    uint8 corner_dark,
+    uint8 corner_bright
 );
 
 void emit_rect(

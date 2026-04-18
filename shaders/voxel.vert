@@ -67,6 +67,10 @@ void main() {
     uint ao_c2 = (inData1 >> 12) & 0x3u;
     uint ao_c3 = (inData1 >> 14) & 0x3u;
     uint corner = (inData1 >> 16) & 0x3u;
+    uint br_c0 = (inData1 >> 18) & 0x3u;
+    uint br_c1 = (inData1 >> 20) & 0x3u;
+    uint br_c2 = (inData1 >> 22) & 0x3u;
+    uint br_c3 = (inData1 >> 24) & 0x3u;
 
     mat4 model = modelMatrices.models[inInstanceIndex];
 
@@ -77,7 +81,8 @@ void main() {
     fragNormal = normalize(mat3(normalMatrices.normals[inInstanceIndex]) * NORMALS[normal_id]);
 
     fragColor = unpackPaletteColor(palette[palette_idx]);
-    fragAoPacked = (ao_c0) | (ao_c1 << 2u) | (ao_c2 << 4u) | (ao_c3 << 6u);
+    fragAoPacked = (ao_c0) | (ao_c1 << 2u) | (ao_c2 << 4u) | (ao_c3 << 6u)
+                 | (br_c0 << 8u) | (br_c1 << 10u) | (br_c2 << 12u) | (br_c3 << 14u);
     fragUV = vec2(float(corner & 1u), float(corner >> 1u));
 
     viewDepth = -(ubo.view * worldPos).z;
