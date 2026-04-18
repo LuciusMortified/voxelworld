@@ -146,7 +146,6 @@ struct vw::gfx::system_trait<vw::gfx::animation_system> {
     using components = std::tuple<
         vw::gfx::animation_player_component,
         vw::gfx::animation_target_component>;
-    using depends_on = vw::gfx::system_list<vw::gfx::transform_system>;
     using resources  = std::tuple<vw::gfx::animation_clip_registry>;
 };
 

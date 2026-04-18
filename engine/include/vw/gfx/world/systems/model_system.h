@@ -57,7 +57,6 @@ namespace vw::gfx { class model_registry; }
 template <>
 struct vw::gfx::system_trait<vw::gfx::model_system> {
     using components = std::tuple<vw::gfx::model_component>;
-    using depends_on = vw::gfx::system_list<>;
     using resources  = std::tuple<vw::gfx::model_registry>;
 };
 

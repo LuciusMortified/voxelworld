@@ -57,7 +57,6 @@ private:
 template <>
 struct vw::gfx::system_trait<vw::gfx::hierarchy_system> {
     using components = std::tuple<vw::gfx::hierarchy_component>;
-    using depends_on = vw::gfx::system_list<>;
     using resources  = std::tuple<>;
 };
 

@@ -63,7 +63,6 @@ private:
 template <>
 struct vw::gfx::system_trait<vw::gfx::socket_system> {
     using components = std::tuple<vw::gfx::socket_component>;
-    using depends_on = vw::gfx::system_list<vw::gfx::hierarchy_system, vw::gfx::transform_system>;
     using resources  = std::tuple<>;
 };
 

@@ -56,7 +56,6 @@ struct vw::gfx::system_trait<vw::gfx::character_controller_system> {
     using components = std::tuple<
         vw::gfx::character_controller_component,
         vw::gfx::movement_intent_component>;
-    using depends_on = vw::gfx::system_list<vw::gfx::transform_system>;
     using resources  = std::tuple<>;
 };
 

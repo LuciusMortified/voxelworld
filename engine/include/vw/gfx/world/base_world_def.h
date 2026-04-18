@@ -20,16 +20,16 @@ namespace vw::gfx {
 
 using base_world_def = world_def<
     hierarchy_system,
+    character_controller_system,
+    animation_fsm_system,
+    physics_system,
     transform_system,
     model_system,
     spatial_system,
     light_system,
     socket_system,
-    animation_system,
-    animation_fsm_system,
-    character_controller_system,
-    physics_system,
-    world_grid_system>;
+    world_grid_system,
+    animation_system>;
 
 }  // namespace vw::gfx
 

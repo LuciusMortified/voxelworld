@@ -10,16 +10,11 @@
 
 namespace vw::gfx {
 
-/// Type list for template template parameters (systems).
-template <template <typename> class... Ss>
-struct system_list {};
-
-/// Metadata for a system: what components it owns, what it depends on, what resources it needs.
+/// Metadata for a system: what components it owns, what resources it needs.
 /// Specialize for each concrete system template.
 template <template <typename> class S>
 struct system_trait {
     using components = std::tuple<>;
-    using depends_on = system_list<>;
     using resources  = std::tuple<>;
 };
 

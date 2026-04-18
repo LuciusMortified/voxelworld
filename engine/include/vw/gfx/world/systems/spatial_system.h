@@ -104,7 +104,6 @@ private:
 template <>
 struct vw::gfx::system_trait<vw::gfx::spatial_system> {
     using components = std::tuple<vw::gfx::spatial_component>;
-    using depends_on = vw::gfx::system_list<>;
     using resources  = std::tuple<>;
 };
 

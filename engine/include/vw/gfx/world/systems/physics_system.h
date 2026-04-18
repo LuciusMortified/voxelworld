@@ -121,8 +121,6 @@ struct vw::gfx::system_trait<vw::gfx::physics_system> {
     using components = std::tuple<
         vw::gfx::rigid_body_component,
         vw::gfx::box_collider_component>;
-    using depends_on = vw::gfx::system_list<
-        vw::gfx::transform_system, vw::gfx::spatial_system>;
     using resources  = std::tuple<>;
 };
 
