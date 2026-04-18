@@ -237,7 +237,7 @@ void main() {
         mix(ao_c3, ao_c2, fragUV.x),
         fragUV.y
     );
-    float aoFactor = mix(1.0, ao, 0.4);
+    float aoFactor = mix(1.0, ao, 0.3);
 
     vec3 ambient = (baseAmbient + hemisphereAmbient) * aoFactor;
 

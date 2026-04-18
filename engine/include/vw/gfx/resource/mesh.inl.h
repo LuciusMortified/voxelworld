@@ -8,18 +8,19 @@ namespace vw::gfx {
 // ==================== vertex ====================
 
 inline auto vertex::pack(
-    int x, int y, int z, uint8 normal_id, block_id block_id,
-    const std::array<uint8, 4>& ao_quad, uint8 corner
+    int x,
+    int y,
+    int z,
+    uint8 normal_id,
+    block_id block_id,
+    const std::array<uint8, 4>& ao_quad,
+    uint8 corner
 ) -> vertex {
     vertex v;
-    v.data0 =
-        (static_cast<uint32>(x) & 0x7Fu) |
-        ((static_cast<uint32>(y) & 0x7Fu) << 7) |
-        ((static_cast<uint32>(z) & 0x7Fu) << 14) |
-        ((static_cast<uint32>(normal_id) & 0x7u) << 21);
+    v.data0 = (static_cast<uint32>(x) & 0x7Fu) | ((static_cast<uint32>(y) & 0x7Fu) << 7) |
+        ((static_cast<uint32>(z) & 0x7Fu) << 14) | ((static_cast<uint32>(normal_id) & 0x7u) << 21);
 
-    v.data1 =
-        static_cast<uint32>(block_id.value) |
+    v.data1 = static_cast<uint32>(block_id.value) |
         ((static_cast<uint32>(ao_quad[0]) & 0x3u) << 8) |
         ((static_cast<uint32>(ao_quad[1]) & 0x3u) << 10) |
         ((static_cast<uint32>(ao_quad[2]) & 0x3u) << 12) |
@@ -71,31 +72,19 @@ inline auto vertex::get_attribute_descriptions() -> std::vector<VkVertexInputAtt
 
 // ==================== AO tables ====================
 
-static constexpr std::array ao_normal = {
-    std::array{1, 0, 0},
-    std::array{-1, 0, 0},
-    std::array{0, 1, 0},
-    std::array{0, -1, 0},
-    std::array{0, 0, 1},
-    std::array{0, 0, -1}
+static constexpr std::array<vec3i, 6> ao_normal = {
+    vec3i{1, 0, 0}, vec3i{-1, 0, 0}, vec3i{0, 1, 0},
+    vec3i{0, -1, 0}, vec3i{0, 0, 1}, vec3i{0, 0, -1},
 };
 
-static constexpr std::array ao_tangent_u = {
-    std::array{0, 0, 1},
-    std::array{0, 0, 1},
-    std::array{1, 0, 0},
-    std::array{1, 0, 0},
-    std::array{1, 0, 0},
-    std::array{1, 0, 0}
+static constexpr std::array<vec3i, 6> ao_tangent_u = {
+    vec3i{0, 0, 1}, vec3i{0, 0, 1}, vec3i{1, 0, 0},
+    vec3i{1, 0, 0}, vec3i{1, 0, 0}, vec3i{1, 0, 0},
 };
 
-static constexpr std::array ao_tangent_v = {
-    std::array{0, 1, 0},
-    std::array{0, 1, 0},
-    std::array{0, 0, 1},
-    std::array{0, 0, 1},
-    std::array{0, 1, 0},
-    std::array{0, 1, 0}
+static constexpr std::array<vec3i, 6> ao_tangent_v = {
+    vec3i{0, 1, 0}, vec3i{0, 1, 0}, vec3i{0, 0, 1},
+    vec3i{0, 0, 1}, vec3i{0, 1, 0}, vec3i{0, 1, 0},
 };
 
 static constexpr std::array ao_winding_signs = {
@@ -175,49 +164,55 @@ inline face_axis_mapping::face_axis_mapping(
     }
 }
 
+inline auto is_solid_at(const model& mdl, vec3i p) -> bool {
+    const bool ox = p.x < 0 || p.x >= mdl.width();
+    const bool oy = p.y < 0 || p.y >= mdl.height();
+    const bool oz = p.z < 0 || p.z >= mdl.depth();
+
+    if (!ox && !oy && !oz) {
+        return !mdl.is_empty(p.x, p.y, p.z);
+    }
+    if (static_cast<int>(ox) + static_cast<int>(oy) + static_cast<int>(oz) > 1) {
+        return false;
+    }
+
+    if (p.x >= mdl.width() && mdl.has_boundary_slice(0)) {
+        return mdl.is_boundary_solid(0, 0, p.y, p.z);
+    }
+    if (p.x < 0 && mdl.has_boundary_slice(1)) {
+        return mdl.is_boundary_solid(1, 0, p.y, p.z);
+    }
+    if (p.y >= mdl.height() && mdl.has_boundary_slice(2)) {
+        return mdl.is_boundary_solid(2, p.x, 0, p.z);
+    }
+    if (p.y < 0 && mdl.has_boundary_slice(3)) {
+        return mdl.is_boundary_solid(3, p.x, 0, p.z);
+    }
+    if (p.z >= mdl.depth() && mdl.has_boundary_slice(4)) {
+        return mdl.is_boundary_solid(4, p.x, p.y, 0);
+    }
+    if (p.z < 0 && mdl.has_boundary_slice(5)) {
+        return mdl.is_boundary_solid(5, p.x, p.y, 0);
+    }
+
+    return false;
+}
+
 inline auto compute_vertex_ao_int(
     const model& mdl, int x, int y, int z, int face, int su, int sv
 ) -> int {
-    int nx = x + ao_normal[face][0];
-    int ny = y + ao_normal[face][1];
-    int nz = z + ao_normal[face][2];
+    const vec3i n = vec3i{x, y, z} + ao_normal[face];
+    const vec3i u = ao_tangent_u[face] * su;
+    const vec3i v = ao_tangent_v[face] * sv;
 
-    auto is_solid = [&](int px, int py, int pz) -> bool {
-        bool ox = px < 0 || px >= mdl.width();
-        bool oy = py < 0 || py >= mdl.height();
-        bool oz = pz < 0 || pz >= mdl.depth();
+    const bool side1 = is_solid_at(mdl, n + u);
+    const bool side2 = is_solid_at(mdl, n + v);
 
-        if (!ox && !oy && !oz)
-            return !mdl.is_empty(px, py, pz);
-        if ((ox ? 1 : 0) + (oy ? 1 : 0) + (oz ? 1 : 0) > 1)
-            return false;
-
-        if (px >= mdl.width() && mdl.has_boundary_slice(0))
-            return mdl.is_boundary_solid(0, 0, py, pz);
-        if (px < 0 && mdl.has_boundary_slice(1))
-            return mdl.is_boundary_solid(1, 0, py, pz);
-        if (py >= mdl.height() && mdl.has_boundary_slice(2))
-            return mdl.is_boundary_solid(2, px, 0, pz);
-        if (py < 0 && mdl.has_boundary_slice(3))
-            return mdl.is_boundary_solid(3, px, 0, pz);
-        if (pz >= mdl.depth() && mdl.has_boundary_slice(4))
-            return mdl.is_boundary_solid(4, px, py, 0);
-        if (pz < 0 && mdl.has_boundary_slice(5))
-            return mdl.is_boundary_solid(5, px, py, 0);
-
-        return false;
-    };
-
-    int ux = ao_tangent_u[face][0], uy = ao_tangent_u[face][1], uz = ao_tangent_u[face][2];
-    int vx = ao_tangent_v[face][0], vy = ao_tangent_v[face][1], vz = ao_tangent_v[face][2];
-
-    bool side1 = is_solid(nx + su * ux, ny + su * uy, nz + su * uz);
-    bool side2 = is_solid(nx + sv * vx, ny + sv * vy, nz + sv * vz);
-
-    if (side1 && side2)
+    if (side1 && side2) {
         return 0;
+    }
 
-    bool corner = is_solid(nx + su * ux + sv * vx, ny + su * uy + sv * vy, nz + su * uz + sv * vz);
+    const bool corner = is_solid_at(mdl, n + u + v);
 
     return 3 - static_cast<int>(side1) - static_cast<int>(side2) - static_cast<int>(corner);
 }
@@ -367,10 +362,11 @@ inline void add_quad(
         int x = face_verts[face_direction][i][0] ? max_pos.x : min_pos.x;
         int y = face_verts[face_direction][i][1] ? max_pos.y : min_pos.y;
         int z = face_verts[face_direction][i][2] ? max_pos.z : min_pos.z;
-        vertices.push_back(vertex::pack(
-            x, y, z, normal_id, block_id,
-            canonical_ao, winding_to_corner[face_direction][i]
-        ));
+        vertices.push_back(
+            vertex::pack(
+                x, y, z, normal_id, block_id, canonical_ao, winding_to_corner[face_direction][i]
+            )
+        );
     }
 
     if (ao[0] + ao[2] > ao[1] + ao[3]) {
