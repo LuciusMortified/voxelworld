@@ -90,7 +90,7 @@ private:
         generator_params_ = {
             .voxel_scale = 8,
         };
-        auto& registry = world.template get_resource<gfx::model_registry>();
+        auto& registry = world.template get_resource<asset::model_registry>();
         auto generator = std::make_unique<gfx::perlin_terrain_generator>(
             registry.get_identity_pool(), registry.get_page_pool(), generator_params_);
         generator_     = generator.get();

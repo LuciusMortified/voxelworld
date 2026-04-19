@@ -34,7 +34,7 @@ private:
     std::string parent_name_;
     transform transform_;
     bool with_model_ = false;
-    std::shared_ptr<gfx::model> saved_model_;
+    std::shared_ptr<asset::model> saved_model_;
 };
 
 }  // namespace vw::sculptor

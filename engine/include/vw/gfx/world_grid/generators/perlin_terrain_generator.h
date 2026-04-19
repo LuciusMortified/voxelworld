@@ -7,10 +7,13 @@
 
 #include "vw/gfx/world_grid/terrain_generator.h"
 
-namespace vw::gfx {
-
+namespace vw::asset {
 class model_identity_pool;
 class page_pool;
+}  // namespace vw::asset
+
+namespace vw::gfx {
+
 
 class perlin_terrain_generator final : public terrain_generator {
 public:
@@ -37,7 +40,7 @@ public:
         float32 warp_strength = 30.0f;
     };
 
-    perlin_terrain_generator(model_identity_pool& identity_pool, page_pool& page_pool,
+    perlin_terrain_generator(vw::asset::model_identity_pool& identity_pool, vw::asset::page_pool& pool,
                              params p = {});
 
     void generate(terrain_context& ctx) override;
@@ -57,8 +60,8 @@ private:
     static auto lerp(float64 t, float64 a, float64 b) -> float64;
     static auto grad(int32 hash, float64 x, float64 y) -> float64;
 
-    model_identity_pool* identity_pool_;
-    page_pool* page_pool_;
+    vw::asset::model_identity_pool* identity_pool_;
+    vw::asset::page_pool* page_pool_;
     params params_;
     std::array<int32, 512> perm_;
 };

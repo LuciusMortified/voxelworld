@@ -8,13 +8,14 @@
 #include "vw/core.h"
 #include "vw/gfx/world_grid/chunk.h"
 
+namespace vw::asset { class model; }
+
 namespace vw::gfx {
 
-class model;
 
 struct chunk_data {
     vec3i coord;
-    std::shared_ptr<model> chunk_model;
+    std::shared_ptr<vw::asset::model> chunk_model;
 };
 
 struct chunk_y_range {

@@ -107,7 +107,7 @@ inline auto save_clip_as_modal::save_clip_() -> bool {
         return false;
     }
 
-    auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
+    auto& registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
     if (registry.has(name_)) {
         error_ = "A clip with this name is already open.";
         return false;

@@ -7,13 +7,13 @@
 #include <variant>
 
 #include "vw/core/transform.h"
-#include "vw/gfx/animation/animation_types.h"
-#include "vw/gfx/animation/keyframe.h"
+#include "vw/asset/animation/animation_types.h"
+#include "vw/asset/animation/keyframe.h"
 #include "vw/gfx/world/entity_guard.h"
 
 namespace vw::sculptor {
 
-using keyframe_value    = std::variant<gfx::keyframe_vec3f, gfx::keyframe_quat>;
+using keyframe_value    = std::variant<asset::keyframe_vec3f, asset::keyframe_quat>;
 using entity_guard_type = gfx::entity_guard<gfx::base_world_def>;
 
 enum class tools : uint8 {
@@ -67,18 +67,18 @@ struct tool_state {
 
 struct clip_settings {
     float32 playback_speed             = 1.0f;
-    gfx::animation_loop_mode loop_mode = gfx::animation_loop_mode::once;
-    gfx::transition blend_transition   = {};
-    gfx::transition fade_in            = {};
-    gfx::transition fade_out           = {};
+    asset::animation_loop_mode loop_mode = asset::animation_loop_mode::once;
+    asset::transition blend_transition   = {};
+    asset::transition fade_in            = {};
+    asset::transition fade_out           = {};
 };
 
 struct animation_state {
     std::string selected_clip_name;
     std::string selected_track_name;
-    gfx::animation_property selected_property = gfx::animation_property::position;
+    asset::animation_property selected_property = asset::animation_property::position;
 
-    uint32 selected_keyframe_id = gfx::invalid_keyframe_id;
+    uint32 selected_keyframe_id = asset::invalid_keyframe_id;
     float32 timeline_cursor     = 0.f;
     std::unordered_set<std::string> expanded_tracks;
     bool animation_mode = false;

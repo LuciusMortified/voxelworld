@@ -32,18 +32,18 @@ inline void playback_service::toggle_playback() const {
     const bool is_same_clip = player.has_layer(layer_idx) && player.get_layer(layer_idx).clip &&
         player.get_layer(layer_idx).clip->get_name() == state_->anim.selected_clip_name;
 
-    if (is_same_clip && player.get_layer(layer_idx).state == gfx::animation_state::playing) {
+    if (is_same_clip && player.get_layer(layer_idx).state == asset::animation_state::playing) {
         anim_sys.modify_player(root_ent).layer(layer_idx).pause();
         return;
     }
 
-    const auto& clip_reg = world.template get_resource<gfx::animation_clip_registry>();
+    const auto& clip_reg = world.template get_resource<asset::animation_clip_registry>();
     const auto clip      = clip_reg.get(state_->anim.selected_clip_name);
     if (!clip) {
         return;
     }
 
-    if (is_same_clip && player.get_layer(layer_idx).state == gfx::animation_state::paused) {
+    if (is_same_clip && player.get_layer(layer_idx).state == asset::animation_state::paused) {
         anim_sys.modify_player(root_ent).layer(layer_idx).resume();
     } else {
         const auto& cs      = state_->anim.get_clip_settings(state_->anim.selected_clip_name);

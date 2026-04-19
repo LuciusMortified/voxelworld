@@ -12,10 +12,11 @@
 #include "vw/core/block_registry.h"
 #include "vw/core/types.h"
 #include "vw/core/vec3.h"
-#include "vw/gfx/model/model.h"
+#include "vw/asset/model/model.h"
 #include "vw/gfx/resource/buffer.h"
 
 namespace vw::gfx {
+
 struct vertex {
     uint32 data0 = 0;
     uint32 data1 = 0;
@@ -54,14 +55,14 @@ class simple_mesh_generator {
 public:
     [[nodiscard]]
     static auto generate_mesh_data(
-        const std::shared_ptr<model>& model, const block_registry& registry
+        const std::shared_ptr<vw::asset::model>& mdl, const block_registry& registry
     ) -> mesh;
 
 private:
     static void add_cube_face(
         std::vector<vertex>& vertices,
         std::vector<uint32>& indices,
-        const std::shared_ptr<model>& model,
+        const std::shared_ptr<vw::asset::model>& mdl,
         int x,
         int y,
         int z,
@@ -72,7 +73,7 @@ private:
 
     [[nodiscard]]
     static auto is_face_visible(
-        const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
+        const std::shared_ptr<vw::asset::model>& mdl, int x, int y, int z, int face_direction
     ) -> bool;
 };
 
@@ -108,7 +109,7 @@ struct face_axis_mapping {
     int face_direction;
     int32 voxel_scale;
 
-    face_axis_mapping(const model& mdl, int face_dir);
+    face_axis_mapping(const vw::asset::model& mdl, int face_dir);
 
     [[nodiscard]] auto to_model_coords(int u, int v, int layer) const -> std::tuple<int, int, int>;
 
@@ -116,14 +117,14 @@ struct face_axis_mapping {
         -> std::pair<vec3i, vec3i>;
 };
 
-[[nodiscard]] auto compute_corner_darkness(const model& mdl, int x, int y, int z, int face) -> uint8;
+[[nodiscard]] auto compute_corner_darkness(const vw::asset::model& mdl, int x, int y, int z, int face) -> uint8;
 
-[[nodiscard]] auto is_face_visible(const model& mdl, int x, int y, int z, int face_direction)
+[[nodiscard]] auto is_face_visible(const vw::asset::model& mdl, int x, int y, int z, int face_direction)
     -> bool;
 
 void build_face_mask(
     mesh_generation_storage& storage,
-    const model& mdl,
+    const vw::asset::model& mdl,
     const face_axis_mapping& axes,
     int face_direction,
     int layer
@@ -142,7 +143,7 @@ void add_quad(
 
 void emit_rect(
     mesh_generation_storage& storage,
-    const model& mdl,
+    const vw::asset::model& mdl,
     const face_axis_mapping& axes,
     int face_direction,
     int layer,
@@ -159,13 +160,13 @@ class strip_mesh_generator {
 public:
     [[nodiscard]]
     static auto generate_mesh_data(
-        mesh_generation_storage& storage, const model& mdl, const block_registry& registry
+        mesh_generation_storage& storage, const vw::asset::model& mdl, const block_registry& registry
     ) -> mesh;
 
 private:
     static void merge_and_emit_strips(
         mesh_generation_storage& storage,
-        const model& mdl,
+        const vw::asset::model& mdl,
         const detail::face_axis_mapping& axes,
         int face_direction,
         int layer,
@@ -174,7 +175,7 @@ private:
 
     static void generate_face_quads(
         mesh_generation_storage& storage,
-        const model& mdl,
+        const vw::asset::model& mdl,
         int face_direction,
         const block_registry& registry
     );
@@ -184,13 +185,13 @@ class greedy_mesh_generator {
 public:
     [[nodiscard]]
     static auto generate_mesh_data(
-        mesh_generation_storage& storage, const model& mdl, const block_registry& registry
+        mesh_generation_storage& storage, const vw::asset::model& mdl, const block_registry& registry
     ) -> mesh;
 
 private:
     static void merge_and_emit_rects(
         mesh_generation_storage& storage,
-        const model& mdl,
+        const vw::asset::model& mdl,
         const detail::face_axis_mapping& axes,
         int face_direction,
         int layer,
@@ -199,7 +200,7 @@ private:
 
     static void generate_face_quads(
         mesh_generation_storage& storage,
-        const model& mdl,
+        const vw::asset::model& mdl,
         int face_direction,
         const block_registry& registry
     );

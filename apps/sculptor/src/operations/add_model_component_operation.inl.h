@@ -12,7 +12,7 @@ inline add_model_component_operation::add_model_component_operation(
 
 inline void add_model_component_operation::execute() {
     auto& world          = engine_->get_world();
-    auto& model_reg = world.template get_resource<gfx::model_registry>();
+    auto& model_reg = world.template get_resource<asset::model_registry>();
     auto& model_sys = world.template get_system<gfx::model_system>();
 
     const auto ent = state_->scene.name_to_entity[params_.name];
@@ -32,7 +32,7 @@ inline void add_model_component_operation::execute() {
 
 inline void add_model_component_operation::undo() {
     auto& world          = engine_->get_world();
-    auto& model_reg = world.template get_resource<gfx::model_registry>();
+    auto& model_reg = world.template get_resource<asset::model_registry>();
 
     const auto ent = state_->scene.name_to_entity[params_.name];
     auto* guard    = state_->scene.find_guard(ent);

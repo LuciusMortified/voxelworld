@@ -14,7 +14,7 @@ inline void create_entity_operation::execute() {
     auto& world            = engine_->get_world();
     auto& hierarchy_sys = world.template get_system<gfx::hierarchy_system>();
     auto& transform_sys = world.template get_system<gfx::transform_system>();
-    auto& model_reg = world.template get_resource<gfx::model_registry>();
+    auto& model_reg = world.template get_resource<asset::model_registry>();
     auto& model_sys = world.template get_system<gfx::model_system>();
 
     auto ent_guard = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
@@ -22,7 +22,7 @@ inline void create_entity_operation::execute() {
     ent_guard->with<gfx::transform_component>();
     ent_guard->with<gfx::spatial_component>();
 
-    std::shared_ptr<gfx::model> model = nullptr;
+    std::shared_ptr<asset::model> model = nullptr;
     if (params_.with_model) {
         ent_guard->with<gfx::model_component>();
 

@@ -122,21 +122,21 @@ auto animation_system<WD>::get_cached_target_map(
 
 template <typename WD>
 void animation_system<WD>::update_layer_time(
-    animation_layer& layer, float32 delta_time
+    vw::asset::animation_layer& layer, float32 delta_time
 ) {
     layer.time += delta_time * layer.playback_speed * layer.direction;
 
     float32 duration = layer.clip->get_duration();
 
-    if (layer.loop_mode == animation_loop_mode::once) {
+    if (layer.loop_mode == vw::asset::animation_loop_mode::once) {
         if (layer.time >= duration) {
             layer.time  = duration;
-            layer.state = animation_state::stopped;
+            layer.state = vw::asset::animation_state::stopped;
         } else if (layer.time < 0.0f) {
             layer.time  = 0.0f;
-            layer.state = animation_state::stopped;
+            layer.state = vw::asset::animation_state::stopped;
         }
-    } else if (layer.loop_mode == animation_loop_mode::loop) {
+    } else if (layer.loop_mode == vw::asset::animation_loop_mode::loop) {
         if (duration > 0.0f) {
             if (layer.direction > 0.0f && layer.time >= duration) {
                 layer.time = 0.0f;
@@ -144,7 +144,7 @@ void animation_system<WD>::update_layer_time(
                 layer.time = duration;
             }
         }
-    } else if (layer.loop_mode == animation_loop_mode::ping_pong) {
+    } else if (layer.loop_mode == vw::asset::animation_loop_mode::ping_pong) {
         if (layer.time >= duration) {
             layer.direction = -1.0f;
             layer.time      = duration;
@@ -157,7 +157,7 @@ void animation_system<WD>::update_layer_time(
 
 template <typename WD>
 void animation_system<WD>::process_layer(
-    animation_layer& layer, float32 delta_time, bool is_base
+    vw::asset::animation_layer& layer, float32 delta_time, bool is_base
 ) {
     if (!layer.clip) {
         return;
@@ -197,15 +197,15 @@ void animation_system<WD>::process_layer(
         } else {
             layer.fade_influence = 0.0f;
             layer.fade_is_out    = false;
-            layer.state          = animation_state::stopped;
+            layer.state          = vw::asset::animation_state::stopped;
         }
-        if (layer.state == animation_state::playing) {
+        if (layer.state == vw::asset::animation_state::playing) {
             update_layer_time(layer, delta_time);
         }
         return;
     }
 
-    if (layer.state != animation_state::playing) {
+    if (layer.state != vw::asset::animation_state::playing) {
         return;
     }
 
@@ -228,7 +228,7 @@ void animation_system<WD>::process_layer(
 
     update_layer_time(layer, delta_time);
 
-    if (!is_base && layer.state == animation_state::stopped) {
+    if (!is_base && layer.state == vw::asset::animation_state::stopped) {
         if (layer.fade_out.duration > 0.0f) {
             layer.fade_is_out  = true;
             layer.fade_elapsed = 0.0f;
@@ -240,7 +240,7 @@ void animation_system<WD>::process_layer(
 
 template <typename WD>
 auto animation_system<WD>::compute_layer_transform(
-    const animation_layer& layer, const std::string& target_name, const transform& rest
+    const vw::asset::animation_layer& layer, const std::string& target_name, const transform& rest
 ) const -> std::optional<transform> {
     if (!layer.clip) {
         return std::nullopt;
@@ -454,14 +454,14 @@ void animation_system<WD>::player_modifier::rebuild_target_map() const {
 
 template <typename WD>
 animation_system<WD>::layer_modifier::layer_modifier(
-    animation_system* system, entity ent, animation_layer* layer
+    animation_system* system, entity ent, vw::asset::animation_layer* layer
 )
     : system_(system), entity_(ent), layer_(layer) {}
 
 template <typename WD>
 void animation_system<WD>::layer_modifier::play() const {
-    if (layer_->state != animation_state::playing) {
-        layer_->state          = animation_state::playing;
+    if (layer_->state != vw::asset::animation_state::playing) {
+        layer_->state          = vw::asset::animation_state::playing;
         layer_->time           = 0.0f;
         layer_->direction      = 1.0f;
         layer_->fade_influence = 1.0f;
@@ -474,15 +474,15 @@ void animation_system<WD>::layer_modifier::play() const {
 
 template <typename WD>
 void animation_system<WD>::layer_modifier::play(
-    const transition& fade_in
+    const vw::asset::transition& fade_in
 ) const {
     layer_->fade_in        = fade_in;
     layer_->fade_influence = 0.0f;
     layer_->fade_is_out    = false;
     layer_->fade_elapsed   = 0.0f;
 
-    if (layer_->state != animation_state::playing) {
-        layer_->state     = animation_state::playing;
+    if (layer_->state != vw::asset::animation_state::playing) {
+        layer_->state     = vw::asset::animation_state::playing;
         layer_->time      = 0.0f;
         layer_->direction = 1.0f;
 
@@ -492,14 +492,14 @@ void animation_system<WD>::layer_modifier::play(
 
 template <typename WD>
 void animation_system<WD>::layer_modifier::pause() const {
-    if (layer_->state == animation_state::playing) {
-        layer_->state = animation_state::paused;
+    if (layer_->state == vw::asset::animation_state::playing) {
+        layer_->state = vw::asset::animation_state::paused;
     }
 }
 
 template <typename WD>
 void animation_system<WD>::layer_modifier::stop() const {
-    layer_->state          = animation_state::stopped;
+    layer_->state          = vw::asset::animation_state::stopped;
     layer_->time           = 0.0f;
     layer_->fade_influence = 0.0f;
     layer_->fade_is_out    = false;
@@ -507,12 +507,12 @@ void animation_system<WD>::layer_modifier::stop() const {
 
 template <typename WD>
 void animation_system<WD>::layer_modifier::clear() const {
-    *layer_ = animation_layer{};
+    *layer_ = vw::asset::animation_layer{};
 }
 
 template <typename WD>
 void animation_system<WD>::layer_modifier::stop(
-    const transition& fade_out
+    const vw::asset::transition& fade_out
 ) const {
     layer_->fade_out     = fade_out;
     layer_->fade_is_out  = true;
@@ -521,8 +521,8 @@ void animation_system<WD>::layer_modifier::stop(
 
 template <typename WD>
 void animation_system<WD>::layer_modifier::resume() const {
-    if (layer_->state == animation_state::paused) {
-        layer_->state = animation_state::playing;
+    if (layer_->state == vw::asset::animation_state::paused) {
+        layer_->state = vw::asset::animation_state::playing;
         system_->add_active_entity(entity_);
     }
 }
@@ -543,30 +543,30 @@ void animation_system<WD>::layer_modifier::set_playback_speed(
 
 template <typename WD>
 void animation_system<WD>::layer_modifier::set_loop_mode(
-    animation_loop_mode mode
+    vw::asset::animation_loop_mode mode
 ) const {
     layer_->loop_mode = mode;
 }
 
 template <typename WD>
 void animation_system<WD>::layer_modifier::set_fade_in(
-    const transition& t
+    const vw::asset::transition& t
 ) const {
     layer_->fade_in = t;
 }
 
 template <typename WD>
 void animation_system<WD>::layer_modifier::set_fade_out(
-    const transition& t
+    const vw::asset::transition& t
 ) const {
     layer_->fade_out = t;
 }
 
 template <typename WD>
 void animation_system<WD>::layer_modifier::blend_to(
-    std::shared_ptr<animation_clip> clip, std::optional<transition> t
+    std::shared_ptr<vw::asset::animation_clip> clip, std::optional<vw::asset::transition> t
 ) const {
-    transition trans = t.value_or(layer_->blend_transition);
+    vw::asset::transition trans = t.value_or(layer_->blend_transition);
 
     if (trans.duration > 0.0f && layer_->clip) {
         if (layer_->blend_transition.duration > 0.0f && layer_->clip) {
@@ -651,8 +651,8 @@ void animation_system<WD>::layer_modifier::blend_to(
         layer_->mask.clear();
     }
 
-    if (layer_->state != animation_state::playing) {
-        layer_->state          = animation_state::playing;
+    if (layer_->state != vw::asset::animation_state::playing) {
+        layer_->state          = vw::asset::animation_state::playing;
         layer_->direction      = 1.0f;
         layer_->fade_is_out    = false;
         layer_->fade_influence = 1.0f;
@@ -663,9 +663,9 @@ void animation_system<WD>::layer_modifier::blend_to(
 
 template <typename WD>
 void animation_system<WD>::layer_modifier::blend_to_by_name(
-    std::string_view name, std::optional<transition> t
+    std::string_view name, std::optional<vw::asset::transition> t
 ) {
-    auto clip = system_->context_->template get_resource<animation_clip_registry>().get(name);
+    auto clip = system_->context_->template get_resource<vw::asset::animation_clip_registry>().get(name);
     if (clip) {
         blend_to(std::move(clip), t);
     }
@@ -701,9 +701,9 @@ void animation_system<WD>::target_modifier::set_rest_transform(
 
 template <typename WD>
 auto animation_system<WD>::merge_with_rest(
-    const transform& anim, const animation_track& track, const transform& rest
+    const transform& anim, const vw::asset::animation_track& track, const transform& rest
 ) -> transform {
-    auto has_keyframes = [&](animation_property prop) -> bool {
+    auto has_keyframes = [&](vw::asset::animation_property prop) -> bool {
         const auto* ch = track.get_channel(prop);
         if (!ch) {
             return false;
@@ -713,16 +713,16 @@ auto animation_system<WD>::merge_with_rest(
 
     transform result = anim;
 
-    if (!has_keyframes(animation_property::position)) {
+    if (!has_keyframes(vw::asset::animation_property::position)) {
         result.set_position(rest.get_position());
     }
-    if (!has_keyframes(animation_property::rotation)) {
+    if (!has_keyframes(vw::asset::animation_property::rotation)) {
         result.set_rotation(rest.get_rotation());
     }
-    if (!has_keyframes(animation_property::scale)) {
+    if (!has_keyframes(vw::asset::animation_property::scale)) {
         result.set_scale(rest.get_scale());
     }
-    if (!has_keyframes(animation_property::origin)) {
+    if (!has_keyframes(vw::asset::animation_property::origin)) {
         result.set_origin(rest.get_origin());
     }
 

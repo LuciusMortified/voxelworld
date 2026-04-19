@@ -11,9 +11,9 @@
 #include <unordered_set>
 
 #include "vw/core/transform.h"
-#include "vw/gfx/animation/animation_clip.h"
-#include "vw/gfx/animation/animation_clip_registry.h"
-#include "vw/gfx/animation/animation_layer.h"
+#include "vw/asset/animation/animation_clip.h"
+#include "vw/asset/animation/animation_clip_registry.h"
+#include "vw/asset/animation/animation_layer.h"
 #include "vw/gfx/world/components/animation_player_component.h"
 #include "vw/gfx/world/components/animation_target_component.h"
 #include "vw/gfx/world/system_trait.h"
@@ -23,6 +23,7 @@
 #include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
+
 
 template <typename>
 class transform_system;
@@ -44,29 +45,29 @@ public:
     class layer_modifier {
     public:
         void play() const;
-        void play(const transition& fade_in) const;
+        void play(const vw::asset::transition& fade_in) const;
         void pause() const;
         void stop() const;
-        void stop(const transition& fade_out) const;
+        void stop(const vw::asset::transition& fade_out) const;
         void clear() const;
         void resume() const;
         void set_time(float32 time) const;
         void set_playback_speed(float32 speed) const;
-        void set_loop_mode(animation_loop_mode mode) const;
-        void set_fade_in(const transition& t) const;
-        void set_fade_out(const transition& t) const;
+        void set_loop_mode(vw::asset::animation_loop_mode mode) const;
+        void set_fade_in(const vw::asset::transition& t) const;
+        void set_fade_out(const vw::asset::transition& t) const;
         void blend_to(
-            std::shared_ptr<animation_clip> clip, std::optional<transition> t = std::nullopt
+            std::shared_ptr<vw::asset::animation_clip> clip, std::optional<vw::asset::transition> t = std::nullopt
         ) const;
-        void blend_to_by_name(std::string_view name, std::optional<transition> t = std::nullopt);
+        void blend_to_by_name(std::string_view name, std::optional<vw::asset::transition> t = std::nullopt);
 
     private:
         friend class animation_system;
-        layer_modifier(animation_system* system, entity ent, animation_layer* layer);
+        layer_modifier(animation_system* system, entity ent, vw::asset::animation_layer* layer);
 
         animation_system* system_;
         entity entity_;
-        animation_layer* layer_;
+        vw::asset::animation_layer* layer_;
     };
 
     class player_modifier {
@@ -122,18 +123,18 @@ private:
 
     void process_animation(entity ent, animation_player_component& anim_comp, float32 delta_time);
 
-    static void update_layer_time(animation_layer& layer, float32 delta_time);
+    static void update_layer_time(vw::asset::animation_layer& layer, float32 delta_time);
 
-    void process_layer(animation_layer& layer, float32 delta_time, bool is_base);
+    void process_layer(vw::asset::animation_layer& layer, float32 delta_time, bool is_base);
 
     void apply_animation(entity root_ent, const animation_player_component& anim_comp);
 
     [[nodiscard]] auto compute_layer_transform(
-        const animation_layer& layer, const std::string& target_name, const transform& rest
+        const vw::asset::animation_layer& layer, const std::string& target_name, const transform& rest
     ) const -> std::optional<transform>;
 
     static auto merge_with_rest(
-        const transform& anim, const animation_track& track, const transform& rest
+        const transform& anim, const vw::asset::animation_track& track, const transform& rest
     ) -> transform;
 
     context_type* context_;
@@ -146,7 +147,7 @@ struct vw::gfx::system_trait<vw::gfx::animation_system> {
     using components = std::tuple<
         vw::gfx::animation_player_component,
         vw::gfx::animation_target_component>;
-    using resources  = std::tuple<vw::gfx::animation_clip_registry>;
+    using resources  = std::tuple<vw::asset::animation_clip_registry>;
 };
 
 #include "vw/gfx/world/systems/animation_system.inl.h"

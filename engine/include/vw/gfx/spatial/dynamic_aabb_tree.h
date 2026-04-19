@@ -16,39 +16,36 @@
 
 namespace vw::gfx {
 
-using vw::spatial::aabb;
-using vw::spatial::frustum;
-using vw::spatial::ray;
 
 class dynamic_aabb_tree {
 public:
     explicit dynamic_aabb_tree();
     
-    void insert(entity e, const aabb& bounds, spatial_layer_mask layer = spatial_layer::all);
+    void insert(entity e, const vw::spatial::aabb& bounds, spatial_layer_mask layer = spatial_layer::all);
     void remove(entity e);
-    void update(entity e, const aabb& new_bounds, spatial_layer_mask layer = spatial_layer::all);
+    void update(entity e, const vw::spatial::aabb& new_bounds, spatial_layer_mask layer = spatial_layer::all);
     
     // Методы запросов - возвращают все попавшие сущности
     void query_all(
-        const frustum& f,
+        const vw::spatial::frustum& f,
         std::vector<entity>& result_out,
         spatial_layer_mask layer_mask = spatial_layer::all
     ) const;
 
     void query_all(
-        const ray& r,
+        const vw::spatial::ray& r,
         std::vector<entity>& result_out,
         spatial_layer_mask layer_mask = spatial_layer::all
     ) const;
 
     void query_all(
-        const aabb& bounds,
+        const vw::spatial::aabb& bounds,
         std::vector<entity>& result_out,
         spatial_layer_mask layer_mask = spatial_layer::all
     ) const;
 
     void query_all_any(
-        std::span<const frustum> frustums,
+        std::span<const vw::spatial::frustum> frustums,
         std::vector<entity>& result_out
     ) const;
 
@@ -59,7 +56,7 @@ public:
 
 private:
     struct node {
-        aabb bounds;
+        vw::spatial::aabb bounds;
         entity entity_id          = invalid_entity;
         spatial_layer_mask layer   = spatial_layer::none;
         uint32 parent             = invalid_node_index;

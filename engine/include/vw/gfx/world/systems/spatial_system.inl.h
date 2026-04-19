@@ -75,7 +75,7 @@ void spatial_system<WD>::update_entity(
 
     const auto& model_comp     = context_->registry().template get<model_component>(ent);
     const auto& transform_comp = context_->registry().template get<transform_component>(ent);
-    aabb new_bounds            = calculate_aabb_from_model(ent, model_comp, transform_comp);
+    vw::spatial::aabb new_bounds            = calculate_aabb_from_model(ent, model_comp, transform_comp);
 
     const bool bounds_changed =  //
         spatial.bounds_.min != new_bounds.min || spatial.bounds_.max != new_bounds.max;
@@ -89,7 +89,7 @@ void spatial_system<WD>::update_entity(
             new_bounds.max.z > spatial.fat_bounds_.max.z;
 
         if (needs_tree_update) {
-            aabb new_fat_bounds = expand_aabb_for_fat(new_bounds);
+            vw::spatial::aabb new_fat_bounds = expand_aabb_for_fat(new_bounds);
 
             if (!spatial.dirty_) {
                 tree_.update(ent, new_fat_bounds, spatial.layer_);
@@ -111,8 +111,8 @@ void spatial_system<WD>::update_entity(
 
 template <typename WD>
 auto spatial_system<WD>::expand_aabb_for_fat(
-    const aabb& bounds
-) -> aabb {
+    const vw::spatial::aabb& bounds
+) -> vw::spatial::aabb {
     constexpr float expansion_factor = 0.1f;
     constexpr float min_expansion    = 0.1f;
 
@@ -123,7 +123,7 @@ auto spatial_system<WD>::expand_aabb_for_fat(
         std::max(size.z * expansion_factor, min_expansion)
     };
 
-    return aabb{
+    return vw::spatial::aabb{
         vec3f{bounds.min.x - expansion.x, bounds.min.y - expansion.y, bounds.min.z - expansion.z},
         vec3f{bounds.max.x + expansion.x, bounds.max.y + expansion.y, bounds.max.z + expansion.z}
     };
@@ -132,9 +132,9 @@ auto spatial_system<WD>::expand_aabb_for_fat(
 template <typename WD>
 auto spatial_system<WD>::calculate_aabb_from_model(
     entity ent, const model_component& model_comp, const transform_component& transform_comp
-) const -> aabb {
+) const -> vw::spatial::aabb {
     if (!model_comp.has_model()) {
-        return aabb{.min={0.0f, 0.0f, 0.0f}, .max={0.0f, 0.0f, 0.0f}};
+        return vw::spatial::aabb{.min={0.0f, 0.0f, 0.0f}, .max={0.0f, 0.0f, 0.0f}};
     }
 
     const auto scale = model_comp.get_model()->voxel_scale();
@@ -174,19 +174,19 @@ auto spatial_system<WD>::calculate_aabb_from_model(
         max_point.z = std::max(max_point.z, world_vertex.z);
     }
 
-    return aabb{min_point, max_point};
+    return vw::spatial::aabb{min_point, max_point};
 }
 
 template <typename WD>
 void spatial_system<WD>::query_all(
-    const frustum& f, std::vector<entity>& result_out, spatial_layer_mask layer_mask
+    const vw::spatial::frustum& f, std::vector<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
     tree_.query_all(f, result_out, layer_mask);
 }
 
 template <typename WD>
 void spatial_system<WD>::query_all_any(
-    std::span<const frustum> frustums, std::vector<entity>& result_out
+    std::span<const vw::spatial::frustum> frustums, std::vector<entity>& result_out
 ) const {
     tree_.query_all_any(frustums, result_out);
     std::sort(result_out.begin(), result_out.end());
@@ -194,14 +194,14 @@ void spatial_system<WD>::query_all_any(
 
 template <typename WD>
 void spatial_system<WD>::query_all(
-    const ray& r, std::vector<entity>& result_out, spatial_layer_mask layer_mask
+    const vw::spatial::ray& r, std::vector<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
     tree_.query_all(r, result_out, layer_mask);
 }
 
 template <typename WD>
 void spatial_system<WD>::query_all(
-    const aabb& bounds, std::vector<entity>& result_out, spatial_layer_mask layer_mask
+    const vw::spatial::aabb& bounds, std::vector<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
     tree_.query_all(bounds, result_out, layer_mask);
 }
@@ -215,7 +215,7 @@ void spatial_system<WD>::cleanup(
 
 template <typename WD>
 auto spatial_system<WD>::voxel_ray_cast(
-    const ray& r, std::vector<entity>& candidates, spatial_layer_mask layer_mask
+    const vw::spatial::ray& r, std::vector<entity>& candidates, spatial_layer_mask layer_mask
 ) const -> std::optional<voxel_ray_hit> {
     query_all(r, candidates, layer_mask);
 
@@ -254,7 +254,7 @@ auto spatial_system<WD>::voxel_ray_cast(
         const vec3f local_end       = inverse_world * r.end;
         const vec3f local_direction = math::normalize(local_end - local_start);
 
-        const aabb model_aabb{
+        const vw::spatial::aabb model_aabb{
             .min=vec3f{-1.f, -1.f, -1.f},
             .max=vec3f{
                 static_cast<float>(width) + 1.f,
@@ -264,7 +264,7 @@ auto spatial_system<WD>::voxel_ray_cast(
         };
 
         float t_entry = 0.0f;
-        ray local_ray{local_start, local_end};
+        vw::spatial::ray local_ray{local_start, local_end};
         if (!local_ray.intersects_at(model_aabb, t_entry)) {
             continue;
         }

@@ -15,7 +15,7 @@ inline constexpr log::log_category vox_writer_plain_lc{"vox_writer_plain"};
 }  // namespace detail
 
 inline auto vox_writer_plain::write(
-    const std::filesystem::path& filepath, const vox_prefab_data& prefab
+    const std::filesystem::path& filepath, const vw::asset::vox_prefab_data& prefab
 ) -> std::expected<void, error_type> {
     std::ofstream file(filepath.string(), std::ios::trunc);
     if (!file.is_open()) {
@@ -38,14 +38,14 @@ inline auto vox_writer_plain::write(
 }
 
 inline void vox_writer_plain::write_header_(
-    std::ofstream& file, const vox_prefab_data& prefab
+    std::ofstream& file, const vw::asset::vox_prefab_data& prefab
 ) {
     file << std::format("# Vox File Version {}\n", vox_file_version);
     file << std::format("root {}\n", prefab.root_name);
 }
 
 inline void vox_writer_plain::write_entity_(
-    std::ofstream& file, const vox_entity_data& ent
+    std::ofstream& file, const vw::asset::vox_entity_data& ent
 ) {
     file << std::format("entity {}\n", ent.name);
 
@@ -86,11 +86,11 @@ inline void vox_writer_plain::write_entity_(
 }
 
 inline void vox_writer_plain::write_model_(
-    std::ofstream& file, const vox_model_data& model
+    std::ofstream& file, const vw::asset::vox_model_data& mdl
 ) {
-    file << std::format("\tm {} {} {}\n", model.size.x, model.size.y, model.size.z);
+    file << std::format("\tm {} {} {}\n", mdl.size.x, mdl.size.y, mdl.size.z);
 
-    for (const auto& [pos, v] : model.voxels) {
+    for (const auto& [pos, v] : mdl.voxels) {
         file << std::format("\t\tv {} {} {} 0x{:02X}\n", pos.x, pos.y, pos.z, v.id.value);
     }
 }

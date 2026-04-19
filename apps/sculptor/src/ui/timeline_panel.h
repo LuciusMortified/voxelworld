@@ -29,7 +29,7 @@ private:
     void render_toolbar(float clip_duration);
     void render_tracks();
     void render_track_row(
-        const gfx::animation_track& track,
+        const asset::animation_track& track,
         float track_area_width,
         float clip_duration,
         float scroll_offset
@@ -43,16 +43,16 @@ private:
     void render_scrollbar(float usable_track_width, float track_area_width, float max_scroll);
     void render_track_context_menu(const std::string& target);
     void render_expanded_channels(
-        const gfx::animation_track& track,
+        const asset::animation_track& track,
         const std::string& target,
         float track_area_width,
         float clip_duration,
         float scroll_offset
     );
     void render_keyframe_markers(
-        const gfx::animation_channel_variant& channel_var,
+        const asset::animation_channel_variant& channel_var,
         const std::string& track_name,
-        gfx::animation_property prop,
+        asset::animation_property prop,
         float track_width,
         float clip_duration,
         float scroll_offset
@@ -66,9 +66,9 @@ private:
         float scroll_offset
     ) const;
 
-    void render_playback_controls(const std::shared_ptr<gfx::animation_clip>& clip);
+    void render_playback_controls(const std::shared_ptr<asset::animation_clip>& clip);
     void render_clip_blend_controls_() const;
-    void handle_play(gfx::entity root, const std::shared_ptr<gfx::animation_clip>& clip) const;
+    void handle_play(gfx::entity root, const std::shared_ptr<asset::animation_clip>& clip) const;
     void handle_pause(gfx::entity root) const;
     void handle_stop(gfx::entity root) const;
     auto try_get_root_entity() const -> std::optional<gfx::entity>;

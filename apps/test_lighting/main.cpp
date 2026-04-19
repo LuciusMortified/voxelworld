@@ -61,7 +61,7 @@ public:
 private:
     void setup_scene() {
         auto& world = get_engine().get_world();
-        auto& model_reg = world.template get_resource<gfx::model_registry>();
+        auto& model_reg = world.template get_resource<asset::model_registry>();
         auto& transform_sys = world.template get_system<gfx::transform_system>();
         auto& model_sys = world.template get_system<gfx::model_system>();
 
@@ -258,8 +258,8 @@ private:
 
     std::unique_ptr<gfx::free_camera_controller> camera_controller_;
 
-    std::shared_ptr<gfx::model> floor_model_;
-    std::shared_ptr<gfx::model> pillar_model_;
+    std::shared_ptr<asset::model> floor_model_;
+    std::shared_ptr<asset::model> pillar_model_;
     std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> floor_entity_;
     std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> pillar_entity_;
 

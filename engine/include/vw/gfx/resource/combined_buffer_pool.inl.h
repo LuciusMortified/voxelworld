@@ -96,7 +96,7 @@ void combined_buffer_pool<C>::process_destroyed_(world_type& world) {
             auto swapped = buffers_[info.buffer_index]->free(ent);
             if (swapped && world.template has_component<transform_component>(*swapped)) {
                 auto& tc = world.template get_component<transform_component>(*swapped);
-                aabb bounds{};
+                vw::spatial::aabb bounds{};
                 if (world.template has_component<spatial_component>(*swapped)) {
                     bounds = world.template get_component<spatial_component>(*swapped)
                                  .get_bounds();
@@ -200,7 +200,7 @@ void combined_buffer_pool<C>::update_meshes_(
                 auto swapped = buffers_[buffer_info.buffer_index]->free(ent);
                 if (swapped && world.template has_component<transform_component>(*swapped)) {
                     auto& tc = world.template get_component<transform_component>(*swapped);
-                    aabb swap_bounds{};
+                    vw::spatial::aabb swap_bounds{};
                     if (world.template has_component<spatial_component>(*swapped)) {
                         swap_bounds = world.template get_component<spatial_component>(*swapped)
                                           .get_bounds();
@@ -269,7 +269,7 @@ void combined_buffer_pool<C>::update_meshes_(
             auto swapped = buffer->free(ent);
             if (swapped && world.template has_component<transform_component>(*swapped)) {
                 auto& tc = world.template get_component<transform_component>(*swapped);
-                aabb sw_bounds{};
+                vw::spatial::aabb sw_bounds{};
                 if (world.template has_component<spatial_component>(*swapped)) {
                     sw_bounds = world.template get_component<spatial_component>(*swapped)
                                     .get_bounds();
@@ -284,7 +284,7 @@ void combined_buffer_pool<C>::update_meshes_(
         auto* buffer            = get_or_create_buffer(required_chunk_size);
         const auto buffer_index = chunk_size_to_buffer_index_[required_chunk_size];
 
-        aabb ent_bounds{};
+        vw::spatial::aabb ent_bounds{};
         if (world.template has_component<spatial_component>(ent)) {
             ent_bounds = world.template get_component<spatial_component>(ent).get_bounds();
         }
@@ -336,7 +336,7 @@ void combined_buffer_pool<C>::update_transforms_(
 
         auto& info = entity_buffer_infos_[ent];
         const auto& transform_comp = world.template get_component<transform_component>(ent);
-        aabb tr_bounds{};
+        vw::spatial::aabb tr_bounds{};
         if (world.template has_component<spatial_component>(ent)) {
             tr_bounds = world.template get_component<spatial_component>(ent).get_bounds();
         }

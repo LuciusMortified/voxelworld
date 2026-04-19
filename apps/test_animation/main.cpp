@@ -54,7 +54,7 @@ public:
 private:
     void setup_scene() {
         auto& world            = get_engine().get_world();
-        auto& model_reg = world.template get_resource<gfx::model_registry>();
+        auto& model_reg = world.template get_resource<asset::model_registry>();
         auto& transform_sys = world.template get_system<gfx::transform_system>();
         auto& model_sys = world.template get_system<gfx::model_system>();
         auto& hierarchy_sys = world.template get_system<gfx::hierarchy_system>();
@@ -163,53 +163,53 @@ private:
 
     void create_bounce_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.template get_resource<gfx::animation_clip_registry>();
+        auto& clip_registry = world.template get_resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("bounce");
 
         {
-            auto track       = gfx::animation_track("red", 120.0f);
+            auto track       = asset::animation_track("red", 120.0f);
 
-            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            auto pos_ch = asset::make_animation_channel<asset::animation_property::position>();
             pos_ch.add({0.0f, vec3f{-4.0f, 0.0f, 0.0f}});
             pos_ch.add({0.5f, vec3f{-4.0f, 3.0f, 0.0f}});
             pos_ch.add({1.0f, vec3f{-4.0f, 0.0f, 0.0f}});
-            track.add<gfx::animation_property::position>(pos_ch);
+            track.add<asset::animation_property::position>(pos_ch);
 
-            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            auto org_ch = asset::make_animation_channel<asset::animation_property::origin>();
             org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
-            track.add<gfx::animation_property::origin>(org_ch);
+            track.add<asset::animation_property::origin>(org_ch);
 
             clip->add_track(track);
         }
 
         {
-            auto track       = gfx::animation_track("green", 120.0f);
+            auto track       = asset::animation_track("green", 120.0f);
 
-            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            auto pos_ch = asset::make_animation_channel<asset::animation_property::position>();
             pos_ch.add({0.0f, vec3f{0.0f, 3.0f, 0.0f}});
             pos_ch.add({0.5f, vec3f{0.0f, 0.0f, 0.0f}});
             pos_ch.add({1.0f, vec3f{0.0f, 3.0f, 0.0f}});
-            track.add<gfx::animation_property::position>(pos_ch);
+            track.add<asset::animation_property::position>(pos_ch);
 
-            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            auto org_ch = asset::make_animation_channel<asset::animation_property::origin>();
             org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
-            track.add<gfx::animation_property::origin>(org_ch);
+            track.add<asset::animation_property::origin>(org_ch);
 
             clip->add_track(track);
         }
 
         {
-            auto track       = gfx::animation_track("blue", 120.0f);
+            auto track       = asset::animation_track("blue", 120.0f);
 
-            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            auto pos_ch = asset::make_animation_channel<asset::animation_property::position>();
             pos_ch.add({0.0f, vec3f{4.0f, 0.0f, 0.0f}});
             pos_ch.add({0.5f, vec3f{4.0f, 3.0f, 0.0f}});
             pos_ch.add({1.0f, vec3f{4.0f, 0.0f, 0.0f}});
-            track.add<gfx::animation_property::position>(pos_ch);
+            track.add<asset::animation_property::position>(pos_ch);
 
-            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            auto org_ch = asset::make_animation_channel<asset::animation_property::origin>();
             org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
-            track.add<gfx::animation_property::origin>(org_ch);
+            track.add<asset::animation_property::origin>(org_ch);
 
             clip->add_track(track);
         }
@@ -217,71 +217,71 @@ private:
         auto& anim_sys = world.template get_system<gfx::animation_system>();
         auto layer_mod = anim_sys.modify_player(root_->get_entity()).layer(0);
         layer_mod.blend_to_by_name("bounce");
-        layer_mod.set_loop_mode(gfx::animation_loop_mode::loop);
+        layer_mod.set_loop_mode(asset::animation_loop_mode::loop);
         layer_mod.play();
     }
 
     void create_rotation_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.template get_resource<gfx::animation_clip_registry>();
+        auto& clip_registry = world.template get_resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("rotation");
 
         {
-            auto track       = gfx::animation_track("red", 120.0f);
+            auto track       = asset::animation_track("red", 120.0f);
 
-            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            auto pos_ch = asset::make_animation_channel<asset::animation_property::position>();
             pos_ch.add({0.0f, vec3f{-4.0f, 0.0f, 0.0f}});
-            track.add<gfx::animation_property::position>(pos_ch);
+            track.add<asset::animation_property::position>(pos_ch);
 
-            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            auto org_ch = asset::make_animation_channel<asset::animation_property::origin>();
             org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
-            track.add<gfx::animation_property::origin>(org_ch);
+            track.add<asset::animation_property::origin>(org_ch);
 
-            auto rot_ch = gfx::make_animation_channel<gfx::animation_property::rotation>();
+            auto rot_ch = asset::make_animation_channel<asset::animation_property::rotation>();
             rot_ch.add({0.0f, math::euler_to_quat({0.0f, 0.0f, 0.0f})});
             rot_ch.add({1.0f, math::euler_to_quat({math::radians(180.0f), 0.0f, 0.0f})});
             rot_ch.add({2.0f, math::euler_to_quat({math::radians(360.0f), 0.0f, 0.0f})});
-            track.add<gfx::animation_property::rotation>(rot_ch);
+            track.add<asset::animation_property::rotation>(rot_ch);
 
             clip->add_track(track);
         }
 
         {
-            auto track       = gfx::animation_track("green", 120.0f);
+            auto track       = asset::animation_track("green", 120.0f);
 
-            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            auto pos_ch = asset::make_animation_channel<asset::animation_property::position>();
             pos_ch.add({0.0f, vec3f{0.0f, 0.0f, 0.0f}});
-            track.add<gfx::animation_property::position>(pos_ch);
+            track.add<asset::animation_property::position>(pos_ch);
 
-            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            auto org_ch = asset::make_animation_channel<asset::animation_property::origin>();
             org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
-            track.add<gfx::animation_property::origin>(org_ch);
+            track.add<asset::animation_property::origin>(org_ch);
 
-            auto rot_ch = gfx::make_animation_channel<gfx::animation_property::rotation>();
+            auto rot_ch = asset::make_animation_channel<asset::animation_property::rotation>();
             rot_ch.add({0.0f, math::euler_to_quat({0.0f, 0.0f, 0.0f})});
             rot_ch.add({1.0f, math::euler_to_quat({0.0f, math::radians(180.0f), 0.0f})});
             rot_ch.add({2.0f, math::euler_to_quat({0.0f, math::radians(360.0f), 0.0f})});
-            track.add<gfx::animation_property::rotation>(rot_ch);
+            track.add<asset::animation_property::rotation>(rot_ch);
 
             clip->add_track(track);
         }
 
         {
-            auto track       = gfx::animation_track("blue", 120.0f);
+            auto track       = asset::animation_track("blue", 120.0f);
 
-            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            auto pos_ch = asset::make_animation_channel<asset::animation_property::position>();
             pos_ch.add({0.0f, vec3f{4.0f, 0.0f, 0.0f}});
-            track.add<gfx::animation_property::position>(pos_ch);
+            track.add<asset::animation_property::position>(pos_ch);
 
-            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            auto org_ch = asset::make_animation_channel<asset::animation_property::origin>();
             org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
-            track.add<gfx::animation_property::origin>(org_ch);
+            track.add<asset::animation_property::origin>(org_ch);
 
-            auto rot_ch = gfx::make_animation_channel<gfx::animation_property::rotation>();
+            auto rot_ch = asset::make_animation_channel<asset::animation_property::rotation>();
             rot_ch.add({0.0f, math::euler_to_quat({0.0f, 0.0f, 0.0f})});
             rot_ch.add({1.0f, math::euler_to_quat({0.0f, 0.0f, math::radians(180.0f)})});
             rot_ch.add({2.0f, math::euler_to_quat({0.0f, 0.0f, math::radians(360.0f)})});
-            track.add<gfx::animation_property::rotation>(rot_ch);
+            track.add<asset::animation_property::rotation>(rot_ch);
 
             clip->add_track(track);
         }
@@ -289,57 +289,57 @@ private:
 
     void create_wave_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.template get_resource<gfx::animation_clip_registry>();
+        auto& clip_registry = world.template get_resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("wave");
 
         {
-            auto track       = gfx::animation_track("red", 120.0f);
+            auto track       = asset::animation_track("red", 120.0f);
 
-            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            auto pos_ch = asset::make_animation_channel<asset::animation_property::position>();
             pos_ch.add({0.0f, vec3f{-4.0f, 0.0f, 0.0f}});
             pos_ch.add({0.33f, vec3f{-4.0f, 2.0f, 0.0f}});
             pos_ch.add({0.66f, vec3f{-4.0f, 0.0f, 0.0f}});
             pos_ch.add({1.0f, vec3f{-4.0f, 0.0f, 0.0f}});
-            track.add<gfx::animation_property::position>(pos_ch);
+            track.add<asset::animation_property::position>(pos_ch);
 
-            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            auto org_ch = asset::make_animation_channel<asset::animation_property::origin>();
             org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
-            track.add<gfx::animation_property::origin>(org_ch);
+            track.add<asset::animation_property::origin>(org_ch);
 
             clip->add_track(track);
         }
 
         {
-            auto track       = gfx::animation_track("green", 120.0f);
+            auto track       = asset::animation_track("green", 120.0f);
 
-            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            auto pos_ch = asset::make_animation_channel<asset::animation_property::position>();
             pos_ch.add({0.0f, vec3f{0.0f, 0.0f, 0.0f}});
             pos_ch.add({0.33f, vec3f{0.0f, 0.0f, 0.0f}});
             pos_ch.add({0.66f, vec3f{0.0f, 2.0f, 0.0f}});
             pos_ch.add({1.0f, vec3f{0.0f, 0.0f, 0.0f}});
-            track.add<gfx::animation_property::position>(pos_ch);
+            track.add<asset::animation_property::position>(pos_ch);
 
-            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            auto org_ch = asset::make_animation_channel<asset::animation_property::origin>();
             org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
-            track.add<gfx::animation_property::origin>(org_ch);
+            track.add<asset::animation_property::origin>(org_ch);
 
             clip->add_track(track);
         }
 
         {
-            auto track       = gfx::animation_track("blue", 120.0f);
+            auto track       = asset::animation_track("blue", 120.0f);
 
-            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            auto pos_ch = asset::make_animation_channel<asset::animation_property::position>();
             pos_ch.add({0.0f, vec3f{4.0f, 0.0f, 0.0f}});
             pos_ch.add({0.33f, vec3f{4.0f, 0.0f, 0.0f}});
             pos_ch.add({0.66f, vec3f{4.0f, 0.0f, 0.0f}});
             pos_ch.add({1.0f, vec3f{4.0f, 2.0f, 0.0f}});
             pos_ch.add({1.33f, vec3f{4.0f, 0.0f, 0.0f}});
-            track.add<gfx::animation_property::position>(pos_ch);
+            track.add<asset::animation_property::position>(pos_ch);
 
-            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            auto org_ch = asset::make_animation_channel<asset::animation_property::origin>();
             org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
-            track.add<gfx::animation_property::origin>(org_ch);
+            track.add<asset::animation_property::origin>(org_ch);
 
             clip->add_track(track);
         }
@@ -347,65 +347,65 @@ private:
 
     void create_scale_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.template get_resource<gfx::animation_clip_registry>();
+        auto& clip_registry = world.template get_resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("scale");
 
         {
-            auto track         = gfx::animation_track("red", 120.0f);
+            auto track         = asset::animation_track("red", 120.0f);
 
-            auto scl_ch = gfx::make_animation_channel<gfx::animation_property::scale>();
+            auto scl_ch = asset::make_animation_channel<asset::animation_property::scale>();
             scl_ch.add({0.0f, vec3f{1.0f, 1.0f, 1.0f}});
             scl_ch.add({0.5f, vec3f{1.5f, 1.5f, 1.5f}});
             scl_ch.add({1.0f, vec3f{1.0f, 1.0f, 1.0f}});
-            track.add<gfx::animation_property::scale>(scl_ch);
+            track.add<asset::animation_property::scale>(scl_ch);
 
-            auto pos_ch = gfx::make_animation_channel<gfx::animation_property::position>();
+            auto pos_ch = asset::make_animation_channel<asset::animation_property::position>();
             pos_ch.add({0.0f, vec3f{-4.0f, 0.0f, 0.0f}});
-            track.add<gfx::animation_property::position>(pos_ch);
+            track.add<asset::animation_property::position>(pos_ch);
 
-            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            auto org_ch = asset::make_animation_channel<asset::animation_property::origin>();
             org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
-            track.add<gfx::animation_property::origin>(org_ch);
+            track.add<asset::animation_property::origin>(org_ch);
 
             clip->add_track(track);
         }
 
         {
-            auto track         = gfx::animation_track("green", 120.0f);
+            auto track         = asset::animation_track("green", 120.0f);
 
-            auto scl_ch = gfx::make_animation_channel<gfx::animation_property::scale>();
+            auto scl_ch = asset::make_animation_channel<asset::animation_property::scale>();
             scl_ch.add({0.0f, vec3f{1.0f, 1.0f, 1.0f}});
             scl_ch.add({0.5f, vec3f{0.5f, 0.5f, 0.5f}});
             scl_ch.add({1.0f, vec3f{1.0f, 1.0f, 1.0f}});
-            track.add<gfx::animation_property::scale>(scl_ch);
+            track.add<asset::animation_property::scale>(scl_ch);
 
-            auto pos_ch   = gfx::make_animation_channel<gfx::animation_property::position>();
+            auto pos_ch   = asset::make_animation_channel<asset::animation_property::position>();
             pos_ch.add({0.0f, vec3f{0.0f, 0.0f, 0.0f}});
-            track.add<gfx::animation_property::position>(pos_ch);
+            track.add<asset::animation_property::position>(pos_ch);
 
-            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            auto org_ch = asset::make_animation_channel<asset::animation_property::origin>();
             org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
-            track.add<gfx::animation_property::origin>(org_ch);
+            track.add<asset::animation_property::origin>(org_ch);
 
             clip->add_track(track);
         }
 
         {
-            auto track         = gfx::animation_track("blue", 120.0f);
+            auto track         = asset::animation_track("blue", 120.0f);
 
-            auto scl_ch = gfx::make_animation_channel<gfx::animation_property::scale>();
+            auto scl_ch = asset::make_animation_channel<asset::animation_property::scale>();
             scl_ch.add({0.0f, vec3f{1.0f, 1.0f, 1.0f}});
             scl_ch.add({0.5f, vec3f{1.2f, 0.8f, 1.2f}});
             scl_ch.add({1.0f, vec3f{1.0f, 1.0f, 1.0f}});
-            track.add<gfx::animation_property::scale>(scl_ch);
+            track.add<asset::animation_property::scale>(scl_ch);
 
-            auto pos_ch   = gfx::make_animation_channel<gfx::animation_property::position>();
+            auto pos_ch   = asset::make_animation_channel<asset::animation_property::position>();
             pos_ch.add({0.0f, vec3f{4.0f, 0.0f, 0.0f}});
-            track.add<gfx::animation_property::position>(pos_ch);
+            track.add<asset::animation_property::position>(pos_ch);
 
-            auto org_ch = gfx::make_animation_channel<gfx::animation_property::origin>();
+            auto org_ch = asset::make_animation_channel<asset::animation_property::origin>();
             org_ch.add({0.0f, vec3f{-1.5f, -1.5f, -1.5f}});
-            track.add<gfx::animation_property::origin>(org_ch);
+            track.add<asset::animation_property::origin>(org_ch);
 
             clip->add_track(track);
         }
@@ -451,7 +451,7 @@ private:
         auto& animation_comp =
             world.get_component<gfx::animation_player_component>(root_->get_entity());
 
-        gfx::transition blend_t{.duration = 0.5f};
+        asset::transition blend_t{.duration = 0.5f};
 
         ImGui::Text("Animation: ");
 
@@ -482,15 +482,15 @@ private:
 
         ImGui::Text("Loop Mode:");
         if (ImGui::Button("Once")) {
-            modifier.set_loop_mode(gfx::animation_loop_mode::once);
+            modifier.set_loop_mode(asset::animation_loop_mode::once);
         }
         ImGui::SameLine();
         if (ImGui::Button("Loop")) {
-            modifier.set_loop_mode(gfx::animation_loop_mode::loop);
+            modifier.set_loop_mode(asset::animation_loop_mode::loop);
         }
         ImGui::SameLine();
         if (ImGui::Button("Ping Pong")) {
-            modifier.set_loop_mode(gfx::animation_loop_mode::ping_pong);
+            modifier.set_loop_mode(asset::animation_loop_mode::ping_pong);
         }
 
         ImGui::Separator();
@@ -540,21 +540,21 @@ private:
                 const auto& layer = comp.get_layer(0);
 
                 const char* state_str = "Unknown";
-                if (layer.state == gfx::animation_state::playing) {
+                if (layer.state == asset::animation_state::playing) {
                     state_str = "Playing";
-                } else if (layer.state == gfx::animation_state::paused) {
+                } else if (layer.state == asset::animation_state::paused) {
                     state_str = "Paused";
-                } else if (layer.state == gfx::animation_state::stopped) {
+                } else if (layer.state == asset::animation_state::stopped) {
                     state_str = "Stopped";
                 }
                 ImGui::Text("State: %s", state_str);
 
                 const char* loop_str = "Unknown";
-                if (layer.loop_mode == gfx::animation_loop_mode::once) {
+                if (layer.loop_mode == asset::animation_loop_mode::once) {
                     loop_str = "Once";
-                } else if (layer.loop_mode == gfx::animation_loop_mode::loop) {
+                } else if (layer.loop_mode == asset::animation_loop_mode::loop) {
                     loop_str = "Loop";
-                } else if (layer.loop_mode == gfx::animation_loop_mode::ping_pong) {
+                } else if (layer.loop_mode == asset::animation_loop_mode::ping_pong) {
                     loop_str = "Ping Pong";
                 }
                 ImGui::Text("Loop Mode: %s", loop_str);

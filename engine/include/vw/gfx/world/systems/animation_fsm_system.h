@@ -3,7 +3,7 @@
 #ifndef VW_GFX_WORLD_SYSTEMS_ANIMATION_FSM_SYSTEM_H
 #define VW_GFX_WORLD_SYSTEMS_ANIMATION_FSM_SYSTEM_H
 
-#include "vw/gfx/animation/animation_fsm.h"
+#include "vw/asset/animation/animation_fsm.h"
 #include "vw/gfx/world/components/animation_player_component.h"
 #include "vw/gfx/world/components/animation_fsm_component.h"
 #include "vw/gfx/world/system_trait.h"
@@ -11,6 +11,7 @@
 #include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
+
 
 template <typename WD>
 class animation_system;
@@ -28,7 +29,7 @@ public:
 
     class modifier {
     public:
-        void add_machine(size_t index, animation_fsm machine) const;
+        void add_machine(size_t index, vw::asset::animation_fsm machine) const;
         void fire_trigger(std::string_view name) const;
 
     private:

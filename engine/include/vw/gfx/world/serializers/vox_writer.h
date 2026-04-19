@@ -7,9 +7,10 @@
 #include <filesystem>
 
 #include "vw/core/types.h"
-#include "vw/gfx/world/serializers/vox_prefab_data.h"
+#include "vw/asset/vox/vox_prefab_data.h"
 
 namespace vw::gfx {
+
 
 /// Base class for .vox format writers.
 class vox_writer {
@@ -18,7 +19,7 @@ public:
 
     virtual ~vox_writer() = default;
 
-    virtual auto write(const std::filesystem::path& filepath, const vox_prefab_data& prefab)
+    virtual auto write(const std::filesystem::path& filepath, const vw::asset::vox_prefab_data& prefab)
         -> std::expected<void, error_type> = 0;
 };
 

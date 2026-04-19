@@ -9,7 +9,7 @@
 #include <vw/core.h>
 #include <vw/gfx.h>
 
-#include "vw/gfx/asset_storage.h"
+#include "vw/asset/asset_storage.h"
 #include "vw/gfx/camera/camera.h"
 #include "vw/gfx/player/player_input_state.h"
 #include "vw/gfx/world/entity_guard.h"
@@ -19,7 +19,7 @@ namespace vw::arena {
 
 class player {
 public:
-    explicit player(gfx::engine<>& engine, gfx::asset_storage& assets);
+    explicit player(gfx::engine<>& engine, asset::asset_storage& assets);
 
     auto update(const gfx::player_input_state& input) -> void;
     auto try_place(float32 voxel_scale) -> void;
@@ -39,7 +39,7 @@ private:
     auto setup_animation_fsm() const -> void;
 
     gfx::engine<>& engine_;
-    gfx::asset_storage& assets_;
+    asset::asset_storage& assets_;
 
     std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> root_;
     std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> body_;

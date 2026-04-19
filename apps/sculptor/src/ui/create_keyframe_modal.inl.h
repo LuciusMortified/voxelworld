@@ -32,15 +32,15 @@ inline void create_keyframe_modal::open(
         if (world.has_component<gfx::transform_component>(ent)) {
             auto& tc = world.get_component<gfx::transform_component>(ent);
 
-            auto prop = static_cast<gfx::animation_property>(property_index_);
-            if (prop == gfx::animation_property::position) {
+            auto prop = static_cast<asset::animation_property>(property_index_);
+            if (prop == asset::animation_property::position) {
                 value_vec3f_ = tc.get_position();
-            } else if (prop == gfx::animation_property::rotation) {
+            } else if (prop == asset::animation_property::rotation) {
                 auto rot       = tc.get_rotation_euler();
                 value_euler_deg_ = {
                     math::degrees(rot.x), math::degrees(rot.y), math::degrees(rot.z)
                 };
-            } else if (prop == gfx::animation_property::scale) {
+            } else if (prop == asset::animation_property::scale) {
                 value_vec3f_ = tc.get_scale();
             } else {
                 value_vec3f_ = tc.get_origin();
@@ -81,15 +81,15 @@ inline void create_keyframe_modal::render(
             auto& world = engine_->get_world();
             if (world.has_component<gfx::transform_component>(ent)) {
                 auto& tc  = world.get_component<gfx::transform_component>(ent);
-                auto prop = static_cast<gfx::animation_property>(property_index_);
-                if (prop == gfx::animation_property::position) {
+                auto prop = static_cast<asset::animation_property>(property_index_);
+                if (prop == asset::animation_property::position) {
                     value_vec3f_ = tc.get_position();
-                } else if (prop == gfx::animation_property::rotation) {
+                } else if (prop == asset::animation_property::rotation) {
                     auto rot       = tc.get_rotation_euler();
                     value_euler_deg_ = {
                         math::degrees(rot.x), math::degrees(rot.y), math::degrees(rot.z)
                     };
-                } else if (prop == gfx::animation_property::scale) {
+                } else if (prop == asset::animation_property::scale) {
                     value_vec3f_ = tc.get_scale();
                 } else {
                     value_vec3f_ = tc.get_origin();
@@ -104,11 +104,11 @@ inline void create_keyframe_modal::render(
         ImGui::DragFloat("##Time", &time_, 0.01f, 0.f, 100.f, "%.3f");
         ImGui::PopItemWidth();
 
-        auto prop = static_cast<gfx::animation_property>(property_index_);
+        auto prop = static_cast<asset::animation_property>(property_index_);
         ImGui::AlignTextToFramePadding();
         ImGui::Text("Value");
         ImGui::SameLine(110.f);
-        if (prop == gfx::animation_property::rotation) {
+        if (prop == asset::animation_property::rotation) {
             ImGui::PushItemWidth(60.f);
             ImGui::DragFloat("##valX", &value_euler_deg_.x, 0.1f, 0, 0, "%.2f");
             ImGui::SameLine();
@@ -175,24 +175,24 @@ inline bool create_keyframe_modal::create_keyframe() {
         return false;
     }
 
-    auto& clip_registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
+    auto& clip_registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
     auto clip           = clip_registry.get(state_->anim.selected_clip_name);
     if (!clip) {
         error_ = "Clip not found.";
         return false;
     }
 
-    auto prop  = static_cast<gfx::animation_property>(property_index_);
+    auto prop  = static_cast<asset::animation_property>(property_index_);
     auto interp = static_cast<math::interpolation_type>(interp_index_);
 
     keyframe_value kf_val;
-    if (prop == gfx::animation_property::rotation) {
+    if (prop == asset::animation_property::rotation) {
         vec3f euler_rad{
             math::radians(value_euler_deg_.x),
             math::radians(value_euler_deg_.y),
             math::radians(value_euler_deg_.z),
         };
-        gfx::keyframe_quat kf;
+        asset::keyframe_quat kf;
         kf.time        = time_;
         kf.value       = math::euler_to_quat(euler_rad);
         kf.interp      = interp;
@@ -200,7 +200,7 @@ inline bool create_keyframe_modal::create_keyframe() {
         kf.tangent_out = tangent_out_;
         kf_val         = kf;
     } else {
-        gfx::keyframe_vec3f kf;
+        asset::keyframe_vec3f kf;
         kf.time        = time_;
         kf.value       = value_vec3f_;
         kf.interp      = interp;

@@ -29,11 +29,11 @@ public:
 
     auto serialize(const std::filesystem::path& filepath) -> std::expected<void, error_type>;
 
-    [[nodiscard]] auto extract() const -> vox_prefab_data;
+    [[nodiscard]] auto extract() const -> vw::asset::vox_prefab_data;
 
 private:
     void generate_entity_names_();
-    [[nodiscard]] auto extract_entity_(entity ent) const -> vox_entity_data;
+    [[nodiscard]] auto extract_entity_(entity ent) const -> vw::asset::vox_entity_data;
 
     world_type* world_;
     vox_writer* writer_;

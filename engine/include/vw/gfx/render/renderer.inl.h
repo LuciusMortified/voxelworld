@@ -361,7 +361,7 @@ void renderer<C>::render(
             );
         }
 
-        const frustum& view_frustum = camera.get_frustum();
+        const vw::spatial::frustum& view_frustum = camera.get_frustum();
         cull_pipeline_->update_frustums(current_frame_, view_frustum, cascade_frustums);
 
         for (const auto& buffer : combined_buffer_pool_->get_buffers()) {
@@ -704,7 +704,7 @@ void renderer<C>::create_descriptor_set_layouts() {
         throw std::runtime_error("failed to create uniform descriptor set layout");
     }
 
-    // Storage buffer descriptor set layout (set 1: binding 0 = model matrices, binding 1 = normal
+    // Storage buffer descriptor set layout (set 1: binding 0 = vw::asset::model matrices, binding 1 = normal
     // matrices)
     std::array<VkDescriptorSetLayoutBinding, 2> storage_layout_bindings{};
     storage_layout_bindings[0].binding            = 0;

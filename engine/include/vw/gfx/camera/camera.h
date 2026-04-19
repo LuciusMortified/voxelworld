@@ -9,8 +9,6 @@
 
 namespace vw::gfx {
 
-using vw::spatial::frustum;
-using vw::spatial::ray;
 
 class camera {
 public:
@@ -35,7 +33,7 @@ public:
     [[nodiscard]] auto get_projection_matrix() const -> mat4f;
     [[nodiscard]] auto get_view_projection_matrix() const -> mat4f;
 
-    [[nodiscard]] auto get_frustum() const -> const frustum&;
+    [[nodiscard]] auto get_frustum() const -> const vw::spatial::frustum&;
 
     auto move_forward(float distance) -> void;
     auto move_right(float distance) -> void;
@@ -49,7 +47,7 @@ public:
     [[nodiscard]] auto screen_to_world_ray(
         const vec2d& mouse_pos,
         const vec2i& window_size
-    ) const -> ray;
+    ) const -> vw::spatial::ray;
 
 private:
     auto update_vectors() const -> void;
@@ -69,7 +67,7 @@ private:
     mutable bool view_matrix_dirty_;
     mutable bool projection_matrix_dirty_;
     
-    mutable frustum frustum_;
+    mutable vw::spatial::frustum frustum_;
     mutable bool frustum_dirty_;
 };
 }  // namespace vw::gfx

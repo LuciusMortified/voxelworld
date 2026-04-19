@@ -12,13 +12,13 @@ inline constexpr std::string_view vox_file_version = "1.0";
 /// Plain text format .vox writer.
 class vox_writer_plain final : public vox_writer {
 public:
-    auto write(const std::filesystem::path& filepath, const vox_prefab_data& prefab)
+    auto write(const std::filesystem::path& filepath, const vw::asset::vox_prefab_data& prefab)
         -> std::expected<void, error_type> override;
 
 private:
-    void write_header_(std::ofstream& file, const vox_prefab_data& prefab);
-    void write_entity_(std::ofstream& file, const vox_entity_data& ent);
-    void write_model_(std::ofstream& file, const vox_model_data& model);
+    void write_header_(std::ofstream& file, const vw::asset::vox_prefab_data& prefab);
+    void write_entity_(std::ofstream& file, const vw::asset::vox_entity_data& ent);
+    void write_model_(std::ofstream& file, const vw::asset::vox_model_data& mdl);
 };
 
 }  // namespace vw::gfx

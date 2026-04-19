@@ -5,17 +5,18 @@
 #include <expected>
 #include <filesystem>
 
-#include "vw/gfx/world/serializers/vox_parser.h"
+#include "vw/asset/vox/vox_parser.h"
 #include "vw/gfx/world/world.h"
 
 namespace vw::gfx {
+
 template <typename WC = base_world_def>
 class vox_deserializer final {
 public:
     using world_type        = world<WC>;
     using entity_guard_type = entity_guard<WC>;
 
-    using error_type = vox_parser::error_type;
+    using error_type = vw::asset::vox_parser::error_type;
 
     struct options {
         bool skip_sockets = false;
@@ -29,16 +30,16 @@ public:
         std::vector<std::unique_ptr<entity_guard_type>> entities;
     };
 
-    vox_deserializer(world_type& world, vox_parser& parser);
+    vox_deserializer(world_type& world, vw::asset::vox_parser& parser);
 
     auto deserialize(const std::filesystem::path& filepath, const options& opts = {})
         -> std::expected<result, error_type>;
 
 private:
-    void apply_entity_(const vox_entity_data& data, result& res, const options& opts);
+    void apply_entity_(const vw::asset::vox_entity_data& data, result& res, const options& opts);
 
     world_type* world_;
-    vox_parser* parser_;
+    vw::asset::vox_parser* parser_;
 };
 
 }  // namespace vw::gfx

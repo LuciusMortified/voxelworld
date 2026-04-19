@@ -258,7 +258,7 @@ auto physics_system<WD>::resolve_entity_collisions(
 ) -> void {
     using clock = std::chrono::high_resolution_clock;
     auto center = position + offset;
-    aabb entity_aabb{center - half_extents, center + half_extents};
+    vw::spatial::aabb entity_aabb{center - half_extents, center + half_extents};
 
     const auto q_start = clock::now();
     context_->template get_system<spatial_system>().query_all(entity_aabb, entity_query_cache_, spatial_layer::character);

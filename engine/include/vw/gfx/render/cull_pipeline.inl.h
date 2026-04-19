@@ -57,7 +57,7 @@ inline void cull_pipeline::create_descriptor_set_layouts_() {
             context_->get_device(), &frustum_layout_info, nullptr,
             &frustum_descriptor_set_layout_
         ) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create frustum descriptor set layout!");
+        throw std::runtime_error("Failed to create vw::spatial::frustum descriptor set layout!");
     }
 
     std::array<VkDescriptorSetLayoutBinding, 4> buffer_bindings{};
@@ -137,7 +137,7 @@ inline void cull_pipeline::create_frustum_ubos_() {
     if (vkAllocateDescriptorSets(
             context_->get_device(), &alloc_info, frustum_descriptor_sets_.data()
         ) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to allocate frustum descriptor sets!");
+        throw std::runtime_error("Failed to allocate vw::spatial::frustum descriptor sets!");
     }
 
     for (uint32 i = 0; i < max_frames_in_flight; i++) {
@@ -161,8 +161,8 @@ inline void cull_pipeline::create_frustum_ubos_() {
 
 inline void cull_pipeline::update_frustums(
     uint32 frame_index,
-    const frustum& view_frustum,
-    std::span<const frustum> shadow_frustums
+    const vw::spatial::frustum& view_frustum,
+    std::span<const vw::spatial::frustum> shadow_frustums
 ) {
     cull_frustum_ubo ubo{};
     ubo.pass_count = 1 + static_cast<uint32>(shadow_frustums.size());

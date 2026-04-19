@@ -105,12 +105,12 @@ inline combined_buffer::combined_buffer(
 }
 
 inline void combined_buffer::allocate(
-    entity e, model_identity model_id, const mesh& mesh_data,
-    const mat4f& transform_matrix, const aabb& bounds
+    entity e, vw::asset::model_identity model_id, const mesh& mesh_data,
+    const mat4f& transform_matrix, const vw::spatial::aabb& bounds
 ) {
     // log::debug(
     //     lc_cb_,
-    //     "ALLOCATE entity {}.{} model {}.{} verts {} idxs {}",
+    //     "ALLOCATE entity {}.{} vw::asset::model {}.{} verts {} idxs {}",
     //     e.index, e.generation, model_id.index, model_id.generation,
     //     mesh_data.vertices.size(), mesh_data.indices.size()
     // );
@@ -194,11 +194,11 @@ inline void combined_buffer::allocate(
 }
 
 inline void combined_buffer::allocate_mesh(
-    model_identity model_id, const mesh& mesh_data
+    vw::asset::model_identity model_id, const mesh& mesh_data
 ) {
     // log::debug(
     //     lc_cb_,
-    //     "ALLOC_MESH model {}.{} verts {} idxs {}",
+    //     "ALLOC_MESH vw::asset::model {}.{} verts {} idxs {}",
     //     model_id.index, model_id.generation,
     //     mesh_data.vertices.size(), mesh_data.indices.size()
     // );
@@ -268,7 +268,7 @@ inline void combined_buffer::allocate_mesh(
 }
 
 inline void combined_buffer::write_mesh(
-    model_identity model_id, const mesh& mesh_data
+    vw::asset::model_identity model_id, const mesh& mesh_data
 ) {
     auto& mesh_alloc = mesh_allocations_[model_id.index];
     if (mesh_alloc.generation == model_id.generation) {
@@ -277,7 +277,7 @@ inline void combined_buffer::write_mesh(
 
     // log::debug(
     //     lc_cb_,
-    //     "WRITE_MESH model {}.{} (was gen {}) verts {} idxs {}",
+    //     "WRITE_MESH vw::asset::model {}.{} (was gen {}) verts {} idxs {}",
     //     model_id.index, model_id.generation, mesh_alloc.generation,
     //     mesh_data.vertices.size(), mesh_data.indices.size()
     // );
@@ -324,7 +324,7 @@ inline void combined_buffer::write_mesh(
 }
 
 inline void combined_buffer::write_transform(
-    entity ent, const mat4f& transform_matrix, const aabb& bounds
+    entity ent, const mat4f& transform_matrix, const vw::spatial::aabb& bounds
 ) {
     auto& [instance_index, model_index] = entity_allocations_[ent];
     const auto model_staged = staging_->stage_struct(transform_matrix);

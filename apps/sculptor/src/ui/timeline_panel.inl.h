@@ -28,7 +28,7 @@ inline void timeline_panel::render(
 ) {
     keyframe_clicked_ = false;
 
-    const auto& clip_registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
+    const auto& clip_registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
     const auto clip           = clip_registry.get(state_->anim.selected_clip_name);
     if (!clip) {
         state_->ui.show_timeline = false;
@@ -62,7 +62,7 @@ inline void timeline_panel::render(
 
     if (!still_open && state_->ui.show_timeline) {
         state_->anim.selected_track_name.clear();
-        state_->anim.selected_keyframe_id = gfx::invalid_keyframe_id;
+        state_->anim.selected_keyframe_id = asset::invalid_keyframe_id;
         state_->ui.show_timeline          = false;
     }
 
@@ -138,7 +138,7 @@ inline void timeline_panel::render(
 inline void timeline_panel::render_toolbar(
     float clip_duration
 ) {
-    const auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
+    const auto& registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(state_->anim.selected_clip_name);
     if (!clip) {
         return;
@@ -208,7 +208,7 @@ inline void timeline_panel::render_toolbar(
     const bool loop_changed =
         ImGui::Combo("##Loop", &loop_index, loop_modes.data(), loop_modes.size());
     if (loop_changed) {
-        cs.loop_mode = static_cast<gfx::animation_loop_mode>(loop_index);
+        cs.loop_mode = static_cast<asset::animation_loop_mode>(loop_index);
     }
     ImGui::PopItemWidth();
 
@@ -250,7 +250,7 @@ inline void timeline_panel::render_toolbar(
 }
 
 inline void timeline_panel::render_tracks() {
-    const auto& clip_registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
+    const auto& clip_registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
 
     const auto clip = clip_registry.get(state_->anim.selected_clip_name);
     if (!clip) {
@@ -342,7 +342,7 @@ inline void timeline_panel::render_tracks() {
 }
 
 inline void timeline_panel::render_track_row(
-    const gfx::animation_track& track,
+    const asset::animation_track& track,
     float track_area_width,
     float clip_duration,
     float scroll_offset
@@ -382,11 +382,11 @@ inline void timeline_panel::render_track_row(
     ImGui::NextColumn();
 
     if (!opened) {
-        constexpr gfx::animation_property props[] = {
-            gfx::animation_property::position,
-            gfx::animation_property::rotation,
-            gfx::animation_property::scale,
-            gfx::animation_property::origin
+        constexpr asset::animation_property props[] = {
+            asset::animation_property::position,
+            asset::animation_property::rotation,
+            asset::animation_property::scale,
+            asset::animation_property::origin
         };
 
         for (auto prop : props) {
@@ -424,7 +424,7 @@ inline auto timeline_panel::is_current_layer_playing() const -> bool {
         return false;
     }
     const auto& layer = player.get_layer(idx);
-    return layer.state == gfx::animation_state::playing && layer.clip &&
+    return layer.state == asset::animation_state::playing && layer.clip &&
         layer.clip->get_name() == state_->anim.selected_clip_name;
 }
 
@@ -447,7 +447,7 @@ inline void timeline_panel::handle_pause(
 }
 
 inline void timeline_panel::handle_play(
-    gfx::entity root, const std::shared_ptr<gfx::animation_clip>& clip
+    gfx::entity root, const std::shared_ptr<asset::animation_clip>& clip
 ) const {
     auto& world = engine_->get_world();
 
@@ -468,7 +468,7 @@ inline void timeline_panel::handle_play(
 
     const auto& cs = state_->anim.get_clip_settings(state_->anim.selected_clip_name);
 
-    if (is_same_clip && player.get_layer(layer_idx).state == gfx::animation_state::paused) {
+    if (is_same_clip && player.get_layer(layer_idx).state == asset::animation_state::paused) {
         layer.set_playback_speed(cs.playback_speed);
         layer.set_loop_mode(cs.loop_mode);
         layer.resume();
@@ -503,7 +503,7 @@ inline void timeline_panel::handle_stop(
 }
 
 inline void timeline_panel::render_playback_controls(
-    const std::shared_ptr<gfx::animation_clip>& clip
+    const std::shared_ptr<asset::animation_clip>& clip
 ) {
     const bool playing     = is_current_layer_playing();
     const char* play_label = playing ? "||" : ">";
@@ -672,7 +672,7 @@ inline void timeline_panel::render_track_context_menu(
 }
 
 inline void timeline_panel::render_expanded_channels(
-    const gfx::animation_track& track,
+    const asset::animation_track& track,
     const std::string& target,
     float track_area_width,
     float clip_duration,
@@ -681,10 +681,10 @@ inline void timeline_panel::render_expanded_channels(
     for (int i = 0; i < 4; ++i) {
         constexpr std::array prop_names{"Position", "Rotation", "Scale", "Origin"};
         constexpr std::array props = {
-            gfx::animation_property::position,
-            gfx::animation_property::rotation,
-            gfx::animation_property::scale,
-            gfx::animation_property::origin
+            asset::animation_property::position,
+            asset::animation_property::rotation,
+            asset::animation_property::scale,
+            asset::animation_property::origin
         };
 
         const auto prop = props[i];
@@ -716,9 +716,9 @@ inline void timeline_panel::render_expanded_channels(
 }
 
 inline void timeline_panel::render_keyframe_markers(
-    const gfx::animation_channel_variant& channel_var,
+    const asset::animation_channel_variant& channel_var,
     const std::string& track_name,
-    gfx::animation_property prop,
+    asset::animation_property prop,
     float track_width,
     float clip_duration,
     float scroll_offset
@@ -869,7 +869,7 @@ inline void timeline_panel::ensure_clip_on_layer(
     }
 
     auto& world = engine_->get_world();
-    auto clip   = world.template get_resource<gfx::animation_clip_registry>().get(state_->anim.selected_clip_name);
+    auto clip   = world.template get_resource<asset::animation_clip_registry>().get(state_->anim.selected_clip_name);
     if (!clip) {
         return;
     }

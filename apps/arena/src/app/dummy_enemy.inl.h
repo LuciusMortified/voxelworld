@@ -66,8 +66,8 @@ inline auto dummy_enemy::is_placed() const -> bool {
     return placed_;
 }
 
-inline auto dummy_enemy::create_model() -> std::shared_ptr<gfx::model> {
-    auto& model_reg = engine_.get_world().template get_resource<gfx::model_registry>();
+inline auto dummy_enemy::create_model() -> std::shared_ptr<asset::model> {
+    auto& model_reg = engine_.get_world().template get_resource<asset::model_registry>();
     auto model = model_reg.create_unnamed(16, 32, 16);
     model->fill(voxel{blocks::red_3});
     return model;

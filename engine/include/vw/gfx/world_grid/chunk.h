@@ -9,9 +9,10 @@
 #include "vw/core/voxel.h"
 #include "vw/gfx/world/entity_guard.h"
 
+namespace vw::asset { class model; }
+
 namespace vw::gfx {
 
-class model;
 
 template <typename WD>
 class chunk {
@@ -21,7 +22,7 @@ public:
     static constexpr int32 size = 64;
     static constexpr int32 volume = size * size * size;
 
-    chunk(context_type& ctx, vec3i coord, std::shared_ptr<model> model, int32 voxel_scale = 1);
+    chunk(context_type& ctx, vec3i coord, std::shared_ptr<vw::asset::model> mdl, int32 voxel_scale = 1);
     ~chunk() = default;
 
     chunk(const chunk&) = delete;
@@ -35,7 +36,7 @@ public:
     void set_voxel(vec3i local, const voxel& v) const;
     [[nodiscard]] auto is_empty(int32 x, int32 y, int32 z) const -> bool;
 
-    [[nodiscard]] auto get_model() const -> std::shared_ptr<model>;
+    [[nodiscard]] auto get_model() const -> std::shared_ptr<vw::asset::model>;
     [[nodiscard]] auto get_entity() const -> entity;
 
     static constexpr auto contains(int32 x, int32 y, int32 z) -> bool {
@@ -44,7 +45,7 @@ public:
 
 private:
     entity_guard<WD> guard_;
-    std::shared_ptr<model> model_;
+    std::shared_ptr<vw::asset::model> model_;
 };
 
 }  // namespace vw::gfx

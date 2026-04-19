@@ -111,7 +111,7 @@ auto world<WD>::destroyed() const -> const std::vector<entity>& {
 
 template <typename WD>
 auto world<WD>::voxel_ray_cast(
-    const ray& r, std::vector<entity>& candidates
+    const vw::spatial::ray& r, std::vector<entity>& candidates
 ) const -> std::optional<voxel_ray_hit> {
     return std::get<spatial_system<WD>>(systems_).voxel_ray_cast(r, candidates);
 }

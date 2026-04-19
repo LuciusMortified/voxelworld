@@ -6,12 +6,13 @@
 #include <algorithm>
 #include <functional>
 
-#include "vw/gfx/model/model.h"
+#include "vw/asset/model/model.h"
 #include "vw/gfx/render/vulkan_context.h"
 #include "vw/gfx/resource/mesh.h"
 #include "vw/gfx/resource/mesh_pool.h"
 
 namespace vw::gfx {
+
 
 inline mesh_pool::mesh_pool(
     vulkan_context& context, const block_registry& registry
@@ -48,21 +49,21 @@ inline void mesh_pool::stop_gen_threads() {
 }
 
 [[nodiscard]] inline auto mesh_pool::has(
-    const model_identity& identity
+    const vw::asset::model_identity& identity
 ) const -> bool {
     return meshes_.contains(identity);
 }
 
 [[nodiscard]] inline auto mesh_pool::is_pending(
-    const model_identity& identity
+    const vw::asset::model_identity& identity
 ) const -> bool {
     return pending_meshes_.contains(identity);
 }
 
 inline void mesh_pool::request_mesh(
-    const std::shared_ptr<model>& model_ptr
+    const std::shared_ptr<vw::asset::model>& model_ptr
 ) {
-    model_identity identity = model_ptr->get_identity();
+    vw::asset::model_identity identity = model_ptr->get_identity();
 
     if (has(identity) || is_pending(identity)) {
         return;
@@ -80,7 +81,7 @@ inline void mesh_pool::request_mesh(
 
     // log::debug(
     //     lc_,
-    //     "Requesting mesh generation for model {}.{} with size ({},{},{})",
+    //     "Requesting mesh generation for vw::asset::model {}.{} with size ({},{},{})",
     //     identity.index,
     //     identity.generation,
     //     model_ptr->width(),
@@ -102,14 +103,14 @@ inline void mesh_pool::request_mesh(
 }
 
 [[nodiscard]] inline auto mesh_pool::get(
-    const model_identity& identity
+    const vw::asset::model_identity& identity
 ) const -> std::shared_ptr<mesh> {
     auto iter = meshes_.find(identity);
     return iter != meshes_.end() ? iter->second : nullptr;
 }
 
 inline void mesh_pool::remove(
-    const model_identity& identity
+    const vw::asset::model_identity& identity
 ) {
     meshes_.erase(identity);
     model_refs_.erase(identity);
@@ -118,7 +119,7 @@ inline void mesh_pool::remove(
 }
 
 inline void mesh_pool::evict(
-    const model_identity& identity
+    const vw::asset::model_identity& identity
 ) {
     meshes_.erase(identity);
     pending_indices_.erase(identity.index);
@@ -155,7 +156,7 @@ inline void mesh_pool::process_completed() {
 
             // log::debug(
             //     lc_,
-            //     "Completed mesh generation for model {}.{} vertices {} indices {}",
+            //     "Completed mesh generation for vw::asset::model {}.{} vertices {} indices {}",
             //     identity.index,
             //     identity.generation,
             //     data.vertices.size(),

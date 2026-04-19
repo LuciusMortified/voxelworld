@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <vw/gfx/animation/animation_layer.h>
-#include <vw/gfx/animation/animation_types.h>
+#include <vw/asset/animation/animation_layer.h>
+#include <vw/asset/animation/animation_types.h>
 #include <vw/gfx/world/components/animation_player_component.h>
 #include <vw/gfx/world/components/animation_target_component.h>
 #include <vw/gfx/world/components/hierarchy_component.h>
@@ -15,6 +15,7 @@
 
 using namespace vw;
 using namespace vw::gfx;
+using namespace vw::asset;
 
 using test_def = world_def<hierarchy_system, transform_system, spatial_system, animation_system>;
 
@@ -74,13 +75,13 @@ TEST_CASE("animation_layer is_active", "[animation_layer]") {
     animation_layer layer;
     REQUIRE_FALSE(layer.is_active());
 
-    layer.state = animation_state::playing;
+    layer.state = vw::asset::animation_state::playing;
     REQUIRE(layer.is_active());
 
-    layer.state = animation_state::paused;
+    layer.state = vw::asset::animation_state::paused;
     REQUIRE_FALSE(layer.is_active());
 
-    layer.state = animation_state::stopped;
+    layer.state = vw::asset::animation_state::stopped;
     layer.fade_is_out = true;
     REQUIRE(layer.is_active());
 }

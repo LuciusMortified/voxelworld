@@ -13,7 +13,7 @@ namespace vw::sculptor {
 struct modify_keyframe_params {
     std::string clip_name;
     std::string track_name;
-    gfx::animation_property property;
+    asset::animation_property property;
     keyframe_value old_keyframe;
     keyframe_value new_keyframe;
 };

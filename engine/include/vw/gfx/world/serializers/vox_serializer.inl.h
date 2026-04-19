@@ -28,8 +28,8 @@ auto vox_serializer<WC>::serialize(
 }
 
 template <typename WC>
-auto vox_serializer<WC>::extract() const -> vox_prefab_data {
-    vox_prefab_data prefab;
+auto vox_serializer<WC>::extract() const -> vw::asset::vox_prefab_data {
+    vw::asset::vox_prefab_data prefab;
     prefab.root_name = entity_names_.at(root_);
 
     std::deque<entity> to_process;
@@ -92,11 +92,11 @@ void vox_serializer<WC>::generate_entity_names_() {
 }
 
 template <typename WC>
-auto vox_serializer<WC>::extract_entity_(entity ent) const -> vox_entity_data {
+auto vox_serializer<WC>::extract_entity_(entity ent) const -> vw::asset::vox_entity_data {
     auto& hierarchy_comp = world_->template get_component<hierarchy_component>(ent);
     auto& transform_comp = world_->template get_component<transform_component>(ent);
 
-    vox_entity_data data;
+    vw::asset::vox_entity_data data;
     data.name = entity_names_.at(ent);
 
     if (hierarchy_comp.has_parent()) {
@@ -128,7 +128,7 @@ auto vox_serializer<WC>::extract_entity_(entity ent) const -> vox_entity_data {
         auto& model_comp = world_->template get_component<model_component>(ent);
         auto size = model_comp.size();
 
-        vox_model_data model_data;
+        vw::asset::vox_model_data model_data;
         model_data.size = size;
 
         for (int32 z = 0; z < size.z; ++z) {

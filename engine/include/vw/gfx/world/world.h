@@ -6,8 +6,8 @@
 #include <optional>
 #include <unordered_set>
 
-#include "vw/gfx/animation/animation_clip_registry.h"
-#include "vw/gfx/model/model_registry.h"
+#include "vw/asset/animation/animation_clip_registry.h"
+#include "vw/asset/model/model_registry.h"
 #include "vw/gfx/world/base_world_def.h"
 #include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/systems/spatial_system.h"
@@ -16,7 +16,7 @@
 
 namespace vw::gfx {
 
-using vw::spatial::ray;
+
 
 template <typename WD>
 class world_grid;
@@ -84,7 +84,7 @@ public:
     template <typename T>
     [[nodiscard]] auto changed() -> std::unordered_set<entity>&;
 
-    [[nodiscard]] auto voxel_ray_cast(const ray& r, std::vector<entity>& candidates) const
+    [[nodiscard]] auto voxel_ray_cast(const vw::spatial::ray& r, std::vector<entity>& candidates) const
         -> std::optional<voxel_ray_hit>;
 
     [[nodiscard]] auto destroyed() const -> const std::vector<entity>&;

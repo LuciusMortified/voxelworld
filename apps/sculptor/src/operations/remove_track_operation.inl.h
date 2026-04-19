@@ -11,7 +11,7 @@ inline remove_track_operation::remove_track_operation(
     : engine_(&eng), state_(&state), params_(std::move(params)) {}
 
 inline void remove_track_operation::execute() {
-    auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
+    auto& registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
     auto clip      = registry.get(params_.clip_name);
     if (!clip) {
         return;
@@ -27,13 +27,13 @@ inline void remove_track_operation::execute() {
 
     if (state_->anim.selected_track_name == params_.track_name) {
         state_->anim.selected_track_name.clear();
-        state_->anim.selected_keyframe_id = gfx::invalid_keyframe_id;
+        state_->anim.selected_keyframe_id = asset::invalid_keyframe_id;
     }
     state_->anim.expanded_tracks.erase(params_.track_name);
 }
 
 inline void remove_track_operation::undo() {
-    auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
+    auto& registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
     auto clip      = registry.get(params_.clip_name);
     if (!clip || !saved_track_) {
         return;

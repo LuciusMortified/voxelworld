@@ -12,7 +12,7 @@ inline remove_model_component_operation::remove_model_component_operation(
 
 inline void remove_model_component_operation::execute() {
     auto& world          = engine_->get_world();
-    auto& model_reg = world.template get_resource<gfx::model_registry>();
+    auto& model_reg = world.template get_resource<asset::model_registry>();
 
     const auto ent         = state_->scene.name_to_entity[params_.name];
     const auto& model_comp = world.get_component<gfx::model_component>(ent);

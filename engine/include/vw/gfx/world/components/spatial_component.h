@@ -9,20 +9,19 @@
 
 namespace vw::gfx {
 
-using vw::spatial::aabb;
 
 template <typename>
 class spatial_system;
 
 struct spatial_component final {
 private:
-    aabb bounds_;
-    aabb fat_bounds_;
+    vw::spatial::aabb bounds_;
+    vw::spatial::aabb fat_bounds_;
     spatial_layer_mask layer_ = spatial_layer::prop;
     bool dirty_   = true;
 
 public:
-    [[nodiscard]] auto get_bounds() const -> const aabb&;
+    [[nodiscard]] auto get_bounds() const -> const vw::spatial::aabb&;
     [[nodiscard]] auto get_layer() const -> spatial_layer_mask;
     [[nodiscard]] auto is_dirty() const -> bool;
 

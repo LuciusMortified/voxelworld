@@ -193,7 +193,7 @@ inline void camera::update_projection_matrix() const {
     projection_matrix_dirty_ = false;
 }
 
-inline const frustum& camera::get_frustum() const {
+inline const vw::spatial::frustum& camera::get_frustum() const {
     if (vectors_dirty_) {
         update_vectors();
     }
@@ -210,15 +210,15 @@ inline const frustum& camera::get_frustum() const {
 }
 
 inline void camera::update_frustum() const {
-    frustum_       = frustum::from_view_projection_matrix(get_view_projection_matrix());
+    frustum_       = vw::spatial::frustum::from_view_projection_matrix(get_view_projection_matrix());
     frustum_dirty_ = false;
 }
 
 inline auto camera::screen_to_world_ray(
     const vec2d& mouse_pos, const vec2i& window_size
-) const -> ray {
+) const -> vw::spatial::ray {
     if (window_size.x <= 0 || window_size.y <= 0) {
-        return ray{vec3f{0.0f, 0.0f, 0.0f}, vec3f{0.0f, 0.0f, 1.0f}};
+        return vw::spatial::ray{vec3f{0.0f, 0.0f, 0.0f}, vec3f{0.0f, 0.0f, 1.0f}};
     }
 
     const float ndc_x =
@@ -230,7 +230,7 @@ inline auto camera::screen_to_world_ray(
     const auto inv_result     = math::inverse_matrix(view_proj);
     const mat4f inv_view_proj = inv_result.value_or(math::identity_matrix());
 
-    // Unproject точки на near plane (ndc_z = -1.0)
+    // Unproject точки на near vw::spatial::plane (ndc_z = -1.0)
     vec4f near_ndc{ndc_x, ndc_y, -1.0f, 1.0f};
     vec4f near_homogeneous = inv_view_proj * near_ndc;
 
@@ -245,7 +245,7 @@ inline auto camera::screen_to_world_ray(
         near_point = vec3f{near_homogeneous.x, near_homogeneous.y, near_homogeneous.z};
     }
 
-    // Unproject точки на far plane (ndc_z = 1.0)
+    // Unproject точки на far vw::spatial::plane (ndc_z = 1.0)
     vec4f far_ndc{ndc_x, ndc_y, 1.0f, 1.0f};
     vec4f far_homogeneous = inv_view_proj * far_ndc;
 
@@ -260,7 +260,7 @@ inline auto camera::screen_to_world_ray(
         far_point = vec3f{far_homogeneous.x, far_homogeneous.y, far_homogeneous.z};
     }
 
-    return ray{near_point, far_point};
+    return vw::spatial::ray{near_point, far_point};
 }
 }  // namespace vw::gfx
 

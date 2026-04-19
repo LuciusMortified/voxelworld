@@ -3,7 +3,7 @@
 #ifndef VW_SCULPTOR_OPEN_FILE_MODAL_INL_H
 #define VW_SCULPTOR_OPEN_FILE_MODAL_INL_H
 #include "vw/gfx/world/serializers/vox_deserializer.h"
-#include "vw/gfx/world/serializers/vox_parser_plain.h"
+#include "vw/asset/vox/vox_parser_plain.h"
 
 namespace vw::sculptor {
 
@@ -91,7 +91,7 @@ inline void open_file_modal::load_existing_filenames_() {
 inline auto open_file_modal::open_file_() -> bool {
     namespace fs = std::filesystem;
 
-    gfx::vox_parser_plain parser{engine_->get_block_registry()};
+    asset::vox_parser_plain parser{engine_->get_block_registry()};
     gfx::vox_deserializer<> deserializer{engine_->get_world(), parser};
 
     const fs::path filepath =  //

@@ -71,7 +71,7 @@ inline auto dynamic_aabb_tree::find_best_sibling(uint32 new_node_index) const ->
         return invalid_node_index;
     }
 
-    const aabb& new_bounds = nodes_[new_node_index].bounds;
+    const vw::spatial::aabb& new_bounds = nodes_[new_node_index].bounds;
 
     uint32 best_sibling = invalid_node_index;
     float32 best_cost = std::numeric_limits<float32>::max();
@@ -84,7 +84,7 @@ inline auto dynamic_aabb_tree::find_best_sibling(uint32 new_node_index) const ->
         sibling_stack_.pop_back();
 
         const node& current_node = nodes_[current];
-        float32 direct_cost = aabb::merge(current_node.bounds, new_bounds).area();
+        float32 direct_cost = vw::spatial::aabb::merge(current_node.bounds, new_bounds).area();
         float32 total_cost = direct_cost + inherited;
 
         if (inherited >= best_cost) {
@@ -144,7 +144,7 @@ inline void dynamic_aabb_tree::insert_leaf(uint32 leaf_index) {
     nodes_[sibling].parent = new_parent;
     nodes_[leaf_index].parent = new_parent;
     
-    new_parent_node.bounds = aabb::merge(nodes_[sibling].bounds, nodes_[leaf_index].bounds);
+    new_parent_node.bounds = vw::spatial::aabb::merge(nodes_[sibling].bounds, nodes_[leaf_index].bounds);
     new_parent_node.layer = nodes_[sibling].layer | nodes_[leaf_index].layer;
     
     // Обновить ссылку на родителя в старом родителе
@@ -206,7 +206,7 @@ inline void dynamic_aabb_tree::refit(uint32 index) {
             const auto& left = nodes_[current.left];
             const auto& right = nodes_[current.right];
 
-            current.bounds = aabb::merge(left.bounds, right.bounds);
+            current.bounds = vw::spatial::aabb::merge(left.bounds, right.bounds);
             current.layer = left.layer | right.layer;
             current.height = std::max(left.height, right.height) + 1;
 
@@ -262,18 +262,18 @@ inline void dynamic_aabb_tree::rotate(uint32 a_idx) {
 
     const auto& al = nodes_[a.left];
     const auto& ar = nodes_[a.right];
-    a.bounds = aabb::merge(al.bounds, ar.bounds);
+    a.bounds = vw::spatial::aabb::merge(al.bounds, ar.bounds);
     a.layer = al.layer | ar.layer;
     a.height = std::max(al.height, ar.height) + 1;
 
     const auto& bl = nodes_[b.left];
     const auto& br = nodes_[b.right];
-    b.bounds = aabb::merge(bl.bounds, br.bounds);
+    b.bounds = vw::spatial::aabb::merge(bl.bounds, br.bounds);
     b.layer = bl.layer | br.layer;
     b.height = std::max(bl.height, br.height) + 1;
 }
 
-inline void dynamic_aabb_tree::insert(entity e, const aabb& bounds, spatial_layer_mask layer) {
+inline void dynamic_aabb_tree::insert(entity e, const vw::spatial::aabb& bounds, spatial_layer_mask layer) {
     if (entity_to_node_.find(e) != entity_to_node_.end()) {
         update(e, bounds, layer);
         return;
@@ -305,7 +305,7 @@ inline void dynamic_aabb_tree::remove(entity e) {
     free_node(node_index);
 }
 
-inline void dynamic_aabb_tree::update(entity e, const aabb& new_bounds, spatial_layer_mask layer) {
+inline void dynamic_aabb_tree::update(entity e, const vw::spatial::aabb& new_bounds, spatial_layer_mask layer) {
     auto it = entity_to_node_.find(e);
     if (it == entity_to_node_.end()) {
         insert(e, new_bounds, layer);
@@ -332,7 +332,7 @@ inline void dynamic_aabb_tree::update(entity e, const aabb& new_bounds, spatial_
 }
 
 inline void dynamic_aabb_tree::query_all(
-    const frustum& f,
+    const vw::spatial::frustum& f,
     std::vector<entity>& result_out,
     spatial_layer_mask layer_mask
 ) const {
@@ -365,7 +365,7 @@ inline void dynamic_aabb_tree::query_all(
 }
 
 inline void dynamic_aabb_tree::query_all_any(
-    std::span<const frustum> frustums,
+    std::span<const vw::spatial::frustum> frustums,
     std::vector<entity>& result_out
 ) const {
     result_out.clear();
@@ -404,7 +404,7 @@ inline void dynamic_aabb_tree::query_all_any(
 }
 
 inline void dynamic_aabb_tree::query_all(
-    const ray& r,
+    const vw::spatial::ray& r,
     std::vector<entity>& result_out,
     spatial_layer_mask layer_mask
 ) const {
@@ -437,7 +437,7 @@ inline void dynamic_aabb_tree::query_all(
 }
 
 inline void dynamic_aabb_tree::query_all(
-    const aabb& bounds,
+    const vw::spatial::aabb& bounds,
     std::vector<entity>& result_out,
     spatial_layer_mask layer_mask
 ) const {

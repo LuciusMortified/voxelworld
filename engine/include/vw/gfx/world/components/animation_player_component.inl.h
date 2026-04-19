@@ -10,7 +10,7 @@ inline auto animation_player_component::has_layer(size_t index) const -> bool {
     return index < layers_.size();
 }
 
-inline auto animation_player_component::get_layer(size_t index) const -> const animation_layer& {
+inline auto animation_player_component::get_layer(size_t index) const -> const vw::asset::animation_layer& {
     return layers_[index];
 }
 

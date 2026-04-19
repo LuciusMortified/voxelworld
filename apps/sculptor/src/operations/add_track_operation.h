@@ -15,7 +15,7 @@ namespace vw::sculptor {
 struct add_track_params {
     std::string clip_name;
     std::string track_name;
-    std::optional<gfx::animation_property> property;
+    std::optional<asset::animation_property> property;
     std::optional<keyframe_value> keyframe;
 };
 

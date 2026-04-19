@@ -3,7 +3,7 @@
 #ifndef VW_SCULPTOR_CLOSE_CLIP_OPERATION_H
 #define VW_SCULPTOR_CLOSE_CLIP_OPERATION_H
 
-#include <vw/gfx/animation/animation_clip.h>
+#include <vw/asset/animation/animation_clip.h>
 #include <vw/gfx/engine/engine.h>
 
 #include "app/app_state.h"
@@ -28,7 +28,7 @@ private:
     engine_type* engine_;
     app_state* state_;
     close_clip_params params_;
-    std::shared_ptr<gfx::animation_clip> saved_clip_;
+    std::shared_ptr<asset::animation_clip> saved_clip_;
 };
 
 }  // namespace vw::sculptor

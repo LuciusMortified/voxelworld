@@ -11,34 +11,34 @@ inline add_track_operation::add_track_operation(
     : base_operation(), engine_(&engine), state_(&state), params_(params) {}
 
 inline void add_track_operation::execute() {
-    const auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
+    const auto& registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(params_.clip_name);
     if (!clip) {
         return;
     }
 
-    gfx::animation_track track(params_.track_name);
+    asset::animation_track track(params_.track_name);
 
     if (params_.property.has_value() && params_.keyframe.has_value()) {
         const auto prop = params_.property.value();
         const auto& kf  = params_.keyframe.value();
 
-        if (prop == gfx::animation_property::rotation) {
-            auto channel = gfx::make_animation_channel<gfx::animation_property::rotation>();
-            channel.add(std::get<gfx::keyframe_quat>(kf));
-            track.add<gfx::animation_property::rotation>(std::move(channel));
-        } else if (prop == gfx::animation_property::position) {
-            auto channel = gfx::make_animation_channel<gfx::animation_property::position>();
-            channel.add(std::get<gfx::keyframe_vec3f>(kf));
-            track.add<gfx::animation_property::position>(std::move(channel));
-        } else if (prop == gfx::animation_property::scale) {
-            auto channel = gfx::make_animation_channel<gfx::animation_property::scale>();
-            channel.add(std::get<gfx::keyframe_vec3f>(kf));
-            track.add<gfx::animation_property::scale>(std::move(channel));
-        } else if (prop == gfx::animation_property::origin) {
-            auto channel = gfx::make_animation_channel<gfx::animation_property::origin>();
-            channel.add(std::get<gfx::keyframe_vec3f>(kf));
-            track.add<gfx::animation_property::origin>(std::move(channel));
+        if (prop == asset::animation_property::rotation) {
+            auto channel = asset::make_animation_channel<asset::animation_property::rotation>();
+            channel.add(std::get<asset::keyframe_quat>(kf));
+            track.add<asset::animation_property::rotation>(std::move(channel));
+        } else if (prop == asset::animation_property::position) {
+            auto channel = asset::make_animation_channel<asset::animation_property::position>();
+            channel.add(std::get<asset::keyframe_vec3f>(kf));
+            track.add<asset::animation_property::position>(std::move(channel));
+        } else if (prop == asset::animation_property::scale) {
+            auto channel = asset::make_animation_channel<asset::animation_property::scale>();
+            channel.add(std::get<asset::keyframe_vec3f>(kf));
+            track.add<asset::animation_property::scale>(std::move(channel));
+        } else if (prop == asset::animation_property::origin) {
+            auto channel = asset::make_animation_channel<asset::animation_property::origin>();
+            channel.add(std::get<asset::keyframe_vec3f>(kf));
+            track.add<asset::animation_property::origin>(std::move(channel));
         }
     }
 
@@ -66,7 +66,7 @@ inline void add_track_operation::execute() {
 }
 
 inline void add_track_operation::undo() {
-    const auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
+    const auto& registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(params_.clip_name);
     if (!clip) {
         return;

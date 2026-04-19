@@ -9,10 +9,10 @@
 #include <vw/core.h>
 #include <vw/gfx.h>
 
-#include "vw/gfx/asset_storage.h"
+#include "vw/asset/asset_storage.h"
 #include "vw/gfx/camera/third_person_camera_controller.h"
 #include "vw/gfx/player/player_input_controller.h"
-#include "vw/gfx/world/serializers/vox_parser_plain.h"
+#include "vw/asset/vox/vox_parser_plain.h"
 #include "vw/gfx/world_grid/generators/perlin_terrain_generator.h"
 
 #include "dummy_enemy.h"
@@ -31,8 +31,8 @@ private:
     auto handle_key_press(gfx::keyboard::keys key) -> void;
     auto load_assets() -> void;
 
-    gfx::vox_parser_plain parser_;
-    gfx::asset_storage assets_;
+    asset::vox_parser_plain parser_;
+    asset::asset_storage assets_;
 
     gfx::player_input_controller input_controller_;
     gfx::third_person_camera_controller<> camera_controller_;

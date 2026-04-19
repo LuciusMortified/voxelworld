@@ -3,9 +3,10 @@
 #ifndef VW_GFX_WORLD_SYSTEMS_MODEL_SYSTEM_INL_H
 #define VW_GFX_WORLD_SYSTEMS_MODEL_SYSTEM_INL_H
 
-#include "vw/gfx/model/model.h"
+#include "vw/asset/model/model.h"
 
 namespace vw::gfx {
+
 
 template <typename WD>
 model_system<WD>::model_system(
@@ -37,13 +38,13 @@ model_system<WD>::model_modifier::model_modifier(
     : system_(&system), component_(component), entity_(entity_id) {}
 
 template <typename WD>
-auto model_system<WD>::model_modifier::get_model() const -> std::shared_ptr<model> {
+auto model_system<WD>::model_modifier::get_model() const -> std::shared_ptr<vw::asset::model> {
     return component_->model_;
 }
 
 template <typename WD>
 void model_system<WD>::model_modifier::set_model(
-    std::shared_ptr<model> model_ptr
+    std::shared_ptr<vw::asset::model> model_ptr
 ) {
     component_->model_ = std::move(model_ptr);
     system_->context_->registry().template request_change<model_component>(entity_);

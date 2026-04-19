@@ -20,7 +20,7 @@ inline void keyframe_service::add_keyframe() {
     }
 
     auto& world    = engine_->get_world();
-    auto& clip_reg = world.template get_resource<gfx::animation_clip_registry>();
+    auto& clip_reg = world.template get_resource<asset::animation_clip_registry>();
     auto clip      = clip_reg.get(state_->anim.selected_clip_name);
     if (!clip) {
         return;
@@ -38,14 +38,14 @@ inline void keyframe_service::add_keyframe() {
     auto& tc = world.get_component<gfx::transform_component>(ent);
 
     keyframe_value kf_val;
-    if (prop == gfx::animation_property::rotation) {
-        kf_val = gfx::keyframe_quat(time, tc.get_rotation());
-    } else if (prop == gfx::animation_property::position) {
-        kf_val = gfx::keyframe_vec3f(time, tc.get_position());
-    } else if (prop == gfx::animation_property::scale) {
-        kf_val = gfx::keyframe_vec3f(time, tc.get_scale());
+    if (prop == asset::animation_property::rotation) {
+        kf_val = asset::keyframe_quat(time, tc.get_rotation());
+    } else if (prop == asset::animation_property::position) {
+        kf_val = asset::keyframe_vec3f(time, tc.get_position());
+    } else if (prop == asset::animation_property::scale) {
+        kf_val = asset::keyframe_vec3f(time, tc.get_scale());
     } else {
-        kf_val = gfx::keyframe_vec3f(time, tc.get_origin());
+        kf_val = asset::keyframe_vec3f(time, tc.get_origin());
     }
 
     if (!clip->has_track(entity_name)) {
@@ -70,13 +70,13 @@ inline void keyframe_service::add_keyframe() {
 }
 
 inline void keyframe_service::delete_keyframe() {
-    if (state_->anim.selected_keyframe_id == gfx::invalid_keyframe_id ||
+    if (state_->anim.selected_keyframe_id == asset::invalid_keyframe_id ||
         state_->anim.selected_clip_name.empty() || state_->anim.selected_track_name.empty()) {
         return;
     }
 
     auto& world          = engine_->get_world();
-    const auto& clip_reg = world.template get_resource<gfx::animation_clip_registry>();
+    const auto& clip_reg = world.template get_resource<asset::animation_clip_registry>();
     const auto clip      = clip_reg.get(state_->anim.selected_clip_name);
     if (!clip) {
         return;

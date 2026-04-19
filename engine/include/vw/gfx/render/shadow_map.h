@@ -13,7 +13,6 @@
 
 namespace vw::gfx {
 
-using vw::spatial::frustum;
 
 class vulkan_context;
 class camera;
@@ -37,7 +36,7 @@ public:
     [[nodiscard]] auto get_light_space_matrix(uint32 cascade_index) const -> mat4f;
     [[nodiscard]] auto get_light_space_matrices() const -> const std::array<mat4f, cascade_count>&;
     [[nodiscard]] auto get_cascade_splits() const -> const std::array<float, cascade_count>&;
-    [[nodiscard]] auto get_cascade_frustums() const -> const std::array<frustum, cascade_count>&;
+    [[nodiscard]] auto get_cascade_frustums() const -> const std::array<vw::spatial::frustum, cascade_count>&;
     [[nodiscard]] auto get_image() const -> VkImage;
     [[nodiscard]] auto get_image_view(uint32 cascade_index) const -> VkImageView;
     [[nodiscard]] auto get_array_image_view() const -> VkImageView;
@@ -65,7 +64,7 @@ private:
     VkRenderPass shadow_render_pass_                                   = VK_NULL_HANDLE;
 
     std::array<mat4f, cascade_count> light_space_matrices_ = {};
-    std::array<frustum, cascade_count> cascade_frustums_   = {};
+    std::array<vw::spatial::frustum, cascade_count> cascade_frustums_   = {};
     std::array<float, cascade_count> cascade_splits_       = {};
 
     uint32 size_;

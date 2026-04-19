@@ -13,21 +13,23 @@
 #include <unordered_set>
 #include <vector>
 
-#include "vw/gfx/model/model_identity.h"
+#include "vw/asset/model/model_identity.h"
 #include "vw/gfx/resource/mesh.h"
+
+namespace vw::asset { class model; }
 
 namespace vw::gfx {
 
+
 class vulkan_context;
-class model;
 
 struct mesh_generation_task {
-    model_identity identity;
-    std::weak_ptr<model> model_ref;
+    vw::asset::model_identity identity;
+    std::weak_ptr<vw::asset::model> model_ref;
     std::promise<mesh> promise;
 
     mesh_generation_task(
-        model_identity identity, std::weak_ptr<model> model_ref
+        vw::asset::model_identity identity, std::weak_ptr<vw::asset::model> model_ref
     )
         : identity(identity), model_ref(std::move(model_ref)) {}
 };
@@ -43,12 +45,12 @@ public:
     auto operator=(mesh_pool&&) -> mesh_pool&      = delete;
 
     void stop_gen_threads();
-    [[nodiscard]] auto has(const model_identity& identity) const -> bool;
-    [[nodiscard]] auto is_pending(const model_identity& identity) const -> bool;
-    void request_mesh(const std::shared_ptr<model>& model_ptr);
-    [[nodiscard]] auto get(const model_identity& identity) const -> std::shared_ptr<mesh>;
-    void remove(const model_identity& identity);
-    void evict(const model_identity& identity);
+    [[nodiscard]] auto has(const vw::asset::model_identity& identity) const -> bool;
+    [[nodiscard]] auto is_pending(const vw::asset::model_identity& identity) const -> bool;
+    void request_mesh(const std::shared_ptr<vw::asset::model>& model_ptr);
+    [[nodiscard]] auto get(const vw::asset::model_identity& identity) const -> std::shared_ptr<mesh>;
+    void remove(const vw::asset::model_identity& identity);
+    void evict(const vw::asset::model_identity& identity);
     void process_completed();
     [[nodiscard]] auto get_pending_count() const -> uint32;
 
@@ -58,9 +60,9 @@ private:
 
     vulkan_context* context_;
     const block_registry* registry_;
-    std::unordered_map<model_identity, std::shared_ptr<mesh>> meshes_;
-    std::unordered_map<model_identity, std::weak_ptr<model>> model_refs_;
-    std::unordered_map<model_identity, std::future<mesh>> pending_meshes_;
+    std::unordered_map<vw::asset::model_identity, std::shared_ptr<mesh>> meshes_;
+    std::unordered_map<vw::asset::model_identity, std::weak_ptr<vw::asset::model>> model_refs_;
+    std::unordered_map<vw::asset::model_identity, std::future<mesh>> pending_meshes_;
     std::unordered_set<uint32> pending_indices_;
 
     std::vector<std::thread> gen_threads_;

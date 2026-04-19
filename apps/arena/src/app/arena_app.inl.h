@@ -12,7 +12,7 @@ inline arena_app::arena_app(
 )
     : app{eng}
     , parser_(eng.get_block_registry())
-    , assets_(parser_, eng.get_world().template get_resource<gfx::model_registry>())
+    , assets_(parser_, eng.get_world().template get_resource<asset::model_registry>())
     , input_controller_(get_engine().get_window())
     , camera_controller_(
           get_engine().get_camera(),

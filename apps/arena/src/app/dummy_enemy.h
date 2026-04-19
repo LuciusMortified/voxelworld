@@ -22,7 +22,7 @@ public:
     [[nodiscard]] auto is_placed() const -> bool;
 
 private:
-    auto create_model() -> std::shared_ptr<gfx::model>;
+    auto create_model() -> std::shared_ptr<asset::model>;
 
     gfx::engine<>& engine_;
     std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> root_;

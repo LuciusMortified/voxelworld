@@ -20,9 +20,6 @@
 
 namespace vw::gfx {
 
-using vw::spatial::aabb;
-using vw::spatial::frustum;
-using vw::spatial::ray;
 
 struct model_component;
 struct transform_component;
@@ -47,30 +44,30 @@ public:
     void update(float32 dt);
 
     void query_all(
-        const frustum& f,
+        const vw::spatial::frustum& f,
         std::vector<entity>& result_out,
         spatial_layer_mask layer_mask = spatial_layer::all
     ) const;
 
     void query_all(
-        const ray& r,
+        const vw::spatial::ray& r,
         std::vector<entity>& result_out,
         spatial_layer_mask layer_mask = spatial_layer::all
     ) const;
 
     void query_all(
-        const aabb& bounds,
+        const vw::spatial::aabb& bounds,
         std::vector<entity>& result_out,
         spatial_layer_mask layer_mask = spatial_layer::all
     ) const;
 
     void query_all_any(
-        std::span<const frustum> frustums,
+        std::span<const vw::spatial::frustum> frustums,
         std::vector<entity>& result_out
     ) const;
 
     [[nodiscard]] auto voxel_ray_cast(
-        const ray& r,
+        const vw::spatial::ray& r,
         std::vector<entity>& candidates,
         spatial_layer_mask layer_mask = spatial_layer::all
     ) const -> std::optional<voxel_ray_hit>;
@@ -103,8 +100,8 @@ private:
         entity ent,
         const model_component& model_comp,
         const transform_component& transform_comp
-    ) const -> aabb;
-    static auto expand_aabb_for_fat(const aabb& bounds) -> aabb;
+    ) const -> vw::spatial::aabb;
+    static auto expand_aabb_for_fat(const vw::spatial::aabb& bounds) -> vw::spatial::aabb;
 
     context_type* context_;
     dynamic_aabb_tree tree_;

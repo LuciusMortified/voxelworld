@@ -7,7 +7,7 @@
 
 namespace vw::gfx {
 
-inline auto spatial_component::get_bounds() const -> const aabb& {
+inline auto spatial_component::get_bounds() const -> const vw::spatial::aabb& {
     return bounds_;
 }
 

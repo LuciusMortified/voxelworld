@@ -31,7 +31,7 @@ private:
     app_state* state_;
     remove_model_component_params params_;
 
-    std::shared_ptr<gfx::model> saved_model_;
+    std::shared_ptr<asset::model> saved_model_;
 };
 
 }  // namespace vw::sculptor

@@ -13,7 +13,7 @@ inline void expand_model_operation::execute() {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
-    auto& model_reg = world.template get_resource<gfx::model_registry>();
+    auto& model_reg = world.template get_resource<asset::model_registry>();
     auto& model_sys = world.template get_system<gfx::model_system>();
     auto& transform_sys = world.template get_system<gfx::transform_system>();
 
@@ -64,7 +64,7 @@ inline void expand_model_operation::undo() {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
-    auto& model_reg = world.template get_resource<gfx::model_registry>();
+    auto& model_reg = world.template get_resource<asset::model_registry>();
     auto& model_sys = world.template get_system<gfx::model_system>();
     auto& transform_sys = world.template get_system<gfx::transform_system>();
 

@@ -91,7 +91,7 @@ public:
 private:
     void create_flower_model() {
         auto& world            = get_engine().get_world();
-        auto& model_reg = world.template get_resource<gfx::model_registry>();
+        auto& model_reg = world.template get_resource<asset::model_registry>();
         auto& transform_sys = world.template get_system<gfx::transform_system>();
         auto& model_sys = world.template get_system<gfx::model_system>();
 
@@ -270,7 +270,7 @@ private:
 
     std::unique_ptr<gfx::free_camera_controller> camera_controller_;
 
-    std::shared_ptr<gfx::model> model_;
+    std::shared_ptr<asset::model> model_;
     float object_rotation_{};
     float object_rotation_speed_{};
 
@@ -281,7 +281,7 @@ private:
     gfx::entity selected_entity_ = gfx::invalid_entity;
     vec3i selected_voxel_{-1, -1, -1};
     vec3i selected_empty_pos_{-1, -1, -1};
-    gfx::ray select_ray_{vec3f{}, vec3f{}};
+    spatial::ray select_ray_{vec3f{}, vec3f{}};
 };
 
 int main() {

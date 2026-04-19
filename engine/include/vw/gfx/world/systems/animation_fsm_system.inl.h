@@ -31,7 +31,7 @@ void animation_fsm_system<WD>::update(float32 /*dt*/) {
 
             auto lm = pm.layer(i);
 
-            if (layer.state == animation_state::stopped && !layer.clip) {
+            if (layer.state == vw::asset::animation_state::stopped && !layer.clip) {
                 const auto* state = machine.get_current_state_node();
                 if (!state) {
                     continue;
@@ -76,7 +76,7 @@ animation_fsm_system<WD>::modifier::modifier(
 
 template <typename WD>
 void animation_fsm_system<WD>::modifier::add_machine(
-    size_t index, animation_fsm machine
+    size_t index, vw::asset::animation_fsm machine
 ) const {
     if (index >= component_->machines_.size()) {
         component_->machines_.resize(index + 1);

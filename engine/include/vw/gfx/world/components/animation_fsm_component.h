@@ -5,15 +5,16 @@
 
 #include <vector>
 
-#include "vw/gfx/animation/animation_fsm.h"
+#include "vw/asset/animation/animation_fsm.h"
 
 namespace vw::gfx {
 
+
 struct animation_fsm_component final {
 private:
-    using trigger_set = animation_fsm::trigger_set;
+    using trigger_set = vw::asset::animation_fsm::trigger_set;
 
-    std::vector<animation_fsm> machines_;
+    std::vector<vw::asset::animation_fsm> machines_;
     trigger_set triggers_;
 
     template <typename>
@@ -21,8 +22,8 @@ private:
 
 public:
     [[nodiscard]] auto machine_count() const -> size_t;
-    [[nodiscard]] auto get_machine(size_t index) -> animation_fsm&;
-    [[nodiscard]] auto get_machine(size_t index) const -> const animation_fsm&;
+    [[nodiscard]] auto get_machine(size_t index) -> vw::asset::animation_fsm&;
+    [[nodiscard]] auto get_machine(size_t index) const -> const vw::asset::animation_fsm&;
 };
 
 }  // namespace vw::gfx

@@ -8,10 +8,13 @@
 
 #include "vw/gfx/world_grid/world_grid_generator.h"
 
-namespace vw::gfx {
-
+namespace vw::asset {
 class model_identity_pool;
 class page_pool;
+}  // namespace vw::asset
+
+namespace vw::gfx {
+
 
 class perlin_world_grid_generator final : public world_grid_generator {
 public:
@@ -38,7 +41,7 @@ public:
         float32 warp_strength = 30.0f;
     };
 
-    perlin_world_grid_generator(model_identity_pool& identity_pool, page_pool& page_pool,
+    perlin_world_grid_generator(vw::asset::model_identity_pool& identity_pool, vw::asset::page_pool& pool,
                                params p = {});
 
     [[nodiscard]] auto generate_chunk(vec3i coord) -> chunk_data override;
@@ -57,8 +60,8 @@ private:
     static auto lerp(float64 t, float64 a, float64 b) -> float64;
     static auto grad(int32 hash, float64 x, float64 y) -> float64;
 
-    model_identity_pool* identity_pool_;
-    page_pool* page_pool_;
+    vw::asset::model_identity_pool* identity_pool_;
+    vw::asset::page_pool* page_pool_;
     params params_;
     std::array<int32, 512> perm_;
     std::unordered_map<uint64, chunk_y_range> y_range_cache_;

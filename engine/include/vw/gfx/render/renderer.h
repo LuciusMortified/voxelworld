@@ -84,7 +84,7 @@ struct shadow_uniform_buffer_object {
 };
 
 struct push_constant_data {
-    alignas(16) float32 model[16]{};
+    alignas(16) float32 matrix[16]{};
 };
 
 struct render_timing_stats {
@@ -362,7 +362,7 @@ private:
     const block_registry* block_registry_;
     std::unique_ptr<palette_buffer> palette_buffer_;
 
-    // GPU frustum culling
+    // GPU vw::spatial::frustum culling
     std::unique_ptr<cull_pipeline> cull_pipeline_;
 
     // Shadow map для directional light

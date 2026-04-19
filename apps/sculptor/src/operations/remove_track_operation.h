@@ -3,7 +3,7 @@
 #ifndef VW_SCULPTOR_REMOVE_TRACK_OPERATION_H
 #define VW_SCULPTOR_REMOVE_TRACK_OPERATION_H
 
-#include <vw/gfx/animation/animation_track.h>
+#include <vw/asset/animation/animation_track.h>
 #include <vw/gfx/engine/engine.h>
 
 #include "app/app_state.h"
@@ -29,7 +29,7 @@ private:
     engine_type* engine_;
     app_state* state_;
     remove_track_params params_;
-    std::optional<gfx::animation_track> saved_track_;
+    std::optional<asset::animation_track> saved_track_;
 };
 
 }  // namespace vw::sculptor

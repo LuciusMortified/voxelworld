@@ -5,8 +5,9 @@
 
 namespace vw::gfx {
 
+
 template <typename WC>
-vox_deserializer<WC>::vox_deserializer(world_type& world, vox_parser& parser)
+vox_deserializer<WC>::vox_deserializer(world_type& world, vw::asset::vox_parser& parser)
     : world_(&world), parser_(&parser) {}
 
 template <typename WC>
@@ -30,7 +31,7 @@ auto vox_deserializer<WC>::deserialize(
 
 template <typename WC>
 void vox_deserializer<WC>::apply_entity_(
-    const vox_entity_data& data, result& res, const options& opts
+    const vw::asset::vox_entity_data& data, result& res, const options& opts
 ) {
     auto ent_guard = std::make_unique<entity_guard<WC>>(world_->get_context());
     ent_guard->template with<hierarchy_component>();
@@ -83,7 +84,7 @@ void vox_deserializer<WC>::apply_entity_(
     }
 
     if (data.model.has_value()) {
-        auto& model_reg = world_->template get_resource<model_registry>();
+        auto& model_reg = world_->template get_resource<vw::asset::model_registry>();
         auto model_ptr = model_reg.create(data.name, data.model->size);
 
         ent_guard->template with<model_component>();

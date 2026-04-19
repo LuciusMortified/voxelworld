@@ -1,11 +1,11 @@
 #pragma once
 
-#include "vw/gfx/world/serializers/vox_parser_plain.h"
+#include "vw/asset/vox/vox_parser_plain.h"
 
 namespace vw::arena {
 
 inline player::player(
-    gfx::engine<>& engine, gfx::asset_storage& assets
+    gfx::engine<>& engine, asset::asset_storage& assets
 )
     : engine_{engine}, assets_{assets} {
     auto& world            = engine_.get_world();
@@ -256,16 +256,16 @@ inline auto player::setup_animation_fsm() const -> void {
         return rb.is_grounded();
     };
 
-    constexpr gfx::transition blend_fast{.duration = 0.15f};
-    constexpr gfx::transition blend_normal{.duration = 0.25f};
-    constexpr gfx::transition blend_slow{.duration = 0.35f};
+    constexpr asset::transition blend_fast{.duration = 0.15f};
+    constexpr asset::transition blend_normal{.duration = 0.25f};
+    constexpr asset::transition blend_slow{.duration = 0.35f};
 
-    gfx::animation_fsm fsm_movement;
+    asset::animation_fsm fsm_movement;
 
     fsm_movement.add_state({
         .name      = "idle",
         .clip      = assets_.get_clip("a_idle"),
-        .loop_mode = gfx::animation_loop_mode::loop,
+        .loop_mode = asset::animation_loop_mode::loop,
         .transitions =
             {
                 {.target_state = "walk", .condition = is_walk, .blend = blend_fast},
@@ -287,7 +287,7 @@ inline auto player::setup_animation_fsm() const -> void {
     fsm_movement.add_state({
         .name           = "walk",
         .clip           = assets_.get_clip("a_walk"),
-        .loop_mode      = gfx::animation_loop_mode::loop,
+        .loop_mode      = asset::animation_loop_mode::loop,
         .playback_speed = 1.25f,
         .transitions =
             {
@@ -308,7 +308,7 @@ inline auto player::setup_animation_fsm() const -> void {
     fsm_movement.add_state({
         .name           = "jump_right",
         .clip           = assets_.get_clip("a_jump_right"),
-        .loop_mode      = gfx::animation_loop_mode::loop,
+        .loop_mode      = asset::animation_loop_mode::loop,
         .playback_speed = 1.0f,
         .transitions =
             {
@@ -324,7 +324,7 @@ inline auto player::setup_animation_fsm() const -> void {
     fsm_movement.add_state({
         .name           = "jump_left",
         .clip           = assets_.get_clip("a_jump_left"),
-        .loop_mode      = gfx::animation_loop_mode::loop,
+        .loop_mode      = asset::animation_loop_mode::loop,
         .playback_speed = 1.0f,
         .transitions =
             {
@@ -341,7 +341,7 @@ inline auto player::setup_animation_fsm() const -> void {
 
     world.template get_system<gfx::animation_fsm_system>().modify(ent).add_machine(0, std::move(fsm_movement));
 
-    gfx::animation_fsm fsm_action;
+    asset::animation_fsm fsm_action;
 
     fsm_action.add_state({
         .name = "none",
@@ -358,7 +358,7 @@ inline auto player::setup_animation_fsm() const -> void {
     fsm_action.add_state({
         .name            = "sword_attack",
         .clip            = assets_.get_clip("a_sword_attack"),
-        .loop_mode       = gfx::animation_loop_mode::once,
+        .loop_mode       = asset::animation_loop_mode::once,
         .playback_speed  = 2.f,
         .layer_blend_in  = blend_normal,
         .layer_blend_out = blend_slow,

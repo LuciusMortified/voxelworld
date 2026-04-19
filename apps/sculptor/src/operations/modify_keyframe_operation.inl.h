@@ -21,7 +21,7 @@ inline void modify_keyframe_operation::undo() {
 inline void modify_keyframe_operation::apply(
     const keyframe_value& replacement
 ) const {
-    const auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
+    const auto& registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(params_.clip_name);
     if (!clip) {
         return;
@@ -40,12 +40,12 @@ inline void modify_keyframe_operation::apply(
     const uint32 id =
         std::visit([](const auto& kf) -> uint32 { return kf.id(); }, params_.old_keyframe);
 
-    if (params_.property == gfx::animation_property::rotation) {
-        auto& channel = std::get<gfx::animation_channel<quat>>(*channel_var);
-        channel.replace(id, std::get<gfx::keyframe_quat>(replacement));
+    if (params_.property == asset::animation_property::rotation) {
+        auto& channel = std::get<asset::animation_channel<quat>>(*channel_var);
+        channel.replace(id, std::get<asset::keyframe_quat>(replacement));
     } else {
-        auto& channel = std::get<gfx::animation_channel<vec3f>>(*channel_var);
-        channel.replace(id, std::get<gfx::keyframe_vec3f>(replacement));
+        auto& channel = std::get<asset::animation_channel<vec3f>>(*channel_var);
+        channel.replace(id, std::get<asset::keyframe_vec3f>(replacement));
     }
 
     track->mark_dirty();

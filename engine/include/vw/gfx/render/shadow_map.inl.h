@@ -344,7 +344,7 @@ inline void shadow_map::update(
         lsm[1, 3] += (rounded_y - shadow_origin.y * half_size) / half_size;
 
         light_space_matrices_[cascade_index] = lsm;
-        cascade_frustums_[cascade_index]    = frustum::from_view_projection_matrix(lsm);
+        cascade_frustums_[cascade_index]    = vw::spatial::frustum::from_view_projection_matrix(lsm);
 
 #if 0
         std::string matrix_values;
@@ -377,7 +377,7 @@ inline auto shadow_map::get_cascade_splits() const -> const std::array<float, ca
     return cascade_splits_;
 }
 
-inline auto shadow_map::get_cascade_frustums() const -> const std::array<frustum, cascade_count>& {
+inline auto shadow_map::get_cascade_frustums() const -> const std::array<vw::spatial::frustum, cascade_count>& {
     return cascade_frustums_;
 }
 

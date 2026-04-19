@@ -18,7 +18,6 @@
 
 namespace vw::gfx {
 
-using vw::spatial::frustum;
 
 class vulkan_context;
 
@@ -45,8 +44,8 @@ public:
 
     void update_frustums(
         uint32 frame_index,
-        const frustum& view_frustum,
-        std::span<const frustum> shadow_frustums
+        const vw::spatial::frustum& view_frustum,
+        std::span<const vw::spatial::frustum> shadow_frustums
     );
 
     void dispatch(

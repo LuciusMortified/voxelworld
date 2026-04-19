@@ -7,15 +7,16 @@
 #include <cmath>
 
 #include "vw/core/color.h"
-#include "vw/gfx/model/model.h"
+#include "vw/asset/model/model.h"
 #include "vw/gfx/world_grid/chunk.h"
 
 namespace vw::gfx {
 
+
 inline perlin_terrain_generator::perlin_terrain_generator(
-    model_identity_pool& identity_pool, page_pool& page_pool, params p
+    vw::asset::model_identity_pool& identity_pool, vw::asset::page_pool& pool, params p
 )
-    : identity_pool_(&identity_pool), page_pool_(&page_pool), params_(p) {
+    : identity_pool_(&identity_pool), page_pool_(&pool), params_(p) {
     for (int32 i = 0; i < 256; ++i) {
         perm_[i] = i;
     }
@@ -244,7 +245,7 @@ inline void perlin_terrain_generator::generate_chunk(
 ) {
     constexpr int32 s = 64;
 
-    auto mdl = std::make_shared<model>(*identity_pool_, *page_pool_, s, s, s, params_.voxel_scale);
+    auto mdl = std::make_shared<vw::asset::model>(*identity_pool_, *page_pool_, s, s, s, params_.voxel_scale);
 
     for (int32 x = 0; x < s; ++x) {
         for (int32 z = 0; z < s; ++z) {

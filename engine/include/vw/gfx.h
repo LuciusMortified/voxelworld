@@ -10,9 +10,6 @@
 #include "vw/gfx/debug/debug_window.h"
 #include "vw/gfx/engine/app.h"
 #include "vw/gfx/engine/engine.h"
-#include "vw/gfx/model/model.h"
-#include "vw/gfx/model/model_identity.h"
-#include "vw/gfx/model/model_registry.h"
 #include "vw/gfx/player/player_input_controller.h"
 #include "vw/gfx/player/player_input_state.h"
 #include "vw/gfx/render/renderer.h"
@@ -26,9 +23,5 @@
 #include "vw/gfx/window/window.h"
 #include "vw/gfx/world/world.h"
 #include "vw/gfx/world_grid/world_grid.h"
-#include "vw/spatial/aabb.h"
-#include "vw/spatial/frustum.h"
-#include "vw/spatial/plane.h"
-#include "vw/spatial/ray.h"
 
 #endif  //  VW_GFX_H

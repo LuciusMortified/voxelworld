@@ -9,11 +9,11 @@ inline auto animation_fsm_component::machine_count() const -> size_t {
     return machines_.size();
 }
 
-inline auto animation_fsm_component::get_machine(size_t index) -> animation_fsm& {
+inline auto animation_fsm_component::get_machine(size_t index) -> vw::asset::animation_fsm& {
     return machines_[index];
 }
 
-inline auto animation_fsm_component::get_machine(size_t index) const -> const animation_fsm& {
+inline auto animation_fsm_component::get_machine(size_t index) const -> const vw::asset::animation_fsm& {
     return machines_[index];
 }
 

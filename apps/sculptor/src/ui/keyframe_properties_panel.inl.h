@@ -16,12 +16,12 @@ inline keyframe_properties_panel::keyframe_properties_panel(
 inline void keyframe_properties_panel::render(
     float /*delta_time*/
 ) {
-    if (state_->anim.selected_keyframe_id == gfx::invalid_keyframe_id ||
+    if (state_->anim.selected_keyframe_id == asset::invalid_keyframe_id ||
         state_->anim.selected_clip_name.empty() || state_->anim.selected_track_name.empty()) {
         return;
     }
 
-    const auto& clip_registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
+    const auto& clip_registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
     const auto clip           = clip_registry.get(state_->anim.selected_clip_name);
     if (!clip) {
         return;

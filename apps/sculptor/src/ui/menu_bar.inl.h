@@ -138,7 +138,7 @@ inline void menu_bar::render(
                 "Delete Keyframe",
                 nullptr,
                 false,
-                state_->anim.selected_keyframe_id != gfx::invalid_keyframe_id
+                state_->anim.selected_keyframe_id != asset::invalid_keyframe_id
             )) {
             state_->anim.need_delete_keyframe = true;
         }

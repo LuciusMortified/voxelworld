@@ -3,16 +3,17 @@
 #ifndef VW_GFX_WORLD_GRID_CHUNK_INL_H
 #define VW_GFX_WORLD_GRID_CHUNK_INL_H
 
-#include "vw/gfx/model/model.h"
+#include "vw/asset/model/model.h"
 
 namespace vw::gfx {
 
+
 template <typename WD>
 chunk<WD>::chunk(
-    context_type& ctx, vec3i coord, std::shared_ptr<model> model, int32 voxel_scale
+    context_type& ctx, vec3i coord, std::shared_ptr<vw::asset::model> mdl, int32 voxel_scale
 )
     : guard_(ctx)
-    , model_(std::move(model)) {
+    , model_(std::move(mdl)) {
     guard_.template with<transform_component>();
     guard_.template with<model_component>();
     guard_.template with<spatial_component>();
@@ -67,7 +68,7 @@ auto chunk<WD>::is_empty(
 }
 
 template <typename WD>
-auto chunk<WD>::get_model() const -> std::shared_ptr<model> {
+auto chunk<WD>::get_model() const -> std::shared_ptr<vw::asset::model> {
     return model_;
 }
 

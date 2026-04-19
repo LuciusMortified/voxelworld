@@ -13,7 +13,7 @@
 #include "vw/core/mat4.h"
 #include "vw/core/math.h"
 #include "vw/core/types.h"
-#include "vw/gfx/model/model_identity.h"
+#include "vw/asset/model/model_identity.h"
 #include "vw/gfx/resource/buffer.h"
 #include "vw/gfx/resource/mesh.h"
 #include "vw/gfx/resource/staging_buffer.h"
@@ -22,7 +22,7 @@
 
 namespace vw::gfx {
 
-using vw::spatial::aabb;
+
 
 class vulkan_context;
 
@@ -108,12 +108,12 @@ public:
     combined_buffer& operator=(combined_buffer&&) noexcept = default;
 
     void allocate(
-        entity e, model_identity model_id, const mesh& mesh_data,
-        const mat4f& transform_matrix, const aabb& bounds
+        entity e, vw::asset::model_identity model_id, const mesh& mesh_data,
+        const mat4f& transform_matrix, const vw::spatial::aabb& bounds
     );
-    void allocate_mesh(model_identity model_id, const mesh& mesh_data);
-    void write_mesh(model_identity model_id, const mesh& mesh_data);
-    void write_transform(entity ent, const mat4f& transform_matrix, const aabb& bounds);
+    void allocate_mesh(vw::asset::model_identity model_id, const mesh& mesh_data);
+    void write_mesh(vw::asset::model_identity model_id, const mesh& mesh_data);
+    void write_transform(entity ent, const mat4f& transform_matrix, const vw::spatial::aabb& bounds);
     auto free(entity ent) -> std::optional<entity>;
 
     [[nodiscard]] auto get_entity_allocation(entity ent) -> const entity_allocation&;

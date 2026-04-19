@@ -85,7 +85,7 @@ static constexpr std::array<vec3i, 6> ao_tangent_v = {
 namespace detail {
 
 inline face_axis_mapping::face_axis_mapping(
-    const model& mdl, int face_dir
+    const vw::asset::model& mdl, int face_dir
 )
     : face_direction(face_dir), voxel_scale(mdl.voxel_scale()) {
     switch (face_dir / 2) {
@@ -139,7 +139,7 @@ inline face_axis_mapping::face_axis_mapping(
     }
 }
 
-inline auto is_solid_at(const model& mdl, vec3i p) -> bool {
+inline auto is_solid_at(const vw::asset::model& mdl, vec3i p) -> bool {
     const bool ox = p.x < 0 || p.x >= mdl.width();
     const bool oy = p.y < 0 || p.y >= mdl.height();
     const bool oz = p.z < 0 || p.z >= mdl.depth();
@@ -174,7 +174,7 @@ inline auto is_solid_at(const model& mdl, vec3i p) -> bool {
 }
 
 inline auto compute_corner_darkness(
-    const model& mdl, int x, int y, int z, int face
+    const vw::asset::model& mdl, int x, int y, int z, int face
 ) -> uint8 {
     const vec3i n = vec3i{x, y, z} + ao_normal[face];
     const vec3i u = ao_tangent_u[face];
@@ -206,7 +206,7 @@ inline auto compute_corner_darkness(
 }
 
 inline auto compute_corner_brightness(
-    const model& mdl, int x, int y, int z, int face
+    const vw::asset::model& mdl, int x, int y, int z, int face
 ) -> uint8 {
     const vec3i host = vec3i{x, y, z};
     const vec3i u = ao_tangent_u[face];
@@ -238,7 +238,7 @@ inline auto compute_corner_brightness(
 }
 
 inline auto is_face_visible(
-    const model& mdl, int x, int y, int z, int face_direction
+    const vw::asset::model& mdl, int x, int y, int z, int face_direction
 ) -> bool {
     static constexpr int dx[6] = {1, -1, 0, 0, 0, 0};
     static constexpr int dy[6] = {0, 0, 1, -1, 0, 0};
@@ -261,12 +261,12 @@ inline auto is_face_visible(
 
 inline void build_face_mask(
     mesh_generation_storage& storage,
-    const model& mdl,
+    const vw::asset::model& mdl,
     const face_axis_mapping& axes,
     int face_direction,
     int layer
 ) {
-    constexpr int ps = model::page_size;
+    constexpr int ps = vw::asset::model::page_size;
 
     auto idx = [&](int u, int v) -> size_t {
         return (static_cast<size_t>(u) * static_cast<size_t>(axes.height)) + static_cast<size_t>(v);
@@ -282,7 +282,7 @@ inline void build_face_mask(
             auto [pmx, pmy, pmz] = axes.to_model_coords(u_block, v_block, layer);
             auto pm              = mdl.get_page_mode(pmx / ps, pmy / ps, pmz / ps);
 
-            if (pm == page_mode::empty) {
+            if (pm == vw::asset::page_mode::empty) {
                 for (int u = u_block; u < u_end; u++) {
                     for (int v = v_block; v < v_end; v++) {
                         storage.mask[idx(u, v)] = empty_cell;
@@ -291,7 +291,7 @@ inline void build_face_mask(
                 continue;
             }
 
-            if (pm == page_mode::uniform) {
+            if (pm == vw::asset::page_mode::uniform) {
                 const auto fid = mdl.get_page_fill_id(pmx / ps, pmy / ps, pmz / ps);
                 for (int u = u_block; u < u_end; u++) {
                     for (int v = v_block; v < v_end; v++) {
@@ -381,7 +381,7 @@ inline void add_quad(
 
 inline void emit_rect(
     mesh_generation_storage& storage,
-    const model& mdl,
+    const vw::asset::model& mdl,
     const face_axis_mapping& axes,
     int face_direction,
     int layer,
@@ -405,23 +405,23 @@ inline void emit_rect(
 // ==================== simple_mesh_generator ====================
 
 inline auto simple_mesh_generator::generate_mesh_data(
-    const std::shared_ptr<model>& model, const block_registry& registry
+    const std::shared_ptr<vw::asset::model>& mdl, const block_registry& registry
 ) -> mesh {
-    if (!model) {
+    if (!mdl) {
         return mesh{};
     }
 
     std::vector<vertex> vertices;
     std::vector<uint32> indices;
 
-    for (int x = 0; x < model->width(); x++) {
-        for (int y = 0; y < model->height(); y++) {
-            for (int z = 0; z < model->depth(); z++) {
-                if (voxel voxel_obj = model->get_voxel(x, y, z); !voxel_obj.is_empty()) {
+    for (int x = 0; x < mdl->width(); x++) {
+        for (int y = 0; y < mdl->height(); y++) {
+            for (int z = 0; z < mdl->depth(); z++) {
+                if (voxel voxel_obj = mdl->get_voxel(x, y, z); !voxel_obj.is_empty()) {
                     for (int face = 0; face < 6; face++) {
-                        if (is_face_visible(model, x, y, z, face)) {
+                        if (is_face_visible(mdl, x, y, z, face)) {
                             add_cube_face(
-                                vertices, indices, model, x, y, z, face, voxel_obj.id, registry
+                                vertices, indices, mdl, x, y, z, face, voxel_obj.id, registry
                             );
                         }
                     }
@@ -436,7 +436,7 @@ inline auto simple_mesh_generator::generate_mesh_data(
 inline void simple_mesh_generator::add_cube_face(
     std::vector<vertex>& vertices,
     std::vector<uint32>& indices,
-    const std::shared_ptr<model>& model,
+    const std::shared_ptr<vw::asset::model>& mdl,
     int x,
     int y,
     int z,
@@ -444,17 +444,17 @@ inline void simple_mesh_generator::add_cube_face(
     block_id voxel_id,
     const block_registry& registry
 ) {
-    uint8 corner_dark  = detail::compute_corner_darkness(*model, x, y, z, face_direction);
-    uint8 corner_bright = detail::compute_corner_brightness(*model, x, y, z, face_direction);
+    uint8 corner_dark  = detail::compute_corner_darkness(*mdl, x, y, z, face_direction);
+    uint8 corner_bright = detail::compute_corner_brightness(*mdl, x, y, z, face_direction);
     detail::add_quad(
         vertices, indices, face_direction, {x, y, z}, {x + 1, y + 1, z + 1}, voxel_id, corner_dark, corner_bright
     );
 }
 
 inline auto simple_mesh_generator::is_face_visible(
-    const std::shared_ptr<model>& model, int x, int y, int z, int face_direction
+    const std::shared_ptr<vw::asset::model>& mdl, int x, int y, int z, int face_direction
 ) -> bool {
-    if (!model)
+    if (!mdl)
         return false;
 
     static constexpr int dx[6] = {1, -1, 0, 0, 0, 0};
@@ -465,18 +465,18 @@ inline auto simple_mesh_generator::is_face_visible(
     int ny = y + dy[face_direction];
     int nz = z + dz[face_direction];
 
-    if (nx < 0 || nx >= model->width() || ny < 0 || ny >= model->height() || nz < 0 ||
-        nz >= model->depth()) {
+    if (nx < 0 || nx >= mdl->width() || ny < 0 || ny >= mdl->height() || nz < 0 ||
+        nz >= mdl->depth()) {
         return true;
     }
 
-    return model->is_empty(nx, ny, nz);
+    return mdl->is_empty(nx, ny, nz);
 }
 
 // ==================== strip_mesh_generator ====================
 
 inline auto strip_mesh_generator::generate_mesh_data(
-    mesh_generation_storage& storage, const model& mdl, const block_registry& registry
+    mesh_generation_storage& storage, const vw::asset::model& mdl, const block_registry& registry
 ) -> mesh {
     storage.clear();
 
@@ -499,7 +499,7 @@ inline auto strip_mesh_generator::generate_mesh_data(
 
 inline void strip_mesh_generator::merge_and_emit_strips(
     mesh_generation_storage& storage,
-    const model& mdl,
+    const vw::asset::model& mdl,
     const detail::face_axis_mapping& axes,
     int face_direction,
     int layer,
@@ -544,12 +544,12 @@ inline void strip_mesh_generator::merge_and_emit_strips(
 
 inline void strip_mesh_generator::generate_face_quads(
     mesh_generation_storage& storage,
-    const model& mdl,
+    const vw::asset::model& mdl,
     int face_direction,
     const block_registry& registry
 ) {
     detail::face_axis_mapping axes(mdl, face_direction);
-    constexpr int ps = model::page_size;
+    constexpr int ps = vw::asset::model::page_size;
 
     auto mask_size = static_cast<size_t>(axes.width) * static_cast<size_t>(axes.height);
     storage.mask.resize(mask_size);
@@ -564,7 +564,7 @@ inline void strip_mesh_generator::generate_face_quads(
         for (int pu = 0; pu < u_pages && !storage.depth_has_pages[pd]; pu++) {
             for (int pv = 0; pv < v_pages && !storage.depth_has_pages[pd]; pv++) {
                 auto [mx, my, mz] = axes.to_model_coords(pu * ps, pv * ps, pd * ps);
-                if (mdl.get_page_mode(mx / ps, my / ps, mz / ps) != page_mode::empty) {
+                if (mdl.get_page_mode(mx / ps, my / ps, mz / ps) != vw::asset::page_mode::empty) {
                     storage.depth_has_pages[pd] = true;
                 }
             }
@@ -593,7 +593,7 @@ inline void strip_mesh_generator::generate_face_quads(
 // ==================== greedy_mesh_generator ====================
 
 inline auto greedy_mesh_generator::generate_mesh_data(
-    mesh_generation_storage& storage, const model& mdl, const block_registry& registry
+    mesh_generation_storage& storage, const vw::asset::model& mdl, const block_registry& registry
 ) -> mesh {
     storage.clear();
 
@@ -616,7 +616,7 @@ inline auto greedy_mesh_generator::generate_mesh_data(
 
 inline void greedy_mesh_generator::merge_and_emit_rects(
     mesh_generation_storage& storage,
-    const model& mdl,
+    const vw::asset::model& mdl,
     const detail::face_axis_mapping& axes,
     int face_direction,
     int layer,
@@ -668,12 +668,12 @@ inline void greedy_mesh_generator::merge_and_emit_rects(
 
 inline void greedy_mesh_generator::generate_face_quads(
     mesh_generation_storage& storage,
-    const model& mdl,
+    const vw::asset::model& mdl,
     int face_direction,
     const block_registry& registry
 ) {
     detail::face_axis_mapping axes(mdl, face_direction);
-    constexpr int ps = model::page_size;
+    constexpr int ps = vw::asset::model::page_size;
 
     auto mask_size = static_cast<size_t>(axes.width) * static_cast<size_t>(axes.height);
     storage.mask.resize(mask_size);
@@ -688,7 +688,7 @@ inline void greedy_mesh_generator::generate_face_quads(
         for (int pu = 0; pu < u_pages && !storage.depth_has_pages[pd]; pu++) {
             for (int pv = 0; pv < v_pages && !storage.depth_has_pages[pd]; pv++) {
                 auto [mx, my, mz] = axes.to_model_coords(pu * ps, pv * ps, pd * ps);
-                if (mdl.get_page_mode(mx / ps, my / ps, mz / ps) != page_mode::empty) {
+                if (mdl.get_page_mode(mx / ps, my / ps, mz / ps) != vw::asset::page_mode::empty) {
                     storage.depth_has_pages[pd] = true;
                 }
             }

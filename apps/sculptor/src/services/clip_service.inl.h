@@ -6,8 +6,8 @@
 #include <filesystem>
 
 #include "operations/close_clip_operation.h"
-#include "vw/gfx/world/serializers/voxa_deserializer.h"
-#include "vw/gfx/world/serializers/voxa_serializer.h"
+#include "vw/asset/voxa/voxa_deserializer.h"
+#include "vw/asset/voxa/voxa_serializer.h"
 
 namespace vw::sculptor {
 
@@ -21,7 +21,7 @@ inline auto clip_service::save_clip(
 ) const -> bool {
     namespace fs = std::filesystem;
 
-    const auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
+    const auto& registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(clip_name);
     if (!clip) {
         return false;
@@ -29,7 +29,7 @@ inline auto clip_service::save_clip(
 
     const fs::path asset_dir_path{app_state::asset_dir_name};
     const fs::path filepath = asset_dir_path / std::format("{}.voxa", clip->get_name());
-    gfx::voxa_serializer serializer(*clip);
+    asset::voxa_serializer serializer(*clip);
     const auto result = serializer.serialize(filepath);
     if (result.has_value()) {
         state_->anim.unsaved_clips[clip_name] = false;
@@ -42,7 +42,7 @@ inline auto clip_service::save_clip_as(
 ) const -> bool {
     namespace fs = std::filesystem;
 
-    auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
+    auto& registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
     auto clip      = registry.get(clip_name);
     if (!clip) {
         return false;
@@ -55,7 +55,7 @@ inline auto clip_service::save_clip_as(
 
     const fs::path asset_dir_path{app_state::asset_dir_name};
     const fs::path filepath = asset_dir_path / std::format("{}.voxa", new_name);
-    gfx::voxa_serializer serializer(*clip);
+    asset::voxa_serializer serializer(*clip);
     const auto result = serializer.serialize(filepath);
 
     state_->anim.unsaved_clips.erase(old_name);
@@ -81,7 +81,7 @@ inline auto clip_service::save_clip_as(
 inline void clip_service::save_all_clips() const {
     namespace fs = std::filesystem;
 
-    const auto& registry = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
+    const auto& registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
     const fs::path asset_dir_path{app_state::asset_dir_name};
 
     for (const auto& [name, clip] : registry.all()) {
@@ -90,7 +90,7 @@ inline void clip_service::save_all_clips() const {
         }
 
         fs::path filepath = asset_dir_path / std::format("{}.voxa", name);
-        gfx::voxa_serializer serializer(*clip);
+        asset::voxa_serializer serializer(*clip);
         if (serializer.serialize(filepath).has_value()) {
             state_->anim.unsaved_clips[name] = false;
         }
@@ -103,20 +103,20 @@ inline auto clip_service::load_clip(
     namespace fs = std::filesystem;
 
     const fs::path filepath = fs::path{app_state::asset_dir_name} / fs::path{filename};
-    gfx::voxa_deserializer deserializer;
+    asset::voxa_deserializer deserializer;
     const auto result = deserializer.deserialize(filepath);
     if (!result) {
         return false;
     }
 
     const auto& clip = *result;
-    auto& registry   = engine_->get_world().template get_resource<gfx::animation_clip_registry>();
+    auto& registry   = engine_->get_world().template get_resource<asset::animation_clip_registry>();
     registry.add(clip->get_name(), clip);
 
     state_->anim.selected_clip_name = clip->get_name();
     state_->ui.show_timeline        = true;
     state_->anim.selected_track_name.clear();
-    state_->anim.selected_keyframe_id = gfx::invalid_keyframe_id;
+    state_->anim.selected_keyframe_id = asset::invalid_keyframe_id;
 
     return true;
 }
