@@ -4,7 +4,6 @@
 #define VW_GFX_WORLD_CONTEXT_H
 
 #include <cassert>
-#include <memory>
 #include <typeindex>
 #include <unordered_map>
 
@@ -37,11 +36,11 @@ public:
         return *registry_;
     }
 
-    [[nodiscard]] auto get_world_grid() -> std::shared_ptr<world_grid_type> {
-        return world_grid_;
+    [[nodiscard]] auto get_grid() -> world_grid_type* {
+        return grid_;
     }
-    [[nodiscard]] auto get_world_grid() const -> std::shared_ptr<world_grid_type> {
-        return world_grid_;
+    [[nodiscard]] auto get_grid() const -> const world_grid_type* {
+        return grid_;
     }
 
     template <template <typename> class S>
@@ -121,7 +120,7 @@ private:
 
     registry_type*                    registry_    = nullptr;
     systems_tuple*                    systems_     = nullptr;
-    std::shared_ptr<world_grid_type>  world_grid_;
+    world_grid_type*                  grid_        = nullptr;
     std::unordered_map<std::type_index, void*> resources_;
 };
 

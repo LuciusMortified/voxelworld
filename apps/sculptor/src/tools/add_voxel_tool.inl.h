@@ -149,7 +149,7 @@ inline void add_voxel_tool::update_hovered_voxel_() {
     const auto& camera = engine_->get_camera();
 
     const auto ray = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
-    const auto hit = world.voxel_ray_cast(ray, ray_cast_entities_);
+    const auto hit = world.get_system<gfx::spatial_system>().voxel_ray_cast(ray, ray_cast_entities_);
     if (!hit) {
         hovered_voxel_ = vec3i{-1, -1, -1};
         return;

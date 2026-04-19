@@ -38,8 +38,6 @@ public:
 
     explicit world_grid_system(context_type& context);
 
-    [[nodiscard]] auto get_world_grid() const -> std::shared_ptr<world_grid<WD>>;
-
     void update(float32 dt);
 
     [[nodiscard]] auto get_stats() const -> const world_grid_system_stats&;

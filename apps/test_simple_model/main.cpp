@@ -203,7 +203,7 @@ private:
             auto ray    = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
             select_ray_ = ray;
 
-            auto voxel_hit = world.voxel_ray_cast(ray, selected_entities_);
+            auto voxel_hit = world.get_system<gfx::spatial_system>().voxel_ray_cast(ray, selected_entities_);
             if (voxel_hit.has_value()) {
                 selected_entity_    = voxel_hit->ent;
                 selected_voxel_     = voxel_hit->voxel_pos;

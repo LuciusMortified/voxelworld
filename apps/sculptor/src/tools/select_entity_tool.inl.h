@@ -68,7 +68,7 @@ inline void select_entity_tool::update_hovered_entity_() {
     const auto& camera = engine_->get_camera();
 
     const auto ray = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
-    const auto hit = world.voxel_ray_cast(ray, ray_cast_entities_);
+    const auto hit = world.get_system<gfx::spatial_system>().voxel_ray_cast(ray, ray_cast_entities_);
 
     if (!hit) {
         hovered_entity_ = gfx::invalid_entity;

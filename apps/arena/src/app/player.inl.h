@@ -108,7 +108,7 @@ inline auto player::try_place(
         return;
     }
 
-    const auto grid    = engine_.get_world().get_world_grid();
+    const auto grid    = engine_.get_world().get_grid();
     const auto surface = grid->get_surface_y(0, 0);
     if (!surface) {
         return;

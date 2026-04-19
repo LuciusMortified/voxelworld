@@ -38,7 +38,7 @@ inline auto dummy_enemy::try_place() -> void {
         return;
     }
 
-    const auto grid = engine_.get_world().get_world_grid();
+    const auto grid = engine_.get_world().get_grid();
     const auto vs   = grid->voxel_scale();
     const auto surface = grid->get_surface_y(
         static_cast<int32>(spawn_xz_.x / vs),

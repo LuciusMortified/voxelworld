@@ -3,20 +3,16 @@
 #ifndef VW_GFX_WORLD_H
 #define VW_GFX_WORLD_H
 
-#include <optional>
+#include <memory>
 #include <unordered_set>
 
 #include "vw/asset/animation/animation_clip_registry.h"
 #include "vw/asset/model/model_registry.h"
 #include "vw/gfx/world/base_world_def.h"
 #include "vw/gfx/world/entity_registry.h"
-#include "vw/gfx/world/systems/spatial_system.h"
 #include "vw/gfx/world/world_context.h"
-#include "vw/spatial/ray.h"
 
 namespace vw::gfx {
-
-
 
 template <typename WD>
 class world_grid;
@@ -73,8 +69,10 @@ public:
         return std::get<R>(resources_);
     }
 
-    void set_world_grid(std::shared_ptr<world_grid<WD>> grid);
-    [[nodiscard]] auto get_world_grid() const -> std::shared_ptr<world_grid<WD>>;
+    void set_grid(std::unique_ptr<world_grid<WD>> grid);
+    [[nodiscard]] auto get_grid() -> world_grid<WD>*;
+    [[nodiscard]] auto get_grid() const -> const world_grid<WD>*;
+    [[nodiscard]] auto has_grid() const -> bool;
 
     [[nodiscard]] auto get_context() -> context_type& { return context_; }
     [[nodiscard]] auto get_context() const -> const context_type& { return context_; }
@@ -83,9 +81,6 @@ public:
 
     template <typename T>
     [[nodiscard]] auto changed() -> std::unordered_set<entity>&;
-
-    [[nodiscard]] auto voxel_ray_cast(const vw::spatial::ray& r, std::vector<entity>& candidates) const
-        -> std::optional<voxel_ray_hit>;
 
     [[nodiscard]] auto destroyed() const -> const std::vector<entity>&;
 
@@ -104,10 +99,11 @@ private:
     [[nodiscard]] auto batch_create_entities(uint32 count) -> std::vector<entity>;
     void batch_destroy_entities(const std::vector<entity>& entities) noexcept;
 
-    registry_type  registry_;
-    context_type   context_;
-    systems_tuple  systems_;
-    resources_tuple resources_;
+    registry_type                    registry_;
+    context_type                     context_;
+    systems_tuple                    systems_;
+    resources_tuple                  resources_;
+    std::unique_ptr<world_grid<WD>>  grid_;
 };
 
 }  // namespace vw::gfx

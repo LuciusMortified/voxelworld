@@ -15,22 +15,17 @@ world_grid_system<WD>::world_grid_system(
     : context_(&context) {}
 
 template <typename WD>
-auto world_grid_system<WD>::get_world_grid() const -> std::shared_ptr<world_grid<WD>> {
-    return context_->get_world_grid();
-}
-
-template <typename WD>
 auto world_grid_system<WD>::get_stats() const -> const world_grid_system_stats& {
     return stats_;
 }
 
 template <typename WD>
 void world_grid_system<WD>::update(float32 /*dt*/) {
-    if (!context_->get_world_grid()) {
+    if (!context_->get_grid()) {
         return;
     }
 
-    stats_.process_completed_ms = measure_ms([&] { context_->get_world_grid()->process_completed(); });
+    stats_.process_completed_ms = measure_ms([&] { context_->get_grid()->process_completed(); });
     stats_.request_columns_ms   = measure_ms([&] { dispatch_column_requests(); });
     update_grid_stats();
 
@@ -57,7 +52,7 @@ void world_grid_system<WD>::dispatch_column_requests() {
     while (!pending_requests_.empty() && requests < max_requests_per_frame) {
         auto coord = pending_requests_.back();
         pending_requests_.pop_back();
-        if (context_->get_world_grid()->request_column(coord)) {
+        if (context_->get_grid()->request_column(coord)) {
             ++requests;
         }
     }
@@ -66,9 +61,9 @@ void world_grid_system<WD>::dispatch_column_requests() {
 template <typename WD>
 void world_grid_system<WD>::update_grid_stats() {
     stats_.active_count          = static_cast<uint32>(active_columns_.size());
-    stats_.pending_count         = context_->get_world_grid()->get_pending_column_count();
-    stats_.loaded_count          = context_->get_world_grid()->get_loaded_chunk_count();
-    stats_.deferred_remesh_count = context_->get_world_grid()->get_deferred_remesh_count();
+    stats_.pending_count         = context_->get_grid()->get_pending_column_count();
+    stats_.loaded_count          = context_->get_grid()->get_loaded_chunk_count();
+    stats_.deferred_remesh_count = context_->get_grid()->get_deferred_remesh_count();
     stats_.rebuild_active_ms     = 0.0f;
     stats_.unload_ms             = 0.0f;
 }
@@ -117,7 +112,7 @@ template <typename WD>
 void world_grid_system<WD>::unload_inactive_columns() {
     for (const auto& coord : active_columns_) {
         if (!pending_active_columns_.contains(coord)) {
-            context_->get_world_grid()->unload_column(coord);
+            context_->get_grid()->unload_column(coord);
         }
     }
 }
@@ -135,7 +130,7 @@ auto world_grid_system<WD>::process_dirty_entity(
     const auto& tc = context_->registry().template get<transform_component>(ent);
     auto pos = tc.get_position();
 
-    auto new_chunk_coord = context_->get_world_grid()->world_to_chunk_coord({
+    auto new_chunk_coord = context_->get_grid()->world_to_chunk_coord({
         static_cast<int32>(pos.x),
         static_cast<int32>(pos.y),
         static_cast<int32>(pos.z)
@@ -182,7 +177,7 @@ void world_grid_system<WD>::rebuild_pending_requests(
     pending_requests_.clear();
 
     for (const auto& coord : active_columns_) {
-        if (!context_->get_world_grid()->has_column(coord) && !context_->get_world_grid()->is_column_pending(coord)) {
+        if (!context_->get_grid()->has_column(coord) && !context_->get_grid()->is_column_pending(coord)) {
             pending_requests_.push_back(coord);
         }
     }

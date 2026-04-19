@@ -5,6 +5,9 @@
 
 #include <tuple>
 
+#include "vw/gfx/world/systems/spatial_system.h"
+#include "vw/gfx/world_grid/world_grid.h"
+
 namespace vw::gfx {
 
 namespace detail {
@@ -24,7 +27,8 @@ auto make_system_tuple(Ctx& ctx) -> Tuple {
 
 template <typename WD>
 world<WD>::~world() {
-    context_.world_grid_.reset();
+    grid_.reset();
+    context_.grid_ = nullptr;
 }
 
 template <typename WD>
@@ -82,15 +86,26 @@ auto world<WD>::view_components() -> component_view<registry_type, Cs...> {
 }
 
 template <typename WD>
-void world<WD>::set_world_grid(
-    std::shared_ptr<world_grid<WD>> grid
+void world<WD>::set_grid(
+    std::unique_ptr<world_grid<WD>> grid
 ) {
-    context_.world_grid_ = std::move(grid);
+    grid_ = std::move(grid);
+    context_.grid_ = grid_.get();
 }
 
 template <typename WD>
-auto world<WD>::get_world_grid() const -> std::shared_ptr<world_grid<WD>> {
-    return context_.world_grid_;
+auto world<WD>::get_grid() -> world_grid<WD>* {
+    return grid_.get();
+}
+
+template <typename WD>
+auto world<WD>::get_grid() const -> const world_grid<WD>* {
+    return grid_.get();
+}
+
+template <typename WD>
+auto world<WD>::has_grid() const -> bool {
+    return grid_ != nullptr;
 }
 
 template <typename WD>
@@ -107,13 +122,6 @@ auto world<WD>::changed() -> std::unordered_set<entity>& {
 template <typename WD>
 auto world<WD>::destroyed() const -> const std::vector<entity>& {
     return registry_.destroyed();
-}
-
-template <typename WD>
-auto world<WD>::voxel_ray_cast(
-    const vw::spatial::ray& r, std::vector<entity>& candidates
-) const -> std::optional<voxel_ray_hit> {
-    return std::get<spatial_system<WD>>(systems_).voxel_ray_cast(r, candidates);
 }
 
 template <typename WD>
