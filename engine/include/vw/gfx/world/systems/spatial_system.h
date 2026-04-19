@@ -8,19 +8,30 @@
 #include <span>
 #include <vector>
 
-#include "vw/gfx/spatial/aabb.h"
 #include "vw/gfx/spatial/dynamic_aabb_tree.h"
-#include "vw/gfx/spatial/frustum.h"
-#include "vw/gfx/spatial/ray.h"
 #include "vw/gfx/world/components/spatial_component.h"
-#include "vw/gfx/world/system_trait.h"
+#include "vw/gfx/world/entity.h"
 #include "vw/gfx/world/spatial_layer.h"
+#include "vw/gfx/world/system_trait.h"
 #include "vw/gfx/world/world_context.h"
+#include "vw/spatial/aabb.h"
+#include "vw/spatial/frustum.h"
+#include "vw/spatial/ray.h"
 
 namespace vw::gfx {
 
+using vw::spatial::aabb;
+using vw::spatial::frustum;
+using vw::spatial::ray;
+
 struct model_component;
 struct transform_component;
+
+struct voxel_ray_hit {
+    entity ent;
+    vec3i voxel_pos;
+    vec3i empty_pos;
+};
 
 template <typename WD>
 class spatial_system {

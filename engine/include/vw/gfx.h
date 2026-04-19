@@ -26,5 +26,9 @@
 #include "vw/gfx/window/window.h"
 #include "vw/gfx/world/world.h"
 #include "vw/gfx/world_grid/world_grid.h"
+#include "vw/spatial/aabb.h"
+#include "vw/spatial/frustum.h"
+#include "vw/spatial/plane.h"
+#include "vw/spatial/ray.h"
 
 #endif  //  VW_GFX_H

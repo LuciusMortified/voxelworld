@@ -14,9 +14,11 @@
 #include "vw/gfx/resource/buffer.h"
 #include "vw/gfx/resource/combined_buffer.h"
 #include "vw/gfx/resource/shader.h"
-#include "vw/gfx/spatial/frustum.h"
+#include "vw/spatial/frustum.h"
 
 namespace vw::gfx {
+
+using vw::spatial::frustum;
 
 class vulkan_context;
 

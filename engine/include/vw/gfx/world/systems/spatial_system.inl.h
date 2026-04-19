@@ -8,10 +8,10 @@
 #include <limits>
 
 #include "vw/core/math.h"
-#include "vw/gfx/spatial/aabb.h"
 #include "vw/gfx/world/components/model_component.h"
 #include "vw/gfx/world/components/transform_component.h"
 #include "vw/gfx/world/systems/spatial_system.h"
+#include "vw/spatial/aabb.h"
 
 namespace vw::gfx {
 

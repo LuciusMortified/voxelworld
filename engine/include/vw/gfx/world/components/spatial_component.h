@@ -4,10 +4,12 @@
 #define VW_GFX_WORLD_COMPONENTS_SPATIAL_COMPONENT_H
 
 #include "vw/core.h"
-#include "vw/gfx/spatial/aabb.h"
 #include "vw/gfx/world/spatial_layer.h"
+#include "vw/spatial/aabb.h"
 
 namespace vw::gfx {
+
+using vw::spatial::aabb;
 
 template <typename>
 class spatial_system;

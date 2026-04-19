@@ -4,10 +4,14 @@
 #define VW_GFX_CAMERA_H
 
 #include "vw/core.h"
-#include "vw/gfx/spatial/frustum.h"
-#include "vw/gfx/spatial/ray.h"
+#include "vw/spatial/frustum.h"
+#include "vw/spatial/ray.h"
 
 namespace vw::gfx {
+
+using vw::spatial::frustum;
+using vw::spatial::ray;
+
 class camera {
 public:
     explicit camera(

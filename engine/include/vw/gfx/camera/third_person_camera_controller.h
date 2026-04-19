@@ -8,9 +8,9 @@
 #include "vw/core.h"
 #include "vw/gfx/camera/camera.h"
 #include "vw/gfx/player/player_input_state.h"
-#include "vw/gfx/spatial/ray.h"
 #include "vw/gfx/world/spatial_layer.h"
 #include "vw/gfx/world/world.h"
+#include "vw/spatial/ray.h"
 
 namespace vw::gfx {
 

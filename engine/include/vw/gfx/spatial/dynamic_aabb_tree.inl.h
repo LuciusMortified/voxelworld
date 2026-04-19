@@ -8,6 +8,7 @@
 
 #include "vw/core/math.h"
 #include "vw/gfx/spatial/dynamic_aabb_tree.h"
+#include "vw/spatial/aabb.h"
 
 namespace vw::gfx {
 

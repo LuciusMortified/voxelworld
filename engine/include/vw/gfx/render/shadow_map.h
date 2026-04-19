@@ -9,9 +9,11 @@
 #include <memory>
 
 #include "vw/core.h"
-#include "vw/gfx/spatial/frustum.h"
+#include "vw/spatial/frustum.h"
 
 namespace vw::gfx {
+
+using vw::spatial::frustum;
 
 class vulkan_context;
 class camera;

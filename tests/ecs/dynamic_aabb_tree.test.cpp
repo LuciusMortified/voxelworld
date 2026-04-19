@@ -4,6 +4,7 @@
 
 using namespace vw;
 using namespace vw::gfx;
+using namespace vw::spatial;
 
 static auto make_entity(uint32 idx) -> entity {
     return entity{idx, 0};

@@ -1,12 +1,11 @@
 #pragma once
 
-#ifndef VW_GFX_SPATIAL_RAY_H
-#define VW_GFX_SPATIAL_RAY_H
+#ifndef VW_SPATIAL_RAY_H
+#define VW_SPATIAL_RAY_H
 
 #include "vw/core.h"
-#include "vw/gfx/world/entity.h"
 
-namespace vw::gfx {
+namespace vw::spatial {
 
 struct aabb;
 
@@ -22,14 +21,8 @@ struct ray {
     [[nodiscard]] bool intersects_at(const aabb& bounds, float& t_out) const;
 };
 
-struct voxel_ray_hit {
-    entity ent;
-    vec3i voxel_pos;
-    vec3i empty_pos;
-};
+}  // namespace vw::spatial
 
-}  // namespace vw::gfx
+#include "vw/spatial/ray.inl.h"
 
-#include "vw/gfx/spatial/ray.inl.h"
-
-#endif  // VW_GFX_SPATIAL_RAY_H
+#endif  // VW_SPATIAL_RAY_H

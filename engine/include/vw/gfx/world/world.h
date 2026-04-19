@@ -8,12 +8,15 @@
 
 #include "vw/gfx/animation/animation_clip_registry.h"
 #include "vw/gfx/model/model_registry.h"
-#include "vw/gfx/spatial/ray.h"
 #include "vw/gfx/world/base_world_def.h"
 #include "vw/gfx/world/entity_registry.h"
+#include "vw/gfx/world/systems/spatial_system.h"
 #include "vw/gfx/world/world_context.h"
+#include "vw/spatial/ray.h"
 
 namespace vw::gfx {
+
+using vw::spatial::ray;
 
 template <typename WD>
 class world_grid;

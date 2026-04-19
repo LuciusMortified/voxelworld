@@ -8,13 +8,17 @@
 #include <vector>
 
 #include "vw/core.h"
-#include "vw/gfx/spatial/aabb.h"
-#include "vw/gfx/spatial/frustum.h"
-#include "vw/gfx/spatial/ray.h"
 #include "vw/gfx/world/entity.h"
 #include "vw/gfx/world/spatial_layer.h"
+#include "vw/spatial/aabb.h"
+#include "vw/spatial/frustum.h"
+#include "vw/spatial/ray.h"
 
 namespace vw::gfx {
+
+using vw::spatial::aabb;
+using vw::spatial::frustum;
+using vw::spatial::ray;
 
 class dynamic_aabb_tree {
 public:

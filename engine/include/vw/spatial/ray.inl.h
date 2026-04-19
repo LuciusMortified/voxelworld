@@ -1,14 +1,15 @@
 #pragma once
 
-#ifndef VW_GFX_SPATIAL_RAY_INL_H
-#define VW_GFX_SPATIAL_RAY_INL_H
+#ifndef VW_SPATIAL_RAY_INL_H
+#define VW_SPATIAL_RAY_INL_H
 
-#include "vw/gfx/spatial/ray.h"
-#include "vw/gfx/spatial/aabb.h"
-#include "vw/core/math.h"
 #include <algorithm>
 
-namespace vw::gfx {
+#include "vw/core/math.h"
+#include "vw/spatial/aabb.h"
+#include "vw/spatial/ray.h"
+
+namespace vw::spatial {
 
 inline ray::ray(const vec3f& start, const vec3f& end)
     : start(start), end(end) {
@@ -33,8 +34,7 @@ inline bool ray::intersects_at(const aabb& bounds, float& t_out) const {
     float ray_len = length();
     float t_min = 0.0f;
     float t_max = ray_len;
-    
-    // Проверка по оси X
+
     float inv_dir_x = 1.0f / direction.x;
     float t0_x = (bounds.min.x - start.x) * inv_dir_x;
     float t1_x = (bounds.max.x - start.x) * inv_dir_x;
@@ -44,8 +44,7 @@ inline bool ray::intersects_at(const aabb& bounds, float& t_out) const {
     t_min = t0_x > t_min ? t0_x : t_min;
     t_max = t1_x < t_max ? t1_x : t_max;
     if (t_max < t_min) return false;
-    
-    // Проверка по оси Y
+
     float inv_dir_y = 1.0f / direction.y;
     float t0_y = (bounds.min.y - start.y) * inv_dir_y;
     float t1_y = (bounds.max.y - start.y) * inv_dir_y;
@@ -55,8 +54,7 @@ inline bool ray::intersects_at(const aabb& bounds, float& t_out) const {
     t_min = t0_y > t_min ? t0_y : t_min;
     t_max = t1_y < t_max ? t1_y : t_max;
     if (t_max < t_min) return false;
-    
-    // Проверка по оси Z
+
     float inv_dir_z = 1.0f / direction.z;
     float t0_z = (bounds.min.z - start.z) * inv_dir_z;
     float t1_z = (bounds.max.z - start.z) * inv_dir_z;
@@ -68,11 +66,10 @@ inline bool ray::intersects_at(const aabb& bounds, float& t_out) const {
     if (t_max < t_min) return false;
 
     t_out = t_min;
-    
+
     return true;
 }
 
-}  // namespace vw::gfx
+}  // namespace vw::spatial
 
-#endif  // VW_GFX_SPATIAL_RAY_INL_H
-
+#endif  // VW_SPATIAL_RAY_INL_H
