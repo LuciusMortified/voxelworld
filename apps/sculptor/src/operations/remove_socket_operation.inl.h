@@ -25,7 +25,7 @@ inline void remove_socket_operation::execute() {
     }
 
     const auto pkey = socket_state::socket_preview_key(params_.entity_name, params_.socket_name);
-    state_->sockets.socket_previews.erase(pkey);
+    state_->sockets.erase_preview(pkey, world);
     socket_sys.modify(ent).remove_socket(params_.socket_name);
     state_->file.has_unsaved_changes = true;
 }

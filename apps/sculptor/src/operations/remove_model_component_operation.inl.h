@@ -14,6 +14,9 @@ inline void remove_model_component_operation::execute() {
     auto& world          = engine_->get_world();
     auto& model_reg = world.template get_resource<asset::model_registry>();
 
+    if (!state_->scene.name_to_entity.contains(params_.name)) {
+        return;
+    }
     const auto ent         = state_->scene.name_to_entity[params_.name];
     const auto& model_comp = world.get_component<gfx::model_component>(ent);
 
@@ -21,13 +24,8 @@ inline void remove_model_component_operation::execute() {
         saved_model_ = model_comp.get_model();
     }
 
-    auto* guard = state_->scene.find_guard(ent);
-    if (!guard) {
-        return;
-    }
-
     model_reg.erase(params_.name);
-    guard->without<gfx::model_component>();
+    world.template remove_component<gfx::model_component>(ent);
     state_->file.has_unsaved_changes = true;
 }
 
@@ -35,13 +33,12 @@ inline void remove_model_component_operation::undo() {
     auto& world        = engine_->get_world();
     auto& model_sys = world.template get_system<gfx::model_system>();
 
-    const auto ent = state_->scene.name_to_entity[params_.name];
-    auto* guard    = state_->scene.find_guard(ent);
-    if (!guard) {
+    if (!state_->scene.name_to_entity.contains(params_.name)) {
         return;
     }
+    const auto ent = state_->scene.name_to_entity[params_.name];
 
-    guard->with<gfx::model_component>();
+    world.template add_component<gfx::model_component>(ent);
     model_sys.modify(ent).set_model(saved_model_);
     state_->file.has_unsaved_changes = true;
 }

@@ -1,18 +1,19 @@
 #pragma once
 
-#include "vw/gfx/world/entity.h"
 #ifndef VW_GFX_HIERARCHY_SYSTEM_INL_H
 #define VW_GFX_HIERARCHY_SYSTEM_INL_H
 
 #include <stdexcept>
 
+#include "vw/gfx/world/entity.h"
 #include "vw/gfx/world/systems/transform_system.h"
+#include "vw/gfx/world/world.h"
 
 namespace vw::gfx {
 
 template <typename WD>
-hierarchy_system<WD>::hierarchy_system(context_type& context)
-    : context_{&context} {}
+hierarchy_system<WD>::hierarchy_system(world_type& w)
+    : world_{&w} {}
 
 template <typename WD>
 void hierarchy_system<WD>::update(float32 /*dt*/) {}
@@ -28,28 +29,29 @@ template <typename WD>
 void hierarchy_system<WD>::cleanup(
     entity ent
 ) {
-    if (!context_->registry().template has<hierarchy_component>(ent)) {
+    auto& reg = world_->get_registry();
+    if (!reg.template has<hierarchy_component>(ent)) {
         return;
     }
 
-    auto& hierarchy_comp = context_->registry().template get<hierarchy_component>(ent);
+    auto& hierarchy_comp = reg.template get<hierarchy_component>(ent);
     auto parent = invalid_entity;
 
     if (hierarchy_comp.has_parent()) {
         parent = hierarchy_comp.get_parent();
-        if (context_->registry().template has<hierarchy_component>(parent)) {
-            auto& parent_comp = context_->registry().template get<hierarchy_component>(parent);
+        if (reg.template has<hierarchy_component>(parent)) {
+            auto& parent_comp = reg.template get<hierarchy_component>(parent);
             std::erase(parent_comp.children_, ent);
         }
     }
 
     const auto& children = hierarchy_comp.get_children();
     for (entity child : children) {
-        if (context_->registry().template has<hierarchy_component>(child)) {
-            auto& child_comp = context_->registry().template get<hierarchy_component>(child);
+        if (reg.template has<hierarchy_component>(child)) {
+            auto& child_comp = reg.template get<hierarchy_component>(child);
             child_comp.parent_ = invalid_entity;
 
-            context_->template get_system<transform_system>().modify(child).mark_world_dirty();
+            world_->template get_system<transform_system>().modify(child).mark_world_dirty();
         }
     }
 }
@@ -68,8 +70,9 @@ auto hierarchy_system<WD>::get_hierarchy_depth(
     int depth      = 0;
     entity current = ent;
 
-    while (context_->registry().template has<hierarchy_component>(current)) {
-        const auto& hierarchy_comp = context_->registry().template get<hierarchy_component>(current);
+    auto& reg = world_->get_registry();
+    while (reg.template has<hierarchy_component>(current)) {
+        const auto& hierarchy_comp = reg.template get<hierarchy_component>(current);
         if (!hierarchy_comp.has_parent()) {
             break;
         }
@@ -103,16 +106,18 @@ auto hierarchy_system<WD>::hierarchy_modifier::set_parent(entity parent)
         throw std::invalid_argument("setting parent to child would create a hierarchy cycle");
     }
 
-    if (system_->context_->registry().template has<hierarchy_component>(parent)) {
-        auto& parent_component = system_->context_->registry().template get<hierarchy_component>(parent);
+    auto& reg = system_->world_->get_registry();
+
+    if (reg.template has<hierarchy_component>(parent)) {
+        auto& parent_component = reg.template get<hierarchy_component>(parent);
         parent_component.children_.push_back(entity_);
     }
 
-    if (system_->context_->registry().template has<hierarchy_component>(entity_)) {
-        auto& child_component   = system_->context_->registry().template get<hierarchy_component>(entity_);
+    if (reg.template has<hierarchy_component>(entity_)) {
+        auto& child_component   = reg.template get<hierarchy_component>(entity_);
         child_component.parent_ = parent;
 
-        system_->context_->template get_system<transform_system>().modify(entity_).mark_world_dirty();
+        system_->world_->template get_system<transform_system>().modify(entity_).mark_world_dirty();
     }
 
     return *this;
@@ -120,12 +125,13 @@ auto hierarchy_system<WD>::hierarchy_modifier::set_parent(entity parent)
 
 template <typename WD>
 auto hierarchy_system<WD>::hierarchy_modifier::remove_parent() -> hierarchy_modifier& {
-    if (system_->context_->registry().template has<hierarchy_component>(entity_)) {
-        auto& child_component = system_->context_->registry().template get<hierarchy_component>(entity_);
+    auto& reg = system_->world_->get_registry();
+    if (reg.template has<hierarchy_component>(entity_)) {
+        auto& child_component = reg.template get<hierarchy_component>(entity_);
 
-        if (system_->context_->registry().template has<hierarchy_component>(child_component.parent_)) {
+        if (reg.template has<hierarchy_component>(child_component.parent_)) {
             auto& parent_component =
-                system_->context_->registry().template get<hierarchy_component>(child_component.parent_);
+                reg.template get<hierarchy_component>(child_component.parent_);
             std::erase_if(parent_component.children_, [this](entity e) {
                 return e == entity_;
             });
@@ -133,7 +139,7 @@ auto hierarchy_system<WD>::hierarchy_modifier::remove_parent() -> hierarchy_modi
 
         child_component.parent_ = invalid_entity;
 
-        system_->context_->template get_system<transform_system>().modify(entity_).mark_world_dirty();
+        system_->world_->template get_system<transform_system>().modify(entity_).mark_world_dirty();
     }
 
     return *this;
@@ -143,8 +149,9 @@ template <typename WD>
 auto hierarchy_system<WD>::check_hierarchy_cycle(entity parent, entity child) const -> bool {
     entity current = parent;
 
-    while (current.is_valid() && context_->registry().template has<hierarchy_component>(current)) {
-        const auto& current_component = context_->registry().template get<hierarchy_component>(current);
+    auto& reg = world_->get_registry();
+    while (current.is_valid() && reg.template has<hierarchy_component>(current)) {
+        const auto& current_component = reg.template get<hierarchy_component>(current);
         if (current_component.get_parent() == child) {
             return true;
         }

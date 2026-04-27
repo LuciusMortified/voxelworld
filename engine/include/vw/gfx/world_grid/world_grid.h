@@ -23,16 +23,19 @@ namespace vw::gfx {
 template <typename>
 class world_grid_system;
 
+template <typename>
+class world;
+
 template <typename WD>
 class world_grid {
-    using context_type = world_context<WD>;
-    using chunk_type   = chunk<WD>;
+    using world_type = world<WD>;
+    using chunk_type = chunk<WD>;
 
     template <typename>
     friend class world_grid_system;
 
 public:
-    explicit world_grid(context_type& ctx, std::unique_ptr<terrain_generator> generator,
+    explicit world_grid(world_type& w, std::unique_ptr<terrain_generator> generator,
                         int32 voxel_scale = 8);
     ~world_grid();
 
@@ -79,7 +82,7 @@ private:
     void process_completed();
     void gen_thread_function();
 
-    context_type* context_;
+    world_type* world_;
     int32 voxel_scale_{1};
     std::unordered_map<vec3i, std::unique_ptr<chunk_type>> chunks_;
     std::unordered_map<vec2i, std::vector<int32>> column_chunks_;

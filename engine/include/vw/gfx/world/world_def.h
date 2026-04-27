@@ -19,7 +19,7 @@ struct world_def {
     using resources = tuple_unique_t<
         tuple_cat_t<typename system_trait<Systems>::resources...>>;
 
-    using registry_type = typename entity_registry_from_tuple<components>::type;
+    using registry_type = entity_registry_from_tuple<components>::type;
 
     using systems_tuple = std::tuple<Systems<world_def>...>;
 

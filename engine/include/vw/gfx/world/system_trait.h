@@ -10,8 +10,6 @@
 
 namespace vw::gfx {
 
-/// Metadata for a system: what components it owns, what resources it needs.
-/// Specialize for each concrete system template.
 template <template <typename> class S>
 struct system_trait {
     using components = std::tuple<>;

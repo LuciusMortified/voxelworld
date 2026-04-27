@@ -3,32 +3,42 @@
 #ifndef VW_GFX_WORLD_H
 #define VW_GFX_WORLD_H
 
-#include <memory>
 #include <unordered_set>
 
 #include "vw/asset/animation/animation_clip_registry.h"
 #include "vw/asset/model/model_registry.h"
 #include "vw/gfx/world/base_world_def.h"
 #include "vw/gfx/world/entity_registry.h"
-#include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
 
-template <typename WD>
-class world_grid;
-
 template <typename WD = base_world_def>
 class world final {
-
 public:
-    using components       = typename WD::components;
-    using registry_type    = typename entity_registry_from_tuple<components>::type;
-    using context_type     = world_context<WD>;
-    using systems_tuple    = typename WD::systems_tuple;
-    using resources_tuple  = typename WD::resources;
+    using components      = WD::components;
+    using registry_type   = entity_registry_from_tuple<components>::type;
+    using systems_tuple   = WD::systems_tuple;
+    using resources_tuple = WD::resources;
+
+    class modifier {
+    public:
+        modifier(world& w, entity ent);
+
+        template <typename C>
+        auto with(C&& value = {}) -> modifier&;
+
+        template <typename C>
+        auto without() -> modifier&;
+
+        [[nodiscard]] auto get_entity() const -> entity;
+
+    private:
+        world* world_;
+        entity ent_;
+    };
 
     world();
-    ~world();
+    ~world() = default;
 
     world(const world&)                    = delete;
     auto operator=(const world&) -> world& = delete;
@@ -36,6 +46,21 @@ public:
     auto operator=(world&&) -> world&      = delete;
 
     void update(float32 delta_time);
+
+    [[nodiscard]] auto create_entity() -> entity;
+    void destroy_entity(entity ent) noexcept;
+
+    [[nodiscard]] auto batch_create_entities(uint32 count) -> std::vector<entity>;
+    void batch_destroy_entities(const std::vector<entity>& entities) noexcept;
+
+    [[nodiscard]] auto create() -> modifier;
+    [[nodiscard]] auto modify(entity ent) -> modifier;
+
+    template <typename T>
+    void add_component(entity ent, T&& value = {});
+
+    template <typename T>
+    void remove_component(entity ent) noexcept;
 
     template <typename T>
     [[nodiscard]] auto has_component(entity ent) const -> bool;
@@ -69,14 +94,6 @@ public:
         return std::get<R>(resources_);
     }
 
-    void set_grid(std::unique_ptr<world_grid<WD>> grid);
-    [[nodiscard]] auto get_grid() -> world_grid<WD>*;
-    [[nodiscard]] auto get_grid() const -> const world_grid<WD>*;
-    [[nodiscard]] auto has_grid() const -> bool;
-
-    [[nodiscard]] auto get_context() -> context_type& { return context_; }
-    [[nodiscard]] auto get_context() const -> const context_type& { return context_; }
-
     [[nodiscard]] auto get_registry() -> registry_type&;
 
     template <typename T>
@@ -87,23 +104,9 @@ public:
     void clear_changed();
 
 private:
-    template <typename T>
-    void add_component(entity ent, T&& value = {});
-
-    template <typename T>
-    void remove_component(entity ent) noexcept;
-
-    [[nodiscard]] auto create_entity() -> entity;
-    void destroy_entity(entity ent) noexcept;
-
-    [[nodiscard]] auto batch_create_entities(uint32 count) -> std::vector<entity>;
-    void batch_destroy_entities(const std::vector<entity>& entities) noexcept;
-
-    registry_type                    registry_;
-    context_type                     context_;
-    systems_tuple                    systems_;
-    resources_tuple                  resources_;
-    std::unique_ptr<world_grid<WD>>  grid_;
+    registry_type registry_;
+    systems_tuple systems_;
+    resources_tuple resources_;
 };
 
 }  // namespace vw::gfx

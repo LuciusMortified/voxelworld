@@ -45,9 +45,8 @@ inline void delete_entity_operation::execute() {
         state_->scene.selected_name = "";
     }
 
-    std::erase_if(state_->scene.entities, [ent](const auto& guard) {
-        return guard->get_entity() == ent;
-    });
+    world.destroy_entity(ent);
+    std::erase(state_->scene.entities, ent);
     state_->file.has_unsaved_changes = true;
 }
 
@@ -56,17 +55,17 @@ inline void delete_entity_operation::undo() {
     auto& hierarchy_sys = world.template get_system<gfx::hierarchy_system>();
     auto& transform_sys = world.template get_system<gfx::transform_system>();
 
-    auto ent_guard = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
-    ent_guard->with<gfx::hierarchy_component>();
-    ent_guard->with<gfx::transform_component>();
-    ent_guard->with<gfx::spatial_component>();
+    auto modifier = world.create()
+        .template with<gfx::hierarchy_component>()
+        .template with<gfx::transform_component>()
+        .template with<gfx::spatial_component>();
 
-    auto ent = ent_guard->get_entity();
+    const auto ent = modifier.get_entity();
 
     transform_sys.modify(ent).set_transform(transform_);
 
     if (with_model_) {
-        ent_guard->with<gfx::model_component>();
+        modifier.template with<gfx::model_component>();
 
         auto& model_sys = world.template get_system<gfx::model_system>();
         model_sys.modify(ent).set_model(saved_model_);
@@ -86,7 +85,7 @@ inline void delete_entity_operation::undo() {
     state_->scene.selected_name       = params_.name;
     state_->file.has_unsaved_changes = true;
 
-    state_->scene.entities.push_back(std::move(ent_guard));
+    state_->scene.entities.push_back(ent);
 }
 
 }  // namespace vw::sculptor

@@ -3,16 +3,69 @@
 #ifndef VW_SCULPTOR_STATE_INL_H
 #define VW_SCULPTOR_STATE_INL_H
 
+#include "vw/gfx/world/world.h"
+
 namespace vw::sculptor {
 
-inline auto scene_state::find_guard(
-    gfx::entity ent
-) const -> entity_guard_type* {
-    for (auto& g : entities) {
-        if (g->get_entity() == ent)
-            return g.get();
+inline void scene_state::clear_entities(
+    world_type& world
+) {
+    for (auto ent : entities) {
+        world.destroy_entity(ent);
     }
-    return nullptr;
+    entities.clear();
+    name_to_entity.clear();
+    entity_to_name.clear();
+}
+
+inline void socket_state::socket_preview::destroy_entities(
+    world_type& world
+) {
+    for (auto ent : entities) {
+        world.destroy_entity(ent);
+    }
+    entities.clear();
+}
+
+inline void socket_state::erase_preview(
+    const std::string& key, world_type& world
+) {
+    const auto it = socket_previews.find(key);
+    if (it == socket_previews.end()) {
+        return;
+    }
+    it->second.destroy_entities(world);
+    socket_previews.erase(it);
+}
+
+inline void socket_state::erase_previews_for(
+    const std::string& entity_name, world_type& world
+) {
+    const auto prefix = entity_name + ":";
+    std::erase_if(socket_previews, [&](auto& kv) {
+        if (kv.first.starts_with(prefix)) {
+            kv.second.destroy_entities(world);
+            return true;
+        }
+        return false;
+    });
+}
+
+inline void socket_state::clear_all(
+    world_type& world
+) {
+    for (auto& preview : socket_previews | std::views::values) {
+        preview.destroy_entities(world);
+    }
+    socket_previews.clear();
+}
+
+inline void app_state::reset(
+    world_type& world
+) {
+    scene.clear_entities(world);
+    sockets.clear_all(world);
+    *this = app_state{};
 }
 
 inline auto animation_state::has_unsaved_clip(

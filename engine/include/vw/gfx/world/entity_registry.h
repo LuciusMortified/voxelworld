@@ -12,6 +12,7 @@
 
 #include "vw/gfx/world/component_change_deps.h"
 #include "vw/gfx/world/component_pool.h"
+#include "vw/gfx/world/entity_archetype.h"
 #include "vw/gfx/world/entity_pool.h"
 
 namespace vw::gfx {
@@ -39,6 +40,8 @@ consteval auto type_index_in() -> size_t {
 template <typename... Ts>
 class entity_registry {
 public:
+    using archetype_type = entity_archetype<Ts...>;
+
     template <typename T>
     auto get_pool() -> component_pool<T>& {
         constexpr size_t index = type_index_in<T, Ts...>();
@@ -56,27 +59,40 @@ public:
     }
 
     auto create() -> entity {
-        return entity_pool_.create();
+        auto e = entity_pool_.create();
+        ensure_archetype_slot_(e.index);
+        return e;
     }
 
     [[nodiscard]]
     auto batch_create(uint32 count) -> std::vector<entity> {
-        return entity_pool_.batch_create(count);
+        auto entities = entity_pool_.batch_create(count);
+        for (auto e : entities) {
+            ensure_archetype_slot_(e.index);
+        }
+        return entities;
     }
 
     template <typename T>
     void add(entity e, T&& value = {}) {
         get_pool<T>().add(e, std::forward<T>(value));
+        archetypes_[e.index].template set<T>();
     }
 
     template <typename T>
     void batch_add(const std::vector<entity>& entities, const T& value = {}) {
         get_pool<T>().batch_add(entities, value);
+        for (auto e : entities) {
+            archetypes_[e.index].template set<T>();
+        }
     }
 
     template <typename T>
     [[nodiscard]] auto has(entity ent) const -> bool {
-        return get_pool<T>().has(ent);
+        if (!entity_pool_.has(ent)) {
+            return false;
+        }
+        return archetypes_[ent.index].template has<T>();
     }
 
     template <typename T>
@@ -92,24 +108,46 @@ public:
     template <typename T>
     void remove(entity e) {
         get_pool<T>().remove(e);
+        archetypes_[e.index].template unset<T>();
     }
 
     template <typename T>
     void batch_remove(const std::vector<entity>& entities) {
         get_pool<T>().batch_remove(entities);
+        for (auto e : entities) {
+            archetypes_[e.index].template unset<T>();
+        }
     }
 
     void remove_all(entity e) {
         (remove<Ts>(e), ...);
     }
 
+    [[nodiscard]] auto archetype(entity e) const -> const archetype_type& {
+        return archetypes_[e.index];
+    }
+
+    template <typename F>
+    void for_each_component(entity e, F&& f) const {
+        const auto& arch = archetypes_[e.index];
+        (apply_if_present_<Ts>(arch, f), ...);
+    }
+
     void destroy(entity e) {
         destroyed_set_.push_back(e);
+        if (e.index < archetypes_.size()) {
+            archetypes_[e.index].clear();
+        }
         entity_pool_.destroy(e);
     }
 
     void batch_destroy(const std::vector<entity>& entities) {
         destroyed_set_.insert(destroyed_set_.end(), entities.begin(), entities.end());
+        for (auto e : entities) {
+            if (e.index < archetypes_.size()) {
+                archetypes_[e.index].clear();
+            }
+        }
         entity_pool_.batch_destroy(entities);
     }
 
@@ -174,8 +212,24 @@ private:
         }
     }
 
+    void ensure_archetype_slot_(uint32 index) {
+        if (index >= archetypes_.size()) {
+            archetypes_.resize(index + 1);
+        } else {
+            archetypes_[index].clear();
+        }
+    }
+
+    template <typename C, typename F>
+    void apply_if_present_(const archetype_type& arch, F& f) const {
+        if (arch.template has<C>()) {
+            f.template operator()<C>();
+        }
+    }
+
     entity_pool entity_pool_;
     std::tuple<component_pool<Ts>...> component_pools_;
+    std::vector<archetype_type> archetypes_;
     std::array<std::unordered_set<entity>, sizeof...(Ts)> request_sets_;
     std::array<std::unordered_set<entity>, sizeof...(Ts)> changed_sets_;
     std::vector<entity> destroyed_set_;

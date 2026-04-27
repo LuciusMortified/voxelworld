@@ -5,17 +5,19 @@
 
 #include "vw/gfx/world/components/transform_component.h"
 #include "vw/gfx/world/systems/transform_system.h"
+#include "vw/gfx/world/world.h"
 
 namespace vw::gfx {
 
 template <typename WD>
-character_controller_system<WD>::character_controller_system(context_type& context)
-    : context_(&context) {}
+character_controller_system<WD>::character_controller_system(world_type& w)
+    : world_(&w) {}
 
 template <typename WD>
 void character_controller_system<WD>::update(float32 delta_time) {
+    auto& reg = world_->get_registry();
     for (auto [ent, cc, rb, mi] :
-         context_->registry().template view<character_controller_component, rigid_body_component, movement_intent_component>()) {
+         reg.template view<character_controller_component, rigid_body_component, movement_intent_component>()) {
 
         if (rb.is_frozen()) {
             cc.jump_requested_ = false;
@@ -33,12 +35,12 @@ void character_controller_system<WD>::update(float32 delta_time) {
         }
 
         auto facing_len = math::length(cc.facing_direction_);
-        if (facing_len > 0.001f && context_->registry().template has<transform_component>(ent)) {
-            const auto& tc = context_->registry().template get<transform_component>(ent);
+        if (facing_len > 0.001f && reg.template has<transform_component>(ent)) {
+            const auto& tc = reg.template get<transform_component>(ent);
             auto target = math::quat_look_y(cc.facing_direction_);
             auto current = tc.get_rotation();
             float32 t = math::clamp(cc.rotation_speed_ * delta_time, 0.0f, 1.0f);
-            context_->template get_system<transform_system>().modify(ent).set_rotation(math::slerp(current, target, t));
+            world_->template get_system<transform_system>().modify(ent).set_rotation(math::slerp(current, target, t));
         }
 
         cc.jump_requested_ = false;
@@ -63,10 +65,11 @@ template <typename WD>
 auto character_controller_system<WD>::controller_modifier::set_move_input(
     const vec3f& input
 ) -> controller_modifier& {
-    if (!system_->context_->registry().template has<character_controller_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<character_controller_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry().template get<character_controller_component>(entity_);
+    auto& comp = reg.template get<character_controller_component>(entity_);
     comp.move_input_ = input;
     return *this;
 }
@@ -75,10 +78,11 @@ template <typename WD>
 auto character_controller_system<WD>::controller_modifier::set_facing_direction(
     const vec3f& direction
 ) -> controller_modifier& {
-    if (!system_->context_->registry().template has<character_controller_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<character_controller_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry().template get<character_controller_component>(entity_);
+    auto& comp = reg.template get<character_controller_component>(entity_);
     comp.facing_direction_ = direction;
     return *this;
 }
@@ -87,10 +91,11 @@ template <typename WD>
 auto character_controller_system<WD>::controller_modifier::set_move_speed(
     float32 speed
 ) -> controller_modifier& {
-    if (!system_->context_->registry().template has<character_controller_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<character_controller_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry().template get<character_controller_component>(entity_);
+    auto& comp = reg.template get<character_controller_component>(entity_);
     comp.move_speed_ = speed;
     return *this;
 }
@@ -99,10 +104,11 @@ template <typename WD>
 auto character_controller_system<WD>::controller_modifier::set_jump_impulse(
     float32 impulse
 ) -> controller_modifier& {
-    if (!system_->context_->registry().template has<character_controller_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<character_controller_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry().template get<character_controller_component>(entity_);
+    auto& comp = reg.template get<character_controller_component>(entity_);
     comp.jump_impulse_ = impulse;
     return *this;
 }
@@ -111,10 +117,11 @@ template <typename WD>
 auto character_controller_system<WD>::controller_modifier::set_rotation_speed(
     float32 speed
 ) -> controller_modifier& {
-    if (!system_->context_->registry().template has<character_controller_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<character_controller_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry().template get<character_controller_component>(entity_);
+    auto& comp = reg.template get<character_controller_component>(entity_);
     comp.rotation_speed_ = speed;
     return *this;
 }
@@ -122,10 +129,11 @@ auto character_controller_system<WD>::controller_modifier::set_rotation_speed(
 template <typename WD>
 auto character_controller_system<WD>::controller_modifier::request_jump(
 ) -> controller_modifier& {
-    if (!system_->context_->registry().template has<character_controller_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<character_controller_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry().template get<character_controller_component>(entity_);
+    auto& comp = reg.template get<character_controller_component>(entity_);
     comp.jump_requested_ = true;
     return *this;
 }

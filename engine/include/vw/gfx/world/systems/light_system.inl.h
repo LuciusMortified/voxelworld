@@ -4,25 +4,34 @@
 #define VW_GFX_WORLD_SYSTEMS_LIGHT_SYSTEM_INL_H
 
 #include "vw/gfx/world/systems/light_system.h"
+#include "vw/gfx/world/world.h"
 
 namespace vw::gfx {
 
 template <typename WD>
-light_system<WD>::light_system(context_type& context)
-    : context_(&context) {}
+light_system<WD>::light_system(world_type& w)
+    : world_(&w) {}
+
+template <typename WD>
+template <typename C>
+    requires std::same_as<C, light_component>
+void light_system<WD>::on_add(entity e) {
+    world_->get_registry().template request_change<light_component>(e);
+}
 
 template <typename WD>
 void light_system<WD>::update(float32 /*dt*/) {
-    auto& requested = context_->registry().template requested<light_component>();
+    auto& reg       = world_->get_registry();
+    auto& requested = reg.template requested<light_component>();
     if (requested.empty()) {
         return;
     }
 
     for (entity ent : requested) {
-        context_->registry().template notify_changed<light_component>(ent);
+        reg.template notify_changed<light_component>(ent);
     }
 
-    context_->registry().template clear_requested<light_component>();
+    reg.template clear_requested<light_component>();
 }
 
 template <typename WD>
@@ -40,12 +49,13 @@ template <typename WD>
 auto light_system<WD>::light_modifier::set_color(
     const vec3f& color
 ) -> light_modifier& {
-    if (!system_->context_->registry().template has<light_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<light_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry().template get<light_component>(entity_);
+    auto& comp = reg.template get<light_component>(entity_);
     comp.color_ = color;
-    system_->context_->registry().template request_change<light_component>(entity_);
+    reg.template request_change<light_component>(entity_);
     return *this;
 }
 
@@ -53,12 +63,13 @@ template <typename WD>
 auto light_system<WD>::light_modifier::set_intensity(
     float32 intensity
 ) -> light_modifier& {
-    if (!system_->context_->registry().template has<light_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<light_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry().template get<light_component>(entity_);
+    auto& comp = reg.template get<light_component>(entity_);
     comp.intensity_ = intensity;
-    system_->context_->registry().template request_change<light_component>(entity_);
+    reg.template request_change<light_component>(entity_);
     return *this;
 }
 
@@ -66,12 +77,13 @@ template <typename WD>
 auto light_system<WD>::light_modifier::set_range(
     float32 range
 ) -> light_modifier& {
-    if (!system_->context_->registry().template has<light_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<light_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry().template get<light_component>(entity_);
+    auto& comp = reg.template get<light_component>(entity_);
     comp.range_ = range;
-    system_->context_->registry().template request_change<light_component>(entity_);
+    reg.template request_change<light_component>(entity_);
     return *this;
 }
 
@@ -79,14 +91,15 @@ template <typename WD>
 auto light_system<WD>::light_modifier::set_attenuation(
     float32 constant, float32 linear, float32 quadratic
 ) -> light_modifier& {
-    if (!system_->context_->registry().template has<light_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<light_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry().template get<light_component>(entity_);
+    auto& comp = reg.template get<light_component>(entity_);
     comp.attenuation_constant_ = constant;
     comp.attenuation_linear_ = linear;
     comp.attenuation_quadratic_ = quadratic;
-    system_->context_->registry().template request_change<light_component>(entity_);
+    reg.template request_change<light_component>(entity_);
     return *this;
 }
 

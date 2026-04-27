@@ -88,12 +88,12 @@ inline void set_socket_transform_operation::update_preview_(
     }
 
     const auto& preview = it->second;
-    if (preview.guards.empty()) {
+    if (preview.entities.empty()) {
         return;
     }
 
     auto& transform_sys = engine_->get_world().template get_system<gfx::transform_system>();
-    transform_sys.modify(preview.guards[0]->get_entity())
+    transform_sys.modify(preview.entities[0])
         .set_position(position)
         .set_rotation(rotation)
         .set_scale(scale);

@@ -1,9 +1,6 @@
 #include <vw/core.h>
 #include <vw/gfx.h>
 
-#include "vw/gfx/world/entity_guard.h"
-#include "vw/gfx/world/entity_guard_group.h"
-
 using namespace vw;
 
 class simple_model_app final : public gfx::app<> {
@@ -41,7 +38,11 @@ public:
         create_flower_model();
     }
 
-    ~simple_model_app() override = default;
+    ~simple_model_app() override {
+        if (flower_.is_valid()) {
+            get_engine().get_world().destroy_entity(flower_);
+        }
+    }
 
     void render(
         float delta_time
@@ -109,43 +110,22 @@ private:
         model_->set_voxel(0, 4, 1, voxel{blocks::white});
         model_->set_voxel(2, 4, 1, voxel{blocks::white});
 
-        flower_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
-        flower_->with<gfx::transform_component>();
-        flower_->with<gfx::model_component>();
-        flower_->with<gfx::hierarchy_component>();
-        flower_->with<gfx::spatial_component>();
+        flower_ = world.create()
+            .with<gfx::transform_component>()
+            .with<gfx::model_component>()
+            .with<gfx::hierarchy_component>()
+            .with<gfx::spatial_component>()
+            .get_entity();
 
-        // Настраиваем transform
-        transform_sys.modify(flower_->get_entity())
+        transform_sys.modify(flower_)
             .set_origin({-1.5f, 0.f, -1.5f})
             .set_position({0.f, 0.0f, 0.f})
             .set_scale({0.5f, 0.5f, 0.5f});
 
-        // Настраиваем модель через model_system
-        model_sys.modify(flower_->get_entity()).set_model(model_);
+        model_sys.modify(flower_).set_model(model_);
 
         object_rotation_       = 0.0f;
         object_rotation_speed_ = math::radians(5.0f);
-
-// Стресс-тест инстансами одной модели
-#if 0
-        stress_group_ = std::make_unique<gfx::entity_guard_group<gfx::base_world_def>>(world, 9999);
-        stress_group_->with<gfx::transform_component>();
-        stress_group_->with<gfx::model_component>();
-        stress_group_->with<gfx::spatial_component>();
-
-        for (auto ent : *stress_group_) {
-            transform_sys.modify(ent)
-                .set_position({
-                    static_cast<float>(std::rand() % 100),
-                    static_cast<float>(std::rand() % 100),
-                    static_cast<float>(std::rand() % 100),
-                })
-                .set_origin({1.5f, 3.0f, 1.5f});
-
-            model_sys.modify(ent).set_model(model_);
-        }
-#endif
     }
 
     void update_object_rotation(
@@ -159,11 +139,11 @@ private:
 
         auto& world            = get_engine().get_world();
         auto& transform_sys = world.template get_system<gfx::transform_system>();
-        transform_sys.modify(flower_->get_entity()).set_rotation(math::euler_to_quat({0.0f, object_rotation_, 0.0f}));
+        transform_sys.modify(flower_).set_rotation(math::euler_to_quat({0.0f, object_rotation_, 0.0f}));
 
-        if (world.has_component<gfx::transform_component>(flower_->get_entity())) {
+        if (world.has_component<gfx::transform_component>(flower_)) {
             const auto matrix =
-                world.get_component<gfx::transform_component>(flower_->get_entity())
+                world.get_component<gfx::transform_component>(flower_)
                     .get_world_matrix();
             get_engine().get_renderer().draw_grid(matrix, 1.f, 3, 3, colors::white);
         }
@@ -274,8 +254,7 @@ private:
     float object_rotation_{};
     float object_rotation_speed_{};
 
-    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> flower_;
-    std::unique_ptr<gfx::entity_guard_group<gfx::base_world_def>> stress_group_;
+    gfx::entity flower_ = gfx::invalid_entity;
 
     std::vector<gfx::entity> selected_entities_;
     gfx::entity selected_entity_ = gfx::invalid_entity;

@@ -33,12 +33,11 @@ template <typename WC>
 void vox_deserializer<WC>::apply_entity_(
     const vw::asset::vox_entity_data& data, result& res, const options& opts
 ) {
-    auto ent_guard = std::make_unique<entity_guard<WC>>(world_->get_context());
-    ent_guard->template with<hierarchy_component>();
-    ent_guard->template with<transform_component>();
-    ent_guard->template with<spatial_component>();
-
-    auto ent = ent_guard->get_entity();
+    const auto ent = world_->create()
+        .template with<hierarchy_component>()
+        .template with<transform_component>()
+        .template with<spatial_component>()
+        .get_entity();
 
     res.name_to_entity[data.name] = ent;
     res.entity_to_name[ent]       = data.name;
@@ -59,7 +58,7 @@ void vox_deserializer<WC>::apply_entity_(
     }
 
     if (data.animation_target_name.has_value() && !opts.skip_targets) {
-        ent_guard->template with<animation_target_component>();
+        world_->template add_component<animation_target_component>(ent);
         auto& anim_sys = world_->template get_system<animation_system>();
         auto target_mod = anim_sys.modify_target(ent);
         target_mod.set_target_name(*data.animation_target_name);
@@ -74,7 +73,7 @@ void vox_deserializer<WC>::apply_entity_(
     }
 
     if (data.has_sockets && !opts.skip_sockets) {
-        ent_guard->template with<socket_component>();
+        world_->template add_component<socket_component>(ent);
         auto& socket_sys = world_->template get_system<socket_system>();
         for (const auto& sp : data.sockets) {
             socket_sys.modify(ent).add_socket(
@@ -87,7 +86,7 @@ void vox_deserializer<WC>::apply_entity_(
         auto& model_reg = world_->template get_resource<vw::asset::model_registry>();
         auto model_ptr = model_reg.create(data.name, data.model->size);
 
-        ent_guard->template with<model_component>();
+        world_->template add_component<model_component>(ent);
 
         auto& model_sys = world_->template get_system<model_system>();
         model_sys.modify(ent).set_model(model_ptr);
@@ -97,7 +96,7 @@ void vox_deserializer<WC>::apply_entity_(
         }
     }
 
-    res.entities.push_back(std::move(ent_guard));
+    res.entities.push_back(ent);
 }
 
 }  // namespace vw::gfx

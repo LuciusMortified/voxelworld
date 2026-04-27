@@ -11,29 +11,25 @@ inline add_socket_component_operation::add_socket_component_operation(
     : engine_(&engine), state_(&state), params_(params) {}
 
 inline void add_socket_component_operation::execute() {
-    const auto ent = state_->scene.name_to_entity[params_.name];
-    auto* guard    = state_->scene.find_guard(ent);
-    if (!guard) {
+    if (!state_->scene.name_to_entity.contains(params_.name)) {
         return;
     }
+    const auto ent = state_->scene.name_to_entity[params_.name];
 
-    guard->with<gfx::socket_component>();
+    engine_->get_world().template add_component<gfx::socket_component>(ent);
     state_->file.has_unsaved_changes = true;
 }
 
 inline void add_socket_component_operation::undo() {
-    const auto ent = state_->scene.name_to_entity[params_.name];
-    auto* guard    = state_->scene.find_guard(ent);
-    if (!guard) {
+    if (!state_->scene.name_to_entity.contains(params_.name)) {
         return;
     }
+    const auto ent = state_->scene.name_to_entity[params_.name];
 
-    const auto& entity_name = params_.name;
-    std::erase_if(state_->sockets.socket_previews, [&entity_name](const auto& kv) {
-        return kv.first.starts_with(entity_name + ":");
-    });
+    auto& world = engine_->get_world();
+    state_->sockets.erase_previews_for(params_.name, world);
 
-    guard->without<gfx::socket_component>();
+    world.template remove_component<gfx::socket_component>(ent);
     state_->file.has_unsaved_changes = true;
 }
 

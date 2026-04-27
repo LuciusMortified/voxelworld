@@ -8,6 +8,7 @@
 #include <vw/gfx/world/systems/hierarchy_system.h>
 #include <vw/gfx/world/systems/transform_system.h>
 #include <vw/gfx/world/systems/spatial_system.h>
+#include <vw/gfx/world/world.h>
 #include <vw/gfx/world/world_def.h>
 
 using namespace vw;
@@ -87,21 +88,12 @@ TEST_CASE("socket_point default attached is invalid", "[socket]") {
 using test_def = world_def<hierarchy_system, transform_system, spatial_system, socket_system>;
 
 struct socket_test_fixture {
-    test_def::registry_type reg;
-    world_context<test_def> ctx{reg};
-    test_def::systems_tuple systems_{
-        hierarchy_system<test_def>{ctx},
-        transform_system<test_def>{ctx},
-        spatial_system<test_def>{ctx},
-        socket_system<test_def>{ctx}};
+    world<test_def> w;
 
-    socket_system<test_def>& socket_sys = std::get<socket_system<test_def>>(systems_);
-    hierarchy_system<test_def>& hierarchy_sys = std::get<hierarchy_system<test_def>>(systems_);
-    transform_system<test_def>& transform_sys = std::get<transform_system<test_def>>(systems_);
-
-    socket_test_fixture() {
-        ctx.set_systems_ptr_(&systems_);
-    }
+    test_def::registry_type& reg = w.get_registry();
+    socket_system<test_def>& socket_sys = w.get_system<socket_system>();
+    hierarchy_system<test_def>& hierarchy_sys = w.get_system<hierarchy_system>();
+    transform_system<test_def>& transform_sys = w.get_system<transform_system>();
 
     auto create_entity() -> entity {
         auto ent = reg.create();

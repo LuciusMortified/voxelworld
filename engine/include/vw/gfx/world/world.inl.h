@@ -5,41 +5,32 @@
 
 #include <tuple>
 
+#include "vw/gfx/world/system_trait.h"
 #include "vw/gfx/world/systems/spatial_system.h"
-#include "vw/gfx/world_grid/world_grid.h"
 
 namespace vw::gfx {
 
 namespace detail {
 
-template <typename Tuple, typename Ctx, std::size_t... Is>
-auto make_system_tuple_impl(Ctx& ctx, std::index_sequence<Is...>) -> Tuple {
-    return Tuple{std::tuple_element_t<Is, Tuple>(ctx)...};
+template <typename Tuple, typename W, std::size_t... Is>
+auto make_system_tuple_impl(W& w, std::index_sequence<Is...>) -> Tuple {
+    return Tuple{std::tuple_element_t<Is, Tuple>(w)...};
 }
 
-template <typename Tuple, typename Ctx>
-auto make_system_tuple(Ctx& ctx) -> Tuple {
+template <typename Tuple, typename W>
+auto make_system_tuple(W& w) -> Tuple {
     return make_system_tuple_impl<Tuple>(
-        ctx, std::make_index_sequence<std::tuple_size_v<Tuple>>{});
+        w, std::make_index_sequence<std::tuple_size_v<Tuple>>{});
 }
 
 }  // namespace detail
 
 template <typename WD>
-world<WD>::~world() {
-    grid_.reset();
-    context_.grid_ = nullptr;
-}
-
-template <typename WD>
 world<WD>::world()
-    : context_{registry_}
-    , systems_{detail::make_system_tuple<systems_tuple>(context_)}
+    : registry_{}
+    , systems_{detail::make_system_tuple<systems_tuple>(*this)}
     , resources_{}
-{
-    context_.systems_ = &systems_;
-    std::apply([this](auto&... r) { (context_.register_resource_(&r), ...); }, resources_);
-}
+{}
 
 template <typename WD>
 void world<WD>::update(
@@ -83,29 +74,6 @@ template <typename WD>
 template <typename... Cs>
 auto world<WD>::view_components() -> component_view<registry_type, Cs...> {
     return registry_.template view<Cs...>();
-}
-
-template <typename WD>
-void world<WD>::set_grid(
-    std::unique_ptr<world_grid<WD>> grid
-) {
-    grid_ = std::move(grid);
-    context_.grid_ = grid_.get();
-}
-
-template <typename WD>
-auto world<WD>::get_grid() -> world_grid<WD>* {
-    return grid_.get();
-}
-
-template <typename WD>
-auto world<WD>::get_grid() const -> const world_grid<WD>* {
-    return grid_.get();
-}
-
-template <typename WD>
-auto world<WD>::has_grid() const -> bool {
-    return grid_ != nullptr;
 }
 
 template <typename WD>
@@ -157,6 +125,9 @@ template <typename WD>
 void world<WD>::destroy_entity(
     entity ent
 ) noexcept {
+    registry_.for_each_component(ent, [&]<typename C>() noexcept {
+        this->template remove_component<C>(ent);
+    });
     registry_.destroy(ent);
 }
 
@@ -171,7 +142,51 @@ template <typename WD>
 void world<WD>::batch_destroy_entities(
     const std::vector<entity>& entities
 ) noexcept {
+    for (auto ent : entities) {
+        registry_.for_each_component(ent, [&]<typename C>() noexcept {
+            this->template remove_component<C>(ent);
+        });
+    }
     registry_.batch_destroy(entities);
+}
+
+template <typename WD>
+auto world<WD>::create() -> modifier {
+    return modifier(*this, create_entity());
+}
+
+template <typename WD>
+auto world<WD>::modify(
+    entity ent
+) -> modifier {
+    return modifier(*this, ent);
+}
+
+template <typename WD>
+world<WD>::modifier::modifier(
+    world& w, entity ent
+)
+    : world_(&w), ent_(ent) {}
+
+template <typename WD>
+template <typename C>
+auto world<WD>::modifier::with(
+    C&& value
+) -> modifier& {
+    world_->template add_component<C>(ent_, std::forward<C>(value));
+    return *this;
+}
+
+template <typename WD>
+template <typename C>
+auto world<WD>::modifier::without() -> modifier& {
+    world_->template remove_component<C>(ent_);
+    return *this;
+}
+
+template <typename WD>
+auto world<WD>::modifier::get_entity() const -> entity {
+    return ent_;
 }
 
 }  // namespace vw::gfx

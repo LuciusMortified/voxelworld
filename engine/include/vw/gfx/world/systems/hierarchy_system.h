@@ -5,19 +5,22 @@
 
 #include "vw/gfx/world/components/hierarchy_component.h"
 #include "vw/gfx/world/components/transform_component.h"
+#include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/system_trait.h"
-#include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
+
+template <typename>
+class world;
 
 template <typename WD>
 class hierarchy_system final {
 public:
-    using context_type  = world_context<WD>;
-    using components = typename WD::components;
+    using world_type    = world<WD>;
+    using components    = typename WD::components;
     using registry_type = typename entity_registry_from_tuple<components>::type;
 
-    explicit hierarchy_system(context_type& context);
+    explicit hierarchy_system(world_type& w);
 
     void update(float32 dt);
 
@@ -49,7 +52,7 @@ public:
 private:
     [[nodiscard]] auto check_hierarchy_cycle(entity parent, entity child) const -> bool;
 
-    context_type* context_;
+    world_type* world_;
 };
 
 }  // namespace vw::gfx

@@ -8,12 +8,13 @@
 #include "vw/gfx/world/systems/hierarchy_system.h"
 #include "vw/gfx/world/systems/socket_system.h"
 #include "vw/gfx/world/systems/transform_system.h"
+#include "vw/gfx/world/world.h"
 
 namespace vw::gfx {
 
 template <typename WD>
-socket_system<WD>::socket_system(context_type& context)
-    : context_(&context) {}
+socket_system<WD>::socket_system(world_type& w)
+    : world_(&w) {}
 
 template <typename WD>
 void socket_system<WD>::update(float32 /*dt*/) {}
@@ -22,13 +23,14 @@ template <typename WD>
 void socket_system<WD>::cleanup(
     entity ent
 ) {
-    if (!context_->registry().template has<socket_component>(ent)) {
+    auto& reg = world_->get_registry();
+    if (!reg.template has<socket_component>(ent)) {
         return;
     }
-    auto& comp = context_->registry().template get<socket_component>(ent);
+    auto& comp = reg.template get<socket_component>(ent);
     for (auto& slot : comp.sockets_) {
         if (slot.attached.is_valid()) {
-            context_->template get_system<hierarchy_system>().modify(slot.attached).remove_parent();
+            world_->template get_system<hierarchy_system>().modify(slot.attached).remove_parent();
             slot.attached = invalid_entity;
         }
     }
@@ -51,10 +53,11 @@ template <typename WD>
 auto socket_system<WD>::socket_modifier::attach(
     const std::string& socket_name, entity child
 ) -> socket_modifier& {
-    if (!system_->context_->registry().template has<socket_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<socket_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry().template get<socket_component>(entity_);
+    auto& comp = reg.template get<socket_component>(entity_);
     auto it    = std::ranges::find_if(comp.sockets_, [&](const socket_point& sp) {
         return sp.name == socket_name;
     });
@@ -62,8 +65,8 @@ auto socket_system<WD>::socket_modifier::attach(
         return *this;
     }
     it->attached = child;
-    system_->context_->template get_system<hierarchy_system>().modify(child).set_parent(entity_);
-    system_->context_->template get_system<transform_system>().modify(child)
+    system_->world_->template get_system<hierarchy_system>().modify(child).set_parent(entity_);
+    system_->world_->template get_system<transform_system>().modify(child)
         .set_position(it->position)
         .set_rotation(it->rotation)
         .set_scale(it->scale);
@@ -74,10 +77,11 @@ template <typename WD>
 auto socket_system<WD>::socket_modifier::detach(
     const std::string& socket_name
 ) -> socket_modifier& {
-    if (!system_->context_->registry().template has<socket_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<socket_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry().template get<socket_component>(entity_);
+    auto& comp = reg.template get<socket_component>(entity_);
     auto it    = std::ranges::find_if(comp.sockets_, [&](const socket_point& sp) {
         return sp.name == socket_name;
     });
@@ -86,7 +90,7 @@ auto socket_system<WD>::socket_modifier::detach(
     }
     auto detached = it->attached;
     it->attached  = invalid_entity;
-    system_->context_->template get_system<hierarchy_system>().modify(detached).remove_parent();
+    system_->world_->template get_system<hierarchy_system>().modify(detached).remove_parent();
     return *this;
 }
 
@@ -94,10 +98,11 @@ template <typename WD>
 auto socket_system<WD>::socket_modifier::add_socket(
     const std::string& name, const vec3f& position, const quat& rotation, const vec3f& scale
 ) -> socket_modifier& {
-    if (!system_->context_->registry().template has<socket_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<socket_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry().template get<socket_component>(entity_);
+    auto& comp = reg.template get<socket_component>(entity_);
     comp.sockets_.push_back(socket_point{name, position, rotation, scale, invalid_entity});
     return *this;
 }
@@ -106,10 +111,11 @@ template <typename WD>
 auto socket_system<WD>::socket_modifier::remove_socket(
     const std::string& name
 ) -> socket_modifier& {
-    if (!system_->context_->registry().template has<socket_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<socket_component>(entity_)) {
         return *this;
     }
-    auto& comp = system_->context_->registry().template get<socket_component>(entity_);
+    auto& comp = reg.template get<socket_component>(entity_);
     auto it    = std::ranges::find_if(comp.sockets_, [&](const socket_point& sp) -> auto {
         return sp.name == name;
     });
@@ -119,7 +125,7 @@ auto socket_system<WD>::socket_modifier::remove_socket(
     if (it->attached.is_valid()) {
         auto detached = it->attached;
         it->attached  = invalid_entity;
-        system_->context_->template get_system<hierarchy_system>().modify(detached).remove_parent();
+        system_->world_->template get_system<hierarchy_system>().modify(detached).remove_parent();
     }
     comp.sockets_.erase(it);
     return *this;

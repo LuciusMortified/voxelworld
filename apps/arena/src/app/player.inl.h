@@ -8,33 +8,32 @@ inline player::player(
     gfx::engine<>& engine, asset::asset_storage& assets
 )
     : engine_{engine}, assets_{assets} {
-    auto& world            = engine_.get_world();
+    auto& world         = engine_.get_world();
     auto& transform_sys = world.template get_system<gfx::transform_system>();
-    auto& physics_sys = world.template get_system<gfx::physics_system>();
+    auto& physics_sys   = world.template get_system<gfx::physics_system>();
 
-    root_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
-    root_->with<gfx::hierarchy_component>();
-    root_->with<gfx::transform_component>();
-    root_->with<gfx::spatial_component>();
-    root_->with<gfx::rigid_body_component>();
-    root_->with<gfx::box_collider_component>();
-    root_->with<gfx::character_controller_component>();
-    root_->with<gfx::movement_intent_component>();
-    root_->with<gfx::world_view_component>();
-    root_->with<gfx::animation_player_component>();
-    root_->with<gfx::animation_fsm_component>();
+    root_ = world.create()
+        .with<gfx::hierarchy_component>()
+        .with<gfx::transform_component>()
+        .with<gfx::spatial_component>()
+        .with<gfx::rigid_body_component>()
+        .with<gfx::box_collider_component>()
+        .with<gfx::character_controller_component>()
+        .with<gfx::movement_intent_component>()
+        .with<gfx::world_view_component>()
+        .with<gfx::animation_player_component>()
+        .with<gfx::animation_fsm_component>()
+        .get_entity();
 
-    const auto ent = root_->get_entity();
-
-    transform_sys.modify(ent)
+    transform_sys.modify(root_)
         .set_position({0.0f, 500.0f, 0.0f})
         .set_origin({-6.0f, -6.0f, -6.0f});
 
-    physics_sys.modify_collider(ent)
+    physics_sys.modify_collider(root_)
         .set_extents({12.0f, 28.0f, 12.0f})
         .set_offset({0.0f, 2.0f, 0.0f});
 
-    world.template get_system<gfx::spatial_system>().modify(ent).set_layer(gfx::spatial_layer::character);
+    world.template get_system<gfx::spatial_system>().modify(root_).set_layer(gfx::spatial_layer::character);
 
     body_       = create_body_part("m_human", "body");
     head_       = create_body_part("m_human", "head");
@@ -46,10 +45,22 @@ inline player::player(
     setup_animation_fsm();
 }
 
+inline player::~player() {
+    auto& world = engine_.get_world();
+    if (sword_.is_valid())       world.destroy_entity(sword_);
+    if (foot_left_.is_valid())   world.destroy_entity(foot_left_);
+    if (foot_right_.is_valid())  world.destroy_entity(foot_right_);
+    if (hand_left_.is_valid())   world.destroy_entity(hand_left_);
+    if (hand_right_.is_valid())  world.destroy_entity(hand_right_);
+    if (head_.is_valid())        world.destroy_entity(head_);
+    if (body_.is_valid())        world.destroy_entity(body_);
+    if (root_.is_valid())        world.destroy_entity(root_);
+}
+
 inline auto player::update(
     const gfx::player_input_state& input
 ) -> void {
-    const auto ent = root_->get_entity();
+    const auto ent = root_;
     auto& world    = engine_.get_world();
     auto& camera   = engine_.get_camera();
     const auto& rb = world.get_component<gfx::rigid_body_component>(ent);
@@ -108,7 +119,7 @@ inline auto player::try_place(
         return;
     }
 
-    const auto grid    = engine_.get_world().get_grid();
+    const auto grid    = engine_.get_world().template get_system<gfx::world_grid_system>().grid();
     const auto surface = grid->get_surface_y(0, 0);
     if (!surface) {
         return;
@@ -118,59 +129,60 @@ inline auto player::try_place(
 
     engine_.get_world()
         .template get_system<gfx::transform_system>()
-        .modify(root_->get_entity())
+        .modify(root_)
         .set_position({0.0f, spawn_y, 0.0f});
 
     placed_ = true;
 }
 
 inline auto player::toggle_sword() -> void {
-    if (!hand_right_) {
+    if (!hand_right_.is_valid()) {
         return;
     }
 
     auto& world         = engine_.get_world();
-    const auto hand_ent = hand_right_->get_entity();
+    const auto hand_ent = hand_right_;
 
-    if (sword_) {
+    if (sword_.is_valid()) {
         world.template get_system<gfx::socket_system>().modify(hand_ent).detach("hand_right");
-        sword_ = nullptr;
+        world.destroy_entity(sword_);
+        sword_ = gfx::invalid_entity;
     } else {
-        sword_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
-        sword_->with<gfx::hierarchy_component>();
-        sword_->with<gfx::transform_component>();
-        sword_->with<gfx::spatial_component>();
-        sword_->with<gfx::model_component>();
+        sword_ = world.create()
+            .with<gfx::hierarchy_component>()
+            .with<gfx::transform_component>()
+            .with<gfx::spatial_component>()
+            .with<gfx::model_component>()
+            .get_entity();
 
-        const auto sword_ent = sword_->get_entity();
         const auto& ent_data = assets_.get_entity("m_sword", "root");
 
-        world.template get_system<gfx::transform_system>().modify(sword_ent).set_origin(ent_data.origin);
-        world.template get_system<gfx::model_system>().modify(sword_ent).set_model(assets_.get_model("m_sword", "root"));
-        world.template get_system<gfx::socket_system>().modify(hand_ent).attach("hand_right", sword_ent);
-        world.template get_system<gfx::spatial_system>().modify(sword_ent).set_layer(gfx::spatial_layer::character);
+        world.template get_system<gfx::transform_system>().modify(sword_).set_origin(ent_data.origin);
+        world.template get_system<gfx::model_system>().modify(sword_).set_model(assets_.get_model("m_sword", "root"));
+        world.template get_system<gfx::socket_system>().modify(hand_ent).attach("hand_right", sword_);
+        world.template get_system<gfx::spatial_system>().modify(sword_).set_layer(gfx::spatial_layer::character);
     }
 }
 
 inline auto player::handle_attack() const -> void {
     engine_.get_world()
         .template get_system<gfx::animation_fsm_system>()
-        .modify(root_->get_entity())
+        .modify(root_)
         .fire_trigger("attack");
 }
 
 inline auto player::can_attack() const -> bool {
     const auto& anim_player =
-        engine_.get_world().get_component<gfx::animation_player_component>(root_->get_entity());
-    return sword_ != nullptr && !anim_player.get_layer(1).is_active();
+        engine_.get_world().get_component<gfx::animation_player_component>(root_);
+    return sword_.is_valid() && !anim_player.get_layer(1).is_active();
 }
 
 inline auto player::get_entity() const -> gfx::entity {
-    return root_->get_entity();
+    return root_;
 }
 
 inline auto player::has_sword() const -> bool {
-    return sword_ != nullptr;
+    return sword_.is_valid();
 }
 
 inline auto player::is_placed() const -> bool {
@@ -179,28 +191,28 @@ inline auto player::is_placed() const -> bool {
 
 inline auto player::create_body_part(
     std::string_view prefab_name, std::string_view part_name
-) const -> std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> {
-    auto& world            = engine_.get_world();
+) const -> gfx::entity {
+    auto& world         = engine_.get_world();
     auto& hierarchy_sys = world.template get_system<gfx::hierarchy_system>();
     auto& transform_sys = world.template get_system<gfx::transform_system>();
-    auto& model_sys = world.template get_system<gfx::model_system>();
-    auto& anim_sys = world.template get_system<gfx::animation_system>();
+    auto& model_sys     = world.template get_system<gfx::model_system>();
+    auto& anim_sys      = world.template get_system<gfx::animation_system>();
 
-    auto guard = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
-    guard->with<gfx::hierarchy_component>();
-    guard->with<gfx::transform_component>();
-    guard->with<gfx::spatial_component>();
-    guard->with<gfx::model_component>();
-    guard->with<gfx::animation_target_component>();
+    auto modifier = world.create()
+        .with<gfx::hierarchy_component>()
+        .with<gfx::transform_component>()
+        .with<gfx::spatial_component>()
+        .with<gfx::model_component>()
+        .with<gfx::animation_target_component>();
 
     const auto& ent_data = assets_.get_entity(prefab_name, part_name);
     if (ent_data.has_sockets) {
-        guard->with<gfx::socket_component>();
+        modifier.with<gfx::socket_component>();
     }
 
-    const auto ent = guard->get_entity();
+    const auto ent = modifier.get_entity();
 
-    hierarchy_sys.modify(ent).set_parent(root_->get_entity());
+    hierarchy_sys.modify(ent).set_parent(root_);
 
     transform rest;
     rest.set_position(ent_data.position);
@@ -226,11 +238,11 @@ inline auto player::create_body_part(
         }
     }
 
-    return guard;
+    return ent;
 }
 
 inline auto player::setup_animation_fsm() const -> void {
-    const auto ent = root_->get_entity();
+    const auto ent = root_;
     auto& world    = engine_.get_world();
 
     auto is_walk = [&, ent]() -> bool {

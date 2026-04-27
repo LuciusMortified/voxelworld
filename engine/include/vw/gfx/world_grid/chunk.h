@@ -7,28 +7,30 @@
 
 #include "vw/core.h"
 #include "vw/core/voxel.h"
-#include "vw/gfx/world/entity_guard.h"
+#include "vw/gfx/world/entity.h"
 
 namespace vw::asset { class model; }
 
 namespace vw::gfx {
 
+template <typename>
+class world;
 
 template <typename WD>
 class chunk {
 public:
-    using context_type = world_context<WD>;
+    using world_type = world<WD>;
 
     static constexpr int32 size = 64;
     static constexpr int32 volume = size * size * size;
 
-    chunk(context_type& ctx, vec3i coord, std::shared_ptr<vw::asset::model> mdl, int32 voxel_scale = 1);
-    ~chunk() = default;
+    chunk(world_type& w, vec3i coord, std::shared_ptr<asset::model> mdl, int32 voxel_scale = 1);
+    ~chunk();
 
     chunk(const chunk&) = delete;
     auto operator=(const chunk&) -> chunk& = delete;
-    chunk(chunk&&) noexcept = default;
-    auto operator=(chunk&&) noexcept -> chunk& = default;
+    chunk(chunk&& other) noexcept;
+    auto operator=(chunk&& other) noexcept -> chunk&;
 
     [[nodiscard]] auto get_voxel(int32 x, int32 y, int32 z) const -> voxel;
     [[nodiscard]] auto get_voxel(vec3i local) const -> voxel;
@@ -36,7 +38,7 @@ public:
     void set_voxel(vec3i local, const voxel& v) const;
     [[nodiscard]] auto is_empty(int32 x, int32 y, int32 z) const -> bool;
 
-    [[nodiscard]] auto get_model() const -> std::shared_ptr<vw::asset::model>;
+    [[nodiscard]] auto get_model() const -> std::shared_ptr<asset::model>;
     [[nodiscard]] auto get_entity() const -> entity;
 
     static constexpr auto contains(int32 x, int32 y, int32 z) -> bool {
@@ -44,8 +46,9 @@ public:
     }
 
 private:
-    entity_guard<WD> guard_;
-    std::shared_ptr<vw::asset::model> model_;
+    world_type* world_;
+    entity ent_;
+    std::shared_ptr<asset::model> model_;
 };
 
 }  // namespace vw::gfx

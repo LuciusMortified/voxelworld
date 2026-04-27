@@ -3,7 +3,6 @@
 #ifndef VW_GFX_WORLD_BASE_WORLD_DEF_H
 #define VW_GFX_WORLD_BASE_WORLD_DEF_H
 
-#include "vw/gfx/world/world_def.h"
 #include "vw/gfx/world/systems/animation_fsm_system.h"
 #include "vw/gfx/world/systems/animation_system.h"
 #include "vw/gfx/world/systems/character_controller_system.h"
@@ -15,6 +14,7 @@
 #include "vw/gfx/world/systems/spatial_system.h"
 #include "vw/gfx/world/systems/transform_system.h"
 #include "vw/gfx/world/systems/world_grid_system.h"
+#include "vw/gfx/world/world_def.h"
 
 namespace vw::gfx {
 

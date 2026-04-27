@@ -14,8 +14,8 @@ inline auto setup_world_grid(gfx::engine<>& engine) -> world_setup_result {
         registry.get_identity_pool(), registry.get_page_pool(), params
     );
 
-    world.set_grid(
-        std::make_unique<gfx::world_grid<gfx::base_world_def>>(world.get_context(), std::move(generator), params.voxel_scale)
+    world.template get_system<gfx::world_grid_system>().set_grid(
+        std::make_unique<gfx::world_grid<gfx::base_world_def>>(world, std::move(generator), params.voxel_scale)
     );
 
     return {.generator_params = params};

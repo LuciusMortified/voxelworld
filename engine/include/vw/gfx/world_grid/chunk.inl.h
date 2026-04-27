@@ -4,20 +4,22 @@
 #define VW_GFX_WORLD_GRID_CHUNK_INL_H
 
 #include "vw/asset/model/model.h"
+#include "vw/gfx/world/world.h"
 
 namespace vw::gfx {
 
 
 template <typename WD>
 chunk<WD>::chunk(
-    context_type& ctx, vec3i coord, std::shared_ptr<vw::asset::model> mdl, int32 voxel_scale
+    world_type& w, vec3i coord, std::shared_ptr<vw::asset::model> mdl, int32 voxel_scale
 )
-    : guard_(ctx)
+    : world_(&w)
+    , ent_(w.create()
+        .template with<transform_component>()
+        .template with<model_component>()
+        .template with<spatial_component>()
+        .get_entity())
     , model_(std::move(mdl)) {
-    guard_.template with<transform_component>();
-    guard_.template with<model_component>();
-    guard_.template with<spatial_component>();
-
     auto world_pos = vec3f{
         static_cast<float32>(coord.x * size * voxel_scale),
         static_cast<float32>(coord.y * size * voxel_scale),
@@ -25,11 +27,46 @@ chunk<WD>::chunk(
     };
 
     auto vs = static_cast<float32>(voxel_scale);
-    ctx.template get_system<transform_system>().modify(guard_.get_entity())
+    w.template get_system<transform_system>().modify(ent_)
         .set_position(world_pos)
         .set_scale({vs, vs, vs});
-    ctx.template get_system<model_system>().modify(guard_.get_entity()).set_model(model_);
-    ctx.template get_system<spatial_system>().modify(guard_.get_entity()).set_layer(spatial_layer::terrain);
+    w.template get_system<model_system>().modify(ent_).set_model(model_);
+    w.template get_system<spatial_system>().modify(ent_).set_layer(spatial_layer::terrain);
+}
+
+template <typename WD>
+chunk<WD>::~chunk() {
+    if (world_ != nullptr && ent_.is_valid()) {
+        world_->destroy_entity(ent_);
+    }
+}
+
+template <typename WD>
+chunk<WD>::chunk(
+    chunk&& other
+) noexcept
+    : world_(other.world_)
+    , ent_(other.ent_)
+    , model_(std::move(other.model_)) {
+    other.world_ = nullptr;
+    other.ent_   = invalid_entity;
+}
+
+template <typename WD>
+auto chunk<WD>::operator=(
+    chunk&& other
+) noexcept -> chunk& {
+    if (this != &other) {
+        if (world_ != nullptr && ent_.is_valid()) {
+            world_->destroy_entity(ent_);
+        }
+        world_       = other.world_;
+        ent_         = other.ent_;
+        model_       = std::move(other.model_);
+        other.world_ = nullptr;
+        other.ent_   = invalid_entity;
+    }
+    return *this;
 }
 
 template <typename WD>
@@ -74,7 +111,7 @@ auto chunk<WD>::get_model() const -> std::shared_ptr<vw::asset::model> {
 
 template <typename WD>
 auto chunk<WD>::get_entity() const -> entity {
-    return guard_.get_entity();
+    return ent_;
 }
 
 }  // namespace vw::gfx

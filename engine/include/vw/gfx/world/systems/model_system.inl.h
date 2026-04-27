@@ -4,30 +4,38 @@
 #define VW_GFX_WORLD_SYSTEMS_MODEL_SYSTEM_INL_H
 
 #include "vw/asset/model/model.h"
+#include "vw/gfx/world/world.h"
 
 namespace vw::gfx {
 
-
 template <typename WD>
 model_system<WD>::model_system(
-    context_type& context
+    world_type& w
 )
-    : context_(&context) {}
+    : world_(&w) {}
+
+template <typename WD>
+template <typename C>
+    requires std::same_as<C, model_component>
+void model_system<WD>::on_add(entity e) {
+    world_->get_registry().template request_change<model_component>(e);
+}
 
 template <typename WD>
 void model_system<WD>::update(float32 /*dt*/) {
-    auto& requested = context_->registry().template requested<model_component>();
+    auto& reg       = world_->get_registry();
+    auto& requested = reg.template requested<model_component>();
     for (auto ent : requested) {
-        context_->registry().template notify_changed<model_component>(ent);
+        reg.template notify_changed<model_component>(ent);
     }
-    context_->registry().template clear_requested<model_component>();
+    reg.template clear_requested<model_component>();
 }
 
 template <typename WD>
 auto model_system<WD>::modify(
     entity e
 ) -> model_modifier {
-    auto& comp = context_->registry().template get<model_component>(e);
+    auto& comp = world_->get_registry().template get<model_component>(e);
     return model_modifier(*this, &comp, e);
 }
 
@@ -47,7 +55,7 @@ void model_system<WD>::model_modifier::set_model(
     std::shared_ptr<vw::asset::model> model_ptr
 ) {
     component_->model_ = std::move(model_ptr);
-    system_->context_->registry().template request_change<model_component>(entity_);
+    system_->world_->get_registry().template request_change<model_component>(entity_);
 }
 
 template <typename WD>
@@ -56,7 +64,7 @@ void model_system<WD>::model_modifier::set_voxel(
 ) {
     if (component_->model_) {
         component_->model_->set_voxel(x, y, z, v);
-        system_->context_->registry().template request_change<model_component>(entity_);
+        system_->world_->get_registry().template request_change<model_component>(entity_);
     }
 }
 
@@ -66,7 +74,7 @@ void model_system<WD>::model_modifier::set_voxel(
 ) {
     if (component_->model_) {
         component_->model_->set_voxel(pos.x, pos.y, pos.z, v);
-        system_->context_->registry().template request_change<model_component>(entity_);
+        system_->world_->get_registry().template request_change<model_component>(entity_);
     }
 }
 
@@ -76,7 +84,7 @@ void model_system<WD>::model_modifier::fill(
 ) {
     if (component_->model_) {
         component_->model_->fill(v);
-        system_->context_->registry().template request_change<model_component>(entity_);
+        system_->world_->get_registry().template request_change<model_component>(entity_);
     }
 }
 

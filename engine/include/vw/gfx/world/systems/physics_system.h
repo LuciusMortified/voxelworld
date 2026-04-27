@@ -13,7 +13,6 @@
 #include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/spatial_layer.h"
 #include "vw/gfx/world/system_trait.h"
-#include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
 
@@ -25,6 +24,9 @@ class spatial_system;
 
 template <typename>
 class world_grid;
+
+template <typename>
+class world;
 
 class debug_primitives;
 
@@ -41,15 +43,15 @@ struct physics_stats {
 template <typename WD>
 class physics_system final {
 public:
-    using context_type  = world_context<WD>;
-    using components = typename WD::components;
+    using world_type    = world<WD>;
+    using components    = typename WD::components;
     using registry_type = typename entity_registry_from_tuple<components>::type;
 
     static constexpr int32 max_collision_iterations = 4;
     static constexpr float32 fixed_dt = 1.0f / 60.0f;
     static constexpr int32 max_steps_per_frame = 5;
 
-    explicit physics_system(context_type& context);
+    explicit physics_system(world_type& w);
 
     void set_gravity(float32 g);
     [[nodiscard]] auto get_gravity() const -> float32;
@@ -107,7 +109,7 @@ private:
         const vec3f& half_extents, const vec3f& offset
     ) -> void;
 
-    context_type* context_;
+    world_type* world_;
     float32 gravity_ = -300.f;
     float32 accumulated_time_ = 0.0f;
     physics_stats stats_;

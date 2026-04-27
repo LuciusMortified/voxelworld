@@ -363,7 +363,7 @@ inline void socket_panel::load_preview_(
     socket_state::socket_preview preview;
     preview.filename          = filename;
     preview.preview_root_name = result->root_name;
-    preview.guards            = std::move(result->entities);
+    preview.entities          = std::move(result->entities);
 
     if (result->name_to_entity.contains(result->root_name)) {
         const auto preview_root = result->name_to_entity[result->root_name];
@@ -383,7 +383,7 @@ inline void socket_panel::load_preview_(
 inline void socket_panel::unload_preview_(
     const std::string& key
 ) const {
-    state_->sockets.socket_previews.erase(key);
+    state_->sockets.erase_preview(key, engine_->get_world());
 }
 
 inline void socket_panel::update_preview_transform_(
@@ -395,11 +395,11 @@ inline void socket_panel::update_preview_transform_(
     }
 
     const auto& preview = it->second;
-    if (preview.guards.empty()) {
+    if (preview.entities.empty()) {
         return;
     }
 
-    const auto preview_root = preview.guards[0]->get_entity();
+    const auto preview_root = preview.entities[0];
     auto& transform_sys = engine_->get_world().template get_system<gfx::transform_system>();
     transform_sys.modify(preview_root)
         .set_position(position)

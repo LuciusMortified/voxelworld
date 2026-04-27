@@ -8,13 +8,17 @@
 #include <vw/core.h>
 #include <vw/gfx.h>
 
-#include "vw/gfx/world/entity_guard.h"
-
 namespace vw::arena {
 
 class dummy_enemy {
 public:
     explicit dummy_enemy(gfx::engine<>& engine, const vec2f& spawn_xz);
+    ~dummy_enemy();
+
+    dummy_enemy(const dummy_enemy&)                    = delete;
+    auto operator=(const dummy_enemy&) -> dummy_enemy& = delete;
+    dummy_enemy(dummy_enemy&&)                         = delete;
+    auto operator=(dummy_enemy&&) -> dummy_enemy&      = delete;
 
     auto try_place() -> void;
 
@@ -25,7 +29,7 @@ private:
     auto create_model() -> std::shared_ptr<asset::model>;
 
     gfx::engine<>& engine_;
-    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> root_;
+    gfx::entity ent_;
     vec2f spawn_xz_;
     bool placed_ = false;
 };

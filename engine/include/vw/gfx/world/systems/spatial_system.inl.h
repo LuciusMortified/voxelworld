@@ -11,15 +11,16 @@
 #include "vw/gfx/world/components/model_component.h"
 #include "vw/gfx/world/components/transform_component.h"
 #include "vw/gfx/world/systems/spatial_system.h"
+#include "vw/gfx/world/world.h"
 #include "vw/spatial/aabb.h"
 
 namespace vw::gfx {
 
 template <typename WD>
 spatial_system<WD>::spatial_system(
-    context_type& context
+    world_type& w
 )
-    : context_(&context) {}
+    : world_(&w) {}
 
 template <typename WD>
 auto spatial_system<WD>::modify(entity ent) -> spatial_modifier {
@@ -37,45 +38,48 @@ template <typename WD>
 auto spatial_system<WD>::spatial_modifier::set_layer(
     spatial_layer_mask layer
 ) -> spatial_modifier& {
-    if (!system_->context_->registry().template has<spatial_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<spatial_component>(entity_)) {
         return *this;
     }
-    auto& spatial = system_->context_->registry().template get<spatial_component>(entity_);
+    auto& spatial = reg.template get<spatial_component>(entity_);
     spatial.layer_ = layer;
     return *this;
 }
 
 template <typename WD>
 void spatial_system<WD>::update(float32 /*dt*/) {
-    auto& requested = context_->registry().template requested<spatial_component>();
+    auto& reg       = world_->get_registry();
+    auto& requested = reg.template requested<spatial_component>();
     if (requested.empty()) {
         return;
     }
 
     for (entity ent : requested) {
         const bool can_be_updated =  //
-            context_->registry().template has<model_component>(ent) &&
-            context_->registry().template has<transform_component>(ent) &&
-            context_->registry().template has<spatial_component>(ent);
+            reg.template has<model_component>(ent) &&
+            reg.template has<transform_component>(ent) &&
+            reg.template has<spatial_component>(ent);
         if (!can_be_updated) {
             continue;
         }
         update_entity(ent);
-        context_->registry().template notify_changed<spatial_component>(ent);
+        reg.template notify_changed<spatial_component>(ent);
     }
 
-    context_->registry().template clear_requested<spatial_component>();
+    reg.template clear_requested<spatial_component>();
 }
 
 template <typename WD>
 void spatial_system<WD>::update_entity(
     entity ent
 ) {
-    auto& spatial = context_->registry().template get<spatial_component>(ent);
+    auto& reg     = world_->get_registry();
+    auto& spatial = reg.template get<spatial_component>(ent);
 
-    const auto& model_comp     = context_->registry().template get<model_component>(ent);
-    const auto& transform_comp = context_->registry().template get<transform_component>(ent);
-    vw::spatial::aabb new_bounds            = calculate_aabb_from_model(ent, model_comp, transform_comp);
+    const auto& model_comp     = reg.template get<model_component>(ent);
+    const auto& transform_comp = reg.template get<transform_component>(ent);
+    vw::spatial::aabb new_bounds = calculate_aabb_from_model(ent, model_comp, transform_comp);
 
     const bool bounds_changed =  //
         spatial.bounds_.min != new_bounds.min || spatial.bounds_.max != new_bounds.max;
@@ -219,19 +223,20 @@ auto spatial_system<WD>::voxel_ray_cast(
 ) const -> std::optional<voxel_ray_hit> {
     query_all(r, candidates, layer_mask);
 
+    auto& reg = world_->get_registry();
     std::optional<voxel_ray_hit> closest_hit;
     float closest_distance_sq = std::numeric_limits<float>::max();
 
     for (entity ent : candidates) {
         const bool can_be_processed =  //
-            context_->registry().template has<model_component>(ent) &&
-            context_->registry().template has<transform_component>(ent);
+            reg.template has<model_component>(ent) &&
+            reg.template has<transform_component>(ent);
         if (!can_be_processed) {
             continue;
         }
 
-        const auto& model_comp     = context_->registry().template get<model_component>(ent);
-        const auto& transform_comp = context_->registry().template get<transform_component>(ent);
+        const auto& model_comp     = reg.template get<model_component>(ent);
+        const auto& transform_comp = reg.template get<transform_component>(ent);
 
         if (!model_comp.has_model()) {
             continue;

@@ -11,12 +11,14 @@
 #include "vw/gfx/world/components/world_view_component.h"
 #include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/system_trait.h"
-#include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
 
 template <typename>
 class world_grid;
+
+template <typename>
+class world;
 
 struct world_grid_system_stats {
     float32 process_completed_ms = 0.0f;
@@ -32,11 +34,23 @@ struct world_grid_system_stats {
 template <typename WD>
 class world_grid_system {
 public:
-    using components = typename WD::components;
+    using components    = typename WD::components;
     using registry_type = typename entity_registry_from_tuple<components>::type;
-    using context_type = world_context<WD>;
+    using world_type    = world<WD>;
+    using grid_type     = world_grid<WD>;
 
-    explicit world_grid_system(context_type& context);
+    explicit world_grid_system(world_type& w);
+    ~world_grid_system();
+
+    world_grid_system(const world_grid_system&)                    = delete;
+    auto operator=(const world_grid_system&) -> world_grid_system& = delete;
+    world_grid_system(world_grid_system&&) noexcept;
+    auto operator=(world_grid_system&&) noexcept -> world_grid_system&;
+
+    void set_grid(std::unique_ptr<grid_type> grid);
+    [[nodiscard]] auto grid() -> grid_type*;
+    [[nodiscard]] auto grid() const -> const grid_type*;
+    [[nodiscard]] auto has_grid() const -> bool;
 
     void update(float32 dt);
 
@@ -66,7 +80,8 @@ private:
 
     void rebuild_pending_requests(vec2i camera_column);
 
-    context_type* context_;
+    world_type* world_;
+    std::unique_ptr<grid_type> grid_;
     std::unordered_set<vec2i> active_columns_;
     std::unordered_set<vec2i> pending_active_columns_;
     std::vector<vec2i> pending_requests_;

@@ -452,9 +452,7 @@ inline void timeline_panel::handle_play(
     auto& world = engine_->get_world();
 
     if (!world.has_component<gfx::animation_player_component>(root)) {
-        if (auto* guard = state_->scene.find_guard(root)) {
-            guard->with<gfx::animation_player_component>();
-        }
+        world.template add_component<gfx::animation_player_component>(root);
     }
 
     auto& anim_sys       = world.template get_system<gfx::animation_system>();
@@ -875,9 +873,7 @@ inline void timeline_panel::ensure_clip_on_layer(
     }
 
     if (!world.has_component<gfx::animation_player_component>(root)) {
-        if (auto* guard = state_->scene.find_guard(root)) {
-            guard->with<gfx::animation_player_component>();
-        }
+        world.template add_component<gfx::animation_player_component>(root);
     }
 
     auto& anim_sys       = world.template get_system<gfx::animation_system>();

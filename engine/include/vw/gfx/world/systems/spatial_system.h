@@ -11,9 +11,9 @@
 #include "vw/gfx/spatial/dynamic_aabb_tree.h"
 #include "vw/gfx/world/components/spatial_component.h"
 #include "vw/gfx/world/entity.h"
+#include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/spatial_layer.h"
 #include "vw/gfx/world/system_trait.h"
-#include "vw/gfx/world/world_context.h"
 #include "vw/spatial/aabb.h"
 #include "vw/spatial/frustum.h"
 #include "vw/spatial/ray.h"
@@ -24,6 +24,9 @@ namespace vw::gfx {
 struct model_component;
 struct transform_component;
 
+template <typename>
+class world;
+
 struct voxel_ray_hit {
     entity ent;
     vec3i voxel_pos;
@@ -33,12 +36,12 @@ struct voxel_ray_hit {
 template <typename WD>
 class spatial_system {
 public:
-    using components = typename WD::components;
+    using components    = typename WD::components;
     using registry_type = typename entity_registry_from_tuple<components>::type;
-    using context_type = world_context<WD>;
+    using world_type    = world<WD>;
 
     explicit spatial_system(
-        context_type& context
+        world_type& w
     );
 
     void update(float32 dt);
@@ -103,7 +106,7 @@ private:
     ) const -> vw::spatial::aabb;
     static auto expand_aabb_for_fat(const vw::spatial::aabb& bounds) -> vw::spatial::aabb;
 
-    context_type* context_;
+    world_type* world_;
     dynamic_aabb_tree tree_;
 };
 

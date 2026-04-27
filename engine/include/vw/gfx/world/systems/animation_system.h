@@ -10,17 +10,16 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "vw/core/transform.h"
 #include "vw/asset/animation/animation_clip.h"
 #include "vw/asset/animation/animation_clip_registry.h"
 #include "vw/asset/animation/animation_layer.h"
+#include "vw/core/transform.h"
 #include "vw/gfx/world/components/animation_player_component.h"
 #include "vw/gfx/world/components/animation_target_component.h"
-#include "vw/gfx/world/system_trait.h"
 #include "vw/gfx/world/components/hierarchy_component.h"
 #include "vw/gfx/world/components/transform_component.h"
 #include "vw/gfx/world/entity_registry.h"
-#include "vw/gfx/world/world_context.h"
+#include "vw/gfx/world/system_trait.h"
 
 namespace vw::gfx {
 
@@ -28,14 +27,17 @@ namespace vw::gfx {
 template <typename>
 class transform_system;
 
+template <typename>
+class world;
+
 template <typename WD>
 class animation_system final {
 public:
-    using components = typename WD::components;
+    using components    = typename WD::components;
     using registry_type = typename entity_registry_from_tuple<components>::type;
-    using context_type  = world_context<WD>;
+    using world_type    = world<WD>;
 
-    explicit animation_system(context_type& context);
+    explicit animation_system(world_type& w);
 
     void update(float32 delta_time);
 
@@ -123,21 +125,21 @@ private:
 
     void process_animation(entity ent, animation_player_component& anim_comp, float32 delta_time);
 
-    static void update_layer_time(vw::asset::animation_layer& layer, float32 delta_time);
+    static void update_layer_time(asset::animation_layer& layer, float32 delta_time);
 
-    void process_layer(vw::asset::animation_layer& layer, float32 delta_time, bool is_base);
+    void process_layer(asset::animation_layer& layer, float32 delta_time, bool is_base);
 
     void apply_animation(entity root_ent, const animation_player_component& anim_comp);
 
     [[nodiscard]] auto compute_layer_transform(
-        const vw::asset::animation_layer& layer, const std::string& target_name, const transform& rest
+        const asset::animation_layer& layer, const std::string& target_name, const transform& rest
     ) const -> std::optional<transform>;
 
     static auto merge_with_rest(
-        const transform& anim, const vw::asset::animation_track& track, const transform& rest
+        const transform& anim, const asset::animation_track& track, const transform& rest
     ) -> transform;
 
-    context_type* context_;
+    world_type* world_;
 };
 
 }  // namespace vw::gfx
@@ -145,9 +147,9 @@ private:
 template <>
 struct vw::gfx::system_trait<vw::gfx::animation_system> {
     using components = std::tuple<
-        vw::gfx::animation_player_component,
-        vw::gfx::animation_target_component>;
-    using resources  = std::tuple<vw::asset::animation_clip_registry>;
+        animation_player_component,
+        animation_target_component>;
+    using resources  = std::tuple<asset::animation_clip_registry>;
 };
 
 #include "vw/gfx/world/systems/animation_system.inl.h"

@@ -3,6 +3,7 @@
 #ifndef VW_GFX_WORLD_TUPLE_UTILS_H
 #define VW_GFX_WORLD_TUPLE_UTILS_H
 
+#include <array>
 #include <cstddef>
 #include <tuple>
 #include <type_traits>
@@ -26,7 +27,7 @@ struct tuple_cat_impl<std::tuple<T>> {
 
 template <typename T1, typename T2, typename... Rest>
 struct tuple_cat_impl<std::tuple<T1, T2, Rest...>> {
-    using type = typename tuple_cat_impl<
+    using type = tuple_cat_impl<
         std::tuple<decltype(std::tuple_cat(std::declval<T1>(), std::declval<T2>())), Rest...>
     >::type;
 };
@@ -50,7 +51,7 @@ struct tuple_unique_impl<std::tuple<AccTs...>, std::tuple<Head, Tail...>> {
 
 template <typename Head, typename... Tail>
 struct tuple_unique_impl<std::tuple<>, std::tuple<Head, Tail...>> {
-    using type = typename tuple_unique_impl<std::tuple<Head>, std::tuple<Tail...>>::type;
+    using type = tuple_unique_impl<std::tuple<Head>, std::tuple<Tail...>>::type;
 };
 
 template <typename T, typename Tuple>
@@ -67,7 +68,7 @@ template <typename T, typename... Ts>
 struct tuple_index_of<T, std::tuple<Ts...>> {
     static_assert((std::is_same_v<T, Ts> || ...), "type not found in tuple");
     static constexpr std::size_t value = []() -> std::size_t {
-        constexpr bool matches[] = {std::is_same_v<T, Ts>...};  // NOLINT(*-avoid-c-arrays)
+        constexpr std::array<bool, sizeof...(Ts)> matches = {std::is_same_v<T, Ts>...};
         for (std::size_t i = 0; i < sizeof...(Ts); ++i) {
             if (matches[i]) {
                 return i;
@@ -80,10 +81,10 @@ struct tuple_index_of<T, std::tuple<Ts...>> {
 }  // namespace detail
 
 template <typename... Tuples>
-using tuple_cat_t = typename detail::tuple_cat_impl<std::tuple<Tuples...>>::type;
+using tuple_cat_t = detail::tuple_cat_impl<std::tuple<Tuples...>>::type;
 
 template <typename Tuple>
-using tuple_unique_t = typename detail::tuple_unique_impl<std::tuple<>, Tuple>::type;
+using tuple_unique_t = detail::tuple_unique_impl<std::tuple<>, Tuple>::type;
 
 template <typename T, typename Tuple>
 inline constexpr bool tuple_contains_v = detail::tuple_contains<T, Tuple>::value;

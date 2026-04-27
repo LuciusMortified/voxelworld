@@ -4,23 +4,24 @@
 #define VW_GFX_WORLD_SYSTEMS_ANIMATION_FSM_SYSTEM_INL_H
 
 #include "vw/gfx/world/systems/animation_system.h"
+#include "vw/gfx/world/world.h"
 
 namespace vw::gfx {
 
 template <typename WD>
-animation_fsm_system<WD>::animation_fsm_system(context_type& context)
-    : context_(&context) {}
+animation_fsm_system<WD>::animation_fsm_system(world_type& w)
+    : world_(&w) {}
 
 template <typename WD>
 void animation_fsm_system<WD>::update(float32 /*dt*/) {
     auto view =
-        context_->registry()
+        world_->get_registry()
             .template view<animation_fsm_component, animation_player_component>();
 
     for (auto [ent, fsm_comp, player_comp] : view) {
         auto& triggers = fsm_comp.triggers_;
         for (size_t i = 0; i < fsm_comp.machine_count(); ++i) {
-            auto pm = context_->template get_system<animation_system>().modify_player(ent);
+            auto pm = world_->template get_system<animation_system>().modify_player(ent);
             if (!player_comp.has_layer(i)) {
                 pm.add_layer(i);
                 pm.rebuild_target_map();
@@ -95,7 +96,7 @@ template <typename WD>
 auto animation_fsm_system<WD>::modify(
     entity ent
 ) -> modifier {
-    auto& comp = context_->registry().template get<animation_fsm_component>(ent);
+    auto& comp = world_->get_registry().template get<animation_fsm_component>(ent);
     return modifier(&comp);
 }
 

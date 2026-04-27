@@ -107,7 +107,7 @@ inline auto new_file_modal::create_file_() -> bool {
         return false;
     }
 
-    *state_ = app_state{};
+    state_->reset(engine_->get_world());
 
     state_->ui.need_startup_modal = false;
 

@@ -11,6 +11,7 @@
 #include <vw/gfx/world/systems/hierarchy_system.h>
 #include <vw/gfx/world/systems/spatial_system.h>
 #include <vw/gfx/world/systems/transform_system.h>
+#include <vw/gfx/world/world.h>
 #include <vw/gfx/world/world_def.h>
 
 using namespace vw;
@@ -20,23 +21,13 @@ using namespace vw::asset;
 using test_def = world_def<hierarchy_system, transform_system, spatial_system, animation_system>;
 
 struct anim_test_fixture {
-    test_def::registry_type reg;
-    world_context<test_def> ctx{reg};
-    test_def::systems_tuple systems_{
-        hierarchy_system<test_def>{ctx},
-        transform_system<test_def>{ctx},
-        spatial_system<test_def>{ctx},
-        animation_system<test_def>{ctx}};
-    animation_clip_registry clip_reg;
+    world<test_def> w;
 
-    animation_system<test_def>& anim_sys = std::get<animation_system<test_def>>(systems_);
-    hierarchy_system<test_def>& hierarchy_sys = std::get<hierarchy_system<test_def>>(systems_);
-    transform_system<test_def>& transform_sys = std::get<transform_system<test_def>>(systems_);
-
-    anim_test_fixture() {
-        ctx.set_systems_ptr_(&systems_);
-        ctx.register_resource_(&clip_reg);
-    }
+    test_def::registry_type& reg = w.get_registry();
+    animation_clip_registry& clip_reg = w.get_resource<animation_clip_registry>();
+    animation_system<test_def>& anim_sys = w.get_system<animation_system>();
+    hierarchy_system<test_def>& hierarchy_sys = w.get_system<hierarchy_system>();
+    transform_system<test_def>& transform_sys = w.get_system<transform_system>();
 
     auto create_root() -> entity {
         auto ent = reg.create();

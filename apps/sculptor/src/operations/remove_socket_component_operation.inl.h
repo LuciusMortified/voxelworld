@@ -12,6 +12,9 @@ inline remove_socket_component_operation::remove_socket_component_operation(
 
 inline void remove_socket_component_operation::execute() {
     auto& world = engine_->get_world();
+    if (!state_->scene.name_to_entity.contains(params_.name)) {
+        return;
+    }
     const auto ent = state_->scene.name_to_entity[params_.name];
 
     const auto& socket_comp = world.get_component<gfx::socket_component>(ent);
@@ -20,17 +23,9 @@ inline void remove_socket_component_operation::execute() {
         saved_sockets_.push_back({sp.name, sp.position, sp.rotation, sp.scale});
     }
 
-    const auto& entity_name = params_.name;
-    std::erase_if(state_->sockets.socket_previews, [&entity_name](const auto& kv) {
-        return kv.first.starts_with(entity_name + ":");
-    });
+    state_->sockets.erase_previews_for(params_.name, world);
 
-    auto* guard = state_->scene.find_guard(ent);
-    if (!guard) {
-        return;
-    }
-
-    guard->without<gfx::socket_component>();
+    world.template remove_component<gfx::socket_component>(ent);
     state_->file.has_unsaved_changes = true;
 }
 
@@ -38,13 +33,12 @@ inline void remove_socket_component_operation::undo() {
     auto& world         = engine_->get_world();
     auto& socket_sys = world.template get_system<gfx::socket_system>();
 
-    const auto ent = state_->scene.name_to_entity[params_.name];
-    auto* guard    = state_->scene.find_guard(ent);
-    if (!guard) {
+    if (!state_->scene.name_to_entity.contains(params_.name)) {
         return;
     }
+    const auto ent = state_->scene.name_to_entity[params_.name];
 
-    guard->with<gfx::socket_component>();
+    world.template add_component<gfx::socket_component>(ent);
 
     for (const auto& ss : saved_sockets_) {
         socket_sys.modify(ent).add_socket(ss.name, ss.position, ss.rotation, ss.scale);

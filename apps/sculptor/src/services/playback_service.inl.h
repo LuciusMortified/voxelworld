@@ -21,9 +21,7 @@ inline void playback_service::toggle_playback() const {
     const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
 
     if (!world.has_component<gfx::animation_player_component>(root_ent)) {
-        if (auto* guard = state_->scene.find_guard(root_ent)) {
-            guard->with<gfx::animation_player_component>();
-        }
+        world.template add_component<gfx::animation_player_component>(root_ent);
     }
 
     auto& anim_sys     = world.template get_system<gfx::animation_system>();

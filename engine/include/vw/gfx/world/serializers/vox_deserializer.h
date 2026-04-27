@@ -13,8 +13,7 @@ namespace vw::gfx {
 template <typename WC = base_world_def>
 class vox_deserializer final {
 public:
-    using world_type        = world<WC>;
-    using entity_guard_type = entity_guard<WC>;
+    using world_type = world<WC>;
 
     using error_type = vw::asset::vox_parser::error_type;
 
@@ -27,7 +26,7 @@ public:
         std::string root_name;
         std::unordered_map<std::string, entity> name_to_entity;
         std::unordered_map<entity, std::string> entity_to_name;
-        std::vector<std::unique_ptr<entity_guard_type>> entities;
+        std::vector<entity> entities;
     };
 
     vox_deserializer(world_type& world, vw::asset::vox_parser& parser);

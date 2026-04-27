@@ -15,9 +15,9 @@ constexpr log::log_category lc_wg_{"world_grid"};
 
 template <typename WD>
 world_grid<WD>::world_grid(
-    context_type& ctx, std::unique_ptr<terrain_generator> generator, int32 voxel_scale
+    world_type& w, std::unique_ptr<terrain_generator> generator, int32 voxel_scale
 )
-    : context_(&ctx), voxel_scale_(voxel_scale), generator_(std::move(generator)) {
+    : world_(&w), voxel_scale_(voxel_scale), generator_(std::move(generator)) {
     auto count = std::min(std::thread::hardware_concurrency(), 4u);
     if (count == 0) {
         count = 1;
@@ -284,7 +284,7 @@ void world_grid<WD>::process_completed() {
                 chunks_.emplace(
                     cd.coord,
                     std::make_unique<chunk<WD>>(
-                        *context_, cd.coord, std::move(cd.chunk_model), voxel_scale_
+                        *world_, cd.coord, std::move(cd.chunk_model), voxel_scale_
                     )
                 );
             });
@@ -335,7 +335,7 @@ void world_grid<WD>::process_deferred_remeshes() {
 
         auto mdl = chunk_ptr->get_model();
         mdl->invalidate();
-        context_->template get_system<model_system>().modify(chunk_ptr->get_entity()).set_model(mdl);
+        world_->template get_system<model_system>().modify(chunk_ptr->get_entity()).set_model(mdl);
         ++processed;
     }
 }

@@ -6,19 +6,22 @@
 #include <unordered_set>
 
 #include "vw/gfx/world/components/light_component.h"
+#include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/system_trait.h"
-#include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
+
+template <typename>
+class world;
 
 template <typename WD>
 class light_system final {
 public:
-    using components = typename WD::components;
+    using world_type    = world<WD>;
+    using components    = typename WD::components;
     using registry_type = typename entity_registry_from_tuple<components>::type;
-    using context_type = world_context<WD>;
 
-    explicit light_system(context_type& context);
+    explicit light_system(world_type& w);
 
     void update(float32 dt);
 
@@ -41,12 +44,10 @@ public:
 
     template <typename C>
         requires std::same_as<C, light_component>
-    void on_add(entity e) {
-        context_->registry().template request_change<light_component>(e);
-    }
+    void on_add(entity e);
 
 private:
-    context_type* context_;
+    world_type* world_;
 };
 
 }  // namespace vw::gfx

@@ -5,8 +5,8 @@
 
 #include <vector>
 
+#include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/system_trait.h"
-#include "vw/gfx/world/world_context.h"
 
 namespace vw {
 struct transform;
@@ -20,14 +20,17 @@ struct spatial_component;
 template <typename>
 class hierarchy_system;
 
+template <typename>
+class world;
+
 template <typename WD>
 class transform_system final {
 public:
-    using context_type  = world_context<WD>;
-    using components = typename WD::components;
+    using world_type    = world<WD>;
+    using components    = typename WD::components;
     using registry_type = typename entity_registry_from_tuple<components>::type;
 
-    explicit transform_system(context_type& context);
+    explicit transform_system(world_type& w);
 
     void update(float32 dt);
 
@@ -58,16 +61,14 @@ public:
 
     template <typename C>
         requires (std::same_as<C, transform_component> || std::same_as<C, spatial_component>)
-    void on_add(entity e) {
-        context_->registry().template request_change<transform_component>(e);
-    }
+    void on_add(entity e);
 
 private:
     void mark_children_world_dirty(entity ent);
 
     void update_entity_world_matrix(entity ent, const transform_component& transform_comp);
 
-    context_type* context_;
+    world_type* world_;
     std::vector<entity> sorted_entities_;
 };
 

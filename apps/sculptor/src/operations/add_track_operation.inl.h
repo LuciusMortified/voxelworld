@@ -46,11 +46,10 @@ inline void add_track_operation::execute() {
 
     if (state_->scene.name_to_entity.contains(params_.track_name)) {
         const auto ent = state_->scene.name_to_entity[params_.track_name];
-        auto* guard    = state_->scene.find_guard(ent);
-        if (guard && !guard->has<gfx::animation_target_component>()) {
+        auto& world    = engine_->get_world();
+        if (!world.has_component<gfx::animation_target_component>(ent)) {
             added_target_component_ = true;
-            guard->with<gfx::animation_target_component>();
-            auto& world     = engine_->get_world();
+            world.template add_component<gfx::animation_target_component>(ent);
             auto target_mod = world.template get_system<gfx::animation_system>().modify_target(ent);
             target_mod.set_target_name(params_.track_name);
             if (world.has_component<gfx::transform_component>(ent)) {

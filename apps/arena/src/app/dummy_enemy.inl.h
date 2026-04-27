@@ -5,32 +5,37 @@ namespace vw::arena {
 inline dummy_enemy::dummy_enemy(gfx::engine<>& engine, const vec2f& spawn_xz)
     : engine_{engine}
     , spawn_xz_{spawn_xz} {
-    auto& world            = engine_.get_world();
+    auto& world         = engine_.get_world();
     auto& transform_sys = world.template get_system<gfx::transform_system>();
-    auto& physics_sys = world.template get_system<gfx::physics_system>();
-    auto& model_sys = world.template get_system<gfx::model_system>();
+    auto& physics_sys   = world.template get_system<gfx::physics_system>();
+    auto& model_sys     = world.template get_system<gfx::model_system>();
 
-    root_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
-    root_->with<gfx::hierarchy_component>();
-    root_->with<gfx::transform_component>();
-    root_->with<gfx::spatial_component>();
-    root_->with<gfx::rigid_body_component>();
-    root_->with<gfx::box_collider_component>();
-    root_->with<gfx::model_component>();
+    ent_ = world.create()
+        .with<gfx::hierarchy_component>()
+        .with<gfx::transform_component>()
+        .with<gfx::spatial_component>()
+        .with<gfx::rigid_body_component>()
+        .with<gfx::box_collider_component>()
+        .with<gfx::model_component>()
+        .get_entity();
 
-    const auto ent = root_->get_entity();
-
-    transform_sys.modify(ent)
+    transform_sys.modify(ent_)
         .set_position({spawn_xz_.x, 500.0f, spawn_xz_.y})
         .set_origin({-8.0f, -16.0f, -8.0f});
 
-    physics_sys.modify_collider(ent)
+    physics_sys.modify_collider(ent_)
         .set_extents({16.0f, 32.0f, 16.0f})
         .set_offset({0.0f, 0.0f, 0.0f});
 
-    world.template get_system<gfx::spatial_system>().modify(ent).set_layer(gfx::spatial_layer::character);
+    world.template get_system<gfx::spatial_system>().modify(ent_).set_layer(gfx::spatial_layer::character);
 
-    model_sys.modify(ent).set_model(create_model());
+    model_sys.modify(ent_).set_model(create_model());
+}
+
+inline dummy_enemy::~dummy_enemy() {
+    if (ent_.is_valid()) {
+        engine_.get_world().destroy_entity(ent_);
+    }
 }
 
 inline auto dummy_enemy::try_place() -> void {
@@ -38,7 +43,7 @@ inline auto dummy_enemy::try_place() -> void {
         return;
     }
 
-    const auto grid = engine_.get_world().get_grid();
+    const auto grid = engine_.get_world().template get_system<gfx::world_grid_system>().grid();
     const auto vs   = grid->voxel_scale();
     const auto surface = grid->get_surface_y(
         static_cast<int32>(spawn_xz_.x / vs),
@@ -52,14 +57,14 @@ inline auto dummy_enemy::try_place() -> void {
 
     engine_.get_world()
         .template get_system<gfx::transform_system>()
-        .modify(root_->get_entity())
+        .modify(ent_)
         .set_position({spawn_xz_.x, spawn_y, spawn_xz_.y});
 
     placed_ = true;
 }
 
 inline auto dummy_enemy::get_entity() const -> gfx::entity {
-    return root_->get_entity();
+    return ent_;
 }
 
 inline auto dummy_enemy::is_placed() const -> bool {

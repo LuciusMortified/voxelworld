@@ -27,7 +27,7 @@ inline void add_socket_operation::undo() {
 
     const auto ent  = state_->scene.name_to_entity[params_.entity_name];
     const auto pkey = socket_state::socket_preview_key(params_.entity_name, params_.socket_name);
-    state_->sockets.socket_previews.erase(pkey);
+    state_->sockets.erase_preview(pkey, world);
     socket_sys  //
         .modify(ent)
         .remove_socket(params_.socket_name);

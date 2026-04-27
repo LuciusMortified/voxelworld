@@ -4,8 +4,8 @@
 #define VW_GFX_WORLD_SYSTEMS_SOCKET_SYSTEM_H
 
 #include "vw/gfx/world/components/socket_component.h"
+#include "vw/gfx/world/entity_registry.h"
 #include "vw/gfx/world/system_trait.h"
-#include "vw/gfx/world/world_context.h"
 
 namespace vw::gfx {
 
@@ -15,14 +15,17 @@ class hierarchy_system;
 template <typename>
 class transform_system;
 
+template <typename>
+class world;
+
 template <typename WD>
 class socket_system final {
 public:
-    using components = typename WD::components;
+    using components    = typename WD::components;
     using registry_type = typename entity_registry_from_tuple<components>::type;
-    using context_type  = world_context<WD>;
+    using world_type    = world<WD>;
 
-    explicit socket_system(context_type& context);
+    explicit socket_system(world_type& w);
 
     class socket_modifier {
     public:
@@ -55,7 +58,7 @@ public:
     }
 
 private:
-    context_type* context_;
+    world_type* world_;
 };
 
 }  // namespace vw::gfx

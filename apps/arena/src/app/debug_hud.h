@@ -77,7 +77,7 @@ inline auto render_debug_hud(
         ImGui::Text("Colliders: %s", show_colliders ? "visible" : "hidden");
     }
 
-    const auto grid = engine.get_world().get_grid();
+    const auto grid = engine.get_world().template get_system<gfx::world_grid_system>().grid();
     if (grid) {
         ImGui::Separator();
         ImGui::Text("Loaded chunks: %u", grid->get_loaded_chunk_count());

@@ -10,12 +10,20 @@
 #include "vw/gfx/world/components/spatial_component.h"
 #include "vw/gfx/world/components/transform_component.h"
 #include "vw/gfx/world/systems/hierarchy_system.h"
+#include "vw/gfx/world/world.h"
 
 namespace vw::gfx {
 
 template <typename WD>
-transform_system<WD>::transform_system(context_type& context)
-    : context_(&context) {}
+transform_system<WD>::transform_system(world_type& w)
+    : world_(&w) {}
+
+template <typename WD>
+template <typename C>
+    requires (std::same_as<C, transform_component> || std::same_as<C, spatial_component>)
+void transform_system<WD>::on_add(entity e) {
+    world_->get_registry().template request_change<transform_component>(e);
+}
 
 template <typename WD>
 transform_system<WD>::transform_modifier::transform_modifier(
@@ -34,16 +42,17 @@ template <typename WD>
 auto transform_system<WD>::transform_modifier::set_position(
     const vec3f& position
 ) -> transform_modifier& {
-    if (!system_->context_->registry().template has<transform_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<transform_component>(entity_)) {
         return *this;
     }
 
-    auto& transform_comp = system_->context_->registry().template get<transform_component>(entity_);
+    auto& transform_comp = reg.template get<transform_component>(entity_);
     transform_comp.transform_.set_position(position);
     transform_comp.local_dirty_ = true;
     transform_comp.world_dirty_ = true;
 
-    system_->context_->registry().template request_change<transform_component>(entity_);
+    reg.template request_change<transform_component>(entity_);
     system_->mark_children_world_dirty(entity_);
 
     return *this;
@@ -53,16 +62,17 @@ template <typename WD>
 auto transform_system<WD>::transform_modifier::set_rotation(
     const quat& rotation
 ) -> transform_modifier& {
-    if (!system_->context_->registry().template has<transform_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<transform_component>(entity_)) {
         return *this;
     }
 
-    auto& transform_comp = system_->context_->registry().template get<transform_component>(entity_);
+    auto& transform_comp = reg.template get<transform_component>(entity_);
     transform_comp.transform_.set_rotation(rotation);
     transform_comp.local_dirty_ = true;
     transform_comp.world_dirty_ = true;
 
-    system_->context_->registry().template request_change<transform_component>(entity_);
+    reg.template request_change<transform_component>(entity_);
     system_->mark_children_world_dirty(entity_);
 
     return *this;
@@ -72,16 +82,17 @@ template <typename WD>
 auto transform_system<WD>::transform_modifier::set_rotation_euler(
     const vec3f& euler
 ) -> transform_modifier& {
-    if (!system_->context_->registry().template has<transform_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<transform_component>(entity_)) {
         return *this;
     }
 
-    auto& transform_comp = system_->context_->registry().template get<transform_component>(entity_);
+    auto& transform_comp = reg.template get<transform_component>(entity_);
     transform_comp.transform_.set_rotation_euler(euler);
     transform_comp.local_dirty_ = true;
     transform_comp.world_dirty_ = true;
 
-    system_->context_->registry().template request_change<transform_component>(entity_);
+    reg.template request_change<transform_component>(entity_);
     system_->mark_children_world_dirty(entity_);
 
     return *this;
@@ -91,16 +102,17 @@ template <typename WD>
 auto transform_system<WD>::transform_modifier::set_scale(
     const vec3f& scale
 ) -> transform_modifier& {
-    if (!system_->context_->registry().template has<transform_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<transform_component>(entity_)) {
         return *this;
     }
 
-    auto& transform_comp = system_->context_->registry().template get<transform_component>(entity_);
+    auto& transform_comp = reg.template get<transform_component>(entity_);
     transform_comp.transform_.set_scale(scale);
     transform_comp.local_dirty_ = true;
     transform_comp.world_dirty_ = true;
 
-    system_->context_->registry().template request_change<transform_component>(entity_);
+    reg.template request_change<transform_component>(entity_);
     system_->mark_children_world_dirty(entity_);
 
     return *this;
@@ -110,16 +122,17 @@ template <typename WD>
 auto transform_system<WD>::transform_modifier::set_origin(
     const vec3f& origin
 ) -> transform_modifier& {
-    if (!system_->context_->registry().template has<transform_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<transform_component>(entity_)) {
         return *this;
     }
 
-    auto& transform_comp = system_->context_->registry().template get<transform_component>(entity_);
+    auto& transform_comp = reg.template get<transform_component>(entity_);
     transform_comp.transform_.set_origin(origin);
     transform_comp.local_dirty_ = true;
     transform_comp.world_dirty_ = true;
 
-    system_->context_->registry().template request_change<transform_component>(entity_);
+    reg.template request_change<transform_component>(entity_);
     system_->mark_children_world_dirty(entity_);
 
     return *this;
@@ -129,16 +142,17 @@ template <typename WD>
 auto transform_system<WD>::transform_modifier::translate(
     const vec3f& offset
 ) -> transform_modifier& {
-    if (!system_->context_->registry().template has<transform_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<transform_component>(entity_)) {
         return *this;
     }
 
-    auto& transform_comp = system_->context_->registry().template get<transform_component>(entity_);
+    auto& transform_comp = reg.template get<transform_component>(entity_);
     transform_comp.transform_.translate(offset);
     transform_comp.local_dirty_ = true;
     transform_comp.world_dirty_ = true;
 
-    system_->context_->registry().template request_change<transform_component>(entity_);
+    reg.template request_change<transform_component>(entity_);
     system_->mark_children_world_dirty(entity_);
 
     return *this;
@@ -148,16 +162,17 @@ template <typename WD>
 auto transform_system<WD>::transform_modifier::rotate(
     const vec3f& angles
 ) -> transform_modifier& {
-    if (!system_->context_->registry().template has<transform_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<transform_component>(entity_)) {
         return *this;
     }
 
-    auto& transform_comp = system_->context_->registry().template get<transform_component>(entity_);
+    auto& transform_comp = reg.template get<transform_component>(entity_);
     transform_comp.transform_.rotate(angles);
     transform_comp.local_dirty_ = true;
     transform_comp.world_dirty_ = true;
 
-    system_->context_->registry().template request_change<transform_component>(entity_);
+    reg.template request_change<transform_component>(entity_);
     system_->mark_children_world_dirty(entity_);
 
     return *this;
@@ -167,16 +182,17 @@ template <typename WD>
 auto transform_system<WD>::transform_modifier::scale(
     const vec3f& factor
 ) -> transform_modifier& {
-    if (!system_->context_->registry().template has<transform_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<transform_component>(entity_)) {
         return *this;
     }
 
-    auto& transform_comp = system_->context_->registry().template get<transform_component>(entity_);
+    auto& transform_comp = reg.template get<transform_component>(entity_);
     transform_comp.transform_.scale(factor);
     transform_comp.local_dirty_ = true;
     transform_comp.world_dirty_ = true;
 
-    system_->context_->registry().template request_change<transform_component>(entity_);
+    reg.template request_change<transform_component>(entity_);
     system_->mark_children_world_dirty(entity_);
 
     return *this;
@@ -184,14 +200,15 @@ auto transform_system<WD>::transform_modifier::scale(
 
 template <typename WD>
 auto transform_system<WD>::transform_modifier::mark_world_dirty() -> transform_modifier& {
-    if (!system_->context_->registry().template has<transform_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<transform_component>(entity_)) {
         return *this;
     }
 
-    auto& transform_comp        = system_->context_->registry().template get<transform_component>(entity_);
+    auto& transform_comp        = reg.template get<transform_component>(entity_);
     transform_comp.world_dirty_ = true;
 
-    system_->context_->registry().template request_change<transform_component>(entity_);
+    reg.template request_change<transform_component>(entity_);
     system_->mark_children_world_dirty(entity_);
 
     return *this;
@@ -201,16 +218,17 @@ template <typename WD>
 auto transform_system<WD>::transform_modifier::set_transform(
     const transform& transform
 ) -> transform_modifier& {
-    if (!system_->context_->registry().template has<transform_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<transform_component>(entity_)) {
         return *this;
     }
 
-    auto& transform_comp        = system_->context_->registry().template get<transform_component>(entity_);
+    auto& transform_comp        = reg.template get<transform_component>(entity_);
     transform_comp.transform_   = transform;
     transform_comp.local_dirty_ = true;
     transform_comp.world_dirty_ = true;
 
-    system_->context_->registry().template request_change<transform_component>(entity_);
+    reg.template request_change<transform_component>(entity_);
     system_->mark_children_world_dirty(entity_);
 
     return *this;
@@ -221,17 +239,18 @@ auto transform_system<WD>::transform_modifier::set_transform_with_matrix(
     const transform& transform,
     const mat4f& local_matrix
 ) -> transform_modifier& {
-    if (!system_->context_->registry().template has<transform_component>(entity_)) {
+    auto& reg = system_->world_->get_registry();
+    if (!reg.template has<transform_component>(entity_)) {
         return *this;
     }
 
-    auto& transform_comp          = system_->context_->registry().template get<transform_component>(entity_);
+    auto& transform_comp          = reg.template get<transform_component>(entity_);
     transform_comp.transform_     = transform;
     transform_comp.local_matrix_  = local_matrix;
     transform_comp.local_dirty_   = false;
     transform_comp.world_dirty_   = true;
 
-    system_->context_->registry().template request_change<transform_component>(entity_);
+    reg.template request_change<transform_component>(entity_);
     system_->mark_children_world_dirty(entity_);
 
     return *this;
@@ -239,7 +258,8 @@ auto transform_system<WD>::transform_modifier::set_transform_with_matrix(
 
 template <typename WD>
 void transform_system<WD>::update(float32 /*dt*/) {
-    auto& requested = context_->registry().template requested<transform_component>();
+    auto& reg       = world_->get_registry();
+    auto& requested = reg.template requested<transform_component>();
     if (requested.empty()) {
         return;
     }
@@ -247,16 +267,16 @@ void transform_system<WD>::update(float32 /*dt*/) {
     sorted_entities_.assign(requested.begin(), requested.end());
 
     std::ranges::sort(sorted_entities_, [this](entity lhs, entity rhs) {
-        return context_->template get_system<hierarchy_system>().get_hierarchy_depth(lhs) <
-               context_->template get_system<hierarchy_system>().get_hierarchy_depth(rhs);
+        return world_->template get_system<hierarchy_system>().get_hierarchy_depth(lhs) <
+               world_->template get_system<hierarchy_system>().get_hierarchy_depth(rhs);
     });
 
     for (entity ent : sorted_entities_) {
-        if (!context_->registry().template has<transform_component>(ent)) {
+        if (!reg.template has<transform_component>(ent)) {
             continue;
         }
 
-        auto& transform_comp = context_->registry().template get<transform_component>(ent);
+        auto& transform_comp = reg.template get<transform_component>(ent);
 
         if (transform_comp.local_dirty_) {
             transform_comp.local_matrix_ = transform_comp.transform_.calc_matrix();
@@ -268,29 +288,30 @@ void transform_system<WD>::update(float32 /*dt*/) {
             transform_comp.world_dirty_ = false;
         }
 
-        context_->registry().template notify_changed<transform_component>(ent);
+        reg.template notify_changed<transform_component>(ent);
     }
 
     sorted_entities_.clear();
-    context_->registry().template clear_requested<transform_component>();
+    reg.template clear_requested<transform_component>();
 }
 
 template <typename WD>
 void transform_system<WD>::mark_children_world_dirty(
     entity ent
 ) {
-    if (!context_->registry().template has<hierarchy_component>(ent)) {
+    auto& reg = world_->get_registry();
+    if (!reg.template has<hierarchy_component>(ent)) {
         return;
     }
 
-    const auto& hierarchy_comp = context_->registry().template get<hierarchy_component>(ent);
+    const auto& hierarchy_comp = reg.template get<hierarchy_component>(ent);
     const auto& children       = hierarchy_comp.get_children();
 
     for (entity child : children) {
-        if (context_->registry().template has<transform_component>(child)) {
-            auto& child_transform        = context_->registry().template get<transform_component>(child);
+        if (reg.template has<transform_component>(child)) {
+            auto& child_transform        = reg.template get<transform_component>(child);
             child_transform.world_dirty_ = true;
-            context_->registry().template request_change<transform_component>(child);
+            reg.template request_change<transform_component>(child);
         }
         mark_children_world_dirty(child);
     }
@@ -302,13 +323,14 @@ void transform_system<WD>::update_entity_world_matrix(
     mat4f local_matrix           = transform_comp.get_local_matrix();
     transform_comp.world_matrix_ = local_matrix;
 
-    if (context_->registry().template has<hierarchy_component>(ent)) {
-        const auto& hierarchy_comp = context_->registry().template get<hierarchy_component>(ent);
+    auto& reg = world_->get_registry();
+    if (reg.template has<hierarchy_component>(ent)) {
+        const auto& hierarchy_comp = reg.template get<hierarchy_component>(ent);
         if (hierarchy_comp.has_parent()) {
             entity parent = hierarchy_comp.get_parent();
-            if (context_->registry().template has<transform_component>(parent)) {
+            if (reg.template has<transform_component>(parent)) {
                 const auto& parent_transform_comp =
-                    context_->registry().template get<transform_component>(parent);
+                    reg.template get<transform_component>(parent);
 
                 auto parent_world_matrix = parent_transform_comp.get_world_matrix() *
                     math::translation_matrix(-parent_transform_comp.get_origin());

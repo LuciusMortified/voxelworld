@@ -3,7 +3,6 @@
 
 #include <algorithm>
 
-#include "vw/gfx/world/entity_guard.h"
 #include "vw/gfx/world_grid/generators/perlin_terrain_generator.h"
 #include "vw/gfx/world_grid/world_grid.h"
 
@@ -43,7 +42,11 @@ public:
         camera.set_rotation(0.0f, 0.0f);
     }
 
-    ~world_grid_app() override = default;
+    ~world_grid_app() override {
+        if (viewer_.is_valid()) {
+            get_engine().get_world().destroy_entity(viewer_);
+        }
+    }
 
     void render(
         float delta_time
@@ -56,7 +59,7 @@ public:
 
         auto& world            = get_engine().get_world();
         auto& transform_sys = world.template get_system<gfx::transform_system>();
-        transform_sys.modify(viewer_->get_entity()).set_position(cam_pos);
+        transform_sys.modify(viewer_).set_position(cam_pos);
 
         auto& renderer = get_engine().get_renderer();
         renderer.draw_line(vec3f{0, 0, 0}, vec3f{100, 0, 0}, colors::red);
@@ -95,14 +98,15 @@ private:
             registry.get_identity_pool(), registry.get_page_pool(), generator_params_);
         generator_  = generator.get();
         auto grid   = std::make_unique<gfx::world_grid<gfx::base_world_def>>(
-            world.get_context(), std::move(generator), generator_params_.voxel_scale
+            world, std::move(generator), generator_params_.voxel_scale
         );
         world_grid_ = grid.get();
-        world.set_grid(std::move(grid));
+        world.template get_system<gfx::world_grid_system>().set_grid(std::move(grid));
 
-        viewer_ = std::make_unique<gfx::entity_guard<gfx::base_world_def>>(world.get_context());
-        viewer_->with<gfx::transform_component>();
-        viewer_->with<gfx::world_view_component>();
+        viewer_ = world.create()
+            .with<gfx::transform_component>()
+            .with<gfx::world_view_component>()
+            .get_entity();
     }
 
     void render_ui() const {
@@ -166,7 +170,7 @@ private:
 
     std::unique_ptr<gfx::free_camera_controller> camera_controller_;
     gfx::world_grid<gfx::base_world_def>* world_grid_ = nullptr;
-    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> viewer_;
+    gfx::entity viewer_ = gfx::invalid_entity;
     gfx::perlin_terrain_generator* generator_ = nullptr;
     gfx::perlin_terrain_generator::params generator_params_;
     bool camera_placed_ = false;

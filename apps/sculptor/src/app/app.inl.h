@@ -85,6 +85,11 @@ inline app::app(
     dir_light_settings.direction = math::normalize(vec3f{+0.4f, -1.0f, +0.4f});
 }
 
+inline app::~app() {
+    state_.scene.clear_entities(get_engine().get_world());
+    state_.sockets.clear_all(get_engine().get_world());
+}
+
 inline void app::render(
     float delta_time
 ) {

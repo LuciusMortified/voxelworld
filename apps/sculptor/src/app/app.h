@@ -33,6 +33,7 @@ public:
     using engine_type = gfx::engine<>;
 
     explicit app(engine_type& eng);
+    ~app() override;
 
     void render(float delta_time) override;
 

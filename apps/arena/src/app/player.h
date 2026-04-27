@@ -3,7 +3,6 @@
 #ifndef VW_ARENA_PLAYER_H
 #define VW_ARENA_PLAYER_H
 
-#include <memory>
 #include <string_view>
 
 #include <vw/core.h>
@@ -12,7 +11,6 @@
 #include "vw/asset/asset_storage.h"
 #include "vw/gfx/camera/camera.h"
 #include "vw/gfx/player/player_input_state.h"
-#include "vw/gfx/world/entity_guard.h"
 #include "vw/gfx/world_grid/world_grid.h"
 
 namespace vw::arena {
@@ -20,6 +18,12 @@ namespace vw::arena {
 class player {
 public:
     explicit player(gfx::engine<>& engine, asset::asset_storage& assets);
+    ~player();
+
+    player(const player&)                    = delete;
+    auto operator=(const player&) -> player& = delete;
+    player(player&&)                         = delete;
+    auto operator=(player&&) -> player&      = delete;
 
     auto update(const gfx::player_input_state& input) -> void;
     auto try_place(float32 voxel_scale) -> void;
@@ -32,7 +36,7 @@ public:
 private:
     [[nodiscard]] auto create_body_part(
         std::string_view prefab_name, std::string_view part_name
-    ) const -> std::unique_ptr<gfx::entity_guard<gfx::base_world_def>>;
+    ) const -> gfx::entity;
 
     auto handle_attack() const -> void;
     [[nodiscard]] auto can_attack() const -> bool;
@@ -41,14 +45,14 @@ private:
     gfx::engine<>& engine_;
     asset::asset_storage& assets_;
 
-    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> root_;
-    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> body_;
-    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> head_;
-    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> hand_right_;
-    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> hand_left_;
-    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> foot_right_;
-    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> foot_left_;
-    std::unique_ptr<gfx::entity_guard<gfx::base_world_def>> sword_;
+    gfx::entity root_;
+    gfx::entity body_;
+    gfx::entity head_;
+    gfx::entity hand_right_;
+    gfx::entity hand_left_;
+    gfx::entity foot_right_;
+    gfx::entity foot_left_;
+    gfx::entity sword_;
 
     static constexpr float32 default_rotation_speed_ = 5.0f;
     static constexpr float32 attack_rotation_speed_  = 25.0f;

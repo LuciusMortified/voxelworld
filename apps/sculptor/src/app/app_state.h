@@ -9,12 +9,17 @@
 #include "vw/core/transform.h"
 #include "vw/asset/animation/animation_types.h"
 #include "vw/asset/animation/keyframe.h"
-#include "vw/gfx/world/entity_guard.h"
+#include "vw/gfx/world/base_world_def.h"
+#include "vw/gfx/world/entity.h"
+
+namespace vw::gfx {
+template <typename> class world;
+}  // namespace vw::gfx
 
 namespace vw::sculptor {
 
-using keyframe_value    = std::variant<asset::keyframe_vec3f, asset::keyframe_quat>;
-using entity_guard_type = gfx::entity_guard<gfx::base_world_def>;
+using world_type    = gfx::world<gfx::base_world_def>;
+using keyframe_value = std::variant<asset::keyframe_vec3f, asset::keyframe_quat>;
 
 enum class tools : uint8 {
     invalid,
@@ -55,9 +60,9 @@ struct scene_state {
     std::string root_name;
     std::unordered_map<std::string, gfx::entity> name_to_entity;
     std::unordered_map<gfx::entity, std::string> entity_to_name;
-    std::vector<std::unique_ptr<entity_guard_type>> entities;
+    std::vector<gfx::entity> entities;
 
-    [[nodiscard]] auto find_guard(gfx::entity ent) const -> entity_guard_type*;
+    void clear_entities(world_type& world);
 };
 
 struct tool_state {
@@ -108,7 +113,9 @@ struct socket_state {
     struct socket_preview {
         std::string filename;
         std::string preview_root_name;
-        std::vector<std::unique_ptr<entity_guard_type>> guards;
+        std::vector<gfx::entity> entities;
+
+        void destroy_entities(world_type& world);
     };
 
     std::unordered_map<std::string, socket_preview> socket_previews;
@@ -122,12 +129,16 @@ struct socket_state {
     [[nodiscard]] auto get_preview_entities() const -> std::unordered_set<gfx::entity> {
         std::unordered_set<gfx::entity> result;
         for (const auto& preview : socket_previews | std::views::values) {
-            for (const auto& guard : preview.guards) {
-                result.insert(guard->get_entity());
+            for (const auto ent : preview.entities) {
+                result.insert(ent);
             }
         }
         return result;
     }
+
+    void erase_preview(const std::string& key, world_type& world);
+    void erase_previews_for(const std::string& entity_name, world_type& world);
+    void clear_all(world_type& world);
 };
 
 struct app_state {
@@ -139,6 +150,8 @@ struct app_state {
     tool_state tool;
     animation_state anim;
     socket_state sockets;
+
+    void reset(world_type& world);
 };
 
 }  // namespace vw::sculptor
