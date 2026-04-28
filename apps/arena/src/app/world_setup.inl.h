@@ -4,7 +4,7 @@ namespace vw::arena {
 
 inline auto setup_world_grid(gfx::engine<>& engine) -> world_setup_result {
     auto& world    = engine.get_world();
-    auto& registry = world.template get_resource<asset::model_registry>();
+    auto& registry = world.template resource<asset::model_registry>();
 
     gfx::perlin_terrain_generator::params params{
         .voxel_scale = 16,
@@ -14,7 +14,7 @@ inline auto setup_world_grid(gfx::engine<>& engine) -> world_setup_result {
         registry.get_identity_pool(), registry.get_page_pool(), params
     );
 
-    world.template get_system<gfx::world_grid_system>().set_grid(
+    world.template system<gfx::world_grid_system>().set_grid(
         std::make_unique<gfx::world_grid<gfx::base_world_def>>(world, std::move(generator), params.voxel_scale)
     );
 

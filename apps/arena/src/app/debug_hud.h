@@ -50,11 +50,11 @@ inline auto render_debug_hud(
     if (player.is_placed()) {
         auto& world           = engine.get_world();
         const auto player_ent = player.get_entity();
-        const auto& tc        = world.get_component<gfx::transform_component>(player_ent);
+        const auto& tc        = world.get<gfx::transform_component>(player_ent);
         const auto pos        = tc.get_position();
         ImGui::Text("Position: (%.1f, %.1f, %.1f)", pos.x, pos.y, pos.z);
 
-        const auto& rb = world.get_component<gfx::rigid_body_component>(player_ent);
+        const auto& rb = world.get<gfx::rigid_body_component>(player_ent);
         const auto vel = rb.get_velocity();
         ImGui::Text("Velocity: (%.1f, %.1f, %.1f)", vel.x, vel.y, vel.z);
         const auto imp = rb.get_impulse();
@@ -66,7 +66,7 @@ inline auto render_debug_hud(
 
         ImGui::Separator();
         ImGui::Text("Animation FSM:");
-        const auto& fsm_comp = world.get_component<gfx::animation_fsm_component>(player_ent);
+        const auto& fsm_comp = world.get<gfx::animation_fsm_component>(player_ent);
         for (size_t i = 0; i < fsm_comp.machine_count(); ++i) {
             const auto& state = fsm_comp.get_machine(i).get_current_state();
             ImGui::Text("  Layer %zu: %s", i, state.c_str());
@@ -77,7 +77,7 @@ inline auto render_debug_hud(
         ImGui::Text("Colliders: %s", show_colliders ? "visible" : "hidden");
     }
 
-    const auto grid = engine.get_world().template get_system<gfx::world_grid_system>().grid();
+    const auto grid = engine.get_world().template system<gfx::world_grid_system>().grid();
     if (grid) {
         ImGui::Separator();
         ImGui::Text("Loaded chunks: %u", grid->get_loaded_chunk_count());

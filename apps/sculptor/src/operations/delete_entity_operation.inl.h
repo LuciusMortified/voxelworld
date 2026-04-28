@@ -14,8 +14,8 @@ inline void delete_entity_operation::execute() {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world          = engine_->get_world();
-    auto& hierarchy_comp = world.get_component<gfx::hierarchy_component>(ent);
-    auto& transform_comp = world.get_component<gfx::transform_component>(ent);
+    auto& hierarchy_comp = world.get<gfx::hierarchy_component>(ent);
+    auto& transform_comp = world.get<gfx::transform_component>(ent);
 
     bool has_parent = hierarchy_comp.has_parent();
     if (has_parent) {
@@ -24,8 +24,8 @@ inline void delete_entity_operation::execute() {
 
     transform_ = transform_comp.get_transform();
 
-    if (world.has_component<gfx::model_component>(ent)) {
-        auto& model_comp = world.get_component<gfx::model_component>(ent);
+    if (world.has<gfx::model_component>(ent)) {
+        auto& model_comp = world.get<gfx::model_component>(ent);
 
         if (model_comp.has_model()) {
             with_model_  = true;
@@ -45,15 +45,15 @@ inline void delete_entity_operation::execute() {
         state_->scene.selected_name = "";
     }
 
-    world.destroy_entity(ent);
+    world.destroy(ent);
     std::erase(state_->scene.entities, ent);
     state_->file.has_unsaved_changes = true;
 }
 
 inline void delete_entity_operation::undo() {
     auto& world            = engine_->get_world();
-    auto& hierarchy_sys = world.template get_system<gfx::hierarchy_system>();
-    auto& transform_sys = world.template get_system<gfx::transform_system>();
+    auto& hierarchy_sys = world.template system<gfx::hierarchy_system>();
+    auto& transform_sys = world.template system<gfx::transform_system>();
 
     auto modifier = world.create()
         .template with<gfx::hierarchy_component>()
@@ -67,7 +67,7 @@ inline void delete_entity_operation::undo() {
     if (with_model_) {
         modifier.template with<gfx::model_component>();
 
-        auto& model_sys = world.template get_system<gfx::model_system>();
+        auto& model_sys = world.template system<gfx::model_system>();
         model_sys.modify(ent).set_model(saved_model_);
     }
 

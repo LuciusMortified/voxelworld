@@ -37,6 +37,24 @@ public:
         entity ent_;
     };
 
+    class batch_modifier {
+    public:
+        batch_modifier(world& w, std::vector<entity> entities);
+
+        template <typename C>
+        auto with(const C& value = {}) -> batch_modifier&;
+
+        template <typename C>
+        auto without() -> batch_modifier&;
+
+        [[nodiscard]] auto get_entities() const -> const std::vector<entity>&;
+        [[nodiscard]] auto release_entities() -> std::vector<entity>;
+
+    private:
+        world* world_;
+        std::vector<entity> entities_;
+    };
+
     world();
     ~world() = default;
 
@@ -46,64 +64,71 @@ public:
     auto operator=(world&&) -> world&      = delete;
 
     void update(float32 delta_time);
-
-    [[nodiscard]] auto create_entity() -> entity;
-    void destroy_entity(entity ent) noexcept;
-
-    [[nodiscard]] auto batch_create_entities(uint32 count) -> std::vector<entity>;
-    void batch_destroy_entities(const std::vector<entity>& entities) noexcept;
+    void clear_changed();
 
     [[nodiscard]] auto create() -> modifier;
     [[nodiscard]] auto modify(entity ent) -> modifier;
+    void destroy(entity ent) noexcept;
+
+    [[nodiscard]] auto batch_create(uint32 count) -> batch_modifier;
+    [[nodiscard]] auto batch_modify(std::vector<entity> entities) -> batch_modifier;
+    void batch_destroy(const std::vector<entity>& entities) noexcept;
 
     template <typename T>
-    void add_component(entity ent, T&& value = {});
+    [[nodiscard]] auto has(entity ent) const -> bool;
 
     template <typename T>
-    void remove_component(entity ent) noexcept;
+    [[nodiscard]] auto get(entity ent) -> T&;
 
     template <typename T>
-    [[nodiscard]] auto has_component(entity ent) const -> bool;
-
-    template <typename T>
-    [[nodiscard]] auto get_component(entity ent) -> T&;
-
-    template <typename T>
-    [[nodiscard]] auto get_component(entity ent) const -> const T&;
+    [[nodiscard]] auto get(entity ent) const -> const T&;
 
     template <typename... Cs>
-    [[nodiscard]] auto view_components() -> component_view<registry_type, Cs...>;
+    [[nodiscard]] auto view() -> component_view<registry_type, Cs...>;
 
     template <template <typename> class S>
-    [[nodiscard]] auto get_system() -> S<WD>& {
+    [[nodiscard]] auto system() -> S<WD>& {
         return std::get<S<WD>>(systems_);
     }
 
     template <template <typename> class S>
-    [[nodiscard]] auto get_system() const -> const S<WD>& {
+    [[nodiscard]] auto system() const -> const S<WD>& {
         return std::get<S<WD>>(systems_);
     }
 
     template <typename R>
-    [[nodiscard]] auto get_resource() -> R& {
+    [[nodiscard]] auto resource() -> R& {
         return std::get<R>(resources_);
     }
 
     template <typename R>
-    [[nodiscard]] auto get_resource() const -> const R& {
+    [[nodiscard]] auto resource() const -> const R& {
         return std::get<R>(resources_);
     }
 
-    [[nodiscard]] auto get_registry() -> registry_type&;
+    [[nodiscard]] auto registry() -> registry_type&;
 
     template <typename T>
     [[nodiscard]] auto changed() -> std::unordered_set<entity>&;
 
     [[nodiscard]] auto destroyed() const -> const std::vector<entity>&;
 
-    void clear_changed();
-
 private:
+    [[nodiscard]] auto create_entity_() -> entity;
+    [[nodiscard]] auto batch_create_entities_(uint32 count) -> std::vector<entity>;
+
+    template <typename T>
+    void add_component_(entity ent, T&& value = {});
+
+    template <typename T>
+    void remove_component_(entity ent) noexcept;
+
+    template <typename T>
+    void batch_add_component_(const std::vector<entity>& entities, const T& value = {});
+
+    template <typename T>
+    void batch_remove_component_(const std::vector<entity>& entities) noexcept;
+
     registry_type registry_;
     systems_tuple systems_;
     resources_tuple resources_;

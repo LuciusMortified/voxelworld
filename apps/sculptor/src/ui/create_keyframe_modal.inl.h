@@ -29,8 +29,8 @@ inline void create_keyframe_modal::open(
     if (state_->scene.name_to_entity.contains(track_name)) {
         auto ent    = state_->scene.name_to_entity[track_name];
         auto& world = engine_->get_world();
-        if (world.has_component<gfx::transform_component>(ent)) {
-            auto& tc = world.get_component<gfx::transform_component>(ent);
+        if (world.has<gfx::transform_component>(ent)) {
+            auto& tc = world.get<gfx::transform_component>(ent);
 
             auto prop = static_cast<asset::animation_property>(property_index_);
             if (prop == asset::animation_property::position) {
@@ -79,8 +79,8 @@ inline void create_keyframe_modal::render(
         if (prev_prop != property_index_ && state_->scene.name_to_entity.contains(track_name_)) {
             auto ent    = state_->scene.name_to_entity[track_name_];
             auto& world = engine_->get_world();
-            if (world.has_component<gfx::transform_component>(ent)) {
-                auto& tc  = world.get_component<gfx::transform_component>(ent);
+            if (world.has<gfx::transform_component>(ent)) {
+                auto& tc  = world.get<gfx::transform_component>(ent);
                 auto prop = static_cast<asset::animation_property>(property_index_);
                 if (prop == asset::animation_property::position) {
                     value_vec3f_ = tc.get_position();
@@ -175,7 +175,7 @@ inline bool create_keyframe_modal::create_keyframe() {
         return false;
     }
 
-    auto& clip_registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
+    auto& clip_registry = engine_->get_world().template resource<asset::animation_clip_registry>();
     auto clip           = clip_registry.get(state_->anim.selected_clip_name);
     if (!clip) {
         error_ = "Clip not found.";

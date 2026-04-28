@@ -68,7 +68,7 @@ inline void select_entity_tool::update_hovered_entity_() {
     const auto& camera = engine_->get_camera();
 
     const auto ray = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
-    const auto hit = world.get_system<gfx::spatial_system>().voxel_ray_cast(ray, ray_cast_entities_);
+    const auto hit = world.system<gfx::spatial_system>().voxel_ray_cast(ray, ray_cast_entities_);
 
     if (!hit) {
         hovered_entity_ = gfx::invalid_entity;
@@ -84,14 +84,14 @@ inline void select_entity_tool::draw_entity_box_(
     auto& world = engine_->get_world();
 
     const bool is_renderable =
-        world.has_component<gfx::transform_component>(ent) &&
-        world.has_component<gfx::model_component>(ent);
+        world.has<gfx::transform_component>(ent) &&
+        world.has<gfx::model_component>(ent);
     if (!is_renderable) {
         return;
     }
 
-    const auto& tc = world.get_component<gfx::transform_component>(ent);
-    const auto& mc = world.get_component<gfx::model_component>(ent);
+    const auto& tc = world.get<gfx::transform_component>(ent);
+    const auto& mc = world.get<gfx::model_component>(ent);
     if (!mc.has_model()) {
         return;
     }

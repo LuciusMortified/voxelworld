@@ -23,11 +23,11 @@ using test_def = world_def<hierarchy_system, transform_system, spatial_system, a
 struct anim_test_fixture {
     world<test_def> w;
 
-    test_def::registry_type& reg = w.get_registry();
-    animation_clip_registry& clip_reg = w.get_resource<animation_clip_registry>();
-    animation_system<test_def>& anim_sys = w.get_system<animation_system>();
-    hierarchy_system<test_def>& hierarchy_sys = w.get_system<hierarchy_system>();
-    transform_system<test_def>& transform_sys = w.get_system<transform_system>();
+    test_def::registry_type& reg = w.registry();
+    animation_clip_registry& clip_reg = w.resource<animation_clip_registry>();
+    animation_system<test_def>& anim_sys = w.system<animation_system>();
+    hierarchy_system<test_def>& hierarchy_sys = w.system<hierarchy_system>();
+    transform_system<test_def>& transform_sys = w.system<transform_system>();
 
     auto create_root() -> entity {
         auto ent = reg.create();

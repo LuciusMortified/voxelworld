@@ -94,11 +94,11 @@ void combined_buffer_pool<C>::process_destroyed_(world_type& world) {
         if (entity_buffer_infos_.contains(ent)) {
             auto& info = entity_buffer_infos_[ent];
             auto swapped = buffers_[info.buffer_index]->free(ent);
-            if (swapped && world.template has_component<transform_component>(*swapped)) {
-                auto& tc = world.template get_component<transform_component>(*swapped);
+            if (swapped && world.template has<transform_component>(*swapped)) {
+                auto& tc = world.template get<transform_component>(*swapped);
                 vw::spatial::aabb bounds{};
-                if (world.template has_component<spatial_component>(*swapped)) {
-                    bounds = world.template get_component<spatial_component>(*swapped)
+                if (world.template has<spatial_component>(*swapped)) {
+                    bounds = world.template get<spatial_component>(*swapped)
                                  .get_bounds();
                 }
                 buffers_[info.buffer_index]->write_transform(
@@ -162,10 +162,10 @@ void combined_buffer_pool<C>::update_meshes_(
     std::sort(entities_to_process_.begin(), entities_to_process_.end(),
         [&](entity a, entity b) {
             auto get_dist_sq = [&](entity e) -> float32 {
-                if (!world.template has_component<spatial_component>(e)) {
+                if (!world.template has<spatial_component>(e)) {
                     return 0.0f;
                 }
-                auto& sc = world.template get_component<spatial_component>(e);
+                auto& sc = world.template get<spatial_component>(e);
                 auto diff = sc.get_bounds().center() - camera_pos;
                 return diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
             };
@@ -191,18 +191,18 @@ void combined_buffer_pool<C>::update_meshes_(
             break;
         }
 
-        const bool has_model     = world.template has_component<model_component>(ent);
-        const bool has_transform = world.template has_component<transform_component>(ent);
+        const bool has_model     = world.template has<model_component>(ent);
+        const bool has_transform = world.template has<transform_component>(ent);
 
         if (!has_model || !has_transform) {
             if (entity_buffer_infos_.contains(ent)) {
                 auto& buffer_info = entity_buffer_infos_[ent];
                 auto swapped = buffers_[buffer_info.buffer_index]->free(ent);
-                if (swapped && world.template has_component<transform_component>(*swapped)) {
-                    auto& tc = world.template get_component<transform_component>(*swapped);
+                if (swapped && world.template has<transform_component>(*swapped)) {
+                    auto& tc = world.template get<transform_component>(*swapped);
                     vw::spatial::aabb swap_bounds{};
-                    if (world.template has_component<spatial_component>(*swapped)) {
-                        swap_bounds = world.template get_component<spatial_component>(*swapped)
+                    if (world.template has<spatial_component>(*swapped)) {
+                        swap_bounds = world.template get<spatial_component>(*swapped)
                                           .get_bounds();
                     }
                     buffers_[buffer_info.buffer_index]->write_transform(
@@ -213,7 +213,7 @@ void combined_buffer_pool<C>::update_meshes_(
             continue;
         }
 
-        const auto& model_comp = world.template get_component<model_component>(ent);
+        const auto& model_comp = world.template get<model_component>(ent);
         if (!model_comp.has_model()) {
             merge_buffer_.push_back(ent);
             continue;
@@ -240,7 +240,7 @@ void combined_buffer_pool<C>::update_meshes_(
             required_chunk_size.index_count * sizeof(uint32) +
             sizeof(uint32) + sizeof(draw_command) + sizeof(mat4f) * 2;
 
-        const auto& transform_comp    = world.template get_component<transform_component>(ent);
+        const auto& transform_comp    = world.template get<transform_component>(ent);
         const mat4f& transform_matrix = transform_comp.get_world_matrix();
 
         if (entity_buffer_infos_.contains(ent)) {
@@ -267,11 +267,11 @@ void combined_buffer_pool<C>::update_meshes_(
             }
 
             auto swapped = buffer->free(ent);
-            if (swapped && world.template has_component<transform_component>(*swapped)) {
-                auto& tc = world.template get_component<transform_component>(*swapped);
+            if (swapped && world.template has<transform_component>(*swapped)) {
+                auto& tc = world.template get<transform_component>(*swapped);
                 vw::spatial::aabb sw_bounds{};
-                if (world.template has_component<spatial_component>(*swapped)) {
-                    sw_bounds = world.template get_component<spatial_component>(*swapped)
+                if (world.template has<spatial_component>(*swapped)) {
+                    sw_bounds = world.template get<spatial_component>(*swapped)
                                     .get_bounds();
                 }
                 buffer->write_transform(*swapped, tc.get_world_matrix(), sw_bounds);
@@ -285,8 +285,8 @@ void combined_buffer_pool<C>::update_meshes_(
         const auto buffer_index = chunk_size_to_buffer_index_[required_chunk_size];
 
         vw::spatial::aabb ent_bounds{};
-        if (world.template has_component<spatial_component>(ent)) {
-            ent_bounds = world.template get_component<spatial_component>(ent).get_bounds();
+        if (world.template has<spatial_component>(ent)) {
+            ent_bounds = world.template get<spatial_component>(ent).get_bounds();
         }
         buffer->allocate(ent, model_id, *mesh_ptr, transform_matrix, ent_bounds);
         pool.evict(model_id);
@@ -320,8 +320,8 @@ void combined_buffer_pool<C>::update_transforms_(
             continue;
         }
 
-        const bool has_model     = world.template has_component<model_component>(ent);
-        const bool has_transform = world.template has_component<transform_component>(ent);
+        const bool has_model     = world.template has<model_component>(ent);
+        const bool has_transform = world.template has<transform_component>(ent);
         if (!has_model || !has_transform) {
             continue;
         }
@@ -335,10 +335,10 @@ void combined_buffer_pool<C>::update_transforms_(
         }
 
         auto& info = entity_buffer_infos_[ent];
-        const auto& transform_comp = world.template get_component<transform_component>(ent);
+        const auto& transform_comp = world.template get<transform_component>(ent);
         vw::spatial::aabb tr_bounds{};
-        if (world.template has_component<spatial_component>(ent)) {
-            tr_bounds = world.template get_component<spatial_component>(ent).get_bounds();
+        if (world.template has<spatial_component>(ent)) {
+            tr_bounds = world.template get<spatial_component>(ent).get_bounds();
         }
         buffers_[info.buffer_index]->write_transform(
             ent, transform_comp.get_world_matrix(), tr_bounds);

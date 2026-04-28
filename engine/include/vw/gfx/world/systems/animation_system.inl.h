@@ -42,7 +42,7 @@ void animation_system<WD>::update(
 
     to_remove_.clear();
 
-    auto& reg = world_->get_registry();
+    auto& reg = world_->registry();
     for (entity ent : active_entities_) {
         if (!reg.template has<animation_player_component>(ent)) {
             to_remove_.push_back(ent);
@@ -91,7 +91,7 @@ void animation_system<WD>::build_and_cache_target_map(
     to_visit_.clear();
     to_visit_.push_back(root_ent);
 
-    auto& reg = world_->get_registry();
+    auto& reg = world_->registry();
     while (!to_visit_.empty()) {
         entity current = to_visit_.front();
         to_visit_.pop_front();
@@ -311,7 +311,7 @@ void animation_system<WD>::apply_animation(
         return;
     }
 
-    auto& reg = world_->get_registry();
+    auto& reg = world_->registry();
 
     auto get_rest = [&](const std::string& name) -> transform {
         auto it = target_map->find(name);
@@ -406,7 +406,7 @@ void animation_system<WD>::apply_animation(
             continue;
         }
 
-        auto modifier = world_->template get_system<transform_system>().modify(target_ent);
+        auto modifier = world_->template system<transform_system>().modify(target_ent);
         modifier.set_transform_with_matrix(t, t.calc_matrix());
     }
 }
@@ -421,7 +421,7 @@ template <typename WD>
 auto animation_system<WD>::modify_player(
     entity ent
 ) -> player_modifier {
-    auto& comp = world_->get_registry().template get<animation_player_component>(ent);
+    auto& comp = world_->registry().template get<animation_player_component>(ent);
     return player_modifier(this, ent, &comp);
 }
 
@@ -585,7 +585,7 @@ void animation_system<WD>::layer_modifier::blend_to(
 
             const auto* target_map = system_->get_cached_target_map(entity_);
 
-            auto& reg = system_->world_->get_registry();
+            auto& reg = system_->world_->registry();
             auto get_rest = [&](const std::string& name) -> transform {
                 if (!target_map) {
                     return {};
@@ -667,7 +667,7 @@ template <typename WD>
 void animation_system<WD>::layer_modifier::blend_to_by_name(
     std::string_view name, std::optional<vw::asset::transition> t
 ) {
-    auto clip = system_->world_->template get_resource<vw::asset::animation_clip_registry>().get(name);
+    auto clip = system_->world_->template resource<vw::asset::animation_clip_registry>().get(name);
     if (clip) {
         blend_to(std::move(clip), t);
     }
@@ -683,7 +683,7 @@ template <typename WD>
 auto animation_system<WD>::modify_target(
     entity ent
 ) -> target_modifier {
-    auto& comp = world_->get_registry().template get<animation_target_component>(ent);
+    auto& comp = world_->registry().template get<animation_target_component>(ent);
     return target_modifier(ent, &comp);
 }
 

@@ -16,12 +16,12 @@ template <typename WD>
 template <typename C>
     requires std::same_as<C, light_component>
 void light_system<WD>::on_add(entity e) {
-    world_->get_registry().template request_change<light_component>(e);
+    world_->registry().template request_change<light_component>(e);
 }
 
 template <typename WD>
 void light_system<WD>::update(float32 /*dt*/) {
-    auto& reg       = world_->get_registry();
+    auto& reg       = world_->registry();
     auto& requested = reg.template requested<light_component>();
     if (requested.empty()) {
         return;
@@ -49,7 +49,7 @@ template <typename WD>
 auto light_system<WD>::light_modifier::set_color(
     const vec3f& color
 ) -> light_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<light_component>(entity_)) {
         return *this;
     }
@@ -63,7 +63,7 @@ template <typename WD>
 auto light_system<WD>::light_modifier::set_intensity(
     float32 intensity
 ) -> light_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<light_component>(entity_)) {
         return *this;
     }
@@ -77,7 +77,7 @@ template <typename WD>
 auto light_system<WD>::light_modifier::set_range(
     float32 range
 ) -> light_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<light_component>(entity_)) {
         return *this;
     }
@@ -91,7 +91,7 @@ template <typename WD>
 auto light_system<WD>::light_modifier::set_attenuation(
     float32 constant, float32 linear, float32 quadratic
 ) -> light_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<light_component>(entity_)) {
         return *this;
     }

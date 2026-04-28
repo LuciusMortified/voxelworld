@@ -38,7 +38,7 @@ template <typename WD>
 auto spatial_system<WD>::spatial_modifier::set_layer(
     spatial_layer_mask layer
 ) -> spatial_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<spatial_component>(entity_)) {
         return *this;
     }
@@ -49,7 +49,7 @@ auto spatial_system<WD>::spatial_modifier::set_layer(
 
 template <typename WD>
 void spatial_system<WD>::update(float32 /*dt*/) {
-    auto& reg       = world_->get_registry();
+    auto& reg       = world_->registry();
     auto& requested = reg.template requested<spatial_component>();
     if (requested.empty()) {
         return;
@@ -74,7 +74,7 @@ template <typename WD>
 void spatial_system<WD>::update_entity(
     entity ent
 ) {
-    auto& reg     = world_->get_registry();
+    auto& reg     = world_->registry();
     auto& spatial = reg.template get<spatial_component>(ent);
 
     const auto& model_comp     = reg.template get<model_component>(ent);
@@ -223,7 +223,7 @@ auto spatial_system<WD>::voxel_ray_cast(
 ) const -> std::optional<voxel_ray_hit> {
     query_all(r, candidates, layer_mask);
 
-    auto& reg = world_->get_registry();
+    auto& reg = world_->registry();
     std::optional<voxel_ray_hit> closest_hit;
     float closest_distance_sq = std::numeric_limits<float>::max();
 

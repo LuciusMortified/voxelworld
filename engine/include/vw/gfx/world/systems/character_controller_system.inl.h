@@ -15,7 +15,7 @@ character_controller_system<WD>::character_controller_system(world_type& w)
 
 template <typename WD>
 void character_controller_system<WD>::update(float32 delta_time) {
-    auto& reg = world_->get_registry();
+    auto& reg = world_->registry();
     for (auto [ent, cc, rb, mi] :
          reg.template view<character_controller_component, rigid_body_component, movement_intent_component>()) {
 
@@ -40,7 +40,7 @@ void character_controller_system<WD>::update(float32 delta_time) {
             auto target = math::quat_look_y(cc.facing_direction_);
             auto current = tc.get_rotation();
             float32 t = math::clamp(cc.rotation_speed_ * delta_time, 0.0f, 1.0f);
-            world_->template get_system<transform_system>().modify(ent).set_rotation(math::slerp(current, target, t));
+            world_->template system<transform_system>().modify(ent).set_rotation(math::slerp(current, target, t));
         }
 
         cc.jump_requested_ = false;
@@ -65,7 +65,7 @@ template <typename WD>
 auto character_controller_system<WD>::controller_modifier::set_move_input(
     const vec3f& input
 ) -> controller_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<character_controller_component>(entity_)) {
         return *this;
     }
@@ -78,7 +78,7 @@ template <typename WD>
 auto character_controller_system<WD>::controller_modifier::set_facing_direction(
     const vec3f& direction
 ) -> controller_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<character_controller_component>(entity_)) {
         return *this;
     }
@@ -91,7 +91,7 @@ template <typename WD>
 auto character_controller_system<WD>::controller_modifier::set_move_speed(
     float32 speed
 ) -> controller_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<character_controller_component>(entity_)) {
         return *this;
     }
@@ -104,7 +104,7 @@ template <typename WD>
 auto character_controller_system<WD>::controller_modifier::set_jump_impulse(
     float32 impulse
 ) -> controller_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<character_controller_component>(entity_)) {
         return *this;
     }
@@ -117,7 +117,7 @@ template <typename WD>
 auto character_controller_system<WD>::controller_modifier::set_rotation_speed(
     float32 speed
 ) -> controller_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<character_controller_component>(entity_)) {
         return *this;
     }
@@ -129,7 +129,7 @@ auto character_controller_system<WD>::controller_modifier::set_rotation_speed(
 template <typename WD>
 auto character_controller_system<WD>::controller_modifier::request_jump(
 ) -> controller_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<character_controller_component>(entity_)) {
         return *this;
     }

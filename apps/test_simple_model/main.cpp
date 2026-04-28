@@ -40,7 +40,7 @@ public:
 
     ~simple_model_app() override {
         if (flower_.is_valid()) {
-            get_engine().get_world().destroy_entity(flower_);
+            get_engine().get_world().destroy(flower_);
         }
     }
 
@@ -92,9 +92,9 @@ public:
 private:
     void create_flower_model() {
         auto& world            = get_engine().get_world();
-        auto& model_reg = world.template get_resource<asset::model_registry>();
-        auto& transform_sys = world.template get_system<gfx::transform_system>();
-        auto& model_sys = world.template get_system<gfx::model_system>();
+        auto& model_reg = world.template resource<asset::model_registry>();
+        auto& transform_sys = world.template system<gfx::transform_system>();
+        auto& model_sys = world.template system<gfx::model_system>();
 
         // Создаем модель и регистрируем ее
         model_ = model_reg.create("flower", 3, 6, 3);
@@ -138,18 +138,18 @@ private:
         }
 
         auto& world            = get_engine().get_world();
-        auto& transform_sys = world.template get_system<gfx::transform_system>();
+        auto& transform_sys = world.template system<gfx::transform_system>();
         transform_sys.modify(flower_).set_rotation(math::euler_to_quat({0.0f, object_rotation_, 0.0f}));
 
-        if (world.has_component<gfx::transform_component>(flower_)) {
+        if (world.has<gfx::transform_component>(flower_)) {
             const auto matrix =
-                world.get_component<gfx::transform_component>(flower_)
+                world.get<gfx::transform_component>(flower_)
                     .get_world_matrix();
             get_engine().get_renderer().draw_grid(matrix, 1.f, 3, 3, colors::white);
         }
 
 #if 0
-        auto transform_view = world.view_components<gfx::transform_component>();
+        auto transform_view = world.view<gfx::transform_component>();
         for (const auto& [entity, transform_comp] : transform_view) {
             transform_sys.modify(entity).set_rotation(math::euler_to_quat({0.0f, object_rotation_, 0.0f}));
         }
@@ -183,7 +183,7 @@ private:
             auto ray    = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
             select_ray_ = ray;
 
-            auto voxel_hit = world.get_system<gfx::spatial_system>().voxel_ray_cast(ray, selected_entities_);
+            auto voxel_hit = world.system<gfx::spatial_system>().voxel_ray_cast(ray, selected_entities_);
             if (voxel_hit.has_value()) {
                 selected_entity_    = voxel_hit->ent;
                 selected_voxel_     = voxel_hit->voxel_pos;
@@ -213,14 +213,14 @@ private:
 
         const bool can_be_rendered =  //
             selected_entity_.is_valid() &&
-            world.has_component<gfx::transform_component>(selected_entity_);
+            world.has<gfx::transform_component>(selected_entity_);
         if (!can_be_rendered) {
             return;
         }
 
         auto& renderer = get_engine().get_renderer();
         const auto& transform_matrix =
-            world.get_component<gfx::transform_component>(selected_entity_).get_world_matrix();
+            world.get<gfx::transform_component>(selected_entity_).get_world_matrix();
 
         auto voxel_local_pos = vec3f{
             static_cast<float>(selected_voxel_.x),

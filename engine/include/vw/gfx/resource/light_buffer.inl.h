@@ -57,7 +57,7 @@ void light_buffer<WC>::update(world_type& world) {
 
     std::vector<point_light_data> point_lights_data;
 
-    auto view = world.template view_components<light_component, transform_component>();
+    auto view = world.template view<light_component, transform_component>();
     for (const auto& [ent, light_comp, transform_comp] : view) {
         point_light_data light_data;
         const vec3f& pos = transform_comp.get_position();

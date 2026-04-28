@@ -35,10 +35,10 @@ public:
 
     ~test_animation_app() override {
         auto& world = get_engine().get_world();
-        if (blue_.is_valid())  world.destroy_entity(blue_);
-        if (green_.is_valid()) world.destroy_entity(green_);
-        if (red_.is_valid())   world.destroy_entity(red_);
-        if (root_.is_valid())  world.destroy_entity(root_);
+        if (blue_.is_valid())  world.destroy(blue_);
+        if (green_.is_valid()) world.destroy(green_);
+        if (red_.is_valid())   world.destroy(red_);
+        if (root_.is_valid())  world.destroy(root_);
     }
 
     void render(
@@ -58,11 +58,11 @@ public:
 private:
     void setup_scene() {
         auto& world            = get_engine().get_world();
-        auto& model_reg = world.template get_resource<asset::model_registry>();
-        auto& transform_sys = world.template get_system<gfx::transform_system>();
-        auto& model_sys = world.template get_system<gfx::model_system>();
-        auto& hierarchy_sys = world.template get_system<gfx::hierarchy_system>();
-        auto& anim_sys = world.template get_system<gfx::animation_system>();
+        auto& model_reg = world.template resource<asset::model_registry>();
+        auto& transform_sys = world.template system<gfx::transform_system>();
+        auto& model_sys = world.template system<gfx::model_system>();
+        auto& hierarchy_sys = world.template system<gfx::hierarchy_system>();
+        auto& anim_sys = world.template system<gfx::animation_system>();
 
         auto red_cube_model = model_reg.create("red_cube", 3, 3, 3);
         red_cube_model->fill(voxel{blocks::red_3});
@@ -171,7 +171,7 @@ private:
 
     void create_bounce_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.template get_resource<asset::animation_clip_registry>();
+        auto& clip_registry = world.template resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("bounce");
 
         {
@@ -222,7 +222,7 @@ private:
             clip->add_track(track);
         }
 
-        auto& anim_sys = world.template get_system<gfx::animation_system>();
+        auto& anim_sys = world.template system<gfx::animation_system>();
         auto layer_mod = anim_sys.modify_player(root_).layer(0);
         layer_mod.blend_to_by_name("bounce");
         layer_mod.set_loop_mode(asset::animation_loop_mode::loop);
@@ -231,7 +231,7 @@ private:
 
     void create_rotation_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.template get_resource<asset::animation_clip_registry>();
+        auto& clip_registry = world.template resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("rotation");
 
         {
@@ -297,7 +297,7 @@ private:
 
     void create_wave_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.template get_resource<asset::animation_clip_registry>();
+        auto& clip_registry = world.template resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("wave");
 
         {
@@ -355,7 +355,7 @@ private:
 
     void create_scale_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.template get_resource<asset::animation_clip_registry>();
+        auto& clip_registry = world.template resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("scale");
 
         {
@@ -454,10 +454,10 @@ private:
         ImGui::Separator();
 
         auto& world            = get_engine().get_world();
-        auto& anim_sys = world.template get_system<gfx::animation_system>();
+        auto& anim_sys = world.template system<gfx::animation_system>();
         auto modifier = anim_sys.modify_player(root_).layer(0);
         auto& animation_comp =
-            world.get_component<gfx::animation_player_component>(root_);
+            world.get<gfx::animation_player_component>(root_);
 
         asset::transition blend_t{.duration = 0.5f};
 
@@ -538,8 +538,8 @@ private:
         ImGui::Separator();
         ImGui::Text("Current: %s", current_animation_.c_str());
 
-        if (world.has_component<gfx::animation_player_component>(root_)) {
-            auto& comp = world.get_component<gfx::animation_player_component>(root_);
+        if (world.has<gfx::animation_player_component>(root_)) {
+            auto& comp = world.get<gfx::animation_player_component>(root_);
 
             ImGui::Separator();
             ImGui::Text("Animation State:");

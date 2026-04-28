@@ -11,7 +11,7 @@ inline add_keyframe_operation::add_keyframe_operation(
     : engine_(&engine), state_(&state), params_(params) {}
 
 inline void add_keyframe_operation::execute() {
-    const auto& registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
+    const auto& registry = engine_->get_world().template resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(params_.clip_name);
     if (!clip) {
         return;
@@ -59,7 +59,7 @@ inline void add_keyframe_operation::execute() {
 }
 
 inline void add_keyframe_operation::undo() {
-    const auto& registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
+    const auto& registry = engine_->get_world().template resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(params_.clip_name);
     if (!clip) {
         return;

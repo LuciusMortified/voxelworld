@@ -16,7 +16,7 @@ inline void add_socket_component_operation::execute() {
     }
     const auto ent = state_->scene.name_to_entity[params_.name];
 
-    engine_->get_world().template add_component<gfx::socket_component>(ent);
+    engine_->get_world().modify(ent).template with<gfx::socket_component>();
     state_->file.has_unsaved_changes = true;
 }
 
@@ -29,7 +29,7 @@ inline void add_socket_component_operation::undo() {
     auto& world = engine_->get_world();
     state_->sockets.erase_previews_for(params_.name, world);
 
-    world.template remove_component<gfx::socket_component>(ent);
+    world.modify(ent).template without<gfx::socket_component>();
     state_->file.has_unsaved_changes = true;
 }
 

@@ -11,7 +11,7 @@ inline void scene_state::clear_entities(
     world_type& world
 ) {
     for (auto ent : entities) {
-        world.destroy_entity(ent);
+        world.destroy(ent);
     }
     entities.clear();
     name_to_entity.clear();
@@ -22,7 +22,7 @@ inline void socket_state::socket_preview::destroy_entities(
     world_type& world
 ) {
     for (auto ent : entities) {
-        world.destroy_entity(ent);
+        world.destroy(ent);
     }
     entities.clear();
 }

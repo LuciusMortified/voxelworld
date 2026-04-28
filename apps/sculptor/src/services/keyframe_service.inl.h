@@ -20,7 +20,7 @@ inline void keyframe_service::add_keyframe() {
     }
 
     auto& world    = engine_->get_world();
-    auto& clip_reg = world.template get_resource<asset::animation_clip_registry>();
+    auto& clip_reg = world.template resource<asset::animation_clip_registry>();
     auto clip      = clip_reg.get(state_->anim.selected_clip_name);
     if (!clip) {
         return;
@@ -31,11 +31,11 @@ inline void keyframe_service::add_keyframe() {
     auto prop        = state_->anim.selected_property;
     float32 time     = state_->anim.timeline_cursor;
 
-    if (!world.has_component<gfx::transform_component>(ent)) {
+    if (!world.has<gfx::transform_component>(ent)) {
         return;
     }
 
-    auto& tc = world.get_component<gfx::transform_component>(ent);
+    auto& tc = world.get<gfx::transform_component>(ent);
 
     keyframe_value kf_val;
     if (prop == asset::animation_property::rotation) {
@@ -76,7 +76,7 @@ inline void keyframe_service::delete_keyframe() {
     }
 
     auto& world          = engine_->get_world();
-    const auto& clip_reg = world.template get_resource<asset::animation_clip_registry>();
+    const auto& clip_reg = world.template resource<asset::animation_clip_registry>();
     const auto clip      = clip_reg.get(state_->anim.selected_clip_name);
     if (!clip) {
         return;

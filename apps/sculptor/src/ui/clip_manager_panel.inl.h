@@ -73,7 +73,7 @@ inline void clip_manager_panel::render(
     }
 
     const bool has_selected = !state_->anim.selected_clip_name.empty() &&
-        engine_->get_world().template get_resource<asset::animation_clip_registry>().has(state_->anim.selected_clip_name);
+        engine_->get_world().template resource<asset::animation_clip_registry>().has(state_->anim.selected_clip_name);
 
     if (ImGui::Button("New")) {
         create_modal_.open();
@@ -135,7 +135,7 @@ inline void clip_manager_panel::render(
         ImGuiChildFlags_Borders;
 
     if (ImGui::BeginChild("##clip_list", ImVec2(0.f, list_height), child_flags)) {
-        const auto& registry = engine_->get_world().template get_resource<asset::animation_clip_registry>();
+        const auto& registry = engine_->get_world().template resource<asset::animation_clip_registry>();
         for (const auto& [name, clip] : registry.all()) {
             const bool is_selected = (state_->anim.selected_clip_name == name);
             const bool is_unsaved  = state_->anim.has_unsaved_clip(name);

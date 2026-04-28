@@ -45,7 +45,7 @@ inline void entity_properties_panel::render(float /*delta_time*/) {
         ImGui::Separator();
         ImGui::Spacing();
 
-        if (!world.has_component<gfx::transform_component>(ent)) {
+        if (!world.has<gfx::transform_component>(ent)) {
             ImGui::TextColored(ImVec4(1.f, 1.f, 0.f, 1.f), "Entity has no transform component");
         } else {
             ImGui::BeginDisabled(state_->anim.animation_mode);
@@ -72,7 +72,7 @@ inline void entity_properties_panel::render(float /*delta_time*/) {
 inline void entity_properties_panel::render_position() const {
     const auto ent             = state_->scene.name_to_entity[state_->scene.selected_name];
     auto& world                = engine_->get_world();
-    const auto& transform_comp = world.get_component<gfx::transform_component>(ent);
+    const auto& transform_comp = world.get<gfx::transform_component>(ent);
     vec3f position             = transform_comp.get_position();
     if (imgui_drag_vec3f("Pos", position)) {
         transform new_transform = transform_comp.get_transform();
@@ -89,7 +89,7 @@ inline void entity_properties_panel::render_rotation() const {
     const auto& name           = state_->scene.selected_name;
     const auto ent             = state_->scene.name_to_entity[name];
     auto& world                = engine_->get_world();
-    const auto& transform_comp = world.get_component<gfx::transform_component>(ent);
+    const auto& transform_comp = world.get<gfx::transform_component>(ent);
 
     const auto& current_quat = transform_comp.get_rotation();
     if (cached_rotation_entity_ != name || cached_rotation_quat_ != current_quat) {
@@ -123,7 +123,7 @@ inline void entity_properties_panel::render_rotation() const {
 inline void entity_properties_panel::render_scale() const {
     const auto ent       = state_->scene.name_to_entity[state_->scene.selected_name];
     auto& world          = engine_->get_world();
-    auto& transform_comp = world.get_component<gfx::transform_component>(ent);
+    auto& transform_comp = world.get<gfx::transform_component>(ent);
     vec3f scale          = transform_comp.get_scale();
     if (imgui_drag_vec3f("Scale", scale)) {
         transform new_transform = transform_comp.get_transform();
@@ -139,7 +139,7 @@ inline void entity_properties_panel::render_scale() const {
 inline void entity_properties_panel::render_origin() const {
     const auto ent             = state_->scene.name_to_entity[state_->scene.selected_name];
     auto& world                = engine_->get_world();
-    const auto& transform_comp = world.get_component<gfx::transform_component>(ent);
+    const auto& transform_comp = world.get<gfx::transform_component>(ent);
     vec3f origin               = transform_comp.get_origin();
     if (imgui_drag_vec3f("Origin", origin)) {
         transform new_transform = transform_comp.get_transform();
@@ -163,12 +163,12 @@ inline void entity_properties_panel::render_components_section() {
 
     ImGui::BeginDisabled(state_->anim.animation_mode);
 
-    const bool has_model = world.has_component<gfx::model_component>(ent);
+    const bool has_model = world.has<gfx::model_component>(ent);
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted("Model");
     ImGui::SameLine(100.f);
     if (has_model) {
-        const auto& model_comp = world.get_component<gfx::model_component>(ent);
+        const auto& model_comp = world.get<gfx::model_component>(ent);
         const auto model_size  = model_comp.size();
         ImGui::TextDisabled("(%dx%dx%d)", model_size.x, model_size.y, model_size.z);
         ImGui::SameLine();
@@ -183,7 +183,7 @@ inline void entity_properties_panel::render_components_section() {
         }
     }
 
-    const bool has_socket = world.has_component<gfx::socket_component>(ent);
+    const bool has_socket = world.has<gfx::socket_component>(ent);
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted("Socket");
     ImGui::SameLine(100.f);
@@ -201,12 +201,12 @@ inline void entity_properties_panel::render_components_section() {
         }
     }
 
-    const bool has_anim_target = world.has_component<gfx::animation_target_component>(ent);
+    const bool has_anim_target = world.has<gfx::animation_target_component>(ent);
     ImGui::AlignTextToFramePadding();
     ImGui::TextUnformatted("Anim. Target");
     ImGui::SameLine(100.f);
     if (has_anim_target) {
-        const auto& target_comp = world.get_component<gfx::animation_target_component>(ent);
+        const auto& target_comp = world.get<gfx::animation_target_component>(ent);
         ImGui::TextDisabled("(%s)", target_comp.get_name().c_str());
         ImGui::SameLine();
         if (ImGui::Button("Remove##anim_target")) {

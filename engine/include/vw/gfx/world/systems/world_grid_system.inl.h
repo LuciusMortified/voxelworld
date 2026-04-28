@@ -58,7 +58,7 @@ void world_grid_system<WD>::update(float32 /*dt*/) {
         return;
     }
 
-    auto& reg = world_->get_registry();
+    auto& reg = world_->registry();
     stats_.process_completed_ms = measure_ms([&] { grid_->process_completed(); });
     stats_.request_columns_ms   = measure_ms([&] { dispatch_column_requests(); });
     update_grid_stats();
@@ -104,7 +104,7 @@ void world_grid_system<WD>::update_grid_stats() {
 
 template <typename WD>
 auto world_grid_system<WD>::process_dirty_entities() -> bool {
-    auto& reg = world_->get_registry();
+    auto& reg = world_->registry();
     bool chunks_dirty = false;
     for (auto ent : reg.template requested<world_view_component>()) {
         if (process_dirty_entity(ent)) {
@@ -117,7 +117,7 @@ auto world_grid_system<WD>::process_dirty_entities() -> bool {
 
 template <typename WD>
 auto world_grid_system<WD>::rebuild_active_set() -> vec2i {
-    auto& reg = world_->get_registry();
+    auto& reg = world_->registry();
     pending_active_columns_.clear();
     vec2i camera_column{};
 
@@ -157,7 +157,7 @@ template <typename WD>
 auto world_grid_system<WD>::process_dirty_entity(
     entity ent
 ) -> bool {
-    auto& reg = world_->get_registry();
+    auto& reg = world_->registry();
     if (!reg.template has<world_view_component>(ent) ||
         !reg.template has<transform_component>(ent)) {
         return false;
@@ -196,7 +196,7 @@ template <typename WD>
 auto world_grid_system<WD>::view_modifier::set_view_distance(
     uint32 distance
 ) -> view_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<world_view_component>(entity_)) {
         return *this;
     }

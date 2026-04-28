@@ -335,7 +335,7 @@ void world_grid<WD>::process_deferred_remeshes() {
 
         auto mdl = chunk_ptr->get_model();
         mdl->invalidate();
-        world_->template get_system<model_system>().modify(chunk_ptr->get_entity()).set_model(mdl);
+        world_->template system<model_system>().modify(chunk_ptr->get_entity()).set_model(mdl);
         ++processed;
     }
 }

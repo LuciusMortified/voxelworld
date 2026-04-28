@@ -29,7 +29,7 @@ template <typename WD>
 void hierarchy_system<WD>::cleanup(
     entity ent
 ) {
-    auto& reg = world_->get_registry();
+    auto& reg = world_->registry();
     if (!reg.template has<hierarchy_component>(ent)) {
         return;
     }
@@ -51,7 +51,7 @@ void hierarchy_system<WD>::cleanup(
             auto& child_comp = reg.template get<hierarchy_component>(child);
             child_comp.parent_ = invalid_entity;
 
-            world_->template get_system<transform_system>().modify(child).mark_world_dirty();
+            world_->template system<transform_system>().modify(child).mark_world_dirty();
         }
     }
 }
@@ -70,7 +70,7 @@ auto hierarchy_system<WD>::get_hierarchy_depth(
     int depth      = 0;
     entity current = ent;
 
-    auto& reg = world_->get_registry();
+    auto& reg = world_->registry();
     while (reg.template has<hierarchy_component>(current)) {
         const auto& hierarchy_comp = reg.template get<hierarchy_component>(current);
         if (!hierarchy_comp.has_parent()) {
@@ -106,7 +106,7 @@ auto hierarchy_system<WD>::hierarchy_modifier::set_parent(entity parent)
         throw std::invalid_argument("setting parent to child would create a hierarchy cycle");
     }
 
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
 
     if (reg.template has<hierarchy_component>(parent)) {
         auto& parent_component = reg.template get<hierarchy_component>(parent);
@@ -117,7 +117,7 @@ auto hierarchy_system<WD>::hierarchy_modifier::set_parent(entity parent)
         auto& child_component   = reg.template get<hierarchy_component>(entity_);
         child_component.parent_ = parent;
 
-        system_->world_->template get_system<transform_system>().modify(entity_).mark_world_dirty();
+        system_->world_->template system<transform_system>().modify(entity_).mark_world_dirty();
     }
 
     return *this;
@@ -125,7 +125,7 @@ auto hierarchy_system<WD>::hierarchy_modifier::set_parent(entity parent)
 
 template <typename WD>
 auto hierarchy_system<WD>::hierarchy_modifier::remove_parent() -> hierarchy_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (reg.template has<hierarchy_component>(entity_)) {
         auto& child_component = reg.template get<hierarchy_component>(entity_);
 
@@ -139,7 +139,7 @@ auto hierarchy_system<WD>::hierarchy_modifier::remove_parent() -> hierarchy_modi
 
         child_component.parent_ = invalid_entity;
 
-        system_->world_->template get_system<transform_system>().modify(entity_).mark_world_dirty();
+        system_->world_->template system<transform_system>().modify(entity_).mark_world_dirty();
     }
 
     return *this;
@@ -149,7 +149,7 @@ template <typename WD>
 auto hierarchy_system<WD>::check_hierarchy_cycle(entity parent, entity child) const -> bool {
     entity current = parent;
 
-    auto& reg = world_->get_registry();
+    auto& reg = world_->registry();
     while (current.is_valid() && reg.template has<hierarchy_component>(current)) {
         const auto& current_component = reg.template get<hierarchy_component>(current);
         if (current_component.get_parent() == child) {

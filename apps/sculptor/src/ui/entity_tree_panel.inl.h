@@ -85,11 +85,11 @@ inline void entity_tree_panel::render_entity_node(
     auto ent    = state_->scene.name_to_entity[name];
     auto& world = engine_->get_world();
 
-    const bool has_hierarchy = world.has_component<gfx::hierarchy_component>(ent);
+    const bool has_hierarchy = world.has<gfx::hierarchy_component>(ent);
     bool has_children        = false;
 
     if (has_hierarchy) {
-        const auto& hierarchy_comp = world.get_component<gfx::hierarchy_component>(ent);
+        const auto& hierarchy_comp = world.get<gfx::hierarchy_component>(ent);
         has_children = std::ranges::any_of(hierarchy_comp.get_children(), [&](auto child) {
             return !preview_entities.contains(child);
         });
@@ -137,7 +137,7 @@ inline void entity_tree_panel::render_entity_node(
     }
 
     if (is_open && has_children) {
-        const auto& hierarchy_comp = world.get_component<gfx::hierarchy_component>(ent);
+        const auto& hierarchy_comp = world.get<gfx::hierarchy_component>(ent);
         const auto& children       = hierarchy_comp.get_children();
 
         for (auto child : children) {

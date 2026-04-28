@@ -44,10 +44,10 @@ public:
     ~lighting_app() override {
         auto& world = get_engine().get_world();
         for (auto ent : light_entities_) {
-            world.destroy_entity(ent);
+            world.destroy(ent);
         }
-        if (pillar_entity_.is_valid()) world.destroy_entity(pillar_entity_);
-        if (floor_entity_.is_valid())  world.destroy_entity(floor_entity_);
+        if (pillar_entity_.is_valid()) world.destroy(pillar_entity_);
+        if (floor_entity_.is_valid())  world.destroy(floor_entity_);
     }
 
     void render(float delta_time) override {
@@ -65,9 +65,9 @@ public:
 private:
     void setup_scene() {
         auto& world = get_engine().get_world();
-        auto& model_reg = world.template get_resource<asset::model_registry>();
-        auto& transform_sys = world.template get_system<gfx::transform_system>();
-        auto& model_sys = world.template get_system<gfx::model_system>();
+        auto& model_reg = world.template resource<asset::model_registry>();
+        auto& transform_sys = world.template system<gfx::transform_system>();
+        auto& model_sys = world.template system<gfx::model_system>();
 
         floor_model_ = model_reg.create("floor", 80, 1, 80);
         for (uint32 x = 0; x < 80; ++x) {
@@ -140,8 +140,8 @@ private:
         }
 
         auto& world = get_engine().get_world();
-        auto& transform_sys = world.template get_system<gfx::transform_system>();
-        auto& light_sys = world.template get_system<gfx::light_system>();
+        auto& transform_sys = world.template system<gfx::transform_system>();
+        auto& light_sys = world.template system<gfx::light_system>();
 
         if (target > current) {
             light_infos_.resize(target);
@@ -174,7 +174,7 @@ private:
             }
         } else {
             for (uint32 i = target; i < current; ++i) {
-                world.destroy_entity(light_entities_[i]);
+                world.destroy(light_entities_[i]);
             }
             light_entities_.resize(target);
             light_infos_.resize(target);
@@ -186,7 +186,7 @@ private:
 
     void update_point_lights() {
         auto& world = get_engine().get_world();
-        auto& transform_sys = world.template get_system<gfx::transform_system>();
+        auto& transform_sys = world.template system<gfx::transform_system>();
         auto& renderer = get_engine().get_renderer();
 
         for (uint32 i = 0; i < light_entities_.size(); ++i) {

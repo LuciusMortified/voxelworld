@@ -25,7 +25,7 @@ inline void socket_panel::render(
     auto& world    = engine_->get_world();
     const auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
 
-    if (!world.has_component<gfx::socket_component>(ent)) {
+    if (!world.has<gfx::socket_component>(ent)) {
         return;
     }
 
@@ -49,7 +49,7 @@ inline void socket_panel::render(
 
     render_add_socket_();
 
-    const auto& socket_comp = world.template get_component<gfx::socket_component>(ent);
+    const auto& socket_comp = world.template get<gfx::socket_component>(ent);
     const auto& sockets     = socket_comp.get_sockets();
 
     ImGui::Spacing();
@@ -240,7 +240,7 @@ inline void socket_panel::render_add_socket_modal_() {
             } else {
                 auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
                 const auto& sc =
-                    engine_->get_world().template get_component<gfx::socket_component>(ent);
+                    engine_->get_world().template get<gfx::socket_component>(ent);
                 if (sc.find(new_socket_name_) != nullptr) {
                     add_socket_error_ = "A socket with this name already exists.";
                 } else {
@@ -354,7 +354,7 @@ inline void socket_panel::load_preview_(
 
     const auto parent_ent   = state_->scene.name_to_entity[state_->scene.selected_name];
     auto& world             = engine_->get_world();
-    const auto& socket_comp = world.template get_component<gfx::socket_component>(parent_ent);
+    const auto& socket_comp = world.template get<gfx::socket_component>(parent_ent);
     const auto* sp          = socket_comp.find(socket_name);
     if (!sp) {
         return;
@@ -367,13 +367,13 @@ inline void socket_panel::load_preview_(
 
     if (result->name_to_entity.contains(result->root_name)) {
         const auto preview_root = result->name_to_entity[result->root_name];
-        auto& transform_sys = world.template get_system<gfx::transform_system>();
+        auto& transform_sys = world.template system<gfx::transform_system>();
         transform_sys.modify(preview_root)
             .set_position(sp->position)
             .set_rotation(sp->rotation)
             .set_scale(sp->scale);
 
-        auto& hierarchy_sys = world.template get_system<gfx::hierarchy_system>();
+        auto& hierarchy_sys = world.template system<gfx::hierarchy_system>();
         hierarchy_sys.modify(preview_root).set_parent(parent_ent);
     }
 
@@ -400,7 +400,7 @@ inline void socket_panel::update_preview_transform_(
     }
 
     const auto preview_root = preview.entities[0];
-    auto& transform_sys = engine_->get_world().template get_system<gfx::transform_system>();
+    auto& transform_sys = engine_->get_world().template system<gfx::transform_system>();
     transform_sys.modify(preview_root)
         .set_position(position)
         .set_rotation(rotation)

@@ -15,13 +15,13 @@ animation_fsm_system<WD>::animation_fsm_system(world_type& w)
 template <typename WD>
 void animation_fsm_system<WD>::update(float32 /*dt*/) {
     auto view =
-        world_->get_registry()
+        world_->registry()
             .template view<animation_fsm_component, animation_player_component>();
 
     for (auto [ent, fsm_comp, player_comp] : view) {
         auto& triggers = fsm_comp.triggers_;
         for (size_t i = 0; i < fsm_comp.machine_count(); ++i) {
-            auto pm = world_->template get_system<animation_system>().modify_player(ent);
+            auto pm = world_->template system<animation_system>().modify_player(ent);
             if (!player_comp.has_layer(i)) {
                 pm.add_layer(i);
                 pm.rebuild_target_map();
@@ -96,7 +96,7 @@ template <typename WD>
 auto animation_fsm_system<WD>::modify(
     entity ent
 ) -> modifier {
-    auto& comp = world_->get_registry().template get<animation_fsm_component>(ent);
+    auto& comp = world_->registry().template get<animation_fsm_component>(ent);
     return modifier(&comp);
 }
 

@@ -44,7 +44,7 @@ public:
 
     ~world_grid_app() override {
         if (viewer_.is_valid()) {
-            get_engine().get_world().destroy_entity(viewer_);
+            get_engine().get_world().destroy(viewer_);
         }
     }
 
@@ -58,7 +58,7 @@ public:
         const auto cam_pos = camera.get_position();
 
         auto& world            = get_engine().get_world();
-        auto& transform_sys = world.template get_system<gfx::transform_system>();
+        auto& transform_sys = world.template system<gfx::transform_system>();
         transform_sys.modify(viewer_).set_position(cam_pos);
 
         auto& renderer = get_engine().get_renderer();
@@ -88,12 +88,12 @@ private:
 
     void setup_world_grid() {
         auto& world       = get_engine().get_world();
-        auto& grid_system = world.template get_system<gfx::world_grid_system>();
+        auto& grid_system = world.template system<gfx::world_grid_system>();
 
         generator_params_ = {
             .voxel_scale = 8,
         };
-        auto& registry = world.template get_resource<asset::model_registry>();
+        auto& registry = world.template resource<asset::model_registry>();
         auto generator = std::make_unique<gfx::perlin_terrain_generator>(
             registry.get_identity_pool(), registry.get_page_pool(), generator_params_);
         generator_  = generator.get();
@@ -101,7 +101,7 @@ private:
             world, std::move(generator), generator_params_.voxel_scale
         );
         world_grid_ = grid.get();
-        world.template get_system<gfx::world_grid_system>().set_grid(std::move(grid));
+        world.template system<gfx::world_grid_system>().set_grid(std::move(grid));
 
         viewer_ = world.create()
             .with<gfx::transform_component>()

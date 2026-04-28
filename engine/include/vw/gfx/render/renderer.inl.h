@@ -227,7 +227,7 @@ void renderer<C>::draw_colliders(
     world<C>& w, color col
 ) {
     for (auto [ent, box, tc] :
-         w.get_registry().template view<box_collider_component, transform_component>()) {
+         w.registry().template view<box_collider_component, transform_component>()) {
         auto pos  = tc.get_position() + box.get_offset();
         auto half = box.get_extents() * 0.5f;
         draw_box(pos - half, box.get_extents(), col);
@@ -274,7 +274,7 @@ template <typename C>
 void renderer<C>::sync_meshes_(world_type& world) {
     mesh_pool_.process_completed();
 
-    auto& registry = world.get_registry();
+    auto& registry = world.registry();
 
     for (auto it = pending_mesh_entities_.begin(); it != pending_mesh_entities_.end();) {
         auto ent = *it;

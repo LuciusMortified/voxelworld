@@ -12,10 +12,10 @@ inline create_entity_operation::create_entity_operation(
 
 inline void create_entity_operation::execute() {
     auto& world            = engine_->get_world();
-    auto& hierarchy_sys = world.template get_system<gfx::hierarchy_system>();
-    auto& transform_sys = world.template get_system<gfx::transform_system>();
-    auto& model_reg = world.template get_resource<asset::model_registry>();
-    auto& model_sys = world.template get_system<gfx::model_system>();
+    auto& hierarchy_sys = world.template system<gfx::hierarchy_system>();
+    auto& transform_sys = world.template system<gfx::transform_system>();
+    auto& model_reg = world.template resource<asset::model_registry>();
+    auto& model_sys = world.template system<gfx::model_system>();
 
     auto modifier = world.create()
         .template with<gfx::hierarchy_component>()
@@ -67,7 +67,7 @@ inline void create_entity_operation::undo() {
     state_->scene.entity_to_name.erase(ent);
     state_->scene.name_to_entity.erase(params_.name);
 
-    world.destroy_entity(ent);
+    world.destroy(ent);
     std::erase(state_->scene.entities, ent);
 
     if (state_->scene.root_name == params_.name) {

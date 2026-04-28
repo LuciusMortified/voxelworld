@@ -23,7 +23,7 @@ void third_person_camera_controller<WC>::update(
     params_.arm_length =
         math::clamp(params_.arm_length, params_.arm_length_min, params_.arm_length_max);
 
-    auto& registry = world_->get_registry();
+    auto& registry = world_->registry();
     if (!registry.template has<transform_component>(target)) {
         return;
     }
@@ -45,7 +45,7 @@ void third_person_camera_controller<WC>::update(
 
     actual_arm_length_ = params_.arm_length;
 
-    auto& spatial_sys = world_->template get_system<spatial_system>();
+    auto& spatial_sys = world_->template system<spatial_system>();
     vw::spatial::ray collision_ray{focus, desired_pos};
     std::vector<entity> candidates;
     constexpr spatial_layer_mask camera_mask = spatial_layer::terrain | spatial_layer::prop;

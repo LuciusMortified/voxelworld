@@ -32,7 +32,7 @@ template <typename WD>
 void physics_system<WD>::update(
     float32 delta_time
 ) {
-    if (!world_->template get_system<world_grid_system>().grid()) {
+    if (!world_->template system<world_grid_system>().grid()) {
         return;
     }
 
@@ -68,7 +68,7 @@ void physics_system<WD>::step(
     using clock = std::chrono::high_resolution_clock;
     constexpr float32 impulse_epsilon = 0.01f;
 
-    auto& reg = world_->get_registry();
+    auto& reg = world_->registry();
     for (auto [ent, rb, tc] :
          reg.template view<rigid_body_component, transform_component>()) {
         auto position = tc.get_position();
@@ -123,7 +123,7 @@ void physics_system<WD>::step(
             stats_.entity_collision_ms += std::chrono::duration<float32>(clock::now() - entity_start).count() * 1000.0f;
         }
 
-        world_->template get_system<transform_system>().modify(ent).set_position(new_position);
+        world_->template system<transform_system>().modify(ent).set_position(new_position);
     }
 }
 
@@ -131,7 +131,7 @@ template <typename WD>
 auto physics_system<WD>::are_chunks_loaded(
     const vec3f& position, const vec3f& extents
 ) const -> bool {
-    auto* grid = world_->template get_system<world_grid_system>().grid();
+    auto* grid = world_->template system<world_grid_system>().grid();
     const auto vs = static_cast<float32>(grid->voxel_scale());
     auto half = extents * 0.5f;
 
@@ -164,7 +164,7 @@ template <typename WD>
 auto physics_system<WD>::resolve_box_voxel(
     vec3f center, const vec3f& half_extents, vec3f& velocity
 ) const -> collision_result {
-    auto* grid = world_->template get_system<world_grid_system>().grid();
+    auto* grid = world_->template system<world_grid_system>().grid();
     auto vs = static_cast<float32>(grid->voxel_scale());
     auto vs_i = grid->voxel_scale();
     bool grounded = false;
@@ -267,11 +267,11 @@ auto physics_system<WD>::resolve_entity_collisions(
     vw::spatial::aabb entity_aabb{center - half_extents, center + half_extents};
 
     const auto q_start = clock::now();
-    world_->template get_system<spatial_system>().query_all(entity_aabb, entity_query_cache_, spatial_layer::character);
+    world_->template system<spatial_system>().query_all(entity_aabb, entity_query_cache_, spatial_layer::character);
     stats_.entity_query_ms += std::chrono::duration<float32>(clock::now() - q_start).count() * 1000.0f;
     stats_.entity_query_results += static_cast<int32>(entity_query_cache_.size());
 
-    auto& reg = world_->get_registry();
+    auto& reg = world_->registry();
     const auto r_start = clock::now();
     for (const auto other : entity_query_cache_) {
         if (other == ent) {
@@ -346,7 +346,7 @@ template <typename WD>
 auto physics_system<WD>::rigid_body_modifier::set_velocity(
     const vec3f& vel
 ) -> rigid_body_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<rigid_body_component>(entity_)) {
         return *this;
     }
@@ -359,7 +359,7 @@ template <typename WD>
 auto physics_system<WD>::rigid_body_modifier::set_gravity_scale(
     float32 scale
 ) -> rigid_body_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<rigid_body_component>(entity_)) {
         return *this;
     }
@@ -372,7 +372,7 @@ template <typename WD>
 auto physics_system<WD>::rigid_body_modifier::add_impulse(
     const vec3f& impulse
 ) -> rigid_body_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<rigid_body_component>(entity_)) {
         return *this;
     }
@@ -385,7 +385,7 @@ template <typename WD>
 auto physics_system<WD>::rigid_body_modifier::add_external_impulse(
     const vec3f& impulse
 ) -> rigid_body_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<rigid_body_component>(entity_)) {
         return *this;
     }
@@ -398,7 +398,7 @@ template <typename WD>
 auto physics_system<WD>::rigid_body_modifier::set_drag(
     float32 drag
 ) -> rigid_body_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<rigid_body_component>(entity_)) {
         return *this;
     }
@@ -424,7 +424,7 @@ template <typename WD>
 auto physics_system<WD>::collider_modifier::set_extents(
     const vec3f& ext
 ) -> collider_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<box_collider_component>(entity_)) {
         return *this;
     }
@@ -437,7 +437,7 @@ template <typename WD>
 auto physics_system<WD>::collider_modifier::set_offset(
     const vec3f& offset
 ) -> collider_modifier& {
-    auto& reg = system_->world_->get_registry();
+    auto& reg = system_->world_->registry();
     if (!reg.template has<box_collider_component>(entity_)) {
         return *this;
     }

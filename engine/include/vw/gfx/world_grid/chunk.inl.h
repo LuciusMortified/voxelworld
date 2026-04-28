@@ -27,17 +27,17 @@ chunk<WD>::chunk(
     };
 
     auto vs = static_cast<float32>(voxel_scale);
-    w.template get_system<transform_system>().modify(ent_)
+    w.template system<transform_system>().modify(ent_)
         .set_position(world_pos)
         .set_scale({vs, vs, vs});
-    w.template get_system<model_system>().modify(ent_).set_model(model_);
-    w.template get_system<spatial_system>().modify(ent_).set_layer(spatial_layer::terrain);
+    w.template system<model_system>().modify(ent_).set_model(model_);
+    w.template system<spatial_system>().modify(ent_).set_layer(spatial_layer::terrain);
 }
 
 template <typename WD>
 chunk<WD>::~chunk() {
     if (world_ != nullptr && ent_.is_valid()) {
-        world_->destroy_entity(ent_);
+        world_->destroy(ent_);
     }
 }
 
@@ -58,7 +58,7 @@ auto chunk<WD>::operator=(
 ) noexcept -> chunk& {
     if (this != &other) {
         if (world_ != nullptr && ent_.is_valid()) {
-            world_->destroy_entity(ent_);
+            world_->destroy(ent_);
         }
         world_       = other.world_;
         ent_         = other.ent_;

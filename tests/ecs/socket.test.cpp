@@ -90,10 +90,10 @@ using test_def = world_def<hierarchy_system, transform_system, spatial_system, s
 struct socket_test_fixture {
     world<test_def> w;
 
-    test_def::registry_type& reg = w.get_registry();
-    socket_system<test_def>& socket_sys = w.get_system<socket_system>();
-    hierarchy_system<test_def>& hierarchy_sys = w.get_system<hierarchy_system>();
-    transform_system<test_def>& transform_sys = w.get_system<transform_system>();
+    test_def::registry_type& reg = w.registry();
+    socket_system<test_def>& socket_sys = w.system<socket_system>();
+    hierarchy_system<test_def>& hierarchy_sys = w.system<hierarchy_system>();
+    transform_system<test_def>& transform_sys = w.system<transform_system>();
 
     auto create_entity() -> entity {
         auto ent = reg.create();

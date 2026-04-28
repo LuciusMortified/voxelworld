@@ -44,16 +44,16 @@ auto vox_serializer<WC>::extract() const -> vw::asset::vox_prefab_data {
         }
 
         bool can_be_serialized =
-            world_->template has_component<hierarchy_component>(current) &&
-            world_->template has_component<transform_component>(current) &&
-            world_->template has_component<spatial_component>(current);
+            world_->template has<hierarchy_component>(current) &&
+            world_->template has<transform_component>(current) &&
+            world_->template has<spatial_component>(current);
 
         if (can_be_serialized) {
             prefab.entities.push_back(extract_entity_(current));
         }
 
-        if (world_->template has_component<hierarchy_component>(current)) {
-            auto& hierarchy = world_->template get_component<hierarchy_component>(current);
+        if (world_->template has<hierarchy_component>(current)) {
+            auto& hierarchy = world_->template get<hierarchy_component>(current);
             for (const auto& child : hierarchy.get_children()) {
                 to_process.push_back(child);
             }
@@ -82,8 +82,8 @@ void vox_serializer<WC>::generate_entity_names_() {
             entity_names_[current] = name;
         }
 
-        if (world_->template has_component<hierarchy_component>(current)) {
-            auto& hierarchy = world_->template get_component<hierarchy_component>(current);
+        if (world_->template has<hierarchy_component>(current)) {
+            auto& hierarchy = world_->template get<hierarchy_component>(current);
             for (const auto& child : hierarchy.get_children()) {
                 to_process.push_back(child);
             }
@@ -93,8 +93,8 @@ void vox_serializer<WC>::generate_entity_names_() {
 
 template <typename WC>
 auto vox_serializer<WC>::extract_entity_(entity ent) const -> vw::asset::vox_entity_data {
-    auto& hierarchy_comp = world_->template get_component<hierarchy_component>(ent);
-    auto& transform_comp = world_->template get_component<transform_component>(ent);
+    auto& hierarchy_comp = world_->template get<hierarchy_component>(ent);
+    auto& transform_comp = world_->template get<transform_component>(ent);
 
     vw::asset::vox_entity_data data;
     data.name = entity_names_.at(ent);
@@ -110,13 +110,13 @@ auto vox_serializer<WC>::extract_entity_(entity ent) const -> vw::asset::vox_ent
     data.origin = transform_comp.get_origin();
     data.has_transform = true;
 
-    if (world_->template has_component<animation_target_component>(ent)) {
-        auto& target = world_->template get_component<animation_target_component>(ent);
+    if (world_->template has<animation_target_component>(ent)) {
+        auto& target = world_->template get<animation_target_component>(ent);
         data.animation_target_name = target.get_name();
     }
 
-    if (world_->template has_component<socket_component>(ent)) {
-        auto& socket_comp = world_->template get_component<socket_component>(ent);
+    if (world_->template has<socket_component>(ent)) {
+        auto& socket_comp = world_->template get<socket_component>(ent);
         data.has_sockets = true;
         for (const auto& sp : socket_comp.get_sockets()) {
             auto rot_euler = math::quat_to_euler(sp.rotation);
@@ -124,8 +124,8 @@ auto vox_serializer<WC>::extract_entity_(entity ent) const -> vw::asset::vox_ent
         }
     }
 
-    if (world_->template has_component<model_component>(ent)) {
-        auto& model_comp = world_->template get_component<model_component>(ent);
+    if (world_->template has<model_component>(ent)) {
+        auto& model_comp = world_->template get<model_component>(ent);
         auto size = model_comp.size();
 
         vw::asset::vox_model_data model_data;
