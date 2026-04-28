@@ -28,7 +28,7 @@ auto make_system_tuple(W& w) -> Tuple {
 template <typename WD>
 world<WD>::world()
     : registry_{}
-    , systems_{detail::make_system_tuple<systems_tuple>(*this)}
+    , systems_{detail::make_system_tuple<systems>(*this)}
     , resources_{}
 {}
 

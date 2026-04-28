@@ -5,9 +5,9 @@
 
 #include <tuple>
 
+#include "vw/core/tuple_utils.h"
 #include "vw/ecs/entity_registry.h"
 #include "vw/ecs/system_trait.h"
-#include "vw/ecs/tuple_utils.h"
 
 namespace vw::ecs {
 
@@ -21,7 +21,7 @@ struct world_def {
 
     using registry_type = entity_registry_from_tuple<components>::type;
 
-    using systems_tuple = std::tuple<Systems<world_def>...>;
+    using systems = std::tuple<Systems<world_def>...>;
 
     static constexpr std::size_t system_count = sizeof...(Systems);
 };

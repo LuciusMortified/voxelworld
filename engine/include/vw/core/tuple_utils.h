@@ -1,14 +1,14 @@
 #pragma once
 
-#ifndef VW_ECS_TUPLE_UTILS_H
-#define VW_ECS_TUPLE_UTILS_H
+#ifndef VW_CORE_TUPLE_UTILS_H
+#define VW_CORE_TUPLE_UTILS_H
 
 #include <array>
 #include <cstddef>
 #include <tuple>
 #include <type_traits>
 
-namespace vw::ecs {
+namespace vw {
 
 namespace detail {
 
@@ -54,6 +54,17 @@ struct tuple_unique_impl<std::tuple<>, std::tuple<Head, Tail...>> {
     using type = tuple_unique_impl<std::tuple<Head>, std::tuple<Tail...>>::type;
 };
 
+template <typename T, typename... Ts>
+constexpr auto pack_index_of_impl() -> std::size_t {
+    constexpr std::array<bool, sizeof...(Ts)> matches = {std::is_same_v<T, Ts>...};
+    for (std::size_t i = 0; i < sizeof...(Ts); ++i) {
+        if (matches[i]) {
+            return i;
+        }
+    }
+    return sizeof...(Ts);
+}
+
 template <typename T, typename Tuple>
 struct tuple_contains;
 
@@ -67,15 +78,7 @@ struct tuple_index_of;
 template <typename T, typename... Ts>
 struct tuple_index_of<T, std::tuple<Ts...>> {
     static_assert((std::is_same_v<T, Ts> || ...), "type not found in tuple");
-    static constexpr std::size_t value = []() -> std::size_t {
-        constexpr std::array<bool, sizeof...(Ts)> matches = {std::is_same_v<T, Ts>...};
-        for (std::size_t i = 0; i < sizeof...(Ts); ++i) {
-            if (matches[i]) {
-                return i;
-            }
-        }
-        return sizeof...(Ts);
-    }();
+    static constexpr std::size_t value = pack_index_of_impl<T, Ts...>();
 };
 
 }  // namespace detail
@@ -92,6 +95,16 @@ inline constexpr bool tuple_contains_v = detail::tuple_contains<T, Tuple>::value
 template <typename T, typename Tuple>
 inline constexpr std::size_t tuple_index_of_v = detail::tuple_index_of<T, Tuple>::value;
 
-}  // namespace vw::ecs
+template <typename T, typename... Ts>
+inline constexpr std::size_t pack_index_of_v = []() -> std::size_t {
+    static_assert((std::is_same_v<T, Ts> || ...), "type not in parameter pack");
+    static_assert(
+        ((std::is_same_v<T, Ts> ? 1 : 0) + ...) == 1,
+        "type must appear exactly once in parameter pack"
+    );
+    return detail::pack_index_of_impl<T, Ts...>();
+}();
 
-#endif  // VW_ECS_TUPLE_UTILS_H
+}  // namespace vw
+
+#endif  // VW_CORE_TUPLE_UTILS_H

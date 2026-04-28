@@ -15,10 +15,10 @@ namespace vw::ecs {
 template <typename WD = base_world_def>
 class world final {
 public:
-    using components      = WD::components;
-    using registry_type   = entity_registry_from_tuple<components>::type;
-    using systems_tuple   = WD::systems_tuple;
-    using resources_tuple = WD::resources;
+    using components    = WD::components;
+    using registry_type = entity_registry_from_tuple<components>::type;
+    using systems       = WD::systems;
+    using resources     = WD::resources;
 
     class modifier {
     public:
@@ -130,8 +130,8 @@ private:
     void batch_remove_component_(const std::vector<entity>& entities) noexcept;
 
     registry_type registry_;
-    systems_tuple systems_;
-    resources_tuple resources_;
+    systems systems_;
+    resources resources_;
 };
 
 }  // namespace vw::ecs

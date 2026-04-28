@@ -5,6 +5,7 @@
 
 #include <vector>
 
+#include "vw/core/timing.h"
 #include "vw/gfx/engine/engine.h"
 
 #ifdef _WIN32
@@ -140,36 +141,19 @@ template <typename WC>
 void engine<WC>::render(
     float delta_time
 ) {
-    world_update_start_time_ = std::chrono::high_resolution_clock::now();
-    world_->update(delta_time);
-    const auto world_update_end = std::chrono::high_resolution_clock::now();
-    stats_.world_update_ms =
-        std::chrono::duration<float32>(world_update_end - world_update_start_time_).count() *
-        1000.0f;
+    stats_.world_update_ms = measure_ms([&] { world_->update(delta_time); });
 
-    using clock = std::chrono::high_resolution_clock;
-    auto ms = [](auto a, auto b) -> float32 {
-        return std::chrono::duration<float32>(b - a).count() * 1000.0f;
-    };
-
-    auto r0 = clock::now();
-    renderer_->begin_frame();
-    auto r1 = clock::now();
-    app_->render(delta_time);
-    debug_tool_->render(delta_time);
-    auto r2 = clock::now();
-    renderer_->render(*world_, *camera_);
-    auto r3 = clock::now();
-    renderer_->end_frame();
-    auto r4 = clock::now();
+    stats_.world_render_ms = measure_ms([&] {
+        stats_.begin_frame_ms = measure_ms([&] { renderer_->begin_frame(); });
+        stats_.app_render_ms  = measure_ms([&] {
+            app_->render(delta_time);
+            debug_tool_->render(delta_time);
+        });
+        stats_.renderer_ms  = measure_ms([&] { renderer_->render(*world_, *camera_); });
+        stats_.end_frame_ms = measure_ms([&] { renderer_->end_frame(); });
+    });
 
     world_->clear_changed();
-
-    stats_.begin_frame_ms  = ms(r0, r1);
-    stats_.app_render_ms   = ms(r1, r2);
-    stats_.renderer_ms     = ms(r2, r3);
-    stats_.end_frame_ms    = ms(r3, r4);
-    stats_.world_render_ms = ms(world_update_end, r4);
 }
 
 template <typename WC>

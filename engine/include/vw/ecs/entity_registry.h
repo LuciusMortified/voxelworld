@@ -10,6 +10,7 @@
 #include <typeindex>
 #include <unordered_set>
 
+#include "vw/core/tuple_utils.h"
 #include "vw/ecs/component_change_deps.h"
 #include "vw/ecs/component_pool.h"
 #include "vw/ecs/entity_archetype.h"
@@ -20,23 +21,6 @@ namespace vw::ecs {
 template <typename T, typename... Cs>
 class component_view;
 
-template <typename T, typename... Ts>
-consteval auto type_index_in() -> size_t {
-    static_assert((std::same_as<T, Ts> || ...), "type not in parameter pack");
-    static_assert(
-        ((std::same_as<T, Ts> ? 1 : 0) + ...) == 1,
-        "type must appear exactly once in parameter pack"
-    );
-
-    constexpr bool matches[] = {std::same_as<T, Ts>...};
-    for (std::size_t i = 0; i < sizeof...(Ts); ++i) {
-        if (matches[i]) {
-            return i;
-        }
-    }
-    return std::numeric_limits<size_t>::max();
-}
-
 template <typename... Ts>
 class entity_registry {
 public:
@@ -44,7 +28,7 @@ public:
 
     template <typename T>
     auto get_pool() -> component_pool<T>& {
-        constexpr size_t index = type_index_in<T, Ts...>();
+        constexpr size_t index = pack_index_of_v<T, Ts...>;
         static_assert(index < sizeof...(Ts), "type not in component registry");
 
         return std::get<index>(component_pools_);
@@ -52,7 +36,7 @@ public:
 
     template <typename T>
     auto get_pool() const -> const component_pool<T>& {
-        constexpr size_t index = type_index_in<T, Ts...>();
+        constexpr size_t index = pack_index_of_v<T, Ts...>;
         static_assert(index < sizeof...(Ts), "type not in component registry");
 
         return std::get<index>(component_pools_);
@@ -162,32 +146,32 @@ public:
 
     template <typename T>
     void request_change(entity ent) {
-        constexpr size_t index = type_index_in<T, Ts...>();
+        constexpr size_t index = pack_index_of_v<T, Ts...>;
         request_sets_[index].insert(ent);
     }
 
     template <typename T>
     [[nodiscard]] auto requested() -> std::unordered_set<entity>& {
-        constexpr size_t index = type_index_in<T, Ts...>();
+        constexpr size_t index = pack_index_of_v<T, Ts...>;
         return request_sets_[index];
     }
 
     template <typename T>
     void clear_requested() {
-        constexpr size_t index = type_index_in<T, Ts...>();
+        constexpr size_t index = pack_index_of_v<T, Ts...>;
         request_sets_[index].clear();
     }
 
     template <typename T>
     void notify_changed(entity ent) {
-        constexpr size_t index = type_index_in<T, Ts...>();
+        constexpr size_t index = pack_index_of_v<T, Ts...>;
         changed_sets_[index].insert(ent);
         propagate_deps_(ent, typename component_change_deps<T>::types{});
     }
 
     template <typename T>
     [[nodiscard]] auto changed() -> std::unordered_set<entity>& {
-        constexpr size_t index = type_index_in<T, Ts...>();
+        constexpr size_t index = pack_index_of_v<T, Ts...>;
         return changed_sets_[index];
     }
 
@@ -207,7 +191,7 @@ private:
     template <typename Dep>
     void propagate_one_(entity ent) {
         if (has<Dep>(ent)) {
-            constexpr size_t index = type_index_in<Dep, Ts...>();
+            constexpr size_t index = pack_index_of_v<Dep, Ts...>;
             request_sets_[index].insert(ent);
         }
     }

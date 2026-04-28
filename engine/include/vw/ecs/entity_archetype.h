@@ -6,11 +6,9 @@
 #include <bitset>
 
 #include "vw/core.h"
+#include "vw/core/tuple_utils.h"
 
 namespace vw::ecs {
-
-template <typename T, typename... Ts>
-consteval auto type_index_in() -> size_t;
 
 template <typename... Cs>
 class entity_archetype final {
@@ -19,17 +17,17 @@ public:
 
     template <typename C>
     void set() noexcept {
-        bits_.set(type_index_in<C, Cs...>());
+        bits_.set(pack_index_of_v<C, Cs...>);
     }
 
     template <typename C>
     void unset() noexcept {
-        bits_.reset(type_index_in<C, Cs...>());
+        bits_.reset(pack_index_of_v<C, Cs...>);
     }
 
     template <typename C>
     [[nodiscard]] auto has() const noexcept -> bool {
-        return bits_.test(type_index_in<C, Cs...>());
+        return bits_.test(pack_index_of_v<C, Cs...>);
     }
 
     void clear() noexcept {

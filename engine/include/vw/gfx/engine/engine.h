@@ -81,7 +81,6 @@ private:
 
     mutable engine_stats stats_;
     std::chrono::high_resolution_clock::time_point frame_start_time_;
-    std::chrono::high_resolution_clock::time_point world_update_start_time_;
     std::chrono::high_resolution_clock::time_point last_memory_update_time_;
 
     static constexpr float MEMORY_UPDATE_INTERVAL_SEC = 1.0f;

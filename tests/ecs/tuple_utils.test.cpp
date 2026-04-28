@@ -1,8 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "vw/ecs/tuple_utils.h"
+#include "vw/core/tuple_utils.h"
 
-using namespace vw::ecs;
+using namespace vw;
 
 namespace {
 

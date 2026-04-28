@@ -2,6 +2,7 @@
 
 #include "vw/ecs/world_def.h"
 
+using namespace vw;
 using namespace vw::ecs;
 
 namespace {
@@ -58,7 +59,7 @@ static_assert(std::is_same_v<test_def::resources, std::tuple<resource_x>>);
 static_assert(test_def::system_count == 3);
 
 static_assert(std::is_same_v<
-    test_def::systems_tuple,
+    test_def::systems,
     std::tuple<
         system_alpha<test_def>,
         system_beta<test_def>,
