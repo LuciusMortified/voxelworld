@@ -28,7 +28,7 @@ private:
     delete_entity_modal deletion_modal_;
 
     void render_entity_node(
-        const std::string& name, const std::unordered_set<gfx::entity>& preview_entities
+        const std::string& name, const std::unordered_set<ecs::entity>& preview_entities
     );
 };
 

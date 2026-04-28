@@ -2,12 +2,7 @@ cmake_minimum_required(VERSION 3.25)
 
 project(vwengine)
 
-add_library(${PROJECT_NAME} INTERFACE
-        include/vw/gfx/world/components/model_component.inl.h
-        include/vw/gfx/world/serializers/vox_serializer.h
-        include/vw/gfx/world/serializers/vox_serializer.inl.h
-        include/vw/gfx/world/serializers/vox_deserializer.h
-        include/vw/gfx/world/serializers/vox_deserializer.inl.h)
+add_library(${PROJECT_NAME} INTERFACE)
 
 target_include_directories(${PROJECT_NAME} INTERFACE include)
 target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_23)

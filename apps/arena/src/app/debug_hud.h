@@ -8,7 +8,7 @@
 #include <vw/gfx.h>
 
 #include "vw/gfx/camera/third_person_camera_controller.h"
-#include "vw/gfx/world_grid/world_grid.h"
+#include "vw/ecs/world_grid/world_grid.h"
 
 #include "player.h"
 

@@ -2,7 +2,7 @@
 
 #ifndef VW_SCULPTOR_OPEN_FILE_MODAL_INL_H
 #define VW_SCULPTOR_OPEN_FILE_MODAL_INL_H
-#include "vw/gfx/world/serializers/vox_deserializer.h"
+#include "vw/ecs/serializers/vox_deserializer.h"
 #include "vw/asset/vox/vox_parser_plain.h"
 
 namespace vw::sculptor {

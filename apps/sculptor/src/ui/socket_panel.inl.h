@@ -5,7 +5,7 @@
 
 #include <filesystem>
 
-#include "vw/gfx/world/serializers/vox_deserializer.h"
+#include "vw/ecs/serializers/vox_deserializer.h"
 #include "vw/asset/vox/vox_parser_plain.h"
 
 namespace vw::sculptor {

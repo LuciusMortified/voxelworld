@@ -68,14 +68,14 @@ private:
 
     void render_playback_controls(const std::shared_ptr<asset::animation_clip>& clip);
     void render_clip_blend_controls_() const;
-    void handle_play(gfx::entity root, const std::shared_ptr<asset::animation_clip>& clip) const;
-    void handle_pause(gfx::entity root) const;
-    void handle_stop(gfx::entity root) const;
-    auto try_get_root_entity() const -> std::optional<gfx::entity>;
+    void handle_play(ecs::entity root, const std::shared_ptr<asset::animation_clip>& clip) const;
+    void handle_pause(ecs::entity root) const;
+    void handle_stop(ecs::entity root) const;
+    auto try_get_root_entity() const -> std::optional<ecs::entity>;
 
     [[nodiscard]] auto is_current_layer_playing() const -> bool;
     [[nodiscard]] auto is_clip_on_layer() const -> bool;
-    void ensure_clip_on_layer(gfx::entity root) const;
+    void ensure_clip_on_layer(ecs::entity root) const;
     engine_type* engine_;
     app_state* state_;
     operation_manager* op_manager_;

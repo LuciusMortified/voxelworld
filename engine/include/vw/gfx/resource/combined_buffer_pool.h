@@ -14,10 +14,12 @@
 #include "vw/gfx/resource/combined_buffer.h"
 #include "vw/gfx/resource/mesh_pool.h"
 #include "vw/gfx/resource/staging_buffer.h"
-#include "vw/gfx/world/entity.h"
-#include "vw/gfx/world/world.h"
+#include "vw/ecs/entity.h"
+#include "vw/ecs/world.h"
 
 namespace vw::gfx {
+
+using namespace ::vw::ecs;
 
 class vulkan_context;
 

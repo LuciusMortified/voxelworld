@@ -2,20 +2,20 @@
 
 #include <vw/asset/animation/animation_layer.h>
 #include <vw/asset/animation/animation_types.h>
-#include <vw/gfx/world/components/animation_player_component.h>
-#include <vw/gfx/world/components/animation_target_component.h>
-#include <vw/gfx/world/components/hierarchy_component.h>
-#include <vw/gfx/world/components/spatial_component.h>
-#include <vw/gfx/world/components/transform_component.h>
-#include <vw/gfx/world/systems/animation_system.h>
-#include <vw/gfx/world/systems/hierarchy_system.h>
-#include <vw/gfx/world/systems/spatial_system.h>
-#include <vw/gfx/world/systems/transform_system.h>
-#include <vw/gfx/world/world.h>
-#include <vw/gfx/world/world_def.h>
+#include <vw/ecs/components/animation_player_component.h>
+#include <vw/ecs/components/animation_target_component.h>
+#include <vw/ecs/components/hierarchy_component.h>
+#include <vw/ecs/components/spatial_component.h>
+#include <vw/ecs/components/transform_component.h>
+#include <vw/ecs/systems/animation_system.h>
+#include <vw/ecs/systems/hierarchy_system.h>
+#include <vw/ecs/systems/spatial_system.h>
+#include <vw/ecs/systems/transform_system.h>
+#include <vw/ecs/world.h>
+#include <vw/ecs/world_def.h>
 
 using namespace vw;
-using namespace vw::gfx;
+using namespace vw::ecs;
 using namespace vw::asset;
 
 using test_def = world_def<hierarchy_system, transform_system, spatial_system, animation_system>;

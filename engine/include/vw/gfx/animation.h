@@ -19,10 +19,10 @@
 #include "vw/asset/animation/animation_clip_registry.h"
 
 // ECS компоненты
-#include "vw/gfx/world/components/animation_player_component.h"
-#include "vw/gfx/world/components/animation_target_component.h"
+#include "vw/ecs/components/animation_player_component.h"
+#include "vw/ecs/components/animation_target_component.h"
 
 // Система анимаций
-#include "vw/gfx/world/systems/animation_system.h"
+#include "vw/ecs/systems/animation_system.h"
 
 #endif  // VW_GFX_ANIMATION_H

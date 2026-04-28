@@ -8,11 +8,13 @@
 #include "vw/core.h"
 #include "vw/gfx/camera/camera.h"
 #include "vw/gfx/player/player_input_state.h"
-#include "vw/gfx/world/spatial_layer.h"
-#include "vw/gfx/world/world.h"
+#include "vw/ecs/spatial_layer.h"
+#include "vw/ecs/world.h"
 #include "vw/spatial/ray.h"
 
 namespace vw::gfx {
+
+using namespace ::vw::ecs;
 
 struct third_person_camera_params {
     float32 arm_length     = 10.0f;

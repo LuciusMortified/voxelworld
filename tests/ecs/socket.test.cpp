@@ -1,18 +1,18 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <vw/gfx/world/components/socket_component.h>
-#include <vw/gfx/world/components/hierarchy_component.h>
-#include <vw/gfx/world/components/transform_component.h>
-#include <vw/gfx/world/components/spatial_component.h>
-#include <vw/gfx/world/systems/socket_system.h>
-#include <vw/gfx/world/systems/hierarchy_system.h>
-#include <vw/gfx/world/systems/transform_system.h>
-#include <vw/gfx/world/systems/spatial_system.h>
-#include <vw/gfx/world/world.h>
-#include <vw/gfx/world/world_def.h>
+#include <vw/ecs/components/socket_component.h>
+#include <vw/ecs/components/hierarchy_component.h>
+#include <vw/ecs/components/transform_component.h>
+#include <vw/ecs/components/spatial_component.h>
+#include <vw/ecs/systems/socket_system.h>
+#include <vw/ecs/systems/hierarchy_system.h>
+#include <vw/ecs/systems/transform_system.h>
+#include <vw/ecs/systems/spatial_system.h>
+#include <vw/ecs/world.h>
+#include <vw/ecs/world_def.h>
 
 using namespace vw;
-using namespace vw::gfx;
+using namespace vw::ecs;
 
 TEST_CASE("socket_component default construction", "[socket]") {
     socket_component comp;

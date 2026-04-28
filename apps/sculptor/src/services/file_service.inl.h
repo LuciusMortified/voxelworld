@@ -5,8 +5,8 @@
 
 #include <filesystem>
 
-#include "vw/gfx/world/serializers/vox_serializer.h"
-#include "vw/gfx/world/serializers/vox_writer_plain.h"
+#include "vw/ecs/serializers/vox_serializer.h"
+#include "vw/ecs/serializers/vox_writer_plain.h"
 
 namespace vw::sculptor {
 

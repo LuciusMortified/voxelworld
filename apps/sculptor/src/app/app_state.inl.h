@@ -3,7 +3,7 @@
 #ifndef VW_SCULPTOR_STATE_INL_H
 #define VW_SCULPTOR_STATE_INL_H
 
-#include "vw/gfx/world/world.h"
+#include "vw/ecs/world.h"
 
 namespace vw::sculptor {
 

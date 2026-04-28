@@ -79,7 +79,7 @@ inline void select_entity_tool::update_hovered_entity_() {
 }
 
 inline void select_entity_tool::draw_entity_box_(
-    gfx::entity ent, color col
+    ecs::entity ent, color col
 ) {
     auto& world = engine_->get_world();
 

@@ -3,8 +3,8 @@
 
 #include <algorithm>
 
-#include "vw/gfx/world_grid/generators/perlin_terrain_generator.h"
-#include "vw/gfx/world_grid/world_grid.h"
+#include "vw/ecs/world_grid/generators/perlin_terrain_generator.h"
+#include "vw/ecs/world_grid/world_grid.h"
 
 using namespace vw;
 

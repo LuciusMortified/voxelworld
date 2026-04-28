@@ -4,7 +4,7 @@
 #define VW_SCULPTOR_ADD_ANIMATION_TARGET_OPERATION_H
 
 #include <vw/gfx/engine/engine.h>
-#include <vw/gfx/world/world_components.h>
+#include <vw/ecs/world_components.h>
 
 #include "app/app_state.h"
 #include "base_operation.h"
@@ -32,7 +32,7 @@ private:
     app_state* state_;
     add_animation_target_params params_;
 
-    [[nodiscard]] auto find_animation_root_(gfx::entity ent) const -> gfx::entity;
+    [[nodiscard]] auto find_animation_root_(ecs::entity ent) const -> ecs::entity;
 };
 
 }  // namespace vw::sculptor

@@ -21,9 +21,11 @@
 #include "vw/gfx/resource/palette_buffer.h"
 #include "vw/gfx/resource/shader.h"
 #include "vw/gfx/window/window.h"
-#include "vw/gfx/world/world.h"
+#include "vw/ecs/world.h"
 
 namespace vw::gfx {
+
+using namespace ::vw::ecs;
 
 enum class render_mode : uint8 { lit, wireframe };
 

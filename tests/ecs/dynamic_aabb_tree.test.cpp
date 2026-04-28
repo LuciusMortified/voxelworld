@@ -1,9 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <vw/gfx/spatial/dynamic_aabb_tree.h>
+#include <vw/ecs/spatial/dynamic_aabb_tree.h>
 
 using namespace vw;
-using namespace vw::gfx;
+using namespace vw::ecs;
 using namespace vw::spatial;
 
 static auto make_entity(uint32 idx) -> entity {

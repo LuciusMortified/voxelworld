@@ -1,9 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <vw/gfx/world/component_pool.h>
+#include <vw/ecs/component_pool.h>
 
 using namespace vw;
-using namespace vw::gfx;
+using namespace vw::ecs;
 
 struct test_component {
     int value = 0;

@@ -5,11 +5,13 @@
 
 #include "vw/gfx/resource/light_buffer.h"
 #include "vw/gfx/render/vulkan_context.h"
-#include "vw/gfx/world/systems/light_system.h"
-#include "vw/gfx/world/components/light_component.h"
-#include "vw/gfx/world/components/transform_component.h"
+#include "vw/ecs/systems/light_system.h"
+#include "vw/ecs/components/light_component.h"
+#include "vw/ecs/components/transform_component.h"
 
 namespace vw::gfx {
+
+using namespace ::vw::ecs;
 
 template <typename WC>
 light_buffer<WC>::light_buffer(

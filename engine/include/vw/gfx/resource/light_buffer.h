@@ -10,9 +10,11 @@
 #include "vw/core.h"
 #include "vw/gfx/render/renderer.h"
 #include "vw/gfx/resource/buffer.h"
-#include "vw/gfx/world/world.h"
+#include "vw/ecs/world.h"
 
 namespace vw::gfx {
+
+using namespace ::vw::ecs;
 
 class vulkan_context;
 

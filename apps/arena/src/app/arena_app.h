@@ -13,7 +13,7 @@
 #include "vw/gfx/camera/third_person_camera_controller.h"
 #include "vw/gfx/player/player_input_controller.h"
 #include "vw/asset/vox/vox_parser_plain.h"
-#include "vw/gfx/world_grid/generators/perlin_terrain_generator.h"
+#include "vw/ecs/world_grid/generators/perlin_terrain_generator.h"
 
 #include "dummy_enemy.h"
 #include "player.h"

@@ -17,10 +17,12 @@
 #include "vw/gfx/resource/buffer.h"
 #include "vw/gfx/resource/mesh.h"
 #include "vw/gfx/resource/staging_buffer.h"
-#include "vw/gfx/world/entity.h"
+#include "vw/ecs/entity.h"
 #include "vw/spatial/aabb.h"
 
 namespace vw::gfx {
+
+using namespace ::vw::ecs;
 
 
 

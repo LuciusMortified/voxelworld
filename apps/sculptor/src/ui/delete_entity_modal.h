@@ -4,7 +4,7 @@
 #define VW_SCULPTOR_DELETE_ENTITY_MODAL_H
 
 #include <vw/gfx/engine/engine.h>
-#include <vw/gfx/world/world_components.h>
+#include <vw/ecs/world_components.h>
 
 #include "app/app_state.h"
 #include "operations/operation_manager.h"

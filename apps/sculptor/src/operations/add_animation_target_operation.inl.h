@@ -11,10 +11,10 @@ inline add_animation_target_operation::add_animation_target_operation(
     : engine_(&engine), state_(&state), params_(params) {}
 
 inline auto add_animation_target_operation::find_animation_root_(
-    gfx::entity ent
-) const -> gfx::entity {
+    ecs::entity ent
+) const -> ecs::entity {
     auto& world         = engine_->get_world();
-    gfx::entity current = ent;
+    ecs::entity current = ent;
     while (current.is_valid()) {
         if (world.has<gfx::animation_player_component>(current)) {
             return current;

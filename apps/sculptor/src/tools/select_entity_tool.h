@@ -25,13 +25,13 @@ public:
 
 private:
     void update_hovered_entity_();
-    void draw_entity_box_(gfx::entity ent, color col);
+    void draw_entity_box_(ecs::entity ent, color col);
 
     engine_type* engine_;
     app_state* state_;
 
-    std::vector<gfx::entity> ray_cast_entities_;
-    gfx::entity hovered_entity_;
+    std::vector<ecs::entity> ray_cast_entities_;
+    ecs::entity hovered_entity_;
 };
 
 }  // namespace vw::sculptor

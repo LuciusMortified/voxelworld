@@ -6,12 +6,14 @@ globs: ["engine/**", "apps/**"]
 # Development Workflow Recipes
 
 ## New ECS Component
-1. Create `engine/include/vw/gfx/world/components/<name>_component.h` + `.inl.h`
-2. Add to `world_components.h` tuple if needed
+1. Create `engine/include/vw/ecs/components/<name>_component.h` + `.inl.h`
+2. Namespace: `vw::ecs`
+3. Add to `world_components.h` tuple if needed
 
 ## New ECS System
-1. Create `engine/include/vw/gfx/world/systems/<name>_system.h` + `.inl.h`
-2. Implement `update()` method working with registry view
+1. Create `engine/include/vw/ecs/systems/<name>_system.h` + `.inl.h`
+2. Namespace: `vw::ecs`
+3. Implement `update()` method working with registry view
 
 ## New Sculptor Tool
 1. Create class inheriting `base_tool` in `apps/sculptor/src/tools/`

@@ -428,7 +428,7 @@ inline auto timeline_panel::is_current_layer_playing() const -> bool {
         layer.clip->get_name() == state_->anim.selected_clip_name;
 }
 
-inline auto timeline_panel::try_get_root_entity() const -> std::optional<gfx::entity> {
+inline auto timeline_panel::try_get_root_entity() const -> std::optional<ecs::entity> {
     if (state_->scene.root_name.empty() ||
         !state_->scene.name_to_entity.contains(state_->scene.root_name)) {
         return std::nullopt;
@@ -437,7 +437,7 @@ inline auto timeline_panel::try_get_root_entity() const -> std::optional<gfx::en
 }
 
 inline void timeline_panel::handle_pause(
-    gfx::entity root
+    ecs::entity root
 ) const {
     auto& world = engine_->get_world();
     if (world.has<gfx::animation_player_component>(root)) {
@@ -447,7 +447,7 @@ inline void timeline_panel::handle_pause(
 }
 
 inline void timeline_panel::handle_play(
-    gfx::entity root, const std::shared_ptr<asset::animation_clip>& clip
+    ecs::entity root, const std::shared_ptr<asset::animation_clip>& clip
 ) const {
     auto& world = engine_->get_world();
 
@@ -490,7 +490,7 @@ inline void timeline_panel::handle_play(
 }
 
 inline void timeline_panel::handle_stop(
-    gfx::entity root
+    ecs::entity root
 ) const {
     auto& world          = engine_->get_world();
     const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
@@ -860,7 +860,7 @@ inline auto timeline_panel::is_clip_on_layer() const -> bool {
 }
 
 inline void timeline_panel::ensure_clip_on_layer(
-    gfx::entity root
+    ecs::entity root
 ) const {
     if (is_clip_on_layer()) {
         return;

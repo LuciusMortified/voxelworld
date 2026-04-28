@@ -1,9 +1,9 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <vw/gfx/world/entity_pool.h>
+#include <vw/ecs/entity_pool.h>
 
 using namespace vw;
-using namespace vw::gfx;
+using namespace vw::ecs;
 
 TEST_CASE("entity_pool create", "[entity_pool]") {
     entity_pool pool;

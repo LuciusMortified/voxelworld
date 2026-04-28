@@ -5,9 +5,11 @@
 
 #include <stdexcept>
 
-#include "vw/gfx/world/world_components.h"
+#include "vw/ecs/world_components.h"
 
 namespace vw::gfx {
+
+using namespace ::vw::ecs;
 
 template <typename WC>
 class engine;

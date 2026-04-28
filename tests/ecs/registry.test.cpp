@@ -1,9 +1,9 @@
-#include <vw/gfx/world/entity_registry.h>
+#include <vw/ecs/entity_registry.h>
 
 #include <catch2/catch_test_macros.hpp>
 
 using namespace vw;
-using namespace vw::gfx;
+using namespace vw::ecs;
 
 struct position_component {
     float x = 0.f, y = 0.f, z = 0.f;

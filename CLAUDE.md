@@ -6,7 +6,12 @@
 - **Engine**: header-only INTERFACE библиотека (`engine/include/vw/`)
 - **Apps**: компилируемые executable (`apps/sculptor/`, `apps/test_*`)
 - **Shaders**: GLSL → SPIR-V (`shaders/`)
-- **ECS**: шаблонный `registry` + `view` + `entity` с generation-based handles
+- **Модули движка** (namespace = путь):
+  - `vw::core` — типы, math, transform, voxel, block_registry
+  - `vw::spatial` — чистая геометрия (aabb, frustum, plane, ray)
+  - `vw::asset` — модели, анимации, vox/voxa parsers, asset_storage
+  - `vw::ecs` — entity/registry/world, компоненты, системы, world_grid, dynamic_aabb_tree
+  - `vw::gfx` — Vulkan renderer, окно, камера, ImGui, debug
 - **Undo/Redo**: command паттерн через `base_operation`
 - **Deps**: vcpkg (glfw3, imgui, spdlog, catch2, Vulkan SDK)
 

@@ -9,16 +9,16 @@
 #include "vw/core/transform.h"
 #include "vw/asset/animation/animation_types.h"
 #include "vw/asset/animation/keyframe.h"
-#include "vw/gfx/world/base_world_def.h"
-#include "vw/gfx/world/entity.h"
+#include "vw/ecs/base_world_def.h"
+#include "vw/ecs/entity.h"
 
-namespace vw::gfx {
+namespace vw::ecs {
 template <typename> class world;
-}  // namespace vw::gfx
+}  // namespace vw::ecs
 
 namespace vw::sculptor {
 
-using world_type    = gfx::world<gfx::base_world_def>;
+using world_type    = ecs::world<ecs::base_world_def>;
 using keyframe_value = std::variant<asset::keyframe_vec3f, asset::keyframe_quat>;
 
 enum class tools : uint8 {
@@ -58,9 +58,9 @@ struct file_state {
 struct scene_state {
     std::string selected_name;
     std::string root_name;
-    std::unordered_map<std::string, gfx::entity> name_to_entity;
-    std::unordered_map<gfx::entity, std::string> entity_to_name;
-    std::vector<gfx::entity> entities;
+    std::unordered_map<std::string, ecs::entity> name_to_entity;
+    std::unordered_map<ecs::entity, std::string> entity_to_name;
+    std::vector<ecs::entity> entities;
 
     void clear_entities(world_type& world);
 };
@@ -113,7 +113,7 @@ struct socket_state {
     struct socket_preview {
         std::string filename;
         std::string preview_root_name;
-        std::vector<gfx::entity> entities;
+        std::vector<ecs::entity> entities;
 
         void destroy_entities(world_type& world);
     };
@@ -126,8 +126,8 @@ struct socket_state {
         return std::format("{}:{}", entity_name, socket_name);
     }
 
-    [[nodiscard]] auto get_preview_entities() const -> std::unordered_set<gfx::entity> {
-        std::unordered_set<gfx::entity> result;
+    [[nodiscard]] auto get_preview_entities() const -> std::unordered_set<ecs::entity> {
+        std::unordered_set<ecs::entity> result;
         for (const auto& preview : socket_previews | std::views::values) {
             for (const auto ent : preview.entities) {
                 result.insert(ent);
