@@ -10,7 +10,7 @@
 #include "vw/ecs/systems/transform_system.h"
 #include "vw/ecs/systems/world_grid_system.h"
 #include "vw/ecs/world.h"
-#include "vw/ecs/world_grid/world_grid.h"
+#include "vw/ecs/systems/world_grid/world_grid.h"
 
 namespace vw::ecs {
 

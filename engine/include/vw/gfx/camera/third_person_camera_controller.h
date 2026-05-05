@@ -8,7 +8,7 @@
 #include "vw/core.h"
 #include "vw/gfx/camera/camera.h"
 #include "vw/gfx/player/player_input_state.h"
-#include "vw/ecs/spatial_layer.h"
+#include "vw/ecs/spatial/spatial_layer.h"
 #include "vw/ecs/world.h"
 #include "vw/spatial/ray.h"
 

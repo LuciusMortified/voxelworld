@@ -1,12 +1,11 @@
 #pragma once
 
-#ifndef VW_ECS_WORLD_GRID_GENERATORS_PERLIN_WORLD_GRID_GENERATOR_H
-#define VW_ECS_WORLD_GRID_GENERATORS_PERLIN_WORLD_GRID_GENERATOR_H
+#ifndef VW_ECS_SYSTEMS_WORLD_GRID_GENERATORS_PERLIN_TERRAIN_GENERATOR_H
+#define VW_ECS_SYSTEMS_WORLD_GRID_GENERATORS_PERLIN_TERRAIN_GENERATOR_H
 
 #include <array>
-#include <unordered_map>
 
-#include "vw/ecs/world_grid/world_grid_generator.h"
+#include "vw/ecs/systems/world_grid/terrain_generator.h"
 
 namespace vw::asset {
 class model_identity_pool;
@@ -16,7 +15,7 @@ class page_pool;
 namespace vw::ecs {
 
 
-class perlin_world_grid_generator final : public world_grid_generator {
+class perlin_terrain_generator final : public terrain_generator {
 public:
     struct params {
         uint32 seed = 42;
@@ -41,11 +40,10 @@ public:
         float32 warp_strength = 30.0f;
     };
 
-    perlin_world_grid_generator(vw::asset::model_identity_pool& identity_pool, vw::asset::page_pool& pool,
-                               params p = {});
+    perlin_terrain_generator(vw::asset::model_identity_pool& identity_pool, vw::asset::page_pool& pool,
+                             params p = {});
 
-    [[nodiscard]] auto generate_chunk(vec3i coord) -> chunk_data override;
-    [[nodiscard]] auto get_chunk_y_range(int32 chunk_x, int32 chunk_z) -> chunk_y_range override;
+    void generate(terrain_context& ctx) override;
     [[nodiscard]] auto surface_height_at(int32 wx, int32 wz) const -> int32;
 
 private:
@@ -56,6 +54,8 @@ private:
     [[nodiscard]] auto height_at(int32 wx, int32 wz) const -> int32;
     [[nodiscard]] auto block_at(int32 y, int32 surface_y, float64 continent) const -> block_id;
 
+    void generate_chunk(terrain_context& ctx, int32 chunk_y);
+
     static auto fade(float64 t) -> float64;
     static auto lerp(float64 t, float64 a, float64 b) -> float64;
     static auto grad(int32 hash, float64 x, float64 y) -> float64;
@@ -64,16 +64,10 @@ private:
     vw::asset::page_pool* page_pool_;
     params params_;
     std::array<int32, 512> perm_;
-    std::unordered_map<uint64, chunk_y_range> y_range_cache_;
-
-    static auto pack_coord(int32 cx, int32 cz) -> uint64 {
-        return (static_cast<uint64>(static_cast<uint32>(cx)) << 32) |
-               static_cast<uint64>(static_cast<uint32>(cz));
-    }
 };
 
 }  // namespace vw::ecs
 
-#include "vw/ecs/world_grid/generators/perlin_world_grid_generator.inl.h"
+#include "vw/ecs/systems/world_grid/generators/perlin_terrain_generator.inl.h"
 
-#endif  // VW_ECS_WORLD_GRID_GENERATORS_PERLIN_WORLD_GRID_GENERATOR_H
+#endif  // VW_ECS_SYSTEMS_WORLD_GRID_GENERATORS_PERLIN_TERRAIN_GENERATOR_H

@@ -12,7 +12,7 @@
 #include "vw/ecs/components/spatial_component.h"
 #include "vw/ecs/entity.h"
 #include "vw/ecs/entity_registry.h"
-#include "vw/ecs/spatial_layer.h"
+#include "vw/ecs/spatial/spatial_layer.h"
 #include "vw/ecs/system_trait.h"
 #include "vw/spatial/aabb.h"
 #include "vw/spatial/frustum.h"

@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef VW_ECS_WORLD_GRID_TERRAIN_GENERATOR_H
-#define VW_ECS_WORLD_GRID_TERRAIN_GENERATOR_H
+#ifndef VW_ECS_SYSTEMS_WORLD_GRID_TERRAIN_GENERATOR_H
+#define VW_ECS_SYSTEMS_WORLD_GRID_TERRAIN_GENERATOR_H
 
 #include <functional>
 #include <memory>
@@ -37,4 +37,4 @@ public:
 
 }  // namespace vw::ecs
 
-#endif  // VW_ECS_WORLD_GRID_TERRAIN_GENERATOR_H
+#endif  // VW_ECS_SYSTEMS_WORLD_GRID_TERRAIN_GENERATOR_H

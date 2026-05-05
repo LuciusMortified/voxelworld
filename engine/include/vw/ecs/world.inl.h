@@ -33,6 +33,18 @@ world<WD>::world()
 {}
 
 template <typename WD>
+world<WD>::~world() {
+    std::apply([](auto&... s) {
+        (detail::invoke_shutdown(s), ...);
+    }, systems_);
+
+    auto remaining = registry_.alive_entities();
+    for (auto ent : remaining) {
+        destroy(ent);
+    }
+}
+
+template <typename WD>
 void world<WD>::update(
     float32 delta_time
 ) {

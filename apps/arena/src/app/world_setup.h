@@ -5,8 +5,8 @@
 
 #include <vw/gfx.h>
 
-#include "vw/ecs/world_grid/generators/perlin_terrain_generator.h"
-#include "vw/ecs/world_grid/world_grid.h"
+#include "vw/ecs/systems/world_grid/generators/perlin_terrain_generator.h"
+#include "vw/ecs/systems/world_grid/world_grid.h"
 
 namespace vw::arena {
 

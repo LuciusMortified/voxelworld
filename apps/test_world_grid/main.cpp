@@ -3,8 +3,9 @@
 
 #include <algorithm>
 
-#include "vw/ecs/world_grid/generators/perlin_terrain_generator.h"
-#include "vw/ecs/world_grid/world_grid.h"
+#include "vw/ecs/systems/world_grid/chunk_loader.h"
+#include "vw/ecs/systems/world_grid/generators/perlin_terrain_generator.h"
+#include "vw/ecs/systems/world_grid/world_grid.h"
 
 using namespace vw;
 
@@ -98,10 +99,13 @@ private:
             registry.get_identity_pool(), registry.get_page_pool(), generator_params_);
         generator_  = generator.get();
         auto grid   = std::make_unique<gfx::world_grid<gfx::base_world_def>>(
-            world, std::move(generator), generator_params_.voxel_scale
+            world, generator_params_.voxel_scale
         );
-        world_grid_ = grid.get();
-        world.template system<gfx::world_grid_system>().set_grid(std::move(grid));
+        world_grid_  = grid.get();
+        auto loader  = std::make_unique<gfx::chunk_loader>(std::move(generator));
+        auto& gs     = world.template system<gfx::world_grid_system>();
+        gs.set_grid(std::move(grid));
+        gs.set_loader(std::move(loader));
 
         viewer_ = world.create()
             .with<gfx::transform_component>()
@@ -135,9 +139,10 @@ private:
                 {static_cast<int32>(pos.x), static_cast<int32>(pos.y), static_cast<int32>(pos.z)}
             );
             ImGui::Text("Chunk: (%d, %d, %d)", chunk_coord.x, chunk_coord.y, chunk_coord.z);
-            ImGui::Text("Loaded columns: %u", world_grid_->get_loaded_column_count());
-            ImGui::Text("Loaded chunks: %u", world_grid_->get_loaded_chunk_count());
-            ImGui::Text("Pending columns: %u", world_grid_->get_pending_column_count());
+            const auto& wgs = get_engine().get_world().template system<gfx::world_grid_system>();
+            ImGui::Text("Loaded columns: %u", world_grid_->column_count());
+            ImGui::Text("Loaded chunks: %u", world_grid_->chunk_count());
+            ImGui::Text("Pending columns: %u", wgs.get_stats().pending_count);
             ImGui::Text(
                 "Pending meshes: %u", get_engine().get_renderer().get_mesh_pool().get_pending_count()
             );

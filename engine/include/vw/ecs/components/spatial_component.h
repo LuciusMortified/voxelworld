@@ -4,7 +4,7 @@
 #define VW_ECS_COMPONENTS_SPATIAL_COMPONENT_H
 
 #include "vw/core.h"
-#include "vw/ecs/spatial_layer.h"
+#include "vw/ecs/spatial/spatial_layer.h"
 #include "vw/spatial/aabb.h"
 
 namespace vw::ecs {

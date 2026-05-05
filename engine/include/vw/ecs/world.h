@@ -56,7 +56,7 @@ public:
     };
 
     world();
-    ~world() = default;
+    ~world();
 
     world(const world&)                    = delete;
     auto operator=(const world&) -> world& = delete;

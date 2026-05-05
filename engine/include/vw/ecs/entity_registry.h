@@ -139,6 +139,10 @@ public:
         return destroyed_set_;
     }
 
+    [[nodiscard]] auto alive_entities() const -> std::vector<entity> {
+        return entity_pool_.alive_entities();
+    }
+
     template <typename... Cs>
     auto view() {
         return component_view<entity_registry, Cs...>(*this);

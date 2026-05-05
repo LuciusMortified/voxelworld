@@ -8,7 +8,7 @@
 #include <vw/gfx.h>
 
 #include "vw/gfx/camera/third_person_camera_controller.h"
-#include "vw/ecs/world_grid/world_grid.h"
+#include "vw/ecs/systems/world_grid/world_grid.h"
 
 #include "player.h"
 
@@ -77,11 +77,11 @@ inline auto render_debug_hud(
         ImGui::Text("Colliders: %s", show_colliders ? "visible" : "hidden");
     }
 
-    const auto grid = engine.get_world().template system<gfx::world_grid_system>().grid();
-    if (grid) {
+    const auto& wgs = engine.get_world().template system<gfx::world_grid_system>();
+    if (const auto* grid = wgs.grid()) {
         ImGui::Separator();
-        ImGui::Text("Loaded chunks: %u", grid->get_loaded_chunk_count());
-        ImGui::Text("Pending columns: %u", grid->get_pending_column_count());
+        ImGui::Text("Loaded chunks: %u", grid->chunk_count());
+        ImGui::Text("Pending columns: %u", wgs.get_stats().pending_count);
     }
 
     ImGui::End();

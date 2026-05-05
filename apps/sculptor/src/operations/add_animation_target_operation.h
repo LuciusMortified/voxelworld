@@ -4,7 +4,7 @@
 #define VW_SCULPTOR_ADD_ANIMATION_TARGET_OPERATION_H
 
 #include <vw/gfx/engine/engine.h>
-#include <vw/ecs/world_components.h>
+#include <vw/ecs/base_world_def.h>
 
 #include "app/app_state.h"
 #include "base_operation.h"

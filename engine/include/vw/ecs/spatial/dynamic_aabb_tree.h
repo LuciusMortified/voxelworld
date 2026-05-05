@@ -9,7 +9,7 @@
 
 #include "vw/core.h"
 #include "vw/ecs/entity.h"
-#include "vw/ecs/spatial_layer.h"
+#include "vw/ecs/spatial/spatial_layer.h"
 #include "vw/spatial/aabb.h"
 #include "vw/spatial/frustum.h"
 #include "vw/spatial/ray.h"

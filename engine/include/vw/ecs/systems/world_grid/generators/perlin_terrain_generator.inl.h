@@ -1,14 +1,14 @@
 #pragma once
 
-#ifndef VW_ECS_WORLD_GRID_GENERATORS_PERLIN_TERRAIN_GENERATOR_INL_H
-#define VW_ECS_WORLD_GRID_GENERATORS_PERLIN_TERRAIN_GENERATOR_INL_H
+#ifndef VW_ECS_SYSTEMS_WORLD_GRID_GENERATORS_PERLIN_TERRAIN_GENERATOR_INL_H
+#define VW_ECS_SYSTEMS_WORLD_GRID_GENERATORS_PERLIN_TERRAIN_GENERATOR_INL_H
 
 #include <algorithm>
 #include <cmath>
 
 #include "vw/core/color.h"
 #include "vw/asset/model/model.h"
-#include "vw/ecs/world_grid/chunk.h"
+#include "vw/ecs/systems/world_grid/chunk.h"
 
 namespace vw::ecs {
 
@@ -274,4 +274,4 @@ inline void perlin_terrain_generator::generate_chunk(
 
 }  // namespace vw::ecs
 
-#endif  // VW_ECS_WORLD_GRID_GENERATORS_PERLIN_TERRAIN_GENERATOR_INL_H
+#endif  // VW_ECS_SYSTEMS_WORLD_GRID_GENERATORS_PERLIN_TERRAIN_GENERATOR_INL_H

@@ -11,7 +11,7 @@
 #include "vw/asset/asset_storage.h"
 #include "vw/gfx/camera/camera.h"
 #include "vw/gfx/player/player_input_state.h"
-#include "vw/ecs/world_grid/world_grid.h"
+#include "vw/ecs/systems/world_grid/world_grid.h"
 
 namespace vw::arena {
 

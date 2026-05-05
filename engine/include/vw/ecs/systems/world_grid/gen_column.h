@@ -1,12 +1,12 @@
 #pragma once
 
-#ifndef VW_ECS_WORLD_GRID_GEN_COLUMN_H
-#define VW_ECS_WORLD_GRID_GEN_COLUMN_H
+#ifndef VW_ECS_SYSTEMS_WORLD_GRID_GEN_COLUMN_H
+#define VW_ECS_SYSTEMS_WORLD_GRID_GEN_COLUMN_H
 
 #include <unordered_map>
 
 #include "vw/core.h"
-#include "vw/ecs/world_grid/terrain_generator.h"
+#include "vw/ecs/systems/world_grid/terrain_generator.h"
 
 namespace vw::ecs {
 
@@ -41,6 +41,6 @@ private:
 
 }  // namespace vw::ecs
 
-#include "vw/ecs/world_grid/gen_column.inl.h"
+#include "vw/ecs/systems/world_grid/gen_column.inl.h"
 
-#endif  // VW_ECS_WORLD_GRID_GEN_COLUMN_H
+#endif  // VW_ECS_SYSTEMS_WORLD_GRID_GEN_COLUMN_H

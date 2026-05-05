@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef VW_ECS_WORLD_GRID_CHUNK_H
-#define VW_ECS_WORLD_GRID_CHUNK_H
+#ifndef VW_ECS_SYSTEMS_WORLD_GRID_CHUNK_H
+#define VW_ECS_SYSTEMS_WORLD_GRID_CHUNK_H
 
 #include <memory>
 
@@ -53,6 +53,6 @@ private:
 
 }  // namespace vw::ecs
 
-#include "vw/ecs/world_grid/chunk.inl.h"
+#include "vw/ecs/systems/world_grid/chunk.inl.h"
 
-#endif  // VW_ECS_WORLD_GRID_CHUNK_H
+#endif  // VW_ECS_SYSTEMS_WORLD_GRID_CHUNK_H

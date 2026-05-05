@@ -5,7 +5,7 @@
 
 #include <stdexcept>
 
-#include "vw/ecs/world_components.h"
+#include "vw/ecs/base_world_def.h"
 
 namespace vw::gfx {
 

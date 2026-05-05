@@ -1,9 +1,9 @@
 #pragma once
 
-#ifndef VW_ECS_WORLD_GRID_GENERATORS_FLAT_TERRAIN_GENERATOR_H
-#define VW_ECS_WORLD_GRID_GENERATORS_FLAT_TERRAIN_GENERATOR_H
+#ifndef VW_ECS_SYSTEMS_WORLD_GRID_GENERATORS_FLAT_TERRAIN_GENERATOR_H
+#define VW_ECS_SYSTEMS_WORLD_GRID_GENERATORS_FLAT_TERRAIN_GENERATOR_H
 
-#include "vw/ecs/world_grid/terrain_generator.h"
+#include "vw/ecs/systems/world_grid/terrain_generator.h"
 
 namespace vw::asset {
 class model_identity_pool;
@@ -29,6 +29,6 @@ private:
 
 }  // namespace vw::ecs
 
-#include "vw/ecs/world_grid/generators/flat_terrain_generator.inl.h"
+#include "vw/ecs/systems/world_grid/generators/flat_terrain_generator.inl.h"
 
-#endif  // VW_ECS_WORLD_GRID_GENERATORS_FLAT_TERRAIN_GENERATOR_H
+#endif  // VW_ECS_SYSTEMS_WORLD_GRID_GENERATORS_FLAT_TERRAIN_GENERATOR_H

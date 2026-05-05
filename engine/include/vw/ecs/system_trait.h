@@ -26,6 +26,11 @@ concept has_on_remove = requires(S& s, entity e) {
     s.template on_remove<C>(e);
 };
 
+template <typename S>
+concept has_shutdown = requires(S& s) {
+    s.shutdown();
+};
+
 namespace detail {
 
 template <typename C, typename S>
@@ -39,6 +44,13 @@ template <typename C, typename S>
 void invoke_on_remove(S& system, entity ent) {
     if constexpr (has_on_remove<S, C>) {
         system.template on_remove<C>(ent);
+    }
+}
+
+template <typename S>
+void invoke_shutdown(S& system) {
+    if constexpr (has_shutdown<S>) {
+        system.shutdown();
     }
 }
 

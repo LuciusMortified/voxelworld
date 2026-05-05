@@ -3,6 +3,7 @@
 #ifndef VW_ECS_ENTITY_MANAGER_H
 #define VW_ECS_ENTITY_MANAGER_H
 
+#include <unordered_set>
 #include <vector>
 
 #include "vw/ecs/entity.h"
@@ -56,6 +57,19 @@ public:
         for (auto e : entities) {
             destroy(e);
         }
+    }
+
+    [[nodiscard]]
+    auto alive_entities() const -> std::vector<entity> {
+        std::unordered_set<uint32> free_set(free_indices_.begin(), free_indices_.end());
+        std::vector<entity> result;
+        result.reserve(generations_.size() - free_indices_.size());
+        for (uint32 i = 0; i < generations_.size(); ++i) {
+            if (!free_set.contains(i)) {
+                result.push_back({i, generations_[i]});
+            }
+        }
+        return result;
     }
 
 private:
