@@ -61,7 +61,7 @@ inline void mesh_pool::stop_gen_threads() {
 }
 
 inline void mesh_pool::request_mesh(
-    const std::shared_ptr<vw::asset::model>& model_ptr
+    const std::shared_ptr<vw::asset::model>& model_ptr, mesh_options opts
 ) {
     vw::asset::model_identity identity = model_ptr->get_identity();
 
@@ -79,20 +79,10 @@ inline void mesh_pool::request_mesh(
     }
     pending_indices_.insert(identity.index);
 
-    // log::debug(
-    //     lc_,
-    //     "Requesting mesh generation for vw::asset::model {}.{} with size ({},{},{})",
-    //     identity.index,
-    //     identity.generation,
-    //     model_ptr->width(),
-    //     model_ptr->height(),
-    //     model_ptr->depth()
-    // );
-
     model_refs_[identity] = model_ptr;
 
     {
-        auto task   = std::make_unique<mesh_generation_task>(identity, model_ptr);
+        auto task   = std::make_unique<mesh_generation_task>(identity, model_ptr, opts);
         auto future = task->promise.get_future();
 
         std::scoped_lock lock(gen_mutex_);
@@ -206,7 +196,7 @@ inline void mesh_pool::gen_thread_function() {
 
             try {
                 mesh data = greedy_mesh_generator::generate_mesh_data(
-                    storage, *model_ptr, *registry_
+                    storage, *model_ptr, *registry_, task->opts
                 );
                 task->promise.set_value(std::move(data));
             } catch (const std::exception& e) {

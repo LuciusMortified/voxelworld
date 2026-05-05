@@ -13,9 +13,9 @@ inline auto vertex::pack(
     int z,
     uint8 normal_id,
     block_id block_id,
-    uint8 corner_dark,
-    uint8 corner_bright,
-    uint8 corner
+    uint8 corners_dark,
+    uint8 corners_bright,
+    uint8 corner_id
 ) -> vertex {
     vertex v;
     v.data0 =                                       //
@@ -24,11 +24,11 @@ inline auto vertex::pack(
         ((static_cast<uint32>(z) & 0x7Fu) << 14) |  //
         ((static_cast<uint32>(normal_id) & 0x7u) << 21);
 
-    v.data1 =                                           //
-        static_cast<uint32>(block_id.value) |           //
-        (static_cast<uint32>(corner_dark) << 8) |       //
-        ((static_cast<uint32>(corner) & 0x3u) << 16) |  //
-        ((static_cast<uint32>(corner_bright) & 0xFFu) << 18);
+    v.data1 =                                                   //
+        static_cast<uint32>(block_id.value) |                   //
+        ((static_cast<uint32>(corners_dark) & 0xFu) << 8) |     //
+        ((static_cast<uint32>(corners_bright) & 0xFu) << 12) |  //
+        ((static_cast<uint32>(corner_id) & 0x3u) << 16);
 
     return v;
 }
@@ -288,8 +288,10 @@ inline void build_face_mask(
     const vw::asset::model& mdl,
     const face_axis_mapping& axes,
     int face_direction,
-    int layer
+    int layer,
+    mesh_options opts
 ) {
+    const bool brightness_enabled = opts.enable_top_brightness && face_direction == 2;
     constexpr int ps = vw::asset::model::page_size;
 
     auto idx = [&](int u, int v) -> size_t {
@@ -324,7 +326,9 @@ inline void build_face_mask(
                             storage.mask[idx(u, v)] = {
                                 fid,
                                 compute_corner_darkness(mdl, mx, my, mz, face_direction),
-                                compute_corner_brightness(mdl, mx, my, mz, face_direction)
+                                brightness_enabled
+                                    ? compute_corner_brightness(mdl, mx, my, mz, face_direction)
+                                    : uint8{0}
                             };
                         } else {
                             storage.mask[idx(u, v)] = empty_cell;
@@ -346,7 +350,9 @@ inline void build_face_mask(
                         storage.mask[idx(u, v)] = {
                             vx.id,
                             compute_corner_darkness(mdl, mx, my, mz, face_direction),
-                            compute_corner_brightness(mdl, mx, my, mz, face_direction)
+                            brightness_enabled
+                                ? compute_corner_brightness(mdl, mx, my, mz, face_direction)
+                                : uint8{0}
                         };
                     } else {
                         storage.mask[idx(u, v)] = empty_cell;
@@ -385,25 +391,45 @@ inline void add_quad(
         {1, 3, 2, 0},  // -Z
     };
 
+    static constexpr uint8 corner_to_ao[4] = {0, 1, 3, 2};
+
     const auto normal_id   = static_cast<uint8>(face_direction);
     const auto base_vertex = static_cast<uint32>(vertices.size());
 
+    const uint8 c_dark[4] = {
+        static_cast<uint8>(corner_dark & 0x3u),
+        static_cast<uint8>((corner_dark >> 2) & 0x3u),
+        static_cast<uint8>((corner_dark >> 4) & 0x3u),
+        static_cast<uint8>((corner_dark >> 6) & 0x3u),
+    };
+    const uint8 c_bright[4] = {
+        static_cast<uint8>(corner_bright & 0x3u),
+        static_cast<uint8>((corner_bright >> 2) & 0x3u),
+        static_cast<uint8>((corner_bright >> 4) & 0x3u),
+        static_cast<uint8>((corner_bright >> 6) & 0x3u),
+    };
+
+    uint8 corners_dark_winding   = 0;
+    uint8 corners_bright_winding = 0;
     for (int i = 0; i < 4; i++) {
-        int x = face_verts[face_direction][i][0] ? max_pos.x : min_pos.x;
-        int y = face_verts[face_direction][i][1] ? max_pos.y : min_pos.y;
-        int z = face_verts[face_direction][i][2] ? max_pos.z : min_pos.z;
-        vertices.push_back(
-            vertex::pack(
-                x,
-                y,
-                z,
-                normal_id,
-                block_id,
-                corner_dark,
-                corner_bright,
-                winding_to_corner[face_direction][i]
-            )
-        );
+        const uint8 corner_i = winding_to_corner[face_direction][i];
+        const uint8 ao_i     = corner_to_ao[corner_i];
+        if (c_dark[ao_i] > 0) {
+            corners_dark_winding |= static_cast<uint8>(1u << i);
+        }
+        if (c_bright[ao_i] > 0) {
+            corners_bright_winding |= static_cast<uint8>(1u << i);
+        }
+    }
+
+    for (int i = 0; i < 4; i++) {
+        const int x = face_verts[face_direction][i][0] ? max_pos.x : min_pos.x;
+        const int y = face_verts[face_direction][i][1] ? max_pos.y : min_pos.y;
+        const int z = face_verts[face_direction][i][2] ? max_pos.z : min_pos.z;
+        vertices.push_back(vertex::pack(
+            x, y, z, normal_id, block_id,
+            corners_dark_winding, corners_bright_winding, static_cast<uint8>(i)
+        ));
     }
 
     indices.push_back(base_vertex + 0);
@@ -425,12 +451,15 @@ inline void emit_rect(
     int w,
     int h,
     block_id bid,
-    const block_registry& registry
+    const block_registry& registry,
+    mesh_options opts
 ) {
     auto [min_pos, max_pos] = axes.to_local_min_max(u_start, v_start, w, h, layer);
     auto [cx, cy, cz]       = axes.to_model_coords(u_start, v_start, layer);
     uint8 corner_dark       = compute_corner_darkness(mdl, cx, cy, cz, face_direction);
-    uint8 corner_bright     = compute_corner_brightness(mdl, cx, cy, cz, face_direction);
+    uint8 corner_bright     = (opts.enable_top_brightness && face_direction == 2)
+        ? compute_corner_brightness(mdl, cx, cy, cz, face_direction)
+        : uint8{0};
 
     add_quad(
         storage.vertices,
@@ -449,7 +478,7 @@ inline void emit_rect(
 // ==================== simple_mesh_generator ====================
 
 inline auto simple_mesh_generator::generate_mesh_data(
-    const std::shared_ptr<vw::asset::model>& mdl, const block_registry& registry
+    const std::shared_ptr<vw::asset::model>& mdl, const block_registry& registry, mesh_options opts
 ) -> mesh {
     if (!mdl) {
         return mesh{};
@@ -465,7 +494,7 @@ inline auto simple_mesh_generator::generate_mesh_data(
                     for (int face = 0; face < 6; face++) {
                         if (is_face_visible(mdl, x, y, z, face)) {
                             add_cube_face(
-                                vertices, indices, mdl, x, y, z, face, voxel_obj.id, registry
+                                vertices, indices, mdl, x, y, z, face, voxel_obj.id, registry, opts
                             );
                         }
                     }
@@ -486,10 +515,13 @@ inline void simple_mesh_generator::add_cube_face(
     int z,
     int face_direction,
     block_id voxel_id,
-    const block_registry& registry
+    const block_registry& registry,
+    mesh_options opts
 ) {
     uint8 corner_dark   = detail::compute_corner_darkness(*mdl, x, y, z, face_direction);
-    uint8 corner_bright = detail::compute_corner_brightness(*mdl, x, y, z, face_direction);
+    uint8 corner_bright = (opts.enable_top_brightness && face_direction == 2)
+        ? detail::compute_corner_brightness(*mdl, x, y, z, face_direction)
+        : uint8{0};
     detail::add_quad(
         vertices,
         indices,
@@ -527,7 +559,10 @@ inline auto simple_mesh_generator::is_face_visible(
 // ==================== strip_mesh_generator ====================
 
 inline auto strip_mesh_generator::generate_mesh_data(
-    mesh_generation_storage& storage, const vw::asset::model& mdl, const block_registry& registry
+    mesh_generation_storage& storage,
+    const vw::asset::model& mdl,
+    const block_registry& registry,
+    mesh_options opts
 ) -> mesh {
     storage.clear();
 
@@ -542,7 +577,7 @@ inline auto strip_mesh_generator::generate_mesh_data(
     }
 
     for (int face_direction = 0; face_direction < 6; face_direction++) {
-        generate_face_quads(storage, mdl, face_direction, registry);
+        generate_face_quads(storage, mdl, face_direction, registry, opts);
     }
 
     return mesh{storage.vertices, storage.indices};
@@ -554,7 +589,8 @@ inline void strip_mesh_generator::merge_and_emit_strips(
     const detail::face_axis_mapping& axes,
     int face_direction,
     int layer,
-    const block_registry& registry
+    const block_registry& registry,
+    mesh_options opts
 ) {
     auto idx = [&](int u, int v) -> size_t {
         return static_cast<size_t>(u) * static_cast<size_t>(axes.height) + static_cast<size_t>(v);
@@ -587,7 +623,8 @@ inline void strip_mesh_generator::merge_and_emit_strips(
                 w,
                 1,
                 cell.voxel_id,
-                registry
+                registry,
+                opts
             );
         }
     }
@@ -597,7 +634,8 @@ inline void strip_mesh_generator::generate_face_quads(
     mesh_generation_storage& storage,
     const vw::asset::model& mdl,
     int face_direction,
-    const block_registry& registry
+    const block_registry& registry,
+    mesh_options opts
 ) {
     detail::face_axis_mapping axes(mdl, face_direction);
     constexpr int ps = vw::asset::model::page_size;
@@ -628,7 +666,7 @@ inline void strip_mesh_generator::generate_face_quads(
             continue;
         }
 
-        detail::build_face_mask(storage, mdl, axes, face_direction, layer);
+        detail::build_face_mask(storage, mdl, axes, face_direction, layer, opts);
 
         bool has_faces = false;
         for (size_t i = 0; i < mask_size && !has_faces; i++) {
@@ -637,14 +675,17 @@ inline void strip_mesh_generator::generate_face_quads(
         if (!has_faces)
             continue;
 
-        merge_and_emit_strips(storage, mdl, axes, face_direction, layer, registry);
+        merge_and_emit_strips(storage, mdl, axes, face_direction, layer, registry, opts);
     }
 }
 
 // ==================== greedy_mesh_generator ====================
 
 inline auto greedy_mesh_generator::generate_mesh_data(
-    mesh_generation_storage& storage, const vw::asset::model& mdl, const block_registry& registry
+    mesh_generation_storage& storage,
+    const vw::asset::model& mdl,
+    const block_registry& registry,
+    mesh_options opts
 ) -> mesh {
     storage.clear();
 
@@ -659,7 +700,7 @@ inline auto greedy_mesh_generator::generate_mesh_data(
     }
 
     for (int face_direction = 0; face_direction < 6; face_direction++) {
-        generate_face_quads(storage, mdl, face_direction, registry);
+        generate_face_quads(storage, mdl, face_direction, registry, opts);
     }
 
     return mesh{storage.vertices, storage.indices};
@@ -671,7 +712,8 @@ inline void greedy_mesh_generator::merge_and_emit_rects(
     const detail::face_axis_mapping& axes,
     int face_direction,
     int layer,
-    const block_registry& registry
+    const block_registry& registry,
+    mesh_options opts
 ) {
     auto idx = [&](int u, int v) -> size_t {
         return static_cast<size_t>(u) * static_cast<size_t>(axes.height) + static_cast<size_t>(v);
@@ -711,7 +753,8 @@ inline void greedy_mesh_generator::merge_and_emit_rects(
             }
 
             detail::emit_rect(
-                storage, mdl, axes, face_direction, layer, u, v, w, h, cell.voxel_id, registry
+                storage, mdl, axes, face_direction, layer, u, v, w, h, cell.voxel_id, registry,
+                opts
             );
         }
     }
@@ -721,7 +764,8 @@ inline void greedy_mesh_generator::generate_face_quads(
     mesh_generation_storage& storage,
     const vw::asset::model& mdl,
     int face_direction,
-    const block_registry& registry
+    const block_registry& registry,
+    mesh_options opts
 ) {
     detail::face_axis_mapping axes(mdl, face_direction);
     constexpr int ps = vw::asset::model::page_size;
@@ -752,7 +796,7 @@ inline void greedy_mesh_generator::generate_face_quads(
             continue;
         }
 
-        detail::build_face_mask(storage, mdl, axes, face_direction, layer);
+        detail::build_face_mask(storage, mdl, axes, face_direction, layer, opts);
 
         bool has_faces = false;
         for (size_t i = 0; i < mask_size && !has_faces; i++) {
@@ -761,7 +805,7 @@ inline void greedy_mesh_generator::generate_face_quads(
         if (!has_faces)
             continue;
 
-        merge_and_emit_rects(storage, mdl, axes, face_direction, layer, registry);
+        merge_and_emit_rects(storage, mdl, axes, face_direction, layer, registry, opts);
     }
 }
 

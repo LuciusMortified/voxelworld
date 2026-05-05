@@ -22,16 +22,15 @@ struct vertex {
     uint32 data1 = 0;
 
     // data0: pos.x[6:0] | pos.y[13:7] | pos.z[20:14] | normal_id[23:21] | reserved[31:24]
-    // data1: palette_index[7:0] | corner_dark[15:8] | corner[17:16] | corner_bright[25:18] | reserved[31:26]
-    // corner_dark: 4 quad corner AO darkness levels, 2 bits each (0=bright..3=full dark)
-    // corner: encoded corner of this vertex (bit0=u, bit1=v)
-    // corner_bright: 4 convex brightness levels, 2 bits each (0=flat..3=fully exposed)
+    // data1: palette_index[7:0] | corners_dark[11:8] | corners_bright[15:12] | corner_id[17:16] | reserved[31:18]
+    // corners_dark/bright: 4-bit binary mask, one bit per quad corner in winding order (same on all 4 verts of a quad)
+    // corner_id: which winding-order corner (0..3) this vertex represents — used to pick UV in vertex shader
 
     vertex() = default;
 
     [[nodiscard]] static auto pack(
         int x, int y, int z, uint8 normal_id, block_id block_id,
-        uint8 corner_dark, uint8 corner_bright, uint8 corner
+        uint8 corners_dark, uint8 corners_bright, uint8 corner_id
     ) -> vertex;
 
     [[nodiscard]] static auto get_binding_descriptions()
@@ -51,11 +50,17 @@ struct mesh {
     }
 };
 
+struct mesh_options {
+    bool enable_top_brightness = false;
+};
+
 class simple_mesh_generator {
 public:
     [[nodiscard]]
     static auto generate_mesh_data(
-        const std::shared_ptr<vw::asset::model>& mdl, const block_registry& registry
+        const std::shared_ptr<vw::asset::model>& mdl,
+        const block_registry& registry,
+        mesh_options opts = {}
     ) -> mesh;
 
 private:
@@ -68,7 +73,8 @@ private:
         int z,
         int face_direction,
         block_id voxel_id,
-        const block_registry& registry
+        const block_registry& registry,
+        mesh_options opts
     );
 
     [[nodiscard]]
@@ -127,7 +133,8 @@ void build_face_mask(
     const vw::asset::model& mdl,
     const face_axis_mapping& axes,
     int face_direction,
-    int layer
+    int layer,
+    mesh_options opts
 );
 
 void add_quad(
@@ -152,7 +159,8 @@ void emit_rect(
     int w,
     int h,
     uint8 voxel_id,
-    const block_registry& registry
+    const block_registry& registry,
+    mesh_options opts
 );
 }  // namespace detail
 
@@ -160,7 +168,10 @@ class strip_mesh_generator {
 public:
     [[nodiscard]]
     static auto generate_mesh_data(
-        mesh_generation_storage& storage, const vw::asset::model& mdl, const block_registry& registry
+        mesh_generation_storage& storage,
+        const vw::asset::model& mdl,
+        const block_registry& registry,
+        mesh_options opts = {}
     ) -> mesh;
 
 private:
@@ -170,14 +181,16 @@ private:
         const detail::face_axis_mapping& axes,
         int face_direction,
         int layer,
-        const block_registry& registry
+        const block_registry& registry,
+        mesh_options opts
     );
 
     static void generate_face_quads(
         mesh_generation_storage& storage,
         const vw::asset::model& mdl,
         int face_direction,
-        const block_registry& registry
+        const block_registry& registry,
+        mesh_options opts
     );
 };
 
@@ -185,7 +198,10 @@ class greedy_mesh_generator {
 public:
     [[nodiscard]]
     static auto generate_mesh_data(
-        mesh_generation_storage& storage, const vw::asset::model& mdl, const block_registry& registry
+        mesh_generation_storage& storage,
+        const vw::asset::model& mdl,
+        const block_registry& registry,
+        mesh_options opts = {}
     ) -> mesh;
 
 private:
@@ -195,14 +211,16 @@ private:
         const detail::face_axis_mapping& axes,
         int face_direction,
         int layer,
-        const block_registry& registry
+        const block_registry& registry,
+        mesh_options opts
     );
 
     static void generate_face_quads(
         mesh_generation_storage& storage,
         const vw::asset::model& mdl,
         int face_direction,
-        const block_registry& registry
+        const block_registry& registry,
+        mesh_options opts
     );
 };
 }  // namespace vw::gfx

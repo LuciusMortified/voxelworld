@@ -57,6 +57,10 @@ inline auto model_component::get_identity() const -> vw::asset::model_identity {
     return model_->get_identity();
 }
 
+inline auto model_component::top_brightness() const -> bool {
+    return top_brightness_;
+}
+
 }  // namespace vw::ecs
 
 #endif  // VW_ECS_MODEL_COMPONENT_INL_H

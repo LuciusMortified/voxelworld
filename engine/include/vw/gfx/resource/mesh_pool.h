@@ -27,11 +27,14 @@ struct mesh_generation_task {
     vw::asset::model_identity identity;
     std::weak_ptr<vw::asset::model> model_ref;
     std::promise<mesh> promise;
+    mesh_options opts;
 
     mesh_generation_task(
-        vw::asset::model_identity identity, std::weak_ptr<vw::asset::model> model_ref
+        vw::asset::model_identity identity,
+        std::weak_ptr<vw::asset::model> model_ref,
+        mesh_options opts
     )
-        : identity(identity), model_ref(std::move(model_ref)) {}
+        : identity(identity), model_ref(std::move(model_ref)), opts(opts) {}
 };
 
 class mesh_pool final {
@@ -47,7 +50,7 @@ public:
     void stop_gen_threads();
     [[nodiscard]] auto has(const vw::asset::model_identity& identity) const -> bool;
     [[nodiscard]] auto is_pending(const vw::asset::model_identity& identity) const -> bool;
-    void request_mesh(const std::shared_ptr<vw::asset::model>& model_ptr);
+    void request_mesh(const std::shared_ptr<vw::asset::model>& model_ptr, mesh_options opts = {});
     [[nodiscard]] auto get(const vw::asset::model_identity& identity) const -> std::shared_ptr<mesh>;
     void remove(const vw::asset::model_identity& identity);
     void evict(const vw::asset::model_identity& identity);

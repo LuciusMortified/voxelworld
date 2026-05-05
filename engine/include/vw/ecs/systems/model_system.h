@@ -30,6 +30,7 @@ public:
         [[nodiscard]] std::shared_ptr<vw::asset::model> get_model() const;
 
         void set_model(std::shared_ptr<vw::asset::model> model_ptr);
+        void set_top_brightness(bool enabled);
         void set_voxel(int x, int y, int z, const voxel& v);
         void set_voxel(vec3i pos, const voxel& v);
         void fill(const voxel& v);

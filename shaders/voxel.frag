@@ -3,9 +3,9 @@
 layout(location = 0) in vec3 fragPos;
 layout(location = 1) in vec3 fragNormal;
 layout(location = 2) in vec3 fragColor;
-layout(location = 3) flat in uint fragAoPacked;
-layout(location = 4) in float viewDepth;
-layout(location = 5) in vec2 fragUV;
+layout(location = 3) in float viewDepth;
+layout(location = 4) in vec2 fragUV;
+layout(location = 5) flat in uint fragCornersMask;
 
 struct DirectionalLightData {
     mat4 light_space_matrices[4];
@@ -228,31 +228,24 @@ void main() {
     float hemisphereStrength = 0.15;
     vec3 hemisphereAmbient = calculateHemisphereAmbient(normal) * hemisphereStrength;
 
-    float c0_dark = float(fragAoPacked & 0x3u) / 3.0;
-    float c1_dark = float((fragAoPacked >> 2u) & 0x3u) / 3.0;
-    float c2_dark = float((fragAoPacked >> 4u) & 0x3u) / 3.0;
-    float c3_dark = float((fragAoPacked >> 6u) & 0x3u) / 3.0;
+    uint corners_dark   = fragCornersMask & 0xFu;
+    uint corners_bright = (fragCornersMask >> 4) & 0xFu;
 
-    float ao_dark = mix(
-        mix(c0_dark, c1_dark, fragUV.x),
-        mix(c3_dark, c2_dark, fragUV.x),
-        fragUV.y
-    );
+    float d00 = float( corners_dark        & 1u);
+    float d10 = float((corners_dark >> 1)  & 1u);
+    float d11 = float((corners_dark >> 2)  & 1u);
+    float d01 = float((corners_dark >> 3)  & 1u);
+    float ao_dark = mix(mix(d00, d10, fragUV.x), mix(d01, d11, fragUV.x), fragUV.y);
 
-    float c0_bright = float((fragAoPacked >> 8u)  & 0x3u) / 3.0;
-    float c1_bright = float((fragAoPacked >> 10u) & 0x3u) / 3.0;
-    float c2_bright = float((fragAoPacked >> 12u) & 0x3u) / 3.0;
-    float c3_bright = float((fragAoPacked >> 14u) & 0x3u) / 3.0;
-
-    float ao_bright = mix(
-        mix(c0_bright, c1_bright, fragUV.x),
-        mix(c3_bright, c2_bright, fragUV.x),
-        fragUV.y
-    );
+    float b00 = float( corners_bright        & 1u);
+    float b10 = float((corners_bright >> 1)  & 1u);
+    float b11 = float((corners_bright >> 2)  & 1u);
+    float b01 = float((corners_bright >> 3)  & 1u);
+    float ao_bright = mix(mix(b00, b10, fragUV.x), mix(b01, b11, fragUV.x), fragUV.y);
 
     float upFactor = max(0.0, normal.y);
 
-    float aoStrength = 0.5;
+    float aoStrength = 0.25;
     float brightStrength = 0.15;
     float aoFactor = 1.0 - ao_dark * aoStrength + ao_bright * brightStrength * upFactor;
 

@@ -30,7 +30,11 @@ chunk<WD>::chunk(
     w.template system<transform_system>().modify(ent_)
         .set_position(world_pos)
         .set_scale({vs, vs, vs});
-    w.template system<model_system>().modify(ent_).set_model(model_);
+    {
+        auto modifier = w.template system<model_system>().modify(ent_);
+        modifier.set_model(model_);
+        modifier.set_top_brightness(true);
+    }
     w.template system<spatial_system>().modify(ent_).set_layer(spatial_layer::terrain);
 }
 

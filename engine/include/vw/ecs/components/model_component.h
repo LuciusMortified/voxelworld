@@ -18,6 +18,7 @@ class model_system;
 struct model_component final {
 private:
     std::shared_ptr<vw::asset::model> model_;
+    bool top_brightness_ = false;
 
     template <typename>
     friend class model_system;
@@ -38,6 +39,8 @@ public:
     [[nodiscard]] auto size() const -> vec3i;
 
     [[nodiscard]] auto get_identity() const -> vw::asset::model_identity;
+
+    [[nodiscard]] auto top_brightness() const -> bool;
 };
 
 }  // namespace vw::ecs

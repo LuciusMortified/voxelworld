@@ -301,7 +301,9 @@ void renderer<C>::sync_meshes_(world_type& world) {
         if (!comp.has_model()) continue;
         auto identity = comp.get_identity();
         if (!mesh_pool_.has(identity) && !mesh_pool_.is_pending(identity)) {
-            mesh_pool_.request_mesh(comp.get_model());
+            mesh_pool_.request_mesh(
+                comp.get_model(), mesh_options{.enable_top_brightness = comp.top_brightness()}
+            );
             pending_mesh_entities_.insert(ent);
         }
     }

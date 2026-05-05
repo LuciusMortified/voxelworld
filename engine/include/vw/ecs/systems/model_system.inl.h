@@ -59,6 +59,14 @@ void model_system<WD>::model_modifier::set_model(
 }
 
 template <typename WD>
+void model_system<WD>::model_modifier::set_top_brightness(
+    bool enabled
+) {
+    component_->top_brightness_ = enabled;
+    system_->world_->registry().template request_change<model_component>(entity_);
+}
+
+template <typename WD>
 void model_system<WD>::model_modifier::set_voxel(
     int x, int y, int z, const voxel& v
 ) {
