@@ -8,16 +8,26 @@ namespace vw::gfx {
 // ==================== vertex ====================
 
 inline auto vertex::pack(
-    int x, int y, int z, uint8 normal_id, block_id block_id,
-    uint8 corner_dark, uint8 corner_bright, uint8 corner
+    int x,
+    int y,
+    int z,
+    uint8 normal_id,
+    block_id block_id,
+    uint8 corner_dark,
+    uint8 corner_bright,
+    uint8 corner
 ) -> vertex {
     vertex v;
-    v.data0 = (static_cast<uint32>(x) & 0x7Fu) | ((static_cast<uint32>(y) & 0x7Fu) << 7) |
-        ((static_cast<uint32>(z) & 0x7Fu) << 14) | ((static_cast<uint32>(normal_id) & 0x7u) << 21);
+    v.data0 =                                       //
+        (static_cast<uint32>(x) & 0x7Fu) |          //
+        ((static_cast<uint32>(y) & 0x7Fu) << 7) |   //
+        ((static_cast<uint32>(z) & 0x7Fu) << 14) |  //
+        ((static_cast<uint32>(normal_id) & 0x7u) << 21);
 
-    v.data1 = static_cast<uint32>(block_id.value) |
-        (static_cast<uint32>(corner_dark) << 8) |
-        ((static_cast<uint32>(corner) & 0x3u) << 16) |
+    v.data1 =                                           //
+        static_cast<uint32>(block_id.value) |           //
+        (static_cast<uint32>(corner_dark) << 8) |       //
+        ((static_cast<uint32>(corner) & 0x3u) << 16) |  //
         ((static_cast<uint32>(corner_bright) & 0xFFu) << 18);
 
     return v;
@@ -66,18 +76,30 @@ inline auto vertex::get_attribute_descriptions() -> std::vector<VkVertexInputAtt
 // ==================== AO tables ====================
 
 static constexpr std::array<vec3i, 6> ao_normal = {
-    vec3i{1, 0, 0}, vec3i{-1, 0, 0}, vec3i{0, 1, 0},
-    vec3i{0, -1, 0}, vec3i{0, 0, 1}, vec3i{0, 0, -1},
+    vec3i{1, 0, 0},
+    vec3i{-1, 0, 0},
+    vec3i{0, 1, 0},
+    vec3i{0, -1, 0},
+    vec3i{0, 0, 1},
+    vec3i{0, 0, -1},
 };
 
 static constexpr std::array<vec3i, 6> ao_tangent_u = {
-    vec3i{0, 0, 1}, vec3i{0, 0, 1}, vec3i{1, 0, 0},
-    vec3i{1, 0, 0}, vec3i{1, 0, 0}, vec3i{1, 0, 0},
+    vec3i{0, 0, 1},
+    vec3i{0, 0, 1},
+    vec3i{1, 0, 0},
+    vec3i{1, 0, 0},
+    vec3i{1, 0, 0},
+    vec3i{1, 0, 0},
 };
 
 static constexpr std::array<vec3i, 6> ao_tangent_v = {
-    vec3i{0, 1, 0}, vec3i{0, 1, 0}, vec3i{0, 0, 1},
-    vec3i{0, 0, 1}, vec3i{0, 1, 0}, vec3i{0, 1, 0},
+    vec3i{0, 1, 0},
+    vec3i{0, 1, 0},
+    vec3i{0, 0, 1},
+    vec3i{0, 0, 1},
+    vec3i{0, 1, 0},
+    vec3i{0, 1, 0},
 };
 
 // ==================== detail ====================
@@ -139,7 +161,9 @@ inline face_axis_mapping::face_axis_mapping(
     }
 }
 
-inline auto is_solid_at(const vw::asset::model& mdl, vec3i p) -> bool {
+inline auto is_solid_at(
+    const vw::asset::model& mdl, vec3i p
+) -> bool {
     const bool ox = p.x < 0 || p.x >= mdl.width();
     const bool oy = p.y < 0 || p.y >= mdl.height();
     const bool oz = p.z < 0 || p.z >= mdl.depth();
@@ -209,8 +233,8 @@ inline auto compute_corner_brightness(
     const vw::asset::model& mdl, int x, int y, int z, int face
 ) -> uint8 {
     const vec3i host = vec3i{x, y, z};
-    const vec3i u = ao_tangent_u[face];
-    const vec3i v = ao_tangent_v[face];
+    const vec3i u    = ao_tangent_u[face];
+    const vec3i v    = ao_tangent_v[face];
 
     const bool miss_mv = !is_solid_at(mdl, host - v);
     const bool miss_pu = !is_solid_at(mdl, host + u);
@@ -314,8 +338,10 @@ inline void build_face_mask(
             for (int u = u_block; u < u_end; u++) {
                 for (int v = v_block; v < v_end; v++) {
                     auto [mx, my, mz] = axes.to_model_coords(u, v, layer);
-                    int lx = mx % ps, ly = my % ps, lz = mz % ps;
-                    auto& vx = (*page)[lx + ly * ps + lz * ps * ps];
+                    const int lx      = mx % ps;
+                    const int ly      = my % ps;
+                    const int lz      = mz % ps;
+                    auto& vx          = (*page)[lx + ly * ps + lz * ps * ps];
                     if (!vx.is_empty() && is_face_visible(mdl, mx, my, mz, face_direction)) {
                         storage.mask[idx(u, v)] = {
                             vx.id,
@@ -367,7 +393,16 @@ inline void add_quad(
         int y = face_verts[face_direction][i][1] ? max_pos.y : min_pos.y;
         int z = face_verts[face_direction][i][2] ? max_pos.z : min_pos.z;
         vertices.push_back(
-            vertex::pack(x, y, z, normal_id, block_id, corner_dark, corner_bright, winding_to_corner[face_direction][i])
+            vertex::pack(
+                x,
+                y,
+                z,
+                normal_id,
+                block_id,
+                corner_dark,
+                corner_bright,
+                winding_to_corner[face_direction][i]
+            )
         );
     }
 
@@ -394,10 +429,19 @@ inline void emit_rect(
 ) {
     auto [min_pos, max_pos] = axes.to_local_min_max(u_start, v_start, w, h, layer);
     auto [cx, cy, cz]       = axes.to_model_coords(u_start, v_start, layer);
-    uint8 corner_dark   = compute_corner_darkness(mdl, cx, cy, cz, face_direction);
-    uint8 corner_bright  = compute_corner_brightness(mdl, cx, cy, cz, face_direction);
+    uint8 corner_dark       = compute_corner_darkness(mdl, cx, cy, cz, face_direction);
+    uint8 corner_bright     = compute_corner_brightness(mdl, cx, cy, cz, face_direction);
 
-    add_quad(storage.vertices, storage.indices, face_direction, min_pos, max_pos, bid, corner_dark, corner_bright);
+    add_quad(
+        storage.vertices,
+        storage.indices,
+        face_direction,
+        min_pos,
+        max_pos,
+        bid,
+        corner_dark,
+        corner_bright
+    );
 }
 
 }  // namespace detail
@@ -444,10 +488,17 @@ inline void simple_mesh_generator::add_cube_face(
     block_id voxel_id,
     const block_registry& registry
 ) {
-    uint8 corner_dark  = detail::compute_corner_darkness(*mdl, x, y, z, face_direction);
+    uint8 corner_dark   = detail::compute_corner_darkness(*mdl, x, y, z, face_direction);
     uint8 corner_bright = detail::compute_corner_brightness(*mdl, x, y, z, face_direction);
     detail::add_quad(
-        vertices, indices, face_direction, {x, y, z}, {x + 1, y + 1, z + 1}, voxel_id, corner_dark, corner_bright
+        vertices,
+        indices,
+        face_direction,
+        {x, y, z},
+        {x + 1, y + 1, z + 1},
+        voxel_id,
+        corner_dark,
+        corner_bright
     );
 }
 

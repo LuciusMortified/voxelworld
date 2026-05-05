@@ -252,8 +252,8 @@ void main() {
 
     float upFactor = max(0.0, normal.y);
 
-    float aoStrength = 0.3;
-    float brightStrength = 0.35;
+    float aoStrength = 0.5;
+    float brightStrength = 0.15;
     float aoFactor = 1.0 - ao_dark * aoStrength + ao_bright * brightStrength * upFactor;
 
     vec3 ambient = (baseAmbient + hemisphereAmbient) * aoFactor;
