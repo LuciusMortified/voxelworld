@@ -3,6 +3,10 @@
 #ifndef VOXELWORLD_DEBUG_WINDOW_INL
 #define VOXELWORLD_DEBUG_WINDOW_INL
 
+#include <algorithm>
+#include <array>
+#include <cfloat>
+#include <cstdio>
 #include <imgui.h>
 
 #include "vw/gfx/debug/debug_window.h"
@@ -68,6 +72,23 @@ void debug_window<WC>::render_fps_window() {
 
     if (ImGui::Begin("Debug Tool", &visible_, window_flags)) {
         const auto& eng_stats = engine_->get_stats();
+
+        const float32 frame_ms      = eng_stats.frame_ms;
+        fps_bucket_current_max_     = std::max(fps_bucket_current_max_, frame_ms);
+        fps_bucket_current_min_     = std::min(fps_bucket_current_min_, frame_ms);
+        fps_bucket_accum_ms_       += frame_ms;
+        if (fps_bucket_accum_ms_ >= fps_bucket_duration_ms_) {
+            fps_bucket_max_[fps_bucket_index_] = fps_bucket_current_max_;
+            fps_bucket_min_[fps_bucket_index_] = fps_bucket_current_min_;
+            fps_bucket_index_                  = (fps_bucket_index_ + 1) % fps_bucket_count_;
+            if (fps_bucket_filled_count_ < fps_bucket_count_) {
+                ++fps_bucket_filled_count_;
+            }
+            fps_bucket_accum_ms_    = 0.0f;
+            fps_bucket_current_max_ = 0.0f;
+            fps_bucket_current_min_ = FLT_MAX;
+        }
+
         ImGui::Text("frame_ms  %.2fms fps %.0f", eng_stats.frame_ms, eng_stats.fps);
         ImGui::Text("update_ms %.2fms", eng_stats.world_update_ms);
         ImGui::Text("render_ms %.2fms", eng_stats.world_render_ms);
@@ -101,6 +122,40 @@ void debug_window<WC>::render_fps_window() {
             cb_stats.instance_count,
             cb_stats.instance_capacity
         );
+        ImGui::Spacing();
+        {
+            float32 window_min = FLT_MAX;
+            float32 window_max = 0.0f;
+            for (size_t i = 0; i < fps_bucket_filled_count_; ++i) {
+                window_min = std::min(window_min, fps_bucket_min_[i]);
+                window_max = std::max(window_max, fps_bucket_max_[i]);
+            }
+            if (fps_bucket_filled_count_ == 0) {
+                window_min = 0.0f;
+            }
+
+            std::array<char, 96> overlay{};
+            std::snprintf(
+                overlay.data(), overlay.size(),
+                "peaks 10s  min %.2f max %.2f ms", window_min, window_max
+            );
+
+            int plot_count  = static_cast<int>(fps_bucket_filled_count_);
+            int plot_offset = (fps_bucket_filled_count_ < fps_bucket_count_)
+                ? 0
+                : static_cast<int>(fps_bucket_index_);
+
+            ImGui::PlotLines(
+                "##frame_ms_peaks",
+                fps_bucket_max_.data(),
+                plot_count,
+                plot_offset,
+                overlay.data(),
+                0.0f,
+                FLT_MAX,
+                ImVec2(280.0f, 50.0f)
+            );
+        }
         ImGui::Spacing();
         if (ImGui::Button("systems")) {
             show_systems_detail_ = !show_systems_detail_;
