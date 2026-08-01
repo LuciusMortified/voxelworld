@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 4.0)
 project(voxelworld_tests)
 
 find_package(Catch2 3 CONFIG REQUIRED)
