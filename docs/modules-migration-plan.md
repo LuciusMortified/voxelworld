@@ -14,7 +14,7 @@
 
 | Фаза | Содержание | Риск | Выход |
 |------|-----------|------|-------|
-| M0 | Тулчейн-спайк: CMake 4.x, Ninja, `import std`, `import vulkan_hpp`, матрица MSVC+Clang | низкий | ✅ **выполнено**, отчёт: `docs/m0-toolchain-spike.md` |
+| M0 | Тулчейн-спайк: CMake 4.x, Ninja, `import std`, `import vulkan`, матрица MSVC+Clang | низкий | ✅ **выполнено**, отчёт: `docs/m0-toolchain-spike.md` |
 | M1 | `vw.core`: типы, математика, лог (выпил spdlog), block_registry | низкий | первая боевая библиотека-модуль |
 | M2 | Де-шаблонизация ECS → `vw.ecs` | **высокий** | конкретные world/chunk/системы |
 | M3 | `vw.world`: вынос мира из vw::gfx, headless-сборка | средний | тесты мира без GPU в CI |
@@ -31,7 +31,7 @@
 | # | Решение | Выбор |
 |---|---------|-------|
 | D1 | Механизм модулей | Именованные модули C++20/23, партиции; `import std` обязателен во всех наших TU |
-| D2 | Vulkan-биндинги | Vulkan-Hpp через официальный модуль `import vulkan_hpp` (Khronos) |
+| D2 | Vulkan-биндинги | Vulkan-Hpp через официальный модуль `import vulkan` (Khronos); требуется Vulkan-Headers ≥ 1.4.334 |
 | D3 | Политика ошибок | Двухуровневая: исключения = фатальный путь (panic), `expected` = обрабатываемые; биндинг с `VULKAN_HPP_NO_EXCEPTIONS`, хелперы `vk_must`/`vk_expect` |
 | D4 | RAII-слой | Без `vk::raii`; голые `vk::*`-хэндлы + собственные обёртки владения + очередь отложенной деструкции |
 | D5 | Конструкторы структур | `VULKAN_HPP_NO_CONSTRUCTORS` — designated initializers |
@@ -101,7 +101,7 @@ auto vk_expect(vk::ResultValue<T>&& rv, std::string_view what)
 1. **CMake ≥ 4.0** (текущие 3.16/3.25 в корне и engine — поднять), генератор **Ninja**. Модульное сканирование зависимостей на MSVC+Clang через Ninja — самый отлаженный путь.
 2. Скелет `vw_core_spike`: одна интерфейсная единица + одна имплементационная, `import std`, экспорт пары функций.
 3. Скелет потребителя: исполняемый таргет, `import vw.core.spike;` + Catch2-тест.
-4. Прекомпиляция модуля Vulkan-Hpp и smoke-тест `import vulkan_hpp;` с созданием `vk::ApplicationInfo`.
+4. Прекомпиляция модуля `vulkan` из Vulkan-Headers и smoke-тест `import vulkan;` с созданием `vk::ApplicationInfo`.
 5. Прогон всей матрицы: {MSVC, Clang} × {Debug, Release}.
 
 ## Эскиз CMake
@@ -164,7 +164,7 @@ target_compile_features(VulkanHppModule PUBLIC cxx_std_23)
 
 ## Приёмка M0 — ✅ пройдена
 
-- ✅ Матрица {MSVC, Clang} × {Debug, Release} зелёная: скелет + `import std` + `import vulkan_hpp` + Catch2-тест.
+- ✅ Матрица {MSVC, Clang} × {Debug, Release} зелёная: скелет + `import std` + `import vulkan` + Catch2-тест.
 - ✅ Замерены и записаны: время полной сборки скелета, время инкрементальной сборки после правки интерфейса и после правки имплементации; дополнительно снят базлайн текущего header-only движка.
 - ✅ Задокументирован выбор Clang-конфигурации: `clang++` + MS STL + собственный модуль `std`.
 
@@ -513,32 +513,32 @@ Interop C ↔ Hpp бесшовный (`vk::Buffer` ↔ `VkBuffer` — explicit-�
 
 ## 5.2 Инициализация диспетчера (D6)
 
-Три шага, строго по порядку, в vulkan_context:
+Три шага, строго по порядку, в vulkan_context. Уточнено по итогам M0: хранилище диспетчера определяет сам модуль, поэтому макрос `VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE` в наших TU не нужен (и даёт дубликат символа при линковке), а безаргументный `init()` сам находит загрузчик — C-заголовки не требуются:
 
 ```cpp
 // src/render/vulkan_context.cpp
-module;
-// C-typedef'ы (PFN_*) не экспортируются модулем Vulkan-Hpp — см. M0
-#include <vulkan/vulkan_core.h>
-#include <vulkan/vulkan_hpp_macros.hpp>
 module vw.gfx;
-import vulkan_hpp;
+import vulkan;
 import std;
 
+namespace {
+auto dispatcher() -> vk::detail::DispatchLoaderDynamic& {
+    return vk::detail::defaultDispatchLoaderDynamic;
+}
+}
+
 auto vulkan_context::init() -> vw::expected<void> {
-    // 1) загрузчик: получить vkGetInstanceProcAddr
-    static vk::detail::DynamicLoader loader;   // ищет vulkan-1.dll / libvulkan.so
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(
-        loader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
+    // 1) загрузчик: сам найдёт vulkan-1.dll / libvulkan.so
+    dispatcher().init();
 
     // 2) instance-функции
     auto instance_rv = vk::createInstance({...});
     if (instance_rv.result != vk::Result::eSuccess) { return ...; }
     instance_ = instance_rv.value;
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(instance_);
+    dispatcher().init(instance_);
 
     // 3) device-функции (после выбора physical device и createDevice)
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(device_);
+    dispatcher().init(device_);
     return {};
 }
 ```
@@ -592,7 +592,9 @@ imgui остаётся заголовочным и живёт в двух имп
 
 ## 5.6 Интерфейсная гигиена
 
-Правило (закрепить линтом в CI): `import vulkan_hpp;` разрешён только в имплементационных юнитах и неэкспортируемых партициях `vw.gfx`; в экспортируемых интерфейсах vk-типы не появляются. Публичная поверхность gfx оперирует своими типами (`vw::gfx::buffer_handle`, дескрипторы форматов) — по факту это уже так, миграция это правило только формализует.
+Дополнительное правило, подтверждённое M0: **в наших исходниках нет ни одного макроса Vulkan-Hpp**. Конфигурация (`VULKAN_HPP_NO_EXCEPTIONS`, `NO_CONSTRUCTORS`, `DISPATCH_LOADER_DYNAMIC=1`) задаётся только через `target_compile_definitions` на таргете модуля, а `VULKAN_HPP_DEFAULT_DISPATCHER` не используется — вместо него прямое обращение к экспортированной `vk::detail::defaultDispatchLoaderDynamic`. TU, работающие с Vulkan, не включают заголовков вообще.
+
+Правило (закрепить линтом в CI): `import vulkan;` разрешён только в имплементационных юнитах и неэкспортируемых партициях `vw.gfx`; в экспортируемых интерфейсах vk-типы не появляются. Публичная поверхность gfx оперирует своими типами (`vw::gfx::buffer_handle`, дескрипторы форматов) — по факту это уже так, миграция это правило только формализует.
 
 ## Приёмка M5
 

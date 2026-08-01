@@ -1283,19 +1283,21 @@ void renderer<C>::init_imgui() {
     ImGui_ImplGlfw_InitForVulkan(window_->get_handle(), install_callbacks);
 
     ImGui_ImplVulkan_InitInfo init_info = {};
+    init_info.ApiVersion                = VK_API_VERSION_1_2;
     init_info.Instance                  = context_->get_instance();
     init_info.PhysicalDevice            = context_->get_physical_device();
     init_info.Device                    = context_->get_device();
     init_info.QueueFamily               = context_->get_queue_families().graphics_family.value();
     init_info.Queue                     = context_->get_graphics_queue();
     init_info.DescriptorPool            = imgui_descriptor_pool_;
-    init_info.RenderPass                = render_pass_;
-    init_info.Subpass                   = 2;
     init_info.MinImageCount             = 2;
     init_info.ImageCount                = swapchain_images_.size();
-    init_info.MSAASamples               = msaa_samples_;
     init_info.Allocator                 = nullptr;
     init_info.CheckVkResultFn           = nullptr;
+
+    init_info.PipelineInfoMain.RenderPass  = render_pass_;
+    init_info.PipelineInfoMain.Subpass     = 2;
+    init_info.PipelineInfoMain.MSAASamples = msaa_samples_;
 
     if (!ImGui_ImplVulkan_Init(&init_info)) {
         throw std::runtime_error("failed to initialize imgui");

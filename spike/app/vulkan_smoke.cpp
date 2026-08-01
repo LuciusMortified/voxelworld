@@ -1,12 +1,5 @@
-// C-level declarations (PFN_* typedefs) live in the global module fragment of
-// vulkan.cppm and are not exported; the dispatcher bootstrap needs them here.
-#include <vulkan/vulkan_core.h>
-#include <vulkan/vulkan_hpp_macros.hpp>
-
 import std;
-import vulkan_hpp;
-
-VULKAN_HPP_DEFAULT_DISPATCH_LOADER_DYNAMIC_STORAGE
+import vulkan;
 
 auto main() -> int {
     const vk::ApplicationInfo app_info{
@@ -20,9 +13,7 @@ auto main() -> int {
     std::println("vk::ApplicationInfo: {} api={}", app_info.pApplicationName,
                  app_info.apiVersion);
 
-    vk::detail::DynamicLoader loader;
-    VULKAN_HPP_DEFAULT_DISPATCHER.init(
-        loader.getProcAddress<PFN_vkGetInstanceProcAddr>("vkGetInstanceProcAddr"));
+    vk::detail::defaultDispatchLoaderDynamic.init();
 
     const auto version = vk::enumerateInstanceVersion();
     if (version.result != vk::Result::eSuccess) {
