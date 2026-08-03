@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 4.0)
 
 project(vwengine)
 
+add_subdirectory(core)
+
 add_library(${PROJECT_NAME} INTERFACE)
 
 target_include_directories(${PROJECT_NAME} INTERFACE include)
@@ -16,6 +18,7 @@ find_package(spdlog CONFIG REQUIRED)
 target_include_directories(${PROJECT_NAME} SYSTEM INTERFACE ${Vulkan_INCLUDE_DIRS})
 
 target_link_libraries(${PROJECT_NAME} INTERFACE
+        vw_core
         ${Vulkan_LIBRARIES}
         glfw
         imgui::imgui
