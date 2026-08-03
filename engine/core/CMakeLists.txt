@@ -6,8 +6,12 @@ target_sources(vw_core
             src/core.cppm
             src/types.cppm
             src/timing.cppm
+            src/log.cppm
+    PRIVATE
+        src/log.cpp
 )
 
+target_include_directories(vw_core PUBLIC include)
 target_compile_features(vw_core PUBLIC cxx_std_23)
 
 # `import std` waits for M6: while consumers still include standard headers

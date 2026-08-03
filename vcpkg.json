@@ -8,10 +8,6 @@
         "glfw-binding",
         "vulkan-binding"
       ]
-    },
-    {
-      "name": "spdlog",
-      "version>=": "1.15.3"
     }
   ],
   "version-string": "0.0.1",

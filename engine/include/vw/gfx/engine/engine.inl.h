@@ -9,15 +9,13 @@
 #include "vw/gfx/engine/engine.h"
 
 #ifdef _WIN32
-extern "C" {
-
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 
-#include <Psapi.h>
 #include <Windows.h>
-}
+
+#include <Psapi.h>
 #endif
 
 namespace vw::gfx {

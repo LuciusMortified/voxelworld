@@ -16,6 +16,7 @@ add_executable(core_tests
     core/mat4.test.cpp
     core/math.test.cpp
     core/transform.test.cpp
+    core/log.test.cpp
 )
 
 target_link_libraries(core_tests PRIVATE

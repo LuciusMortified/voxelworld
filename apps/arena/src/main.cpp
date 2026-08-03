@@ -5,7 +5,7 @@
 
 auto main() -> int {
     try {
-        vw::log::logger::get().add_file_sink("arena.log");
+        vw::log::add_file_sink("arena.log");
         std::make_unique<vw::gfx::engine<>>(1280, 720, "Voxel World - Arena")
             ->run<vw::arena::arena_app>();
     } catch (const std::exception& e) {

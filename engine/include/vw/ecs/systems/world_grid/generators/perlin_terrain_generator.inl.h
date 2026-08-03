@@ -14,6 +14,11 @@ namespace vw::ecs {
 
 
 inline perlin_terrain_generator::perlin_terrain_generator(
+    vw::asset::model_identity_pool& identity_pool, vw::asset::page_pool& pool
+)
+    : perlin_terrain_generator(identity_pool, pool, params{}) {}
+
+inline perlin_terrain_generator::perlin_terrain_generator(
     vw::asset::model_identity_pool& identity_pool, vw::asset::page_pool& pool, params p
 )
     : identity_pool_(&identity_pool), page_pool_(&pool), params_(p) {

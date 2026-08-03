@@ -40,8 +40,9 @@ public:
         float32 warp_strength = 30.0f;
     };
 
+    perlin_terrain_generator(vw::asset::model_identity_pool& identity_pool, vw::asset::page_pool& pool);
     perlin_terrain_generator(vw::asset::model_identity_pool& identity_pool, vw::asset::page_pool& pool,
-                             params p = {});
+                             params p);
 
     void generate(terrain_context& ctx) override;
     [[nodiscard]] auto surface_height_at(int32 wx, int32 wz) const -> int32;
