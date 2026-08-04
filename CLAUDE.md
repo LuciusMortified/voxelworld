@@ -3,7 +3,12 @@
 Воксельный движок на C++23/Vulkan. Header-only движок + ECS + приложение Sculptor (редактор вокселей).
 
 ## Architecture
-- **Engine**: header-only INTERFACE библиотека (`engine/include/vw/`)
+Идёт миграция на C++ модули (`docs/modules-migration-plan.md`). Движок сейчас в
+переходном состоянии: `vw.core` — модульная статическая библиотека, остальное
+пока header-only.
+
+- **vw.core**: модуль (`engine/core/src/*.cppm` + `*.cpp`), таргет `vw_core`
+- **Engine**: header-only INTERFACE библиотека (`engine/include/vw/`) — остальные модули
 - **Apps**: компилируемые executable (`apps/sculptor/`, `apps/test_*`)
 - **Shaders**: GLSL → SPIR-V (`shaders/`)
 - **Модули движка** (namespace = путь):
@@ -16,7 +21,9 @@
 - **Deps**: vcpkg (glfw3, imgui, spdlog, catch2, Vulkan SDK)
 
 ## Key Commands
-- `cmake -S . -B build/release && cmake --build build/release --config Release` — сборка
+ТОЛЬКО генератор Ninja — Visual Studio не поддерживает `import std`. Собирать из
+окружения Developer Command Prompt (нужен `VCToolsInstallDir`).
+- `cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build build/release` — сборка
 - `cmake -S . -B build/tests -DCMAKE_TOOLCHAIN_FILE=C:/Users/lucius/vcpkg/scripts/buildsystems/vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DVW_BUILD_APPS=OFF && cmake --build build/tests --target core_tests ecs_tests` — сборка тестов
 - `ctest --test-dir build/tests --output-on-failure` — запуск всех тестов
 - `ctest --test-dir build/tests -R core` / `-R ecs` — запуск по группе
@@ -27,9 +34,24 @@
 - ALWAYS минимум комментариев — код самодокументируемый
 - ALWAYS запускай тесты после изменений в `engine/`
 - NEVER добавляй комментарии к реализациям в `.inl.h` / `.cpp`
+- NEVER форвард-объявляй типы из `vw.core` — модульные сущности нельзя
+  объявлять в глобальном модуле, только импортировать
+- NEVER добавляй `import std` в модульные юниты до M6: пока потребители
+  включают стандартные заголовки текстуально, это ломает сборку на MSVC
 - NEVER используй исключения в горячих путях
 - Полные правила стиля: `.claude/rules/cpp-style.md`
 - Рецепты разработки: `.claude/rules/dev-workflow.md`
+
+## Модульный код (`engine/core/`)
+- Партиция = один `.cppm`. Взаимно зависимые сущности обязаны лежать в одной
+  партиции — циклы между партициями запрещены (так `math` и `transform` вместе)
+- Интерфейс в `.cppm`, реализация нешаблонного кода в `.cpp`; `.inl.h` не бывает
+- Шаблоны и `constexpr` остаются в интерфейсной партиции
+- В `.cpp` не пиши `inline` — определение обязано быть единственным
+- Стандартная библиотека — через global module fragment (`module;` + `#include`),
+  и тот же набор заголовков должен быть в `vw/core/detail/module_prelude.h`
+- Старые заголовки `engine/include/vw/core/*.h` — шимы: прелюдия, затем
+  `import vw.core;`. Удаляются в M6
 
 ## Git
 - Коммиты на английском: `область: описание` (области: `engine`, `sculptor`, `docs`, `shaders`, `build`)

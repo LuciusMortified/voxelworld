@@ -11,9 +11,11 @@ target_sources(vw_core
             src/matrix.cppm
             src/color.cppm
             src/math.cppm
+            src/blocks.cppm
     PRIVATE
         src/log.cpp
         src/math.cpp
+        src/blocks.cpp
 )
 
 target_include_directories(vw_core PUBLIC include)

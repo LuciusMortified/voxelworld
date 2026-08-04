@@ -19,6 +19,8 @@
 #include <expected>
 #include <functional>
 #include <limits>
+#include <span>
 #include <string_view>
+#include <vector>
 
 #endif  // VW_CORE_DETAIL_MODULE_PRELUDE_H

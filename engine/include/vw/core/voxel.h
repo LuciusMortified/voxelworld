@@ -3,24 +3,8 @@
 #ifndef VW_CORE_VOXEL_H
 #define VW_CORE_VOXEL_H
 
-#include "block_registry.h"
-#include "vw/core/types.h"
+#include "vw/core/detail/module_prelude.h"
 
-namespace vw {
-
-struct voxel {
-    block_id id = blocks::air;
-
-    constexpr voxel() = default;
-    constexpr explicit voxel(block_id block_id) : id(block_id) {}
-
-    [[nodiscard]] constexpr auto is_empty() const -> bool { return id == blocks::air; }
-
-    constexpr auto operator==(const voxel&) const -> bool = default;
-};
-
-static constexpr auto empty_voxel = voxel{};
-
-}  // namespace vw
+import vw.core;
 
 #endif  // VW_CORE_VOXEL_H

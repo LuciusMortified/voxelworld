@@ -1,11 +1,12 @@
-#pragma once
+module;
 
-#ifndef VW_CORE_BLOCK_REGISTRY_INL_H
-#define VW_CORE_BLOCK_REGISTRY_INL_H
+#include <array>
+
+module vw.core;
 
 namespace vw {
 
-inline block_registry::block_registry() {
+block_registry::block_registry() {
     using namespace blocks;
     namespace f = block_flags;
 
@@ -70,25 +71,25 @@ inline block_registry::block_registry() {
     // clang-format on
 }
 
-inline void block_registry::reg(
+void block_registry::reg(
     block_id id, color c, uint8 flags
 ) {
     blocks_[id.value] = {id, c, flags};
 }
 
-inline auto block_registry::get(
+auto block_registry::get(
     block_id id
 ) const -> const block_type& {
     return blocks_[id.value];
 }
 
-inline auto block_registry::get_color(
+auto block_registry::get_color(
     block_id id
 ) const -> color {
     return blocks_[id.value].clr;
 }
 
-inline auto block_registry::find_by_color(
+auto block_registry::find_by_color(
     color c
 ) const -> block_id {
     for (const auto& block : blocks_) {
@@ -99,10 +100,8 @@ inline auto block_registry::find_by_color(
     return blocks::air;
 }
 
-inline auto block_registry::blocks() const -> const std::array<block_type, 256>& {
+auto block_registry::blocks() const -> const std::array<block_type, 256>& {
     return blocks_;
 }
 
 }  // namespace vw
-
-#endif  // VW_CORE_BLOCK_REGISTRY_INL_H

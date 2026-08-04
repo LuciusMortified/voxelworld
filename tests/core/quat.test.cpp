@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <vw/core/quat.h>
+
+import vw.core;
 
 using namespace vw;
 

@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <vw/core/mat4.h>
-#include <vw/core/math.h>
+
+import vw.core;
 
 using namespace vw;
 
