@@ -5,12 +5,9 @@
 
 #include <vector>
 
+#include "vw/core/transform.h"
 #include "vw/ecs/entity_registry.h"
 #include "vw/ecs/system_trait.h"
-
-namespace vw {
-struct transform;
-}  // namespace vw
 
 namespace vw::ecs {
 

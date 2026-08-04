@@ -7,8 +7,13 @@ target_sources(vw_core
             src/types.cppm
             src/timing.cppm
             src/log.cppm
+            src/vector.cppm
+            src/matrix.cppm
+            src/color.cppm
+            src/math.cppm
     PRIVATE
         src/log.cpp
+        src/math.cpp
 )
 
 target_include_directories(vw_core PUBLIC include)

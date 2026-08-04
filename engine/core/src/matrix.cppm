@@ -1,13 +1,69 @@
-#pragma once
+module;
 
-#ifndef VW_CORE_MAT4_INL_H
-#define VW_CORE_MAT4_INL_H
-
+#include <array>
+#include <cstddef>
 #include <cstring>
 
-#include "vw/core/mat4.h"
-#include "vw/core/vec3.h"
-#include "vw/core/vec4.h"
+export module vw.core:matrix;
+
+import :types;
+import :vector;
+
+export namespace vw {
+
+template <typename T>
+struct mat4 {
+private:
+    constexpr static std::size_t size_ = 16;
+    std::array<T, size_> data_{};
+
+public:
+    mat4() = default;
+
+    explicit mat4(const T* values);
+
+    mat4(const mat4& other)                    = default;
+    auto operator=(const mat4& other) -> mat4& = default;
+    mat4(mat4&& other)                         = default;
+    auto operator=(mat4&& other) -> mat4&      = default;
+
+    auto operator[](int row, int col) -> T&;
+    auto operator[](int row, int col) const -> const T&;
+    auto operator[](int index) -> T&;
+    auto operator[](int index) const -> const T&;
+
+    auto cptr() -> T*;
+    auto cptr() const -> const T*;
+
+    auto operator*(const mat4& other) const -> mat4;
+    auto operator*(const vec4<T>& v) const -> vec4<T>;
+    auto operator*(const vec3<T>& vec) const -> vec3<T>;
+
+    auto operator+(const mat4& other) const -> mat4;
+    auto operator-(const mat4& other) const -> mat4;
+
+    auto operator-() const -> mat4;
+
+    auto operator*(T scalar) const -> mat4;
+    auto operator/(T scalar) const -> mat4;
+
+    auto operator+=(const mat4& other) -> mat4&;
+    auto operator-=(const mat4& other) -> mat4&;
+    auto operator*=(const mat4& other) -> mat4&;
+    auto operator*=(T scalar) -> mat4&;
+    auto operator/=(T scalar) -> mat4&;
+
+    auto operator==(const mat4& other) const -> bool;
+    auto operator!=(const mat4& other) const -> bool;
+};
+
+template <typename T>
+auto operator*(T scalar, const mat4<T>& m) -> mat4<T>;
+
+using mat4f = mat4<float32>;
+using mat4d = mat4<float64>;
+
+}  // namespace vw
 
 namespace vw {
 
@@ -15,7 +71,7 @@ template <typename T>
 mat4<T>::mat4(
     const T* values
 ) {
-    memcpy(data_.data(), values, size_ * sizeof(T));
+    std::memcpy(data_.data(), values, size_ * sizeof(T));
 }
 
 template <typename T>
@@ -107,7 +163,7 @@ template <typename T>
 auto mat4<T>::operator==(
     const mat4& other
 ) const -> bool {
-    for (int i = 0; i < size_; ++i) {
+    for (std::size_t i = 0; i < size_; ++i) {
         if (data_[i] != other.data_[i]) {
             return false;
         }
@@ -125,7 +181,7 @@ auto mat4<T>::operator!=(
 template <typename T>
 auto mat4<T>::operator+(const mat4& other) const -> mat4 {
     mat4 result;
-    for (int i = 0; i < size_; ++i) {
+    for (std::size_t i = 0; i < size_; ++i) {
         result.data_[i] = data_[i] + other.data_[i];
     }
     return result;
@@ -134,7 +190,7 @@ auto mat4<T>::operator+(const mat4& other) const -> mat4 {
 template <typename T>
 auto mat4<T>::operator-(const mat4& other) const -> mat4 {
     mat4 result;
-    for (int i = 0; i < size_; ++i) {
+    for (std::size_t i = 0; i < size_; ++i) {
         result.data_[i] = data_[i] - other.data_[i];
     }
     return result;
@@ -143,7 +199,7 @@ auto mat4<T>::operator-(const mat4& other) const -> mat4 {
 template <typename T>
 auto mat4<T>::operator-() const -> mat4 {
     mat4 result;
-    for (int i = 0; i < size_; ++i) {
+    for (std::size_t i = 0; i < size_; ++i) {
         result.data_[i] = -data_[i];
     }
     return result;
@@ -152,7 +208,7 @@ auto mat4<T>::operator-() const -> mat4 {
 template <typename T>
 auto mat4<T>::operator*(T scalar) const -> mat4 {
     mat4 result;
-    for (int i = 0; i < size_; ++i) {
+    for (std::size_t i = 0; i < size_; ++i) {
         result.data_[i] = data_[i] * scalar;
     }
     return result;
@@ -161,7 +217,7 @@ auto mat4<T>::operator*(T scalar) const -> mat4 {
 template <typename T>
 auto mat4<T>::operator/(T scalar) const -> mat4 {
     mat4 result;
-    for (int i = 0; i < size_; ++i) {
+    for (std::size_t i = 0; i < size_; ++i) {
         result.data_[i] = data_[i] / scalar;
     }
     return result;
@@ -169,7 +225,7 @@ auto mat4<T>::operator/(T scalar) const -> mat4 {
 
 template <typename T>
 auto mat4<T>::operator+=(const mat4& other) -> mat4& {
-    for (int i = 0; i < size_; ++i) {
+    for (std::size_t i = 0; i < size_; ++i) {
         data_[i] += other.data_[i];
     }
     return *this;
@@ -177,7 +233,7 @@ auto mat4<T>::operator+=(const mat4& other) -> mat4& {
 
 template <typename T>
 auto mat4<T>::operator-=(const mat4& other) -> mat4& {
-    for (int i = 0; i < size_; ++i) {
+    for (std::size_t i = 0; i < size_; ++i) {
         data_[i] -= other.data_[i];
     }
     return *this;
@@ -191,7 +247,7 @@ auto mat4<T>::operator*=(const mat4& other) -> mat4& {
 
 template <typename T>
 auto mat4<T>::operator*=(T scalar) -> mat4& {
-    for (int i = 0; i < size_; ++i) {
+    for (std::size_t i = 0; i < size_; ++i) {
         data_[i] *= scalar;
     }
     return *this;
@@ -199,7 +255,7 @@ auto mat4<T>::operator*=(T scalar) -> mat4& {
 
 template <typename T>
 auto mat4<T>::operator/=(T scalar) -> mat4& {
-    for (int i = 0; i < size_; ++i) {
+    for (std::size_t i = 0; i < size_; ++i) {
         data_[i] /= scalar;
     }
     return *this;
@@ -211,5 +267,3 @@ auto operator*(T scalar, const mat4<T>& m) -> mat4<T> {
 }
 
 }  // namespace vw
-
-#endif  // VW_CORE_MAT4_INL_H

@@ -8,6 +8,7 @@
 #include <utility>
 
 #include "vw/config.h"
+#include "vw/core/detail/module_prelude.h"
 
 import vw.core;
 
