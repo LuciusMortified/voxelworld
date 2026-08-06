@@ -1,10 +1,6 @@
-module;
-
-#include <cmath>
-#include <expected>
-#include <limits>
-
 module vw.core;
+
+import std;
 
 namespace vw::math {
 

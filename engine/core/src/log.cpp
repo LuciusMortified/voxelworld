@@ -6,16 +6,9 @@ module;
 #  include <windows.h>
 #endif
 
-#include <atomic>
-#include <chrono>
-#include <format>
-#include <fstream>
-#include <mutex>
-#include <print>
-#include <string>
-#include <string_view>
-
 module vw.core;
+
+import std;
 
 namespace vw::log {
 namespace {

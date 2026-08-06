@@ -1,8 +1,6 @@
-module;
-
-#include <array>
-
 module vw.core;
+
+import std;
 
 namespace vw {
 
