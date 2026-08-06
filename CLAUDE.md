@@ -52,6 +52,10 @@
   и тот же набор заголовков должен быть в `vw/core/detail/module_prelude.h`
 - Старые заголовки `engine/include/vw/core/*.h` — шимы: прелюдия, затем
   `import vw.core;`. Удаляются в M6
+- Настройки сборки доходят до кода как экспортированные `constexpr`, а не
+  макросы: cache-переменная → `target_compile_definitions(... PRIVATE ...)` →
+  `inline constexpr` в партиции. Образец — `vw::log::min_level`. Макрос в
+  заголовке потребителя ломает ODR, если TU соберут его по-разному
 
 ## Git
 - Коммиты на английском: `область: описание` (области: `engine`, `sculptor`, `docs`, `shaders`, `build`)

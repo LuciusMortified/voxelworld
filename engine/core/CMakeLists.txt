@@ -1,3 +1,7 @@
+set(VW_LOG_MIN_LEVEL "trace" CACHE STRING "Log levels below this are compiled out")
+set_property(CACHE VW_LOG_MIN_LEVEL PROPERTY STRINGS
+    trace debug info warn error critical off)
+
 add_library(vw_core STATIC)
 
 target_sources(vw_core
@@ -18,7 +22,7 @@ target_sources(vw_core
         src/blocks.cpp
 )
 
-target_include_directories(vw_core PUBLIC include)
+target_compile_definitions(vw_core PRIVATE VW_LOG_MIN_LEVEL=${VW_LOG_MIN_LEVEL})
 target_compile_features(vw_core PUBLIC cxx_std_23)
 
 # `import std` waits for M6: while consumers still include standard headers

@@ -7,7 +7,6 @@
 #include <string_view>
 #include <utility>
 
-#include "vw/config.h"
 #include "vw/core/detail/module_prelude.h"
 
 import vw.core;
@@ -28,7 +27,7 @@ namespace detail {
 
 template <level Lvl, typename... Args>
 void emit(std::string_view category, std::format_string<Args...> fmt, Args&&... args) {
-    if constexpr (static_cast<int>(Lvl) >= VW_LOG_MIN_LEVEL) {
+    if constexpr (Lvl >= min_level) {
         if (Lvl >= get_level()) {
             write(Lvl, category, std::format(fmt, std::forward<Args>(args)...));
         }

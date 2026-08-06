@@ -32,7 +32,9 @@ TEST_CASE("log: file sink records level, category and message", "[log]") {
 
     const auto contents = read_all(path);
 
-    REQUIRE(contents.find("[info] plain 42") != std::string::npos);
+    if constexpr (vw::log::min_level <= vw::log::level::info) {
+        REQUIRE(contents.find("[info] plain 42") != std::string::npos);
+    }
     REQUIRE(contents.find("[warning] [parser] value=7") != std::string::npos);
 }
 
@@ -56,7 +58,7 @@ TEST_CASE("log: timestamp prefix has millisecond precision", "[log]") {
     vw::log::set_level(vw::log::level::trace);
     vw::log::add_file_sink(path.string());
 
-    vw::log::info("stamped");
+    vw::log::critical("stamped");
 
     const auto contents = read_all(path);
 
