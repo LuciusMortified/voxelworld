@@ -1,9 +1,14 @@
-#include <vw/ecs/entity_registry.h>
-
 #include <catch2/catch_test_macros.hpp>
+
+#include <memory>
+#include <vector>
+
+import vw.ecs;
 
 using namespace vw;
 using namespace vw::ecs;
+
+namespace {
 
 struct position_component {
     float x = 0.f, y = 0.f, z = 0.f;
@@ -17,10 +22,10 @@ struct health_component {
     int hp = 100;
 };
 
-using test_registry = entity_registry<position_component, velocity_component, health_component>;
+}  // namespace
 
 TEST_CASE("registry create and destroy", "[registry]") {
-    test_registry reg;
+    registry reg;
 
     auto e0 = reg.create();
     auto e1 = reg.create();
@@ -34,7 +39,7 @@ TEST_CASE("registry create and destroy", "[registry]") {
 }
 
 TEST_CASE("registry add and get components", "[registry]") {
-    test_registry reg;
+    registry reg;
     auto e = reg.create();
 
     reg.add<position_component>(e, {1.f, 2.f, 3.f});
@@ -44,8 +49,17 @@ TEST_CASE("registry add and get components", "[registry]") {
     REQUIRE_FALSE(reg.has<velocity_component>(e));
 }
 
+TEST_CASE("registry emplace constructs in place", "[registry]") {
+    registry reg;
+    auto e = reg.create();
+
+    auto& health = reg.emplace<health_component>(e, 55);
+    REQUIRE(health.hp == 55);
+    REQUIRE(reg.get<health_component>(e).hp == 55);
+}
+
 TEST_CASE("registry remove components", "[registry]") {
-    test_registry reg;
+    registry reg;
     auto e = reg.create();
 
     reg.add<position_component>(e);
@@ -54,7 +68,7 @@ TEST_CASE("registry remove components", "[registry]") {
 }
 
 TEST_CASE("registry remove_all", "[registry]") {
-    test_registry reg;
+    registry reg;
     auto e = reg.create();
 
     reg.add<position_component>(e);
@@ -68,8 +82,19 @@ TEST_CASE("registry remove_all", "[registry]") {
     REQUIRE_FALSE(reg.has<health_component>(e));
 }
 
+TEST_CASE("registry has is false for stale handles", "[registry]") {
+    registry reg;
+    auto e = reg.create();
+    reg.add<position_component>(e);
+
+    reg.destroy(e);
+
+    REQUIRE_FALSE(reg.has<position_component>(e));
+    REQUIRE_FALSE(reg.alive(e));
+}
+
 TEST_CASE("registry batch_create", "[registry]") {
-    test_registry reg;
+    registry reg;
 
     auto entities = reg.batch_create(10);
     REQUIRE(entities.size() == 10);
@@ -79,7 +104,7 @@ TEST_CASE("registry batch_create", "[registry]") {
 }
 
 TEST_CASE("registry batch_destroy", "[registry]") {
-    test_registry reg;
+    registry reg;
 
     auto entities = reg.batch_create(5);
     reg.batch_destroy(entities);
@@ -91,7 +116,7 @@ TEST_CASE("registry batch_destroy", "[registry]") {
 }
 
 TEST_CASE("registry batch_add", "[registry]") {
-    test_registry reg;
+    registry reg;
 
     auto entities = reg.batch_create(5);
     reg.batch_add<position_component>(entities, {1.f, 2.f, 3.f});
@@ -103,7 +128,7 @@ TEST_CASE("registry batch_add", "[registry]") {
 }
 
 TEST_CASE("registry batch_remove", "[registry]") {
-    test_registry reg;
+    registry reg;
 
     auto entities = reg.batch_create(5);
     reg.batch_add<position_component>(entities);
@@ -115,7 +140,7 @@ TEST_CASE("registry batch_remove", "[registry]") {
 }
 
 TEST_CASE("registry component_view", "[registry]") {
-    test_registry reg;
+    registry reg;
 
     auto e0 = reg.create();
     auto e1 = reg.create();
@@ -137,4 +162,86 @@ TEST_CASE("registry component_view", "[registry]") {
         ++count;
     }
     REQUIRE(count == 2);
+}
+
+TEST_CASE("registry view over an unregistered component is empty", "[registry]") {
+    registry reg;
+
+    auto e = reg.create();
+    reg.add<position_component>(e);
+
+    auto view  = reg.view<position_component, health_component>();
+    int  count = 0;
+    for ([[maybe_unused]] const auto& row : view) {
+        ++count;
+    }
+    REQUIRE(count == 0);
+}
+
+TEST_CASE("registry change sets and dependencies", "[registry]") {
+    registry reg;
+
+    auto e = reg.create();
+    reg.add<position_component>(e);
+    reg.add<velocity_component>(e);
+
+    reg.add_change_dep(component_id_of<position_component>(),
+                       component_id_of<velocity_component>());
+
+    reg.notify_changed<position_component>(e);
+
+    REQUIRE(reg.changed<position_component>().contains(e));
+    REQUIRE(reg.requested<velocity_component>().contains(e));
+
+    reg.clear_changed();
+    REQUIRE(reg.changed<position_component>().empty());
+}
+
+TEST_CASE("registry propagates a change only to entities holding the dependent", "[registry]") {
+    registry reg;
+
+    auto e = reg.create();
+    reg.add<position_component>(e);
+
+    reg.add_change_dep(component_id_of<position_component>(),
+                       component_id_of<velocity_component>());
+    reg.notify_changed<position_component>(e);
+
+    REQUIRE(reg.requested<velocity_component>().empty());
+}
+
+TEST_CASE("registry accepts a component registered without its type", "[registry]") {
+    registry reg;
+
+    const uint32 script_component = component_id_of<struct script_tag>();
+    const component_ops ops{
+        .size     = sizeof(int),
+        .align    = alignof(int),
+        .destroy  = nullptr,
+        .relocate = +[](void* dst, void* src) { *static_cast<int*>(dst) = *static_cast<int*>(src); },
+    };
+
+    auto& pool = reg.ensure_pool(script_component, ops);
+
+    auto e = reg.create();
+    *static_cast<int*>(pool.emplace(e)) = 7;
+
+    REQUIRE(reg.try_pool(script_component) == &pool);
+    REQUIRE(*static_cast<const int*>(reg.try_pool(script_component)->get(e)) == 7);
+
+    std::vector<uint32> ids;
+    reg.collect_components(e, ids);
+    REQUIRE(ids.size() == 1);
+    REQUIRE(ids.front() == script_component);
+}
+
+TEST_CASE("registry destroy drops component storage", "[registry]") {
+    registry reg;
+
+    auto e = reg.create();
+    reg.add<position_component>(e);
+    REQUIRE(reg.try_pool_of<position_component>()->size() == 1);
+
+    reg.destroy(e);
+    REQUIRE(reg.try_pool_of<position_component>()->size() == 0);
 }

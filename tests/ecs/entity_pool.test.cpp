@@ -1,6 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <vw/ecs/entity_pool.h>
+import vw.ecs;
 
 using namespace vw;
 using namespace vw::ecs;
