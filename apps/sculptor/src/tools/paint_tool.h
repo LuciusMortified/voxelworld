@@ -12,7 +12,7 @@ namespace vw::sculptor {
 
 class paint_tool final : public base_tool {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     paint_tool(engine_type& eng, app_state& st, operation_manager& op_manager);
 

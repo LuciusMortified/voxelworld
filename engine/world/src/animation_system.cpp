@@ -1,31 +1,26 @@
-#pragma once
+#include "vw/ecs/systems/animation_system.h"
 
+#include "vw/ecs/world.h"
 #include <vector>
 
 #include "vw/ecs/systems/transform_system.h"
-#include "vw/ecs/world.h"
 
 namespace vw::ecs {
 
-template <typename WD>
-animation_system<WD>::animation_system(world_type& w)
+animation_system::animation_system(world_type& w)
     : world_(&w) {}
 
-template <typename WD>
-auto animation_system<WD>::get_target_fps() const -> float32 {
+auto animation_system::get_target_fps() const -> float32 {
     return 1.0f / target_frame_time_;
 }
 
-template <typename WD>
-void animation_system<WD>::set_target_fps(
+void animation_system::set_target_fps(
     float32 fps
 ) {
     target_frame_time_ = 1.0f / fps;
 }
 
-
-template <typename WD>
-void animation_system<WD>::update(
+void animation_system::update(
     float32 delta_time
 ) {
     accumulated_delta_time_ += delta_time;
@@ -44,12 +39,12 @@ void animation_system<WD>::update(
 
     auto& reg = world_->registry();
     for (entity ent : active_entities_) {
-        if (!reg.template has<animation_player_component>(ent)) {
+        if (!reg.has<animation_player_component>(ent)) {
             to_remove_.push_back(ent);
             continue;
         }
 
-        auto& anim_comp = reg.template get<animation_player_component>(ent);
+        auto& anim_comp = reg.get<animation_player_component>(ent);
 
         process_animation(ent, anim_comp, effective_delta);
 
@@ -63,8 +58,7 @@ void animation_system<WD>::update(
     }
 }
 
-template <typename WD>
-void animation_system<WD>::add_active_entity(
+void animation_system::add_active_entity(
     entity root_ent
 ) {
     auto [it, inserted] = active_entities_.insert(root_ent);
@@ -74,16 +68,14 @@ void animation_system<WD>::add_active_entity(
     }
 }
 
-template <typename WD>
-void animation_system<WD>::remove_active_entity(
+void animation_system::remove_active_entity(
     entity root_ent
 ) {
     active_entities_.erase(root_ent);
     target_maps_.erase(root_ent);
 }
 
-template <typename WD>
-void animation_system<WD>::build_and_cache_target_map(
+void animation_system::build_and_cache_target_map(
     entity root_ent
 ) {
     std::unordered_map<std::string, entity> target_map;
@@ -96,13 +88,13 @@ void animation_system<WD>::build_and_cache_target_map(
         entity current = to_visit_.front();
         to_visit_.pop_front();
 
-        if (reg.template has<animation_target_component>(current)) {
-            const auto& target_comp = reg.template get<animation_target_component>(current);
+        if (reg.has<animation_target_component>(current)) {
+            const auto& target_comp = reg.get<animation_target_component>(current);
             target_map[target_comp.get_name()] = current;
         }
 
-        if (reg.template has<hierarchy_component>(current)) {
-            const auto& hierarchy = reg.template get<hierarchy_component>(current);
+        if (reg.has<hierarchy_component>(current)) {
+            const auto& hierarchy = reg.get<hierarchy_component>(current);
             for (entity child : hierarchy.get_children()) {
                 to_visit_.push_back(child);
             }
@@ -112,8 +104,7 @@ void animation_system<WD>::build_and_cache_target_map(
     target_maps_[root_ent] = std::move(target_map);
 }
 
-template <typename WD>
-auto animation_system<WD>::get_cached_target_map(
+auto animation_system::get_cached_target_map(
     entity root_ent
 ) const -> const std::unordered_map<std::string, entity>* {
     auto it = target_maps_.find(root_ent);
@@ -123,8 +114,7 @@ auto animation_system<WD>::get_cached_target_map(
     return nullptr;
 }
 
-template <typename WD>
-void animation_system<WD>::update_layer_time(
+void animation_system::update_layer_time(
     vw::asset::animation_layer& layer, float32 delta_time
 ) {
     layer.time += delta_time * layer.playback_speed * layer.direction;
@@ -158,8 +148,7 @@ void animation_system<WD>::update_layer_time(
     }
 }
 
-template <typename WD>
-void animation_system<WD>::process_layer(
+void animation_system::process_layer(
     vw::asset::animation_layer& layer, float32 delta_time, bool is_base
 ) {
     if (!layer.clip) {
@@ -241,8 +230,7 @@ void animation_system<WD>::process_layer(
     }
 }
 
-template <typename WD>
-auto animation_system<WD>::compute_layer_transform(
+auto animation_system::compute_layer_transform(
     const vw::asset::animation_layer& layer, const std::string& target_name, const transform& rest
 ) const -> std::optional<transform> {
     if (!layer.clip) {
@@ -291,8 +279,7 @@ auto animation_system<WD>::compute_layer_transform(
     return t;
 }
 
-template <typename WD>
-void animation_system<WD>::process_animation(
+void animation_system::process_animation(
     entity ent, animation_player_component& anim_comp, float32 delta_time
 ) {
     for (size_t i = 0; i < anim_comp.layers_.size(); ++i) {
@@ -302,8 +289,7 @@ void animation_system<WD>::process_animation(
     apply_animation(ent, anim_comp);
 }
 
-template <typename WD>
-void animation_system<WD>::apply_animation(
+void animation_system::apply_animation(
     entity root_ent, const animation_player_component& anim_comp
 ) {
     const auto* target_map = get_cached_target_map(root_ent);
@@ -316,8 +302,8 @@ void animation_system<WD>::apply_animation(
     auto get_rest = [&](const std::string& name) -> transform {
         auto it = target_map->find(name);
         if (it != target_map->end() &&
-            reg.template has<animation_target_component>(it->second)) {
-            return reg.template get<animation_target_component>(it->second)
+            reg.has<animation_target_component>(it->second)) {
+            return reg.get<animation_target_component>(it->second)
                 .get_rest_transform();
         }
         return {};
@@ -402,31 +388,28 @@ void animation_system<WD>::apply_animation(
         }
 
         entity target_ent = it->second;
-        if (!reg.template has<transform_component>(target_ent)) {
+        if (!reg.has<transform_component>(target_ent)) {
             continue;
         }
 
-        auto modifier = world_->template system<transform_system>().modify(target_ent);
+        auto modifier = world_->system<transform_system>().modify(target_ent);
         modifier.set_transform_with_matrix(t, t.calc_matrix());
     }
 }
 
-template <typename WD>
-animation_system<WD>::player_modifier::player_modifier(
+animation_system::player_modifier::player_modifier(
     animation_system* system, entity ent, animation_player_component* component
 )
     : system_(system), entity_(ent), component_(component) {}
 
-template <typename WD>
-auto animation_system<WD>::modify_player(
+auto animation_system::modify_player(
     entity ent
 ) -> player_modifier {
-    auto& comp = world_->registry().template get<animation_player_component>(ent);
+    auto& comp = world_->registry().get<animation_player_component>(ent);
     return player_modifier(this, ent, &comp);
 }
 
-template <typename WD>
-void animation_system<WD>::player_modifier::add_layer(
+void animation_system::player_modifier::add_layer(
     size_t index
 ) const {
     if (index >= component_->layers_.size()) {
@@ -434,36 +417,30 @@ void animation_system<WD>::player_modifier::add_layer(
     }
 }
 
-
-template <typename WD>
-auto animation_system<WD>::player_modifier::layer(
+auto animation_system::player_modifier::layer(
     size_t index
 ) -> layer_modifier {
     add_layer(index);
     return layer_modifier(system_, entity_, &component_->layers_[index]);
 }
 
-template <typename WD>
-void animation_system<WD>::player_modifier::apply_pose() const {
+void animation_system::player_modifier::apply_pose() const {
     if (!system_->get_cached_target_map(entity_)) {
         system_->build_and_cache_target_map(entity_);
     }
     system_->apply_animation(entity_, *component_);
 }
 
-template <typename WD>
-void animation_system<WD>::player_modifier::rebuild_target_map() const {
+void animation_system::player_modifier::rebuild_target_map() const {
     system_->build_and_cache_target_map(entity_);
 }
 
-template <typename WD>
-animation_system<WD>::layer_modifier::layer_modifier(
+animation_system::layer_modifier::layer_modifier(
     animation_system* system, entity ent, vw::asset::animation_layer* layer
 )
     : system_(system), entity_(ent), layer_(layer) {}
 
-template <typename WD>
-void animation_system<WD>::layer_modifier::play() const {
+void animation_system::layer_modifier::play() const {
     if (layer_->state != vw::asset::animation_state::playing) {
         layer_->state          = vw::asset::animation_state::playing;
         layer_->time           = 0.0f;
@@ -476,8 +453,7 @@ void animation_system<WD>::layer_modifier::play() const {
     }
 }
 
-template <typename WD>
-void animation_system<WD>::layer_modifier::play(
+void animation_system::layer_modifier::play(
     const vw::asset::transition& fade_in
 ) const {
     layer_->fade_in        = fade_in;
@@ -494,28 +470,24 @@ void animation_system<WD>::layer_modifier::play(
     }
 }
 
-template <typename WD>
-void animation_system<WD>::layer_modifier::pause() const {
+void animation_system::layer_modifier::pause() const {
     if (layer_->state == vw::asset::animation_state::playing) {
         layer_->state = vw::asset::animation_state::paused;
     }
 }
 
-template <typename WD>
-void animation_system<WD>::layer_modifier::stop() const {
+void animation_system::layer_modifier::stop() const {
     layer_->state          = vw::asset::animation_state::stopped;
     layer_->time           = 0.0f;
     layer_->fade_influence = 0.0f;
     layer_->fade_is_out    = false;
 }
 
-template <typename WD>
-void animation_system<WD>::layer_modifier::clear() const {
+void animation_system::layer_modifier::clear() const {
     *layer_ = vw::asset::animation_layer{};
 }
 
-template <typename WD>
-void animation_system<WD>::layer_modifier::stop(
+void animation_system::layer_modifier::stop(
     const vw::asset::transition& fade_out
 ) const {
     layer_->fade_out     = fade_out;
@@ -523,51 +495,44 @@ void animation_system<WD>::layer_modifier::stop(
     layer_->fade_elapsed = 0.0f;
 }
 
-template <typename WD>
-void animation_system<WD>::layer_modifier::resume() const {
+void animation_system::layer_modifier::resume() const {
     if (layer_->state == vw::asset::animation_state::paused) {
         layer_->state = vw::asset::animation_state::playing;
         system_->add_active_entity(entity_);
     }
 }
 
-template <typename WD>
-void animation_system<WD>::layer_modifier::set_time(
+void animation_system::layer_modifier::set_time(
     float32 time
 ) const {
     layer_->time = time;
 }
 
-template <typename WD>
-void animation_system<WD>::layer_modifier::set_playback_speed(
+void animation_system::layer_modifier::set_playback_speed(
     float32 speed
 ) const {
     layer_->playback_speed = speed;
 }
 
-template <typename WD>
-void animation_system<WD>::layer_modifier::set_loop_mode(
+void animation_system::layer_modifier::set_loop_mode(
     vw::asset::animation_loop_mode mode
 ) const {
     layer_->loop_mode = mode;
 }
 
-template <typename WD>
-void animation_system<WD>::layer_modifier::set_fade_in(
+void animation_system::layer_modifier::set_fade_in(
     const vw::asset::transition& t
 ) const {
     layer_->fade_in = t;
 }
 
-template <typename WD>
-void animation_system<WD>::layer_modifier::set_fade_out(
+void animation_system::layer_modifier::set_fade_out(
     const vw::asset::transition& t
 ) const {
     layer_->fade_out = t;
 }
 
-template <typename WD>
-void animation_system<WD>::layer_modifier::blend_to(
+void animation_system::layer_modifier::blend_to(
     std::shared_ptr<vw::asset::animation_clip> clip, std::optional<vw::asset::transition> t
 ) const {
     vw::asset::transition trans = t.value_or(layer_->blend_transition);
@@ -592,8 +557,8 @@ void animation_system<WD>::layer_modifier::blend_to(
                 }
                 auto it = target_map->find(name);
                 if (it != target_map->end() &&
-                    reg.template has<animation_target_component>(it->second)) {
-                    return reg.template get<animation_target_component>(it->second)
+                    reg.has<animation_target_component>(it->second)) {
+                    return reg.get<animation_target_component>(it->second)
                         .get_rest_transform();
                 }
                 return {};
@@ -663,46 +628,40 @@ void animation_system<WD>::layer_modifier::blend_to(
     system_->add_active_entity(entity_);
 }
 
-template <typename WD>
-void animation_system<WD>::layer_modifier::blend_to_by_name(
+void animation_system::layer_modifier::blend_to_by_name(
     std::string_view name, std::optional<vw::asset::transition> t
 ) {
-    auto clip = system_->world_->template resource<vw::asset::animation_clip_registry>().get(name);
+    auto clip = system_->world_->resource<vw::asset::animation_clip_registry>().get(name);
     if (clip) {
         blend_to(std::move(clip), t);
     }
 }
 
-template <typename WD>
-animation_system<WD>::target_modifier::target_modifier(
+animation_system::target_modifier::target_modifier(
     entity ent, animation_target_component* component
 )
     : entity_(ent), component_(component) {}
 
-template <typename WD>
-auto animation_system<WD>::modify_target(
+auto animation_system::modify_target(
     entity ent
 ) -> target_modifier {
-    auto& comp = world_->registry().template get<animation_target_component>(ent);
+    auto& comp = world_->registry().get<animation_target_component>(ent);
     return target_modifier(ent, &comp);
 }
 
-template <typename WD>
-void animation_system<WD>::target_modifier::set_target_name(
+void animation_system::target_modifier::set_target_name(
     std::string name
 ) const {
     component_->target_name_ = std::move(name);
 }
 
-template <typename WD>
-void animation_system<WD>::target_modifier::set_rest_transform(
+void animation_system::target_modifier::set_rest_transform(
     const transform& rest
 ) const {
     component_->rest_transform_ = rest;
 }
 
-template <typename WD>
-auto animation_system<WD>::merge_with_rest(
+auto animation_system::merge_with_rest(
     const transform& anim, const vw::asset::animation_track& track, const transform& rest
 ) -> transform {
     auto has_keyframes = [&](vw::asset::animation_property prop) -> bool {

@@ -4,7 +4,6 @@
 #define VW_SCULPTOR_SET_SOCKET_TRANSFORM_OPERATION_H
 
 #include <vw/gfx/engine/engine.h>
-#include <vw/ecs/base_world_def.h>
 
 #include "app/app_state.h"
 #include "base_operation.h"
@@ -21,7 +20,7 @@ struct set_socket_transform_params {
 
 class set_socket_transform_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     set_socket_transform_operation(engine_type& engine, app_state& st,
                                    const set_socket_transform_params& params);

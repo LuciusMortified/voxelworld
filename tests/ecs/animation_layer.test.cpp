@@ -12,22 +12,20 @@
 #include <vw/ecs/systems/spatial_system.h>
 #include <vw/ecs/systems/transform_system.h>
 #include <vw/ecs/world.h>
-#include <vw/ecs/world_def.h>
 
 using namespace vw;
 using namespace vw::ecs;
 using namespace vw::asset;
 
-using test_def = world_def<hierarchy_system, transform_system, spatial_system, animation_system>;
 
 struct anim_test_fixture {
-    world<test_def> w;
+    world w;
 
-    test_def::registry_type& reg = w.registry();
+    registry& reg = w.registry();
     animation_clip_registry& clip_reg = w.resource<animation_clip_registry>();
-    animation_system<test_def>& anim_sys = w.system<animation_system>();
-    hierarchy_system<test_def>& hierarchy_sys = w.system<hierarchy_system>();
-    transform_system<test_def>& transform_sys = w.system<transform_system>();
+    animation_system& anim_sys = w.system<animation_system>();
+    hierarchy_system& hierarchy_sys = w.system<hierarchy_system>();
+    transform_system& transform_sys = w.system<transform_system>();
 
     auto create_root() -> entity {
         auto ent = reg.create();

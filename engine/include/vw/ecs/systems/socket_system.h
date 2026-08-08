@@ -9,21 +9,16 @@
 
 namespace vw::ecs {
 
-template <typename>
 class hierarchy_system;
 
-template <typename>
 class transform_system;
 
-template <typename>
 class world;
 
-template <typename WD>
 class socket_system final {
 public:
-    using components    = typename WD::components;
-    using registry_type = typename entity_registry_from_tuple<components>::type;
-    using world_type    = world<WD>;
+    using registry_type = registry;
+    using world_type    = world;
 
     explicit socket_system(world_type& w);
 
@@ -62,13 +57,5 @@ private:
 };
 
 }  // namespace vw::ecs
-
-template <>
-struct vw::ecs::system_trait<vw::ecs::socket_system> {
-    using components = std::tuple<vw::ecs::socket_component>;
-    using resources  = std::tuple<>;
-};
-
-#include "vw/ecs/systems/socket_system.inl.h"
 
 #endif  // VW_ECS_SYSTEMS_SOCKET_SYSTEM_H

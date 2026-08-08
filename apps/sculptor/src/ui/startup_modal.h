@@ -13,7 +13,7 @@ namespace vw::sculptor {
 
 class startup_modal final {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     startup_modal(engine_type& eng, app_state& state);
 

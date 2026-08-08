@@ -28,9 +28,9 @@
 
 namespace vw::sculptor {
 
-class app final : public gfx::app<> {
+class app final : public gfx::app {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     explicit app(engine_type& eng);
     ~app() override;

@@ -3,34 +3,64 @@
 #ifndef VW_ECS_H
 #define VW_ECS_H
 
+#include <tuple>
 #include <unordered_set>
+#include <vector>
 
 #include "vw/asset/animation/animation_clip_registry.h"
 #include "vw/asset/model/model_registry.h"
-#include "vw/ecs/base_world_def.h"
 #include "vw/ecs/entity_registry.h"
+#include "vw/ecs/system_trait.h"
+#include "vw/ecs/systems/animation_fsm_system.h"
+#include "vw/ecs/systems/animation_system.h"
+#include "vw/ecs/systems/character_controller_system.h"
+#include "vw/ecs/systems/hierarchy_system.h"
+#include "vw/ecs/systems/light_system.h"
+#include "vw/ecs/systems/model_system.h"
+#include "vw/ecs/systems/physics_system.h"
+#include "vw/ecs/systems/socket_system.h"
+#include "vw/ecs/systems/spatial_system.h"
+#include "vw/ecs/systems/transform_system.h"
+#include "vw/ecs/systems/world_grid_system.h"
 
 namespace vw::ecs {
 
-template <typename WD = base_world_def>
 class world final {
 public:
-    using components    = WD::components;
-    using registry_type = entity_registry_from_tuple<components>::type;
-    using systems       = WD::systems;
-    using resources     = WD::resources;
+    using systems = std::tuple<
+        hierarchy_system,
+        character_controller_system,
+        animation_fsm_system,
+        physics_system,
+        transform_system,
+        model_system,
+        spatial_system,
+        light_system,
+        socket_system,
+        world_grid_system,
+        animation_system>;
+
+    using resources = std::tuple<asset::model_registry, asset::animation_clip_registry>;
 
     class modifier {
     public:
-        modifier(world& w, entity ent);
+        modifier(world& w, entity ent) : world_{&w}, ent_{ent} {}
 
         template <typename C>
-        auto with(C&& value = {}) -> modifier&;
+        auto with(C&& value = {}) -> modifier& {
+            world_->add_component_<C>(ent_, std::forward<C>(value));
+            return *this;
+        }
 
         template <typename C>
-        auto without() -> modifier&;
+        auto without() -> modifier& {
+            world_->remove_component_<C>(ent_);
+            return *this;
+        }
 
-        [[nodiscard]] auto get_entity() const -> entity;
+        [[nodiscard]] auto get_entity() const -> entity {
+            return ent_;
+        }
 
     private:
         world* world_;
@@ -39,16 +69,28 @@ public:
 
     class batch_modifier {
     public:
-        batch_modifier(world& w, std::vector<entity> entities);
+        batch_modifier(world& w, std::vector<entity> entities)
+            : world_{&w}, entities_{std::move(entities)} {}
 
         template <typename C>
-        auto with(const C& value = {}) -> batch_modifier&;
+        auto with(const C& value = {}) -> batch_modifier& {
+            world_->batch_add_component_<C>(entities_, value);
+            return *this;
+        }
 
         template <typename C>
-        auto without() -> batch_modifier&;
+        auto without() -> batch_modifier& {
+            world_->batch_remove_component_<C>(entities_);
+            return *this;
+        }
 
-        [[nodiscard]] auto get_entities() const -> const std::vector<entity>&;
-        [[nodiscard]] auto release_entities() -> std::vector<entity>;
+        [[nodiscard]] auto get_entities() const -> const std::vector<entity>& {
+            return entities_;
+        }
+
+        [[nodiscard]] auto release_entities() -> std::vector<entity> {
+            return std::move(entities_);
+        }
 
     private:
         world* world_;
@@ -75,25 +117,33 @@ public:
     void batch_destroy(const std::vector<entity>& entities) noexcept;
 
     template <typename T>
-    [[nodiscard]] auto has(entity ent) const -> bool;
-
-    template <typename T>
-    [[nodiscard]] auto get(entity ent) -> T&;
-
-    template <typename T>
-    [[nodiscard]] auto get(entity ent) const -> const T&;
-
-    template <typename... Cs>
-    [[nodiscard]] auto view() -> component_view<registry_type, Cs...>;
-
-    template <template <typename> class S>
-    [[nodiscard]] auto system() -> S<WD>& {
-        return std::get<S<WD>>(systems_);
+    [[nodiscard]] auto has(entity ent) const -> bool {
+        return registry_.has<T>(ent);
     }
 
-    template <template <typename> class S>
-    [[nodiscard]] auto system() const -> const S<WD>& {
-        return std::get<S<WD>>(systems_);
+    template <typename T>
+    [[nodiscard]] auto get(entity ent) -> T& {
+        return registry_.get<T>(ent);
+    }
+
+    template <typename T>
+    [[nodiscard]] auto get(entity ent) const -> const T& {
+        return registry_.get<T>(ent);
+    }
+
+    template <typename... Cs>
+    [[nodiscard]] auto view() -> component_view<Cs...> {
+        return registry_.view<Cs...>();
+    }
+
+    template <typename S>
+    [[nodiscard]] auto system() -> S& {
+        return std::get<S>(systems_);
+    }
+
+    template <typename S>
+    [[nodiscard]] auto system() const -> const S& {
+        return std::get<S>(systems_);
     }
 
     template <typename R>
@@ -106,36 +156,79 @@ public:
         return std::get<R>(resources_);
     }
 
-    [[nodiscard]] auto registry() -> registry_type&;
+    [[nodiscard]] auto registry() -> ecs::registry&;
 
     template <typename T>
-    [[nodiscard]] auto changed() -> std::unordered_set<entity>&;
+    [[nodiscard]] auto changed() -> std::unordered_set<entity>& {
+        return registry_.changed<T>();
+    }
 
     [[nodiscard]] auto destroyed() const -> const std::vector<entity>&;
 
 private:
-    [[nodiscard]] auto create_entity_() -> entity;
-    [[nodiscard]] auto batch_create_entities_(uint32 count) -> std::vector<entity>;
+    template <typename T>
+    void add_component_(entity ent, T&& value = {}) {
+        using C = std::remove_cvref_t<T>;
+        remember_remove_hook_<C>();
+        registry_.add<C>(ent, std::forward<T>(value));
+
+        std::apply([&](auto&... systems) {
+            (detail::invoke_on_add<C>(systems, ent), ...);
+        }, systems_);
+    }
 
     template <typename T>
-    void add_component_(entity ent, T&& value = {});
+    void remove_component_(entity ent) noexcept {
+        std::apply([&](auto&... systems) {
+            (detail::invoke_on_remove<T>(systems, ent), ...);
+        }, systems_);
+        registry_.remove<T>(ent);
+    }
 
     template <typename T>
-    void remove_component_(entity ent) noexcept;
+    void batch_add_component_(const std::vector<entity>& entities, const T& value = {}) {
+        remember_remove_hook_<T>();
+        registry_.batch_add<T>(entities, value);
+
+        std::apply([&](auto&... systems) {
+            for (auto ent : entities) {
+                (detail::invoke_on_add<T>(systems, ent), ...);
+            }
+        }, systems_);
+    }
 
     template <typename T>
-    void batch_add_component_(const std::vector<entity>& entities, const T& value = {});
+    void batch_remove_component_(const std::vector<entity>& entities) noexcept {
+        std::apply([&](auto&... systems) {
+            for (auto ent : entities) {
+                (detail::invoke_on_remove<T>(systems, ent), ...);
+            }
+        }, systems_);
+        registry_.batch_remove<T>(entities);
+    }
 
+    // Destroying an entity has to notify the systems about every component it
+    // still holds, and by then the type is only known through its id — so each
+    // component type leaves behind a typed remover the first time it is added.
     template <typename T>
-    void batch_remove_component_(const std::vector<entity>& entities) noexcept;
+    void remember_remove_hook_() {
+        const uint32 id = component_id_of<T>();
+        if (id >= remove_hooks_.size()) {
+            remove_hooks_.resize(id + 1, nullptr);
+        }
+        if (remove_hooks_[id] == nullptr) {
+            remove_hooks_[id] = +[](world& w, entity ent) { w.remove_component_<T>(ent); };
+        }
+    }
 
-    registry_type registry_;
+    void detach_components_(entity ent) noexcept;
+
+    ecs::registry registry_;
     systems systems_;
     resources resources_;
+    std::vector<void (*)(world&, entity)> remove_hooks_;
 };
 
 }  // namespace vw::ecs
-
-#include "vw/ecs/world.inl.h"
 
 #endif  // VW_ECS_H

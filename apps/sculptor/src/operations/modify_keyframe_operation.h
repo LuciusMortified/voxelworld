@@ -20,7 +20,7 @@ struct modify_keyframe_params {
 
 class modify_keyframe_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     modify_keyframe_operation(
         engine_type& engine, app_state& state, const modify_keyframe_params& params

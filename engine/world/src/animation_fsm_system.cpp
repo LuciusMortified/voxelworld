@@ -1,27 +1,22 @@
-#pragma once
+#include "vw/ecs/systems/animation_fsm_system.h"
 
-#ifndef VW_ECS_SYSTEMS_ANIMATION_FSM_SYSTEM_INL_H
-#define VW_ECS_SYSTEMS_ANIMATION_FSM_SYSTEM_INL_H
-
-#include "vw/ecs/systems/animation_system.h"
 #include "vw/ecs/world.h"
+#include "vw/ecs/systems/animation_system.h"
 
 namespace vw::ecs {
 
-template <typename WD>
-animation_fsm_system<WD>::animation_fsm_system(world_type& w)
+animation_fsm_system::animation_fsm_system(world_type& w)
     : world_(&w) {}
 
-template <typename WD>
-void animation_fsm_system<WD>::update(float32 /*dt*/) {
+void animation_fsm_system::update(float32 /*dt*/) {
     auto view =
         world_->registry()
-            .template view<animation_fsm_component, animation_player_component>();
+            .view<animation_fsm_component, animation_player_component>();
 
     for (auto [ent, fsm_comp, player_comp] : view) {
         auto& triggers = fsm_comp.triggers_;
         for (size_t i = 0; i < fsm_comp.machine_count(); ++i) {
-            auto pm = world_->template system<animation_system>().modify_player(ent);
+            auto pm = world_->system<animation_system>().modify_player(ent);
             if (!player_comp.has_layer(i)) {
                 pm.add_layer(i);
                 pm.rebuild_target_map();
@@ -69,14 +64,12 @@ void animation_fsm_system<WD>::update(float32 /*dt*/) {
     }
 }
 
-template <typename WD>
-animation_fsm_system<WD>::modifier::modifier(
+animation_fsm_system::modifier::modifier(
     animation_fsm_component* component
 )
     : component_(component) {}
 
-template <typename WD>
-void animation_fsm_system<WD>::modifier::add_machine(
+void animation_fsm_system::modifier::add_machine(
     size_t index, vw::asset::animation_fsm machine
 ) const {
     if (index >= component_->machines_.size()) {
@@ -85,21 +78,18 @@ void animation_fsm_system<WD>::modifier::add_machine(
     component_->machines_[index] = std::move(machine);
 }
 
-template <typename WD>
-void animation_fsm_system<WD>::modifier::fire_trigger(
+void animation_fsm_system::modifier::fire_trigger(
     std::string_view name
 ) const {
     component_->triggers_.emplace(name);
 }
 
-template <typename WD>
-auto animation_fsm_system<WD>::modify(
+auto animation_fsm_system::modify(
     entity ent
 ) -> modifier {
-    auto& comp = world_->registry().template get<animation_fsm_component>(ent);
+    auto& comp = world_->registry().get<animation_fsm_component>(ent);
     return modifier(&comp);
 }
 
 }  // namespace vw::ecs
 
-#endif  // VW_ECS_SYSTEMS_ANIMATION_FSM_SYSTEM_INL_H

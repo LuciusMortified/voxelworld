@@ -8,8 +8,7 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-void renderer<WC>::create_point_lights_descriptor_set_layout() {
+inline void renderer::create_point_lights_descriptor_set_layout() {
     // Point lights storage buffer descriptor set layout (set 3, binding 0)
     VkDescriptorSetLayoutBinding point_lights_layout_binding{};
     point_lights_layout_binding.binding            = 0;
@@ -30,8 +29,7 @@ void renderer<WC>::create_point_lights_descriptor_set_layout() {
     }
 }
 
-template <typename WC>
-void renderer<WC>::cleanup_point_lights_resources() {
+inline void renderer::cleanup_point_lights_resources() {
     if (point_lights_descriptor_set_layout_ != VK_NULL_HANDLE) {
         vkDestroyDescriptorSetLayout(
             context_->get_device(), point_lights_descriptor_set_layout_, nullptr

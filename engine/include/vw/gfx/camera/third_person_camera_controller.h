@@ -28,10 +28,9 @@ struct third_person_camera_params {
 };
 
 /// Third-person camera that follows an entity with arm length, offset, and voxel collision.
-template <typename WC = base_world_def>
 class third_person_camera_controller {
 public:
-    using world_type = world<WC>;
+    using world_type = world;
     explicit third_person_camera_controller(
         camera& camera,
         world_type& world,
@@ -53,14 +52,6 @@ private:
     float32 pitch_ = 20.0f;
     float32 yaw_   = 0.0f;
     float32 actual_arm_length_ = 0.0f;
-};
-
-template <typename WC>
-struct third_person_camera_controller_from_tuple;
-
-template <typename... Cs>
-struct third_person_camera_controller_from_tuple<std::tuple<Cs...>> {
-    using type = third_person_camera_controller<std::tuple<Cs...>>;
 };
 
 }  // namespace vw::gfx

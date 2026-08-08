@@ -11,7 +11,7 @@ namespace vw::sculptor {
 
 class save_clip_as_modal final {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     save_clip_as_modal(engine_type& eng, app_state& st, clip_service& clip_svc);
 

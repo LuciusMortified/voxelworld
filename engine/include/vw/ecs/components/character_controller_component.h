@@ -7,7 +7,6 @@
 
 namespace vw::ecs {
 
-template <typename>
 class character_controller_system;
 
 struct character_controller_component final {
@@ -19,8 +18,7 @@ private:
     float32 rotation_speed_ = 5.0f;
     bool jump_requested_    = false;
 
-    template <typename>
-    friend class character_controller_system;
+        friend class character_controller_system;
 
 public:
     [[nodiscard]] auto get_move_speed() const -> float32;

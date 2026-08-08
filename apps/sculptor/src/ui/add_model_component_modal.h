@@ -12,7 +12,7 @@ namespace vw::sculptor {
 
 class add_model_component_modal final {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     add_model_component_modal(engine_type& eng, app_state& state, operation_manager& op_manager);
 

@@ -12,8 +12,7 @@
 
 namespace vw::gfx {
 
-template <typename C>
-void renderer<C>::create_shadow_uniform_buffers() {
+inline void renderer::create_shadow_uniform_buffers() {
     VkDeviceSize buffer_size = sizeof(shadow_uniform_buffer_object);
     shadow_uniform_buffers_.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -22,8 +21,7 @@ void renderer<C>::create_shadow_uniform_buffers() {
     }
 }
 
-template <typename C>
-void renderer<C>::create_shadow_descriptor_sets() {
+inline void renderer::create_shadow_descriptor_sets() {
     std::vector layouts(MAX_FRAMES_IN_FLIGHT, uniform_descriptor_set_layout_);
     VkDescriptorSetAllocateInfo alloc_info{};
     alloc_info.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -57,8 +55,7 @@ void renderer<C>::create_shadow_descriptor_sets() {
     }
 }
 
-template <typename C>
-void renderer<C>::create_shadow_map_descriptor_sets() {
+inline void renderer::create_shadow_map_descriptor_sets() {
     std::vector layouts(MAX_FRAMES_IN_FLIGHT, shadow_descriptor_set_layout_);
     VkDescriptorSetAllocateInfo alloc_info{};
     alloc_info.sType              = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -93,8 +90,7 @@ void renderer<C>::create_shadow_map_descriptor_sets() {
     }
 }
 
-template <typename C>
-void renderer<C>::create_shadow_pipeline() {
+inline void renderer::create_shadow_pipeline() {
     // Используем shadow шейдеры
     VkPipelineShaderStageCreateInfo shader_stages[] = {
         shadow_vertex_shader_->get_stage_info(), shadow_fragment_shader_->get_stage_info()
@@ -224,8 +220,7 @@ void renderer<C>::create_shadow_pipeline() {
     }
 }
 
-template <typename WC>
-void renderer<WC>::update_shadow_uniform_buffer() const {
+inline void renderer::update_shadow_uniform_buffer() const {
     shadow_uniform_buffer_object ubo{};
     // Directional light data
     const auto& light_space_matrices = shadow_map_->get_light_space_matrices();
@@ -235,8 +230,7 @@ void renderer<WC>::update_shadow_uniform_buffer() const {
     shadow_uniform_buffers_[current_frame_]->copy_from_struct(ubo);
 }
 
-template <typename WC>
-void renderer<WC>::render_shadow_pass(
+inline void renderer::render_shadow_pass(
     world_type& world, const camera& camera
 ) {
     update_shadow_uniform_buffer();

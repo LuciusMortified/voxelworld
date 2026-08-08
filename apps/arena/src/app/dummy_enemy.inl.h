@@ -1,14 +1,16 @@
 #pragma once
 
+#include "vw/ecs/systems/world_grid/world_grid.h"
+
 namespace vw::arena {
 
-inline dummy_enemy::dummy_enemy(gfx::engine<>& engine, const vec2f& spawn_xz)
+inline dummy_enemy::dummy_enemy(gfx::engine& engine, const vec2f& spawn_xz)
     : engine_{engine}
     , spawn_xz_{spawn_xz} {
     auto& world         = engine_.get_world();
-    auto& transform_sys = world.template system<gfx::transform_system>();
-    auto& physics_sys   = world.template system<gfx::physics_system>();
-    auto& model_sys     = world.template system<gfx::model_system>();
+    auto& transform_sys = world.system<gfx::transform_system>();
+    auto& physics_sys   = world.system<gfx::physics_system>();
+    auto& model_sys     = world.system<gfx::model_system>();
 
     ent_ = world.create()
         .with<gfx::hierarchy_component>()
@@ -27,7 +29,7 @@ inline dummy_enemy::dummy_enemy(gfx::engine<>& engine, const vec2f& spawn_xz)
         .set_extents({16.0f, 32.0f, 16.0f})
         .set_offset({0.0f, 0.0f, 0.0f});
 
-    world.template system<gfx::spatial_system>().modify(ent_).set_layer(gfx::spatial_layer::character);
+    world.system<gfx::spatial_system>().modify(ent_).set_layer(gfx::spatial_layer::character);
 
     model_sys.modify(ent_).set_model(create_model());
 }
@@ -43,7 +45,7 @@ inline auto dummy_enemy::try_place() -> void {
         return;
     }
 
-    const auto grid = engine_.get_world().template system<gfx::world_grid_system>().grid();
+    const auto grid = engine_.get_world().system<gfx::world_grid_system>().grid();
     const auto vs   = grid->voxel_scale();
     const auto surface = grid->get_surface_y(
         static_cast<int32>(spawn_xz_.x / vs),
@@ -56,7 +58,7 @@ inline auto dummy_enemy::try_place() -> void {
     float32 spawn_y = (static_cast<float32>(*surface) + 6.0f) * vs;
 
     engine_.get_world()
-        .template system<gfx::transform_system>()
+        .system<gfx::transform_system>()
         .modify(ent_)
         .set_position({spawn_xz_.x, spawn_y, spawn_xz_.y});
 
@@ -72,7 +74,7 @@ inline auto dummy_enemy::is_placed() const -> bool {
 }
 
 inline auto dummy_enemy::create_model() -> std::shared_ptr<asset::model> {
-    auto& model_reg = engine_.get_world().template resource<asset::model_registry>();
+    auto& model_reg = engine_.get_world().resource<asset::model_registry>();
     auto model = model_reg.create_unnamed(16, 32, 16);
     model->fill(voxel{blocks::red_3});
     return model;

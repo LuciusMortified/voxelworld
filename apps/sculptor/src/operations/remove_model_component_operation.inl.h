@@ -12,7 +12,7 @@ inline remove_model_component_operation::remove_model_component_operation(
 
 inline void remove_model_component_operation::execute() {
     auto& world          = engine_->get_world();
-    auto& model_reg = world.template resource<asset::model_registry>();
+    auto& model_reg = world.resource<asset::model_registry>();
 
     if (!state_->scene.name_to_entity.contains(params_.name)) {
         return;
@@ -25,20 +25,20 @@ inline void remove_model_component_operation::execute() {
     }
 
     model_reg.erase(params_.name);
-    world.modify(ent).template without<gfx::model_component>();
+    world.modify(ent).without<gfx::model_component>();
     state_->file.has_unsaved_changes = true;
 }
 
 inline void remove_model_component_operation::undo() {
     auto& world        = engine_->get_world();
-    auto& model_sys = world.template system<gfx::model_system>();
+    auto& model_sys = world.system<gfx::model_system>();
 
     if (!state_->scene.name_to_entity.contains(params_.name)) {
         return;
     }
     const auto ent = state_->scene.name_to_entity[params_.name];
 
-    world.modify(ent).template with<gfx::model_component>();
+    world.modify(ent).with<gfx::model_component>();
     model_sys.modify(ent).set_model(saved_model_);
     state_->file.has_unsaved_changes = true;
 }

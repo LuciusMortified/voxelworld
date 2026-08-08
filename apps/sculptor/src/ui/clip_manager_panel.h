@@ -16,7 +16,7 @@ namespace vw::sculptor {
 
 class clip_manager_panel final {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     clip_manager_panel(engine_type& eng, app_state& st, operation_manager& op_manager,
                        clip_service& clip_svc);

@@ -137,6 +137,11 @@ public:
         return component_view<Cs...>(*this);
     }
 
+    template <typename... Cs, typename Fn>
+    void for_each(Fn&& fn) {
+        component_view<Cs...>(*this).for_each(std::forward<Fn>(fn));
+    }
+
     template <typename T>
     void request_change(entity e) {
         request_change(component_id_of<T>(), e);
@@ -177,14 +182,53 @@ private:
 // of the others. Pool pointers are resolved once per view, not per element.
 template <typename... Cs>
 class component_view {
+    // Resolved once when the view is built, so iteration is plain indexing into
+    // a dense array with a compile time element stride.
+    template <typename C>
+    struct cursor {
+        C* dense                = nullptr;
+        const uint32* sparse    = nullptr;
+        std::size_t sparse_size = 0;
+        const entity* owners    = nullptr;
+
+        [[nodiscard]] auto slot_of(entity e) const -> uint32 {
+            if (e.index >= sparse_size) {
+                return entity::invalid_index;
+            }
+            const uint32 slot = sparse[e.index];
+            return slot != entity::invalid_index && owners[slot] == e ? slot
+                                                                      : entity::invalid_index;
+        }
+
+        [[nodiscard]] auto locate(entity e, uint32& slot_out) const -> bool {
+            slot_out = slot_of(e);
+            return slot_out != entity::invalid_index;
+        }
+    };
+
+    template <typename C>
+    static consteval auto index_of_() -> std::size_t {
+        constexpr std::array<bool, sizeof...(Cs)> matches{std::is_same_v<C, Cs>...};
+        for (std::size_t i = 0; i < matches.size(); ++i) {
+            if (matches[i]) {
+                return i;
+            }
+        }
+        return matches.size();
+    }
+
 public:
     explicit component_view(registry& reg) : registry_{&reg} {
         pick_entities_();
     }
 
+    // Scanning for the next matching entity already resolves its dense slot in
+    // every pool, so the iterator keeps those slots instead of looking them up
+    // a second time on dereference.
     struct iterator {
         const component_view* view = nullptr;
         std::size_t index          = 0;
+        std::array<uint32, sizeof...(Cs)> slots{};
 
         [[nodiscard]] auto operator==(const iterator& rhs) const -> bool {
             return index == rhs.index;
@@ -200,75 +244,97 @@ public:
         }
 
         [[nodiscard]] auto operator*() const -> std::tuple<entity, Cs&...> {
-            const entity ent = (*view->entities_)[index];
-            return std::tuple<entity, Cs&...>{ent, view->template component_of<Cs>(ent)...};
+            return deref_(std::index_sequence_for<Cs...>{});
         }
 
         void skip_missing() {
-            while (index < view->entities_->size() &&
-                   !view->present_in_all((*view->entities_)[index])) {
+            while (index < view->count_ &&
+                   !locate_all_(view->owners_[index], std::index_sequence_for<Cs...>{})) {
                 ++index;
             }
         }
+
+    private:
+        template <std::size_t... Is>
+        [[nodiscard]] auto locate_all_(entity e, std::index_sequence<Is...> /*unused*/) -> bool {
+            return (std::get<Is>(view->cursors_).locate(e, slots[Is]) && ...);
+        }
+
+        template <std::size_t... Is>
+        [[nodiscard]] auto deref_(std::index_sequence<Is...> /*unused*/) const
+            -> std::tuple<entity, Cs&...> {
+            return std::tuple<entity, Cs&...>{
+                view->owners_[index], std::get<Is>(view->cursors_).dense[slots[Is]]...};
+        }
     };
 
-    [[nodiscard]] auto begin() -> iterator {
+    [[nodiscard]] auto begin() const -> iterator {
         iterator it{this, 0};
         it.skip_missing();
         return it;
     }
 
-    [[nodiscard]] auto end() -> iterator {
-        return iterator{this, entities_->size()};
+    [[nodiscard]] auto end() const -> iterator {
+        return iterator{this, count_};
+    }
+
+    // The callback form keeps the whole traversal in one loop body, which is
+    // measurably tighter than driving it through an iterator. Prefer it in
+    // systems that run every frame.
+    template <typename Fn>
+    void for_each(Fn&& fn) const {
+        for_each_(std::forward<Fn>(fn), std::index_sequence_for<Cs...>{});
     }
 
 private:
-    static inline const std::vector<entity> no_entities{};
-
-    template <typename C>
-    [[nodiscard]] auto component_of(entity e) const -> C& {
-        return *static_cast<C*>(pools_[index_of_<C>()]->get(e));
+    template <typename Fn, std::size_t... Is>
+    void for_each_(Fn&& fn, std::index_sequence<Is...> /*unused*/) const {
+        for (std::size_t i = 0; i < count_; ++i) {
+            const entity e = owners_[i];
+            const std::array<uint32, sizeof...(Cs)> slots{
+                std::get<Is>(cursors_).slot_of(e)...};
+            if (((slots[Is] != entity::invalid_index) && ...)) {
+                fn(e, std::get<Is>(cursors_).dense[slots[Is]]...);
+            }
+        }
     }
 
     template <typename C>
-    static consteval auto index_of_() -> std::size_t {
-        constexpr std::array<bool, sizeof...(Cs)> matches{std::is_same_v<C, Cs>...};
-        for (std::size_t i = 0; i < matches.size(); ++i) {
-            if (matches[i]) {
-                return i;
-            }
-        }
-        return matches.size();
+    static auto make_cursor(component_pool& pool) -> cursor<C> {
+        return {
+            .dense       = static_cast<C*>(pool.raw_data()),
+            .sparse      = pool.sparse().data(),
+            .sparse_size = pool.sparse().size(),
+            .owners      = pool.entities().data(),
+        };
     }
 
     void pick_entities_() {
-        entities_ = &no_entities;
         if constexpr (sizeof...(Cs) == 0) {
             return;
         } else {
-            pools_ = {registry_->template try_pool_of<Cs>()...};
-            if (std::ranges::find(pools_, nullptr) != pools_.end()) {
+            const std::array<component_pool*, sizeof...(Cs)> pools{
+                registry_->template try_pool_of<Cs>()...};
+            if (std::ranges::find(pools, nullptr) != pools.end()) {
                 return;
             }
 
+            cursors_ = std::tuple<cursor<Cs>...>{make_cursor<Cs>(*pools[index_of_<Cs>()])...};
+
             const auto* smallest = *std::ranges::min_element(
-                pools_,
+                pools,
                 [](const component_pool* a, const component_pool* b) -> bool {
                     return a->size() < b->size();
                 });
-            entities_ = &smallest->entities();
+            owners_ = smallest->entities().data();
+            count_  = smallest->size();
         }
     }
 
-    [[nodiscard]] auto present_in_all(entity e) const -> bool {
-        return std::ranges::all_of(pools_, [e](const component_pool* p) -> bool {
-            return p->has(e);
-        });
-    }
-
     registry* registry_ = nullptr;
-    std::array<component_pool*, sizeof...(Cs)> pools_{};
-    const std::vector<entity>* entities_ = nullptr;
+    std::tuple<cursor<Cs>...> cursors_;
+    const entity* owners_ = nullptr;
+    std::size_t count_    = 0;
 };
 
 }  // namespace vw::ecs

@@ -9,10 +9,10 @@
 
 using namespace vw;
 
-class world_grid_app final : public gfx::app<> {
+class world_grid_app final : public gfx::app {
 public:
     explicit world_grid_app(
-        gfx::engine<>& eng
+        gfx::engine& eng
     )
         : app{eng} {
         auto& window = get_engine().get_window();
@@ -59,7 +59,7 @@ public:
         const auto cam_pos = camera.get_position();
 
         auto& world            = get_engine().get_world();
-        auto& transform_sys = world.template system<gfx::transform_system>();
+        auto& transform_sys = world.system<gfx::transform_system>();
         transform_sys.modify(viewer_).set_position(cam_pos);
 
         auto& renderer = get_engine().get_renderer();
@@ -89,21 +89,21 @@ private:
 
     void setup_world_grid() {
         auto& world       = get_engine().get_world();
-        auto& grid_system = world.template system<gfx::world_grid_system>();
+        auto& grid_system = world.system<gfx::world_grid_system>();
 
         generator_params_ = {
             .voxel_scale = 8,
         };
-        auto& registry = world.template resource<asset::model_registry>();
+        auto& registry = world.resource<asset::model_registry>();
         auto generator = std::make_unique<gfx::perlin_terrain_generator>(
             registry.get_identity_pool(), registry.get_page_pool(), generator_params_);
         generator_  = generator.get();
-        auto grid   = std::make_unique<gfx::world_grid<gfx::base_world_def>>(
+        auto grid   = std::make_unique<gfx::world_grid>(
             world, generator_params_.voxel_scale
         );
         world_grid_  = grid.get();
         auto loader  = std::make_unique<gfx::chunk_loader>(std::move(generator));
-        auto& gs     = world.template system<gfx::world_grid_system>();
+        auto& gs     = world.system<gfx::world_grid_system>();
         gs.set_grid(std::move(grid));
         gs.set_loader(std::move(loader));
 
@@ -139,7 +139,7 @@ private:
                 {static_cast<int32>(pos.x), static_cast<int32>(pos.y), static_cast<int32>(pos.z)}
             );
             ImGui::Text("Chunk: (%d, %d, %d)", chunk_coord.x, chunk_coord.y, chunk_coord.z);
-            const auto& wgs = get_engine().get_world().template system<gfx::world_grid_system>();
+            const auto& wgs = get_engine().get_world().system<gfx::world_grid_system>();
             ImGui::Text("Loaded columns: %u", world_grid_->column_count());
             ImGui::Text("Loaded chunks: %u", world_grid_->chunk_count());
             ImGui::Text("Pending columns: %u", wgs.get_stats().pending_count);
@@ -174,7 +174,7 @@ private:
     }
 
     std::unique_ptr<gfx::free_camera_controller> camera_controller_;
-    gfx::world_grid<gfx::base_world_def>* world_grid_ = nullptr;
+    gfx::world_grid* world_grid_ = nullptr;
     gfx::entity viewer_ = gfx::invalid_entity;
     gfx::perlin_terrain_generator* generator_ = nullptr;
     gfx::perlin_terrain_generator::params generator_params_;
@@ -184,7 +184,7 @@ private:
 auto main() -> int {
     try {
         log::add_file_sink("test_world_grid.log");
-        std::make_unique<gfx::engine<>>(1280, 720, "Voxel World - World Grid Test")
+        std::make_unique<gfx::engine>(1280, 720, "Voxel World - World Grid Test")
             ->run<world_grid_app>();
     } catch (const std::exception& e) {
         log::error("Error: {}", e.what());

@@ -1,93 +1,75 @@
-#pragma once
+#include "vw/ecs/systems/world_grid_system.h"
 
-#ifndef VW_ECS_SYSTEMS_WORLD_GRID_SYSTEM_INL_H
-#define VW_ECS_SYSTEMS_WORLD_GRID_SYSTEM_INL_H
-
+#include "vw/ecs/world.h"
 #include <algorithm>
 
 #include "vw/asset/model/model.h"
 #include "vw/core/timing.h"
 #include "vw/ecs/components/transform_component.h"
-#include "vw/ecs/world.h"
 #include "vw/ecs/systems/model_system.h"
 #include "vw/ecs/systems/world_grid/world_grid.h"
 
 namespace vw::ecs {
 
-template <typename WD>
-world_grid_system<WD>::world_grid_system(
+world_grid_system::world_grid_system(
     world_type& w
 )
     : world_(&w) {}
 
-template <typename WD>
-world_grid_system<WD>::~world_grid_system() = default;
+world_grid_system::~world_grid_system() = default;
 
-template <typename WD>
-world_grid_system<WD>::world_grid_system(world_grid_system&&) noexcept = default;
+world_grid_system::world_grid_system(world_grid_system&&) noexcept = default;
 
-template <typename WD>
-auto world_grid_system<WD>::operator=(world_grid_system&&) noexcept -> world_grid_system& = default;
+auto world_grid_system::operator=(world_grid_system&&) noexcept -> world_grid_system& = default;
 
-template <typename WD>
-void world_grid_system<WD>::set_grid(
+void world_grid_system::set_grid(
     std::unique_ptr<grid_type> grid
 ) {
     clear_grid_transient_state_();
     grid_ = std::move(grid);
 }
 
-template <typename WD>
-void world_grid_system<WD>::set_loader(
+void world_grid_system::set_loader(
     std::unique_ptr<chunk_loader> loader
 ) {
     clear_loader_transient_state_();
     loader_ = std::move(loader);
 }
 
-template <typename WD>
-auto world_grid_system<WD>::grid() -> grid_type* {
+auto world_grid_system::grid() -> grid_type* {
     return grid_.get();
 }
 
-template <typename WD>
-auto world_grid_system<WD>::grid() const -> const grid_type* {
+auto world_grid_system::grid() const -> const grid_type* {
     return grid_.get();
 }
 
-template <typename WD>
-auto world_grid_system<WD>::loader() -> chunk_loader* {
+auto world_grid_system::loader() -> chunk_loader* {
     return loader_.get();
 }
 
-template <typename WD>
-auto world_grid_system<WD>::loader() const -> const chunk_loader* {
+auto world_grid_system::loader() const -> const chunk_loader* {
     return loader_.get();
 }
 
-template <typename WD>
-auto world_grid_system<WD>::has_grid() const -> bool {
+auto world_grid_system::has_grid() const -> bool {
     return grid_ != nullptr;
 }
 
-template <typename WD>
-auto world_grid_system<WD>::has_loader() const -> bool {
+auto world_grid_system::has_loader() const -> bool {
     return loader_ != nullptr;
 }
 
-template <typename WD>
-auto world_grid_system<WD>::get_stats() const -> const world_grid_system_stats& {
+auto world_grid_system::get_stats() const -> const world_grid_system_stats& {
     return stats_;
 }
 
-template <typename WD>
-void world_grid_system<WD>::shutdown() {
+void world_grid_system::shutdown() {
     grid_.reset();
     loader_.reset();
 }
 
-template <typename WD>
-void world_grid_system<WD>::update(float32 /*dt*/) {
+void world_grid_system::update(float32 /*dt*/) {
     if (!grid_ || !loader_) {
         return;
     }
@@ -98,7 +80,7 @@ void world_grid_system<WD>::update(float32 /*dt*/) {
     stats_.request_columns_ms = measure_ms([&] { dispatch_column_requests_(); });
     update_grid_stats_();
 
-    if (reg.template requested<world_view_component>().empty()) {
+    if (reg.requested<world_view_component>().empty()) {
         return;
     }
 
@@ -111,11 +93,10 @@ void world_grid_system<WD>::update(float32 /*dt*/) {
         stats_.active_count = static_cast<uint32>(active_columns_.size());
     }
 
-    reg.template clear_requested<world_view_component>();
+    reg.clear_requested<world_view_component>();
 }
 
-template <typename WD>
-void world_grid_system<WD>::integrate_completed_columns_() {
+void world_grid_system::integrate_completed_columns_() {
     static constexpr int32 max_columns_per_frame = 1;
     static constexpr vec3i neighbor_offsets[6]   = {
         {1, 0, 0},   //
@@ -155,7 +136,7 @@ void world_grid_system<WD>::integrate_completed_columns_() {
                 }
             });
 
-            chunk<WD>* created = nullptr;
+            chunk* created = nullptr;
             chunk_create_total += measure_ms([&] -> auto {
                 created = grid_->place_chunk(cd.coord, std::move(cd.chunk_model));
             });
@@ -186,8 +167,7 @@ void world_grid_system<WD>::integrate_completed_columns_() {
     stats_.boundary_to_ms   = boundary_to_total;
 }
 
-template <typename WD>
-void world_grid_system<WD>::process_deferred_remeshes_() {
+void world_grid_system::process_deferred_remeshes_() {
     static constexpr int32 max_remeshes_per_frame = 4;
     int32 processed                               = 0;
 
@@ -202,13 +182,12 @@ void world_grid_system<WD>::process_deferred_remeshes_() {
 
         auto mdl = chunk_ptr->get_model();
         mdl->invalidate();
-        world_->template system<model_system>().modify(chunk_ptr->get_entity()).set_model(mdl);
+        world_->system<model_system>().modify(chunk_ptr->get_entity()).set_model(mdl);
         ++processed;
     }
 }
 
-template <typename WD>
-void world_grid_system<WD>::dispatch_column_requests_() {
+void world_grid_system::dispatch_column_requests_() {
     static constexpr int32 max_requests_per_frame = 8;
     int32 requests = 0;
     while (!pending_requests_.empty() && requests < max_requests_per_frame) {
@@ -220,8 +199,7 @@ void world_grid_system<WD>::dispatch_column_requests_() {
     }
 }
 
-template <typename WD>
-void world_grid_system<WD>::update_grid_stats_() {
+void world_grid_system::update_grid_stats_() {
     stats_.active_count          = static_cast<uint32>(active_columns_.size());
     stats_.pending_count         = loader_->pending_count();
     stats_.loaded_count          = grid_->chunk_count();
@@ -230,32 +208,30 @@ void world_grid_system<WD>::update_grid_stats_() {
     stats_.unload_ms             = 0.0f;
 }
 
-template <typename WD>
-auto world_grid_system<WD>::process_dirty_entities_() -> bool {
+auto world_grid_system::process_dirty_entities_() -> bool {
     auto& reg         = world_->registry();
     bool chunks_dirty = false;
-    for (auto ent : reg.template requested<world_view_component>()) {
+    for (auto ent : reg.requested<world_view_component>()) {
         if (process_dirty_entity_(ent)) {
             chunks_dirty = true;
         }
-        reg.template notify_changed<world_view_component>(ent);
+        reg.notify_changed<world_view_component>(ent);
     }
     return chunks_dirty;
 }
 
-template <typename WD>
-auto world_grid_system<WD>::rebuild_active_set_() -> vec2i {
+auto world_grid_system::rebuild_active_set_() -> vec2i {
     auto& reg = world_->registry();
     pending_active_columns_.clear();
     vec2i camera_column{};
 
-    for (auto ent : reg.template requested<world_view_component>()) {
-        if (!reg.template has<world_view_component>(ent) ||
-            !reg.template has<transform_component>(ent)) {
+    for (auto ent : reg.requested<world_view_component>()) {
+        if (!reg.has<world_view_component>(ent) ||
+            !reg.has<transform_component>(ent)) {
             continue;
         }
 
-        const auto& wv   = reg.template get<world_view_component>(ent);
+        const auto& wv   = reg.get<world_view_component>(ent);
         auto chunk_coord = wv.get_chunk_coord();
         camera_column    = {chunk_coord.x, chunk_coord.z};
         const auto dist  = static_cast<int32>(wv.get_view_distance());
@@ -272,8 +248,7 @@ auto world_grid_system<WD>::rebuild_active_set_() -> vec2i {
     return camera_column;
 }
 
-template <typename WD>
-void world_grid_system<WD>::unload_inactive_columns_() {
+void world_grid_system::unload_inactive_columns_() {
     for (const auto& coord : active_columns_) {
         if (!pending_active_columns_.contains(coord)) {
             grid_->unload_column(coord);
@@ -281,18 +256,17 @@ void world_grid_system<WD>::unload_inactive_columns_() {
     }
 }
 
-template <typename WD>
-auto world_grid_system<WD>::process_dirty_entity_(
+auto world_grid_system::process_dirty_entity_(
     entity ent
 ) -> bool {
     auto& reg = world_->registry();
-    if (!reg.template has<world_view_component>(ent) ||
-        !reg.template has<transform_component>(ent)) {
+    if (!reg.has<world_view_component>(ent) ||
+        !reg.has<transform_component>(ent)) {
         return false;
     }
 
-    auto& wv       = reg.template get<world_view_component>(ent);
-    const auto& tc = reg.template get<transform_component>(ent);
+    auto& wv       = reg.get<world_view_component>(ent);
+    const auto& tc = reg.get<transform_component>(ent);
     auto pos       = tc.get_position();
 
     auto new_chunk_coord = grid_->world_to_chunk_coord({
@@ -307,37 +281,33 @@ auto world_grid_system<WD>::process_dirty_entity_(
     return changed;
 }
 
-template <typename WD>
-world_grid_system<WD>::view_modifier::view_modifier(
+world_grid_system::view_modifier::view_modifier(
     world_grid_system* system, entity ent
 )
     : system_(system), entity_(ent) {}
 
-template <typename WD>
-auto world_grid_system<WD>::modify_view(
+auto world_grid_system::modify_view(
     entity ent
 ) -> view_modifier {
     return view_modifier(this, ent);
 }
 
-template <typename WD>
-auto world_grid_system<WD>::view_modifier::set_view_distance(
+auto world_grid_system::view_modifier::set_view_distance(
     uint32 distance
 ) -> view_modifier& {
     auto& reg = system_->world_->registry();
-    if (!reg.template has<world_view_component>(entity_)) {
+    if (!reg.has<world_view_component>(entity_)) {
         return *this;
     }
 
-    auto& wv          = reg.template get<world_view_component>(entity_);
+    auto& wv          = reg.get<world_view_component>(entity_);
     wv.view_distance_ = distance;
-    reg.template request_change<world_view_component>(entity_);
+    reg.request_change<world_view_component>(entity_);
 
     return *this;
 }
 
-template <typename WD>
-void world_grid_system<WD>::rebuild_pending_requests_(
+void world_grid_system::rebuild_pending_requests_(
     vec2i camera_column
 ) {
     pending_requests_.clear();
@@ -360,8 +330,7 @@ void world_grid_system<WD>::rebuild_pending_requests_(
     );
 }
 
-template <typename WD>
-void world_grid_system<WD>::clear_grid_transient_state_() {
+void world_grid_system::clear_grid_transient_state_() {
     pending_requests_.clear();
     while (!deferred_remeshes_.empty()) {
         deferred_remeshes_.pop();
@@ -370,11 +339,9 @@ void world_grid_system<WD>::clear_grid_transient_state_() {
     pending_active_columns_.clear();
 }
 
-template <typename WD>
-void world_grid_system<WD>::clear_loader_transient_state_() {
+void world_grid_system::clear_loader_transient_state_() {
     pending_requests_.clear();
 }
 
 }  // namespace vw::ecs
 
-#endif  // VW_ECS_SYSTEMS_WORLD_GRID_SYSTEM_INL_H

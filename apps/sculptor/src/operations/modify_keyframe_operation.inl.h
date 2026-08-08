@@ -21,7 +21,7 @@ inline void modify_keyframe_operation::undo() {
 inline void modify_keyframe_operation::apply(
     const keyframe_value& replacement
 ) const {
-    const auto& registry = engine_->get_world().template resource<asset::animation_clip_registry>();
+    const auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(params_.clip_name);
     if (!clip) {
         return;

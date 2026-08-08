@@ -1,38 +1,31 @@
-#pragma once
+#include "vw/ecs/systems/physics_system.h"
 
-#ifndef VW_ECS_SYSTEMS_PHYSICS_SYSTEM_INL_H
-#define VW_ECS_SYSTEMS_PHYSICS_SYSTEM_INL_H
-
+#include "vw/ecs/world.h"
 #include <chrono>
 #include <cmath>
 
 #include "vw/ecs/systems/spatial_system.h"
 #include "vw/ecs/systems/transform_system.h"
 #include "vw/ecs/systems/world_grid_system.h"
-#include "vw/ecs/world.h"
 #include "vw/ecs/systems/world_grid/world_grid.h"
 
 namespace vw::ecs {
 
-template <typename WD>
-physics_system<WD>::physics_system(world_type& w)
+physics_system::physics_system(world_type& w)
     : world_(&w) {}
 
-template <typename WD>
-void physics_system<WD>::set_gravity(float32 g) {
+void physics_system::set_gravity(float32 g) {
     gravity_ = g;
 }
 
-template <typename WD>
-auto physics_system<WD>::get_gravity() const -> float32 {
+auto physics_system::get_gravity() const -> float32 {
     return gravity_;
 }
 
-template <typename WD>
-void physics_system<WD>::update(
+void physics_system::update(
     float32 delta_time
 ) {
-    if (!world_->template system<world_grid_system>().grid()) {
+    if (!world_->system<world_grid_system>().grid()) {
         return;
     }
 
@@ -56,13 +49,11 @@ void physics_system<WD>::update(
     stats_.step_ms = std::chrono::duration<float32>(clock::now() - step_start).count() * 1000.0f;
 }
 
-template <typename WD>
-auto physics_system<WD>::get_stats() const -> const physics_stats& {
+auto physics_system::get_stats() const -> const physics_stats& {
     return stats_;
 }
 
-template <typename WD>
-void physics_system<WD>::step(
+void physics_system::step(
     float32 dt
 ) {
     using clock = std::chrono::high_resolution_clock;
@@ -70,13 +61,13 @@ void physics_system<WD>::step(
 
     auto& reg = world_->registry();
     for (auto [ent, rb, tc] :
-         reg.template view<rigid_body_component, transform_component>()) {
+         reg.view<rigid_body_component, transform_component>()) {
         auto position = tc.get_position();
 
         rb.velocity_.y += gravity_ * rb.gravity_scale_ * dt;
 
-        if (reg.template has<movement_intent_component>(ent)) {
-            const auto& mi = reg.template get<movement_intent_component>(ent);
+        if (reg.has<movement_intent_component>(ent)) {
+            const auto& mi = reg.get<movement_intent_component>(ent);
             auto axes = mi.wish_axes_;
 
             if (axes & axis_flag::x) { rb.velocity_.x = mi.wish_velocity_.x; }
@@ -97,8 +88,8 @@ void physics_system<WD>::step(
 
         auto new_position = position + rb.velocity_ * dt;
 
-        if (reg.template has<box_collider_component>(ent)) {
-            const auto& col = reg.template get<box_collider_component>(ent);
+        if (reg.has<box_collider_component>(ent)) {
+            const auto& col = reg.get<box_collider_component>(ent);
             auto half = col.extents_ * 0.5f;
             auto box_center = new_position + col.offset_;
 
@@ -123,15 +114,14 @@ void physics_system<WD>::step(
             stats_.entity_collision_ms += std::chrono::duration<float32>(clock::now() - entity_start).count() * 1000.0f;
         }
 
-        world_->template system<transform_system>().modify(ent).set_position(new_position);
+        world_->system<transform_system>().modify(ent).set_position(new_position);
     }
 }
 
-template <typename WD>
-auto physics_system<WD>::are_chunks_loaded(
+auto physics_system::are_chunks_loaded(
     const vec3f& position, const vec3f& extents
 ) const -> bool {
-    auto* grid = world_->template system<world_grid_system>().grid();
+    auto* grid = world_->system<world_grid_system>().grid();
     const auto vs = static_cast<float32>(grid->voxel_scale());
     auto half = extents * 0.5f;
 
@@ -160,11 +150,10 @@ auto physics_system<WD>::are_chunks_loaded(
     return true;
 }
 
-template <typename WD>
-auto physics_system<WD>::resolve_box_voxel(
+auto physics_system::resolve_box_voxel(
     vec3f center, const vec3f& half_extents, vec3f& velocity
 ) const -> collision_result {
-    auto* grid = world_->template system<world_grid_system>().grid();
+    auto* grid = world_->system<world_grid_system>().grid();
     auto vs = static_cast<float32>(grid->voxel_scale());
     auto vs_i = grid->voxel_scale();
     bool grounded = false;
@@ -257,8 +246,7 @@ auto physics_system<WD>::resolve_box_voxel(
     return {center, grounded};
 }
 
-template <typename WD>
-auto physics_system<WD>::resolve_entity_collisions(
+auto physics_system::resolve_entity_collisions(
     entity ent, vec3f& position, vec3f& velocity,
     const vec3f& half_extents, const vec3f& offset
 ) -> void {
@@ -267,7 +255,7 @@ auto physics_system<WD>::resolve_entity_collisions(
     vw::spatial::aabb entity_aabb{center - half_extents, center + half_extents};
 
     const auto q_start = clock::now();
-    world_->template system<spatial_system>().query_all(entity_aabb, entity_query_cache_, spatial_layer::character);
+    world_->system<spatial_system>().query_all(entity_aabb, entity_query_cache_, spatial_layer::character);
     stats_.entity_query_ms += std::chrono::duration<float32>(clock::now() - q_start).count() * 1000.0f;
     stats_.entity_query_results += static_cast<int32>(entity_query_cache_.size());
 
@@ -278,13 +266,13 @@ auto physics_system<WD>::resolve_entity_collisions(
             continue;
         }
 
-        if (!reg.template has<box_collider_component>(other) ||
-            !reg.template has<transform_component>(other)) {
+        if (!reg.has<box_collider_component>(other) ||
+            !reg.has<transform_component>(other)) {
             continue;
         }
 
-        const auto& other_col = reg.template get<box_collider_component>(other);
-        const auto& other_tc  = reg.template get<transform_component>(other);
+        const auto& other_col = reg.get<box_collider_component>(other);
+        const auto& other_tc  = reg.get<transform_component>(other);
 
         auto other_half   = other_col.extents_ * 0.5f;
         auto other_center = other_tc.get_position() + other_col.offset_;
@@ -329,123 +317,111 @@ auto physics_system<WD>::resolve_entity_collisions(
     position = center - offset;
 }
 
-template <typename WD>
-physics_system<WD>::rigid_body_modifier::rigid_body_modifier(
+physics_system::rigid_body_modifier::rigid_body_modifier(
     physics_system* system, entity ent
 )
     : system_(system), entity_(ent) {}
 
-template <typename WD>
-auto physics_system<WD>::modify(
+auto physics_system::modify(
     entity ent
 ) -> rigid_body_modifier {
     return rigid_body_modifier(this, ent);
 }
 
-template <typename WD>
-auto physics_system<WD>::rigid_body_modifier::set_velocity(
+auto physics_system::rigid_body_modifier::set_velocity(
     const vec3f& vel
 ) -> rigid_body_modifier& {
     auto& reg = system_->world_->registry();
-    if (!reg.template has<rigid_body_component>(entity_)) {
+    if (!reg.has<rigid_body_component>(entity_)) {
         return *this;
     }
-    auto& comp = reg.template get<rigid_body_component>(entity_);
+    auto& comp = reg.get<rigid_body_component>(entity_);
     comp.velocity_ = vel;
     return *this;
 }
 
-template <typename WD>
-auto physics_system<WD>::rigid_body_modifier::set_gravity_scale(
+auto physics_system::rigid_body_modifier::set_gravity_scale(
     float32 scale
 ) -> rigid_body_modifier& {
     auto& reg = system_->world_->registry();
-    if (!reg.template has<rigid_body_component>(entity_)) {
+    if (!reg.has<rigid_body_component>(entity_)) {
         return *this;
     }
-    auto& comp = reg.template get<rigid_body_component>(entity_);
+    auto& comp = reg.get<rigid_body_component>(entity_);
     comp.gravity_scale_ = scale;
     return *this;
 }
 
-template <typename WD>
-auto physics_system<WD>::rigid_body_modifier::add_impulse(
+auto physics_system::rigid_body_modifier::add_impulse(
     const vec3f& impulse
 ) -> rigid_body_modifier& {
     auto& reg = system_->world_->registry();
-    if (!reg.template has<rigid_body_component>(entity_)) {
+    if (!reg.has<rigid_body_component>(entity_)) {
         return *this;
     }
-    auto& comp = reg.template get<rigid_body_component>(entity_);
+    auto& comp = reg.get<rigid_body_component>(entity_);
     comp.velocity_ = comp.velocity_ + impulse;
     return *this;
 }
 
-template <typename WD>
-auto physics_system<WD>::rigid_body_modifier::add_external_impulse(
+auto physics_system::rigid_body_modifier::add_external_impulse(
     const vec3f& impulse
 ) -> rigid_body_modifier& {
     auto& reg = system_->world_->registry();
-    if (!reg.template has<rigid_body_component>(entity_)) {
+    if (!reg.has<rigid_body_component>(entity_)) {
         return *this;
     }
-    auto& comp = reg.template get<rigid_body_component>(entity_);
+    auto& comp = reg.get<rigid_body_component>(entity_);
     comp.impulse_ = comp.impulse_ + impulse;
     return *this;
 }
 
-template <typename WD>
-auto physics_system<WD>::rigid_body_modifier::set_drag(
+auto physics_system::rigid_body_modifier::set_drag(
     float32 drag
 ) -> rigid_body_modifier& {
     auto& reg = system_->world_->registry();
-    if (!reg.template has<rigid_body_component>(entity_)) {
+    if (!reg.has<rigid_body_component>(entity_)) {
         return *this;
     }
-    auto& comp = reg.template get<rigid_body_component>(entity_);
+    auto& comp = reg.get<rigid_body_component>(entity_);
     comp.drag_ = drag;
     return *this;
 }
 
-template <typename WD>
-physics_system<WD>::collider_modifier::collider_modifier(
+physics_system::collider_modifier::collider_modifier(
     physics_system* system, entity ent
 )
     : system_(system), entity_(ent) {}
 
-template <typename WD>
-auto physics_system<WD>::modify_collider(
+auto physics_system::modify_collider(
     entity ent
 ) -> collider_modifier {
     return collider_modifier(this, ent);
 }
 
-template <typename WD>
-auto physics_system<WD>::collider_modifier::set_extents(
+auto physics_system::collider_modifier::set_extents(
     const vec3f& ext
 ) -> collider_modifier& {
     auto& reg = system_->world_->registry();
-    if (!reg.template has<box_collider_component>(entity_)) {
+    if (!reg.has<box_collider_component>(entity_)) {
         return *this;
     }
-    auto& comp = reg.template get<box_collider_component>(entity_);
+    auto& comp = reg.get<box_collider_component>(entity_);
     comp.extents_ = ext;
     return *this;
 }
 
-template <typename WD>
-auto physics_system<WD>::collider_modifier::set_offset(
+auto physics_system::collider_modifier::set_offset(
     const vec3f& offset
 ) -> collider_modifier& {
     auto& reg = system_->world_->registry();
-    if (!reg.template has<box_collider_component>(entity_)) {
+    if (!reg.has<box_collider_component>(entity_)) {
         return *this;
     }
-    auto& comp = reg.template get<box_collider_component>(entity_);
+    auto& comp = reg.get<box_collider_component>(entity_);
     comp.offset_ = offset;
     return *this;
 }
 
 }  // namespace vw::ecs
 
-#endif  // VW_ECS_SYSTEMS_PHYSICS_SYSTEM_INL_H

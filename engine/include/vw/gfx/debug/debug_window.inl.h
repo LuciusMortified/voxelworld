@@ -14,14 +14,12 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-debug_window<WC>::debug_window(
+inline debug_window::debug_window(
     engine_type& engine
 )
     : engine_(&engine) {}
 
-template <typename WC>
-void debug_window<WC>::render(
+inline void debug_window::render(
     [[maybe_unused]] float delta_time
 ) {
     if (!visible_) {
@@ -40,24 +38,20 @@ void debug_window<WC>::render(
     }
 }
 
-template <typename WC>
-void debug_window<WC>::toggle_visibility() {
+inline void debug_window::toggle_visibility() {
     visible_ = !visible_;
 }
 
-template <typename WC>
-void debug_window<WC>::set_visible(
+inline void debug_window::set_visible(
     bool visible
 ) {
     visible_ = visible;
 }
-template <typename WC>
-bool debug_window<WC>::is_visible() const {
+inline bool debug_window::is_visible() const {
     return visible_;
 }
 
-template <typename WC>
-void debug_window<WC>::render_fps_window() {
+inline void debug_window::render_fps_window() {
     ImGuiWindowFlags window_flags =          //
         ImGuiWindowFlags_NoResize |          //
         ImGuiWindowFlags_NoScrollbar |       //
@@ -176,8 +170,7 @@ void debug_window<WC>::render_fps_window() {
     ImGui::End();
 }
 
-template <typename WC>
-void debug_window<WC>::render_render_mode_controls() const {
+inline void debug_window::render_render_mode_controls() const {
     ImGui::Spacing();
     if (ImGui::Button("lit")) {
         engine_->get_renderer().set_render_mode(render_mode::lit);
@@ -188,8 +181,7 @@ void debug_window<WC>::render_render_mode_controls() const {
     }
 }
 
-template <typename WC>
-void debug_window<WC>::render_systems_detail() {
+inline void debug_window::render_systems_detail() {
     ImGuiWindowFlags window_flags =          //
         ImGuiWindowFlags_NoCollapse |        //
         ImGuiWindowFlags_NoSavedSettings |   //
@@ -204,8 +196,7 @@ void debug_window<WC>::render_systems_detail() {
     ImGui::End();
 }
 
-template <typename WC>
-void debug_window<WC>::render_combined_buffers_detail() {
+inline void debug_window::render_combined_buffers_detail() {
     ImGuiWindowFlags window_flags =          //
         ImGuiWindowFlags_NoCollapse |        //
         ImGuiWindowFlags_NoSavedSettings |   //
@@ -253,8 +244,7 @@ void debug_window<WC>::render_combined_buffers_detail() {
     ImGui::End();
 }
 
-template <typename WC>
-void debug_window<WC>::render_render_detail() {
+inline void debug_window::render_render_detail() {
     ImGuiWindowFlags window_flags =          //
         ImGuiWindowFlags_NoCollapse |        //
         ImGuiWindowFlags_NoSavedSettings |   //

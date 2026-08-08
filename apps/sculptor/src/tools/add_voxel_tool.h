@@ -13,7 +13,7 @@ namespace vw::sculptor {
 
 class add_voxel_tool final : public base_tool {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     add_voxel_tool(engine_type& eng, app_state& st, operation_manager& op_manager);
 

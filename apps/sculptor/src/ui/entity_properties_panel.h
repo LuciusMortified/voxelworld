@@ -17,7 +17,7 @@ namespace vw::sculptor {
 
 class entity_properties_panel final {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     entity_properties_panel(engine_type& eng, app_state& st, operation_manager& op_manager);
 

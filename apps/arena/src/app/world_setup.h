@@ -14,7 +14,7 @@ struct world_setup_result {
     gfx::perlin_terrain_generator::params generator_params;
 };
 
-auto setup_world_grid(gfx::engine<>& engine) -> world_setup_result;
+auto setup_world_grid(gfx::engine& engine) -> world_setup_result;
 
 }  // namespace vw::arena
 

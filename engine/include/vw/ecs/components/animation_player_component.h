@@ -11,7 +11,6 @@
 namespace vw::ecs {
 
 
-template <typename>
 class animation_system;
 
 struct animation_player_component final {
@@ -24,8 +23,7 @@ public:
     [[nodiscard]] auto get_layer(size_t index) const -> const vw::asset::animation_layer&;
     [[nodiscard]] auto is_any_playing() const -> bool;
 
-    template <typename>
-    friend class animation_system;
+        friend class animation_system;
 };
 
 }  // namespace vw::ecs

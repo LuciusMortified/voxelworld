@@ -10,7 +10,7 @@ namespace vw::sculptor {
 
 class playback_service final {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     playback_service(engine_type& eng, app_state& state);
 

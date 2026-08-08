@@ -11,15 +11,12 @@ namespace vw::asset { class model; }
 
 namespace vw::ecs {
 
-template <typename>
 class world;
 
-template <typename WD>
 class model_system {
 public:
-    using world_type    = world<WD>;
-    using components    = typename WD::components;
-    using registry_type = typename entity_registry_from_tuple<components>::type;
+    using world_type    = world;
+    using registry_type = registry;
 
     explicit model_system(world_type& w);
 
@@ -53,13 +50,5 @@ private:
 };
 
 }  // namespace vw::ecs
-
-template <>
-struct vw::ecs::system_trait<vw::ecs::model_system> {
-    using components = std::tuple<vw::ecs::model_component>;
-    using resources  = std::tuple<vw::asset::model_registry>;
-};
-
-#include "vw/ecs/systems/model_system.inl.h"
 
 #endif  // VW_ECS_MODEL_SYSTEM_H

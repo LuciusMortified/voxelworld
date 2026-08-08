@@ -5,14 +5,12 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-third_person_camera_controller<WC>::third_person_camera_controller(
+inline third_person_camera_controller::third_person_camera_controller(
     camera& camera, world_type& world, third_person_camera_params params
 )
     : camera_(&camera), world_(&world), params_(params), actual_arm_length_(params.arm_length) {}
 
-template <typename WC>
-void third_person_camera_controller<WC>::update(
+inline void third_person_camera_controller::update(
     const player_input_state& input, entity target
 ) {
     yaw_ += input.look_delta.x;
@@ -24,11 +22,11 @@ void third_person_camera_controller<WC>::update(
         math::clamp(params_.arm_length, params_.arm_length_min, params_.arm_length_max);
 
     auto& registry = world_->registry();
-    if (!registry.template has<transform_component>(target)) {
+    if (!registry.has<transform_component>(target)) {
         return;
     }
 
-    const auto& tc        = registry.template get<transform_component>(target);
+    const auto& tc        = registry.get<transform_component>(target);
     const auto player_pos = tc.get_position();
     const auto focus      = player_pos + params_.target_offset;
 
@@ -45,14 +43,14 @@ void third_person_camera_controller<WC>::update(
 
     actual_arm_length_ = params_.arm_length;
 
-    auto& spatial_sys = world_->template system<spatial_system>();
+    auto& spatial_sys = world_->system<spatial_system>();
     vw::spatial::ray collision_ray{focus, desired_pos};
     std::vector<entity> candidates;
     constexpr spatial_layer_mask camera_mask = spatial_layer::terrain | spatial_layer::prop;
     auto hit = spatial_sys.voxel_ray_cast(collision_ray, candidates, camera_mask);
 
     if (hit) {
-        const auto& hit_tc  = registry.template get<transform_component>(hit->ent);
+        const auto& hit_tc  = registry.get<transform_component>(hit->ent);
         vec3f hit_world_pos = hit_tc.get_world_matrix() *
             vec3f{
                 static_cast<float32>(hit->voxel_pos.x) + 0.5f,
@@ -77,23 +75,19 @@ void third_person_camera_controller<WC>::update(
     camera_->set_rotation(look_pitch, look_yaw);
 }
 
-template <typename WC>
-auto third_person_camera_controller<WC>::get_params() -> third_person_camera_params& {
+inline auto third_person_camera_controller::get_params() -> third_person_camera_params& {
     return params_;
 }
 
-template <typename WC>
-auto third_person_camera_controller<WC>::get_pitch() const -> float32 {
+inline auto third_person_camera_controller::get_pitch() const -> float32 {
     return pitch_;
 }
 
-template <typename WC>
-auto third_person_camera_controller<WC>::get_yaw() const -> float32 {
+inline auto third_person_camera_controller::get_yaw() const -> float32 {
     return yaw_;
 }
 
-template <typename WC>
-auto third_person_camera_controller<WC>::get_actual_arm_length() const -> float32 {
+inline auto third_person_camera_controller::get_actual_arm_length() const -> float32 {
     return actual_arm_length_;
 }
 

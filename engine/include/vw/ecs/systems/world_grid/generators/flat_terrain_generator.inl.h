@@ -18,7 +18,7 @@ inline flat_terrain_generator::flat_terrain_generator(
 inline void flat_terrain_generator::generate(
     terrain_context& ctx
 ) {
-    constexpr int32 s = chunk<>::size;
+    constexpr int32 s = chunk::size;
 
     auto mdl = std::make_shared<vw::asset::model>(*identity_pool_, *page_pool_, s, s, s, voxel_scale_);
 

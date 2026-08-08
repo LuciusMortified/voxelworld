@@ -11,7 +11,7 @@ inline close_clip_operation::close_clip_operation(
     : base_operation(), engine_(&engine), state_(&state), params_(params) {}
 
 inline void close_clip_operation::execute() {
-    auto& registry = engine_->get_world().template resource<asset::animation_clip_registry>();
+    auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     saved_clip_    = registry.get(params_.name);
     registry.remove(params_.name);
 
@@ -24,7 +24,7 @@ inline void close_clip_operation::execute() {
 }
 
 inline void close_clip_operation::undo() {
-    auto& registry = engine_->get_world().template resource<asset::animation_clip_registry>();
+    auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     registry.add(params_.name, saved_clip_);
     state_->anim.selected_clip_name = params_.name;
 }

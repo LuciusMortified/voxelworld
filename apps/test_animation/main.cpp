@@ -3,10 +3,10 @@
 
 using namespace vw;
 
-class test_animation_app final : public gfx::app<> {
+class test_animation_app final : public gfx::app {
 public:
     explicit test_animation_app(
-        gfx::engine<>& eng
+        gfx::engine& eng
     )
         : app{eng} {
         auto& window = get_engine().get_window();
@@ -58,11 +58,11 @@ public:
 private:
     void setup_scene() {
         auto& world            = get_engine().get_world();
-        auto& model_reg = world.template resource<asset::model_registry>();
-        auto& transform_sys = world.template system<gfx::transform_system>();
-        auto& model_sys = world.template system<gfx::model_system>();
-        auto& hierarchy_sys = world.template system<gfx::hierarchy_system>();
-        auto& anim_sys = world.template system<gfx::animation_system>();
+        auto& model_reg = world.resource<asset::model_registry>();
+        auto& transform_sys = world.system<gfx::transform_system>();
+        auto& model_sys = world.system<gfx::model_system>();
+        auto& hierarchy_sys = world.system<gfx::hierarchy_system>();
+        auto& anim_sys = world.system<gfx::animation_system>();
 
         auto red_cube_model = model_reg.create("red_cube", 3, 3, 3);
         red_cube_model->fill(voxel{blocks::red_3});
@@ -171,7 +171,7 @@ private:
 
     void create_bounce_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.template resource<asset::animation_clip_registry>();
+        auto& clip_registry = world.resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("bounce");
 
         {
@@ -222,7 +222,7 @@ private:
             clip->add_track(track);
         }
 
-        auto& anim_sys = world.template system<gfx::animation_system>();
+        auto& anim_sys = world.system<gfx::animation_system>();
         auto layer_mod = anim_sys.modify_player(root_).layer(0);
         layer_mod.blend_to_by_name("bounce");
         layer_mod.set_loop_mode(asset::animation_loop_mode::loop);
@@ -231,7 +231,7 @@ private:
 
     void create_rotation_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.template resource<asset::animation_clip_registry>();
+        auto& clip_registry = world.resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("rotation");
 
         {
@@ -297,7 +297,7 @@ private:
 
     void create_wave_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.template resource<asset::animation_clip_registry>();
+        auto& clip_registry = world.resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("wave");
 
         {
@@ -355,7 +355,7 @@ private:
 
     void create_scale_animation() {
         auto& world         = get_engine().get_world();
-        auto& clip_registry = world.template resource<asset::animation_clip_registry>();
+        auto& clip_registry = world.resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("scale");
 
         {
@@ -454,7 +454,7 @@ private:
         ImGui::Separator();
 
         auto& world            = get_engine().get_world();
-        auto& anim_sys = world.template system<gfx::animation_system>();
+        auto& anim_sys = world.system<gfx::animation_system>();
         auto modifier = anim_sys.modify_player(root_).layer(0);
         auto& animation_comp =
             world.get<gfx::animation_player_component>(root_);
@@ -587,7 +587,7 @@ private:
 
 auto main() -> int32 {
     try {
-        gfx::engine<> engine{1280, 720, "Test Animation"};
+        gfx::engine engine{1280, 720, "Test Animation"};
         engine.run<test_animation_app>();
     } catch (const std::exception& e) {
         log::error("Fatal error: {}", e.what());

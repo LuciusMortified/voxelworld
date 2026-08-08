@@ -11,7 +11,7 @@ inline add_track_operation::add_track_operation(
     : base_operation(), engine_(&engine), state_(&state), params_(params) {}
 
 inline void add_track_operation::execute() {
-    const auto& registry = engine_->get_world().template resource<asset::animation_clip_registry>();
+    const auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(params_.clip_name);
     if (!clip) {
         return;
@@ -49,8 +49,8 @@ inline void add_track_operation::execute() {
         auto& world    = engine_->get_world();
         if (!world.has<gfx::animation_target_component>(ent)) {
             added_target_component_ = true;
-            world.modify(ent).template with<gfx::animation_target_component>();
-            auto target_mod = world.template system<gfx::animation_system>().modify_target(ent);
+            world.modify(ent).with<gfx::animation_target_component>();
+            auto target_mod = world.system<gfx::animation_system>().modify_target(ent);
             target_mod.set_target_name(params_.track_name);
             if (world.has<gfx::transform_component>(ent)) {
                 target_mod.set_rest_transform(
@@ -65,7 +65,7 @@ inline void add_track_operation::execute() {
 }
 
 inline void add_track_operation::undo() {
-    const auto& registry = engine_->get_world().template resource<asset::animation_clip_registry>();
+    const auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(params_.clip_name);
     if (!clip) {
         return;

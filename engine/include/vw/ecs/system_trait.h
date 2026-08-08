@@ -4,17 +4,10 @@
 #define VW_ECS_SYSTEM_TRAIT_H
 
 #include <concepts>
-#include <tuple>
 
 #include "vw/ecs/entity.h"
 
 namespace vw::ecs {
-
-template <template <typename> class S>
-struct system_trait {
-    using components = std::tuple<>;
-    using resources  = std::tuple<>;
-};
 
 template <typename S, typename C>
 concept has_on_add = requires(S& s, entity e) {

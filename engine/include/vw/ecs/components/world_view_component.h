@@ -7,7 +7,6 @@
 
 namespace vw::ecs {
 
-template <typename>
 class world_grid_system;
 
 struct world_view_component final {
@@ -19,8 +18,7 @@ private:
     uint32 view_distance_{10};
     bool dirty_ = true;
 
-    template <typename>
-    friend class world_grid_system;
+        friend class world_grid_system;
 };
 
 }  // namespace vw::ecs

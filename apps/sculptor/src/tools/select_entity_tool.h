@@ -12,7 +12,7 @@ namespace vw::sculptor {
 
 class select_entity_tool final : public base_tool {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     select_entity_tool(engine_type& eng, app_state& st);
 

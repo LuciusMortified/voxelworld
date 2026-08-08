@@ -19,7 +19,7 @@ struct add_keyframe_params {
 
 class add_keyframe_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     add_keyframe_operation(
         engine_type& engine, app_state& state, const add_keyframe_params& params

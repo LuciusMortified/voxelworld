@@ -9,7 +9,6 @@
 #include <vw/ecs/systems/transform_system.h>
 #include <vw/ecs/systems/spatial_system.h>
 #include <vw/ecs/world.h>
-#include <vw/ecs/world_def.h>
 
 using namespace vw;
 using namespace vw::ecs;
@@ -85,15 +84,14 @@ TEST_CASE("socket_point default attached is invalid", "[socket]") {
     REQUIRE_FALSE(sp.attached.is_valid());
 }
 
-using test_def = world_def<hierarchy_system, transform_system, spatial_system, socket_system>;
 
 struct socket_test_fixture {
-    world<test_def> w;
+    world w;
 
-    test_def::registry_type& reg = w.registry();
-    socket_system<test_def>& socket_sys = w.system<socket_system>();
-    hierarchy_system<test_def>& hierarchy_sys = w.system<hierarchy_system>();
-    transform_system<test_def>& transform_sys = w.system<transform_system>();
+    registry& reg = w.registry();
+    socket_system& socket_sys = w.system<socket_system>();
+    hierarchy_system& hierarchy_sys = w.system<hierarchy_system>();
+    transform_system& transform_sys = w.system<transform_system>();
 
     auto create_entity() -> entity {
         auto ent = reg.create();

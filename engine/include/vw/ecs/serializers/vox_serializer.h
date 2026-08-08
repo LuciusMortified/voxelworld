@@ -12,10 +12,9 @@
 
 namespace vw::ecs {
 
-template <typename WC = base_world_def>
 class vox_serializer final {
 public:
-    using world_type        = world<WC>;
+    using world_type        = world;
     using entity_names_type = std::unordered_map<entity, std::string>;
 
     using error_type = vox_writer::error_type;

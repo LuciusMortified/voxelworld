@@ -17,7 +17,7 @@ namespace vw::sculptor {
 inline app::app(
     engine_type& eng
 )
-    : gfx::app<>(eng)
+    : gfx::app(eng)
     , camera_controller_(0.1f, 5.0f)
 
     , file_service_(eng, state_)

@@ -5,6 +5,8 @@
 
 #include <algorithm>
 
+#include "vw/asset/model/model.h"
+
 namespace vw::ecs {
 
 inline chunk_loader::chunk_loader(

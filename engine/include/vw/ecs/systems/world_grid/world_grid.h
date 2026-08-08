@@ -15,13 +15,11 @@ namespace vw::asset { class model; }
 
 namespace vw::ecs {
 
-template <typename>
 class world;
 
-template <typename WD>
 class world_grid {
-    using world_type = world<WD>;
-    using chunk_type = chunk<WD>;
+    using world_type = world;
+    using chunk_type = chunk;
 
 public:
     explicit world_grid(world_type& w, int32 voxel_scale = 8);
@@ -61,7 +59,5 @@ private:
 };
 
 }  // namespace vw::ecs
-
-#include "vw/ecs/systems/world_grid/world_grid.inl.h"
 
 #endif  // VW_ECS_SYSTEMS_WORLD_GRID_H

@@ -50,10 +50,9 @@ struct combined_buffer_pool_stats {
     buffer_pool_timing_stats timing;
 };
 
-template <typename C>
 class combined_buffer_pool {
 public:
-    using world_type = world<C>;
+    using world_type = world;
 
     explicit combined_buffer_pool(
         vulkan_context& context,

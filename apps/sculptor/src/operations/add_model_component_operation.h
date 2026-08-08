@@ -4,7 +4,6 @@
 #define VW_SCULPTOR_ADD_MODEL_COMPONENT_OPERATION_H
 
 #include <vw/gfx/engine/engine.h>
-#include <vw/ecs/base_world_def.h>
 
 #include "app/app_state.h"
 #include "base_operation.h"
@@ -18,7 +17,7 @@ struct add_model_component_params {
 
 class add_model_component_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     add_model_component_operation(
         engine_type& engine, app_state& state, const add_model_component_params& params

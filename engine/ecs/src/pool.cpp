@@ -50,12 +50,6 @@ auto component_pool::operator=(component_pool&& other) noexcept -> component_poo
     return *this;
 }
 
-auto component_pool::has(entity e) const -> bool {
-    return e.index != entity::invalid_index && e.index < sparse_indices_.size() &&
-        sparse_indices_[e.index] != entity::invalid_index &&
-        dense_entities_[sparse_indices_[e.index]] == e;
-}
-
 auto component_pool::emplace(entity e) -> void* {
     if (e.index >= sparse_indices_.size()) [[unlikely]] {
         sparse_indices_.resize(e.index + 1, entity::invalid_index);
@@ -117,38 +111,6 @@ void component_pool::clear() {
     size_ = 0;
     dense_entities_.clear();
     std::ranges::fill(sparse_indices_, entity::invalid_index);
-}
-
-auto component_pool::get(entity e) -> void* {
-    return has(e) ? at(sparse_indices_[e.index]) : nullptr;
-}
-
-auto component_pool::get(entity e) const -> const void* {
-    return has(e) ? at(sparse_indices_[e.index]) : nullptr;
-}
-
-auto component_pool::at(uint32 dense_index) -> void* {
-    return data_ + static_cast<std::size_t>(dense_index) * ops_.size;
-}
-
-auto component_pool::at(uint32 dense_index) const -> const void* {
-    return data_ + static_cast<std::size_t>(dense_index) * ops_.size;
-}
-
-auto component_pool::size() const -> uint32 {
-    return size_;
-}
-
-auto component_pool::ops() const -> const component_ops& {
-    return ops_;
-}
-
-auto component_pool::entities() const -> const std::vector<entity>& {
-    return dense_entities_;
-}
-
-auto component_pool::raw_data() -> void* {
-    return data_;
 }
 
 void component_pool::reserve_(uint32 capacity) {

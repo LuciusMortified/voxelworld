@@ -1,18 +1,14 @@
-#pragma once
+#include "vw/ecs/systems/world_grid/world_grid.h"
 
-#ifndef VW_ECS_SYSTEMS_WORLD_GRID_INL_H
-#define VW_ECS_SYSTEMS_WORLD_GRID_INL_H
-
+#include "vw/ecs/world.h"
 namespace vw::ecs {
 
-template <typename WD>
-world_grid<WD>::world_grid(
+world_grid::world_grid(
     world_type& w, int32 voxel_scale
 )
     : world_(&w), voxel_scale_(voxel_scale) {}
 
-template <typename WD>
-auto world_grid<WD>::get_voxel(
+auto world_grid::get_voxel(
     vec3i world_pos
 ) const -> voxel {
     auto cc = world_to_chunk_coord(world_pos);
@@ -24,8 +20,7 @@ auto world_grid<WD>::get_voxel(
     return it->second->get_voxel(lc / voxel_scale_);
 }
 
-template <typename WD>
-void world_grid<WD>::set_voxel(
+void world_grid::set_voxel(
     vec3i world_pos, const voxel& v
 ) {
     auto cc = world_to_chunk_coord(world_pos);
@@ -37,26 +32,23 @@ void world_grid<WD>::set_voxel(
     it->second->set_voxel(lc / voxel_scale_, v);
 }
 
-template <typename WD>
-auto world_grid<WD>::has_chunk(
+auto world_grid::has_chunk(
     vec3i chunk_coord
 ) const -> bool {
     return chunks_.contains(chunk_coord);
 }
 
-template <typename WD>
-auto world_grid<WD>::get_chunk(
+auto world_grid::get_chunk(
     vec3i chunk_coord
 ) -> chunk_type* {
     auto it = chunks_.find(chunk_coord);
     return it != chunks_.end() ? it->second.get() : nullptr;
 }
 
-template <typename WD>
-auto world_grid<WD>::get_surface_y(
+auto world_grid::get_surface_y(
     int32 wx, int32 wz
 ) const -> std::optional<int32> {
-    constexpr int32 s = chunk<WD>::size;
+    constexpr int32 s = chunk::size;
 
     auto floor_div = [](int32 a, int32 b) -> int32 { return a >= 0 ? a / b : (a - b + 1) / b; };
     int32 cx       = floor_div(wx, s);
@@ -91,25 +83,21 @@ auto world_grid<WD>::get_surface_y(
     return std::nullopt;
 }
 
-template <typename WD>
-auto world_grid<WD>::has_column(
+auto world_grid::has_column(
     vec2i coord
 ) const -> bool {
     return column_chunks_.contains(coord);
 }
 
-template <typename WD>
-auto world_grid<WD>::column_count() const -> uint32 {
+auto world_grid::column_count() const -> uint32 {
     return static_cast<uint32>(column_chunks_.size());
 }
 
-template <typename WD>
-auto world_grid<WD>::chunk_count() const -> uint32 {
+auto world_grid::chunk_count() const -> uint32 {
     return static_cast<uint32>(chunks_.size());
 }
 
-template <typename WD>
-auto world_grid<WD>::place_chunk(
+auto world_grid::place_chunk(
     vec3i chunk_coord, std::shared_ptr<asset::model> mdl
 ) -> chunk_type* {
     auto [it, inserted] = chunks_.emplace(
@@ -119,15 +107,13 @@ auto world_grid<WD>::place_chunk(
     return it->second.get();
 }
 
-template <typename WD>
-void world_grid<WD>::register_column(
+void world_grid::register_column(
     vec2i coord, std::vector<int32> y_levels
 ) {
     column_chunks_[coord] = std::move(y_levels);
 }
 
-template <typename WD>
-void world_grid<WD>::unload_column(
+void world_grid::unload_column(
     vec2i coord
 ) {
     auto col_it = column_chunks_.find(coord);
@@ -140,16 +126,14 @@ void world_grid<WD>::unload_column(
     }
 }
 
-template <typename WD>
-auto world_grid<WD>::voxel_scale() const -> int32 {
+auto world_grid::voxel_scale() const -> int32 {
     return voxel_scale_;
 }
 
-template <typename WD>
-auto world_grid<WD>::world_to_chunk_coord(
+auto world_grid::world_to_chunk_coord(
     vec3i world_pos
 ) const -> vec3i {
-    const int32 s = chunk<WD>::size * voxel_scale_;
+    const int32 s = chunk::size * voxel_scale_;
     return {
         world_pos.x >= 0 ? world_pos.x / s : (world_pos.x - s + 1) / s,
         world_pos.y >= 0 ? world_pos.y / s : (world_pos.y - s + 1) / s,
@@ -157,22 +141,19 @@ auto world_grid<WD>::world_to_chunk_coord(
     };
 }
 
-template <typename WD>
-auto world_grid<WD>::world_to_local_coord(
+auto world_grid::world_to_local_coord(
     vec3i world_pos
 ) const -> vec3i {
-    const int32 s = chunk<WD>::size * voxel_scale_;
+    const int32 s = chunk::size * voxel_scale_;
     return {((world_pos.x % s) + s) % s, ((world_pos.y % s) + s) % s, ((world_pos.z % s) + s) % s};
 }
 
-template <typename WD>
-auto world_grid<WD>::chunk_to_world_coord(
+auto world_grid::chunk_to_world_coord(
     vec3i chunk_coord
 ) const -> vec3i {
-    const int32 s = chunk<WD>::size * voxel_scale_;
+    const int32 s = chunk::size * voxel_scale_;
     return {chunk_coord.x * s, chunk_coord.y * s, chunk_coord.z * s};
 }
 
 }  // namespace vw::ecs
 
-#endif  // VW_ECS_SYSTEMS_WORLD_GRID_INL_H

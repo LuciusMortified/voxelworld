@@ -12,7 +12,7 @@ namespace vw::sculptor {
 
 class delete_track_modal final {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     delete_track_modal(engine_type& eng, app_state& st, operation_manager& op_manager);
 

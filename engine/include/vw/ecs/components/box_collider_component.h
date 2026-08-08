@@ -7,10 +7,8 @@
 
 namespace vw::ecs {
 
-template <typename>
 class physics_system;
 
-template <typename>
 class renderer;
 
 struct box_collider_component final {
@@ -18,11 +16,9 @@ private:
     vec3f extents_{1.0f, 1.0f, 1.0f};
     vec3f offset_{0.0f, 0.0f, 0.0f};
 
-    template <typename>
-    friend class physics_system;
+        friend class physics_system;
 
-    template <typename>
-    friend class renderer;
+        friend class renderer;
 
 public:
     [[nodiscard]] auto get_extents() const -> const vec3f&;

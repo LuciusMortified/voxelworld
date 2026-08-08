@@ -21,10 +21,10 @@ inline void playback_service::toggle_playback() const {
     const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
 
     if (!world.has<gfx::animation_player_component>(root_ent)) {
-        world.modify(root_ent).template with<gfx::animation_player_component>();
+        world.modify(root_ent).with<gfx::animation_player_component>();
     }
 
-    auto& anim_sys     = world.template system<gfx::animation_system>();
+    auto& anim_sys     = world.system<gfx::animation_system>();
     const auto& player = world.get<gfx::animation_player_component>(root_ent);
 
     const bool is_same_clip = player.has_layer(layer_idx) && player.get_layer(layer_idx).clip &&
@@ -35,7 +35,7 @@ inline void playback_service::toggle_playback() const {
         return;
     }
 
-    const auto& clip_reg = world.template resource<asset::animation_clip_registry>();
+    const auto& clip_reg = world.resource<asset::animation_clip_registry>();
     const auto clip      = clip_reg.get(state_->anim.selected_clip_name);
     if (!clip) {
         return;
@@ -68,7 +68,7 @@ inline void playback_service::stop_playback() const {
         const auto root_ent  = state_->scene.name_to_entity[state_->scene.root_name];
         const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
         if (world.has<gfx::animation_player_component>(root_ent)) {
-            auto& anim_sys      = world.template system<gfx::animation_system>();
+            auto& anim_sys      = world.system<gfx::animation_system>();
             const auto& cs      = state_->anim.get_clip_settings(state_->anim.selected_clip_name);
             const auto modifier = anim_sys.modify_player(root_ent).layer(layer_idx);
             if (cs.fade_out.duration > 0.f) {

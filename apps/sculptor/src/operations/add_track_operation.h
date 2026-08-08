@@ -21,7 +21,7 @@ struct add_track_params {
 
 class add_track_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     add_track_operation(engine_type& engine, app_state& state, const add_track_params& params);
 

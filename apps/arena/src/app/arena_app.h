@@ -20,9 +20,9 @@
 
 namespace vw::arena {
 
-class arena_app final : public gfx::app<> {
+class arena_app final : public gfx::app {
 public:
-    explicit arena_app(gfx::engine<>& eng);
+    explicit arena_app(gfx::engine& eng);
     ~arena_app() override = default;
 
     void render(float delta_time) override;
@@ -35,7 +35,7 @@ private:
     asset::asset_storage assets_;
 
     gfx::player_input_controller input_controller_;
-    gfx::third_person_camera_controller<> camera_controller_;
+    gfx::third_person_camera_controller camera_controller_;
 
     std::unique_ptr<player> player_;
     std::vector<std::unique_ptr<dummy_enemy>> enemies_;

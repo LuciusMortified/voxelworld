@@ -11,7 +11,7 @@ inline add_keyframe_operation::add_keyframe_operation(
     : engine_(&engine), state_(&state), params_(params) {}
 
 inline void add_keyframe_operation::execute() {
-    const auto& registry = engine_->get_world().template resource<asset::animation_clip_registry>();
+    const auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(params_.clip_name);
     if (!clip) {
         return;
@@ -27,19 +27,19 @@ inline void add_keyframe_operation::execute() {
         if (params_.property == asset::animation_property::rotation) {
             auto channel = asset::make_animation_channel<asset::animation_property::rotation>();
             channel.add(std::get<asset::keyframe_quat>(params_.keyframe));
-            track->template add<asset::animation_property::rotation>(std::move(channel));
+            track->add<asset::animation_property::rotation>(std::move(channel));
         } else if (params_.property == asset::animation_property::position) {
             auto channel = asset::make_animation_channel<asset::animation_property::position>();
             channel.add(std::get<asset::keyframe_vec3f>(params_.keyframe));
-            track->template add<asset::animation_property::position>(std::move(channel));
+            track->add<asset::animation_property::position>(std::move(channel));
         } else if (params_.property == asset::animation_property::scale) {
             auto channel = asset::make_animation_channel<asset::animation_property::scale>();
             channel.add(std::get<asset::keyframe_vec3f>(params_.keyframe));
-            track->template add<asset::animation_property::scale>(std::move(channel));
+            track->add<asset::animation_property::scale>(std::move(channel));
         } else if (params_.property == asset::animation_property::origin) {
             auto channel = asset::make_animation_channel<asset::animation_property::origin>();
             channel.add(std::get<asset::keyframe_vec3f>(params_.keyframe));
-            track->template add<asset::animation_property::origin>(std::move(channel));
+            track->add<asset::animation_property::origin>(std::move(channel));
         }
         created_channel_ = true;
     } else {
@@ -59,7 +59,7 @@ inline void add_keyframe_operation::execute() {
 }
 
 inline void add_keyframe_operation::undo() {
-    const auto& registry = engine_->get_world().template resource<asset::animation_clip_registry>();
+    const auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(params_.clip_name);
     if (!clip) {
         return;

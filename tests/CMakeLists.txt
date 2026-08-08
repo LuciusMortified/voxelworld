@@ -35,8 +35,6 @@ add_executable(ecs_tests
     ecs/socket.test.cpp
     ecs/animation_layer.test.cpp
     ecs/dynamic_aabb_tree.test.cpp
-    ecs/tuple_utils.test.cpp
-    ecs/world_def.test.cpp
 )
 
 target_link_libraries(ecs_tests PRIVATE
@@ -47,3 +45,7 @@ target_link_libraries(ecs_tests PRIVATE
 target_compile_features(ecs_tests PRIVATE cxx_std_23)
 
 catch_discover_tests(ecs_tests)
+
+add_executable(view_bench ecs/view_bench.cpp)
+target_link_libraries(view_bench PRIVATE vwengine)
+target_compile_features(view_bench PRIVATE cxx_std_23)

@@ -44,8 +44,7 @@ inline void sorted_merge_range(
 
 }  // namespace
 
-template <typename C>
-combined_buffer_pool<C>::combined_buffer_pool(
+inline combined_buffer_pool::combined_buffer_pool(
     vulkan_context& context,
     VkDescriptorPool descriptor_pool,
     VkDescriptorSetLayout descriptor_set_layout,
@@ -57,8 +56,7 @@ combined_buffer_pool<C>::combined_buffer_pool(
     , descriptor_set_layout_(descriptor_set_layout)
     , compute_descriptor_set_layout_(compute_descriptor_set_layout) {}
 
-template <typename C>
-void combined_buffer_pool<C>::update(
+inline void combined_buffer_pool::update(
     world_type& world,
     const camera& camera,
     VkCommandBuffer cmd,
@@ -83,22 +81,20 @@ void combined_buffer_pool<C>::update(
     });
 }
 
-template <typename C>
-const std::vector<std::unique_ptr<combined_buffer>>& combined_buffer_pool<C>::get_buffers() const {
+inline const std::vector<std::unique_ptr<combined_buffer>>& combined_buffer_pool::get_buffers() const {
     return buffers_;
 }
 
-template <typename C>
-void combined_buffer_pool<C>::process_destroyed_(world_type& world) {
+inline void combined_buffer_pool::process_destroyed_(world_type& world) {
     for (auto ent : world.destroyed()) {
         if (entity_buffer_infos_.contains(ent)) {
             auto& info = entity_buffer_infos_[ent];
             auto swapped = buffers_[info.buffer_index]->free(ent);
-            if (swapped && world.template has<transform_component>(*swapped)) {
-                auto& tc = world.template get<transform_component>(*swapped);
+            if (swapped && world.has<transform_component>(*swapped)) {
+                auto& tc = world.get<transform_component>(*swapped);
                 vw::spatial::aabb bounds{};
-                if (world.template has<spatial_component>(*swapped)) {
-                    bounds = world.template get<spatial_component>(*swapped)
+                if (world.has<spatial_component>(*swapped)) {
+                    bounds = world.get<spatial_component>(*swapped)
                                  .get_bounds();
                 }
                 buffers_[info.buffer_index]->write_transform(
@@ -111,8 +107,7 @@ void combined_buffer_pool<C>::process_destroyed_(world_type& world) {
     }
 }
 
-template <typename C>
-buffer_chunk_size combined_buffer_pool<C>::get_chunk_size_for_mesh(
+inline buffer_chunk_size combined_buffer_pool::get_chunk_size_for_mesh(
     uint32 vertex_count, uint32 index_count
 ) {
     uint32 vertex_chunk = 256;
@@ -128,8 +123,7 @@ buffer_chunk_size combined_buffer_pool<C>::get_chunk_size_for_mesh(
     return buffer_chunk_size{vertex_chunk, index_chunk};
 }
 
-template <typename C>
-combined_buffer* combined_buffer_pool<C>::get_or_create_buffer(
+inline combined_buffer* combined_buffer_pool::get_or_create_buffer(
     const buffer_chunk_size& chunk_size
 ) {
     if (chunk_size_to_buffer_index_.contains(chunk_size)) {
@@ -149,11 +143,10 @@ combined_buffer* combined_buffer_pool<C>::get_or_create_buffer(
     return buffers_[buffer_index].get();
 }
 
-template <typename C>
-void combined_buffer_pool<C>::update_meshes_(
+inline void combined_buffer_pool::update_meshes_(
     world_type& world, const vec3f& camera_pos, mesh_pool& pool
 ) {
-    auto& model_changed = world.template changed<model_component>();
+    auto& model_changed = world.changed<model_component>();
     sorted_merge_range(mesh_pending_entities_, model_changed.begin(), model_changed.end());
 
     entities_to_process_.assign(
@@ -162,10 +155,10 @@ void combined_buffer_pool<C>::update_meshes_(
     std::sort(entities_to_process_.begin(), entities_to_process_.end(),
         [&](entity a, entity b) {
             auto get_dist_sq = [&](entity e) -> float32 {
-                if (!world.template has<spatial_component>(e)) {
+                if (!world.has<spatial_component>(e)) {
                     return 0.0f;
                 }
-                auto& sc = world.template get<spatial_component>(e);
+                auto& sc = world.get<spatial_component>(e);
                 auto diff = sc.get_bounds().center() - camera_pos;
                 return diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
             };
@@ -191,18 +184,18 @@ void combined_buffer_pool<C>::update_meshes_(
             break;
         }
 
-        const bool has_model     = world.template has<model_component>(ent);
-        const bool has_transform = world.template has<transform_component>(ent);
+        const bool has_model     = world.has<model_component>(ent);
+        const bool has_transform = world.has<transform_component>(ent);
 
         if (!has_model || !has_transform) {
             if (entity_buffer_infos_.contains(ent)) {
                 auto& buffer_info = entity_buffer_infos_[ent];
                 auto swapped = buffers_[buffer_info.buffer_index]->free(ent);
-                if (swapped && world.template has<transform_component>(*swapped)) {
-                    auto& tc = world.template get<transform_component>(*swapped);
+                if (swapped && world.has<transform_component>(*swapped)) {
+                    auto& tc = world.get<transform_component>(*swapped);
                     vw::spatial::aabb swap_bounds{};
-                    if (world.template has<spatial_component>(*swapped)) {
-                        swap_bounds = world.template get<spatial_component>(*swapped)
+                    if (world.has<spatial_component>(*swapped)) {
+                        swap_bounds = world.get<spatial_component>(*swapped)
                                           .get_bounds();
                     }
                     buffers_[buffer_info.buffer_index]->write_transform(
@@ -213,7 +206,7 @@ void combined_buffer_pool<C>::update_meshes_(
             continue;
         }
 
-        const auto& model_comp = world.template get<model_component>(ent);
+        const auto& model_comp = world.get<model_component>(ent);
         if (!model_comp.has_model()) {
             merge_buffer_.push_back(ent);
             continue;
@@ -240,7 +233,7 @@ void combined_buffer_pool<C>::update_meshes_(
             required_chunk_size.index_count * sizeof(uint32) +
             sizeof(uint32) + sizeof(draw_command) + sizeof(mat4f) * 2;
 
-        const auto& transform_comp    = world.template get<transform_component>(ent);
+        const auto& transform_comp    = world.get<transform_component>(ent);
         const mat4f& transform_matrix = transform_comp.get_world_matrix();
 
         if (entity_buffer_infos_.contains(ent)) {
@@ -267,11 +260,11 @@ void combined_buffer_pool<C>::update_meshes_(
             }
 
             auto swapped = buffer->free(ent);
-            if (swapped && world.template has<transform_component>(*swapped)) {
-                auto& tc = world.template get<transform_component>(*swapped);
+            if (swapped && world.has<transform_component>(*swapped)) {
+                auto& tc = world.get<transform_component>(*swapped);
                 vw::spatial::aabb sw_bounds{};
-                if (world.template has<spatial_component>(*swapped)) {
-                    sw_bounds = world.template get<spatial_component>(*swapped)
+                if (world.has<spatial_component>(*swapped)) {
+                    sw_bounds = world.get<spatial_component>(*swapped)
                                     .get_bounds();
                 }
                 buffer->write_transform(*swapped, tc.get_world_matrix(), sw_bounds);
@@ -285,8 +278,8 @@ void combined_buffer_pool<C>::update_meshes_(
         const auto buffer_index = chunk_size_to_buffer_index_[required_chunk_size];
 
         vw::spatial::aabb ent_bounds{};
-        if (world.template has<spatial_component>(ent)) {
-            ent_bounds = world.template get<spatial_component>(ent).get_bounds();
+        if (world.has<spatial_component>(ent)) {
+            ent_bounds = world.get<spatial_component>(ent).get_bounds();
         }
         buffer->allocate(ent, model_id, *mesh_ptr, transform_matrix, ent_bounds);
         pool.evict(model_id);
@@ -299,11 +292,10 @@ void combined_buffer_pool<C>::update_meshes_(
     mesh_pending_entities_.swap(merge_buffer_);
 }
 
-template <typename C>
-void combined_buffer_pool<C>::update_transforms_(
+inline void combined_buffer_pool::update_transforms_(
     world_type& world
 ) {
-    auto& transform_changed = world.template changed<transform_component>();
+    auto& transform_changed = world.changed<transform_component>();
     sorted_merge_range(
         transform_pending_entities_, transform_changed.begin(), transform_changed.end());
 
@@ -320,8 +312,8 @@ void combined_buffer_pool<C>::update_transforms_(
             continue;
         }
 
-        const bool has_model     = world.template has<model_component>(ent);
-        const bool has_transform = world.template has<transform_component>(ent);
+        const bool has_model     = world.has<model_component>(ent);
+        const bool has_transform = world.has<transform_component>(ent);
         if (!has_model || !has_transform) {
             continue;
         }
@@ -335,10 +327,10 @@ void combined_buffer_pool<C>::update_transforms_(
         }
 
         auto& info = entity_buffer_infos_[ent];
-        const auto& transform_comp = world.template get<transform_component>(ent);
+        const auto& transform_comp = world.get<transform_component>(ent);
         vw::spatial::aabb tr_bounds{};
-        if (world.template has<spatial_component>(ent)) {
-            tr_bounds = world.template get<spatial_component>(ent).get_bounds();
+        if (world.has<spatial_component>(ent)) {
+            tr_bounds = world.get<spatial_component>(ent).get_bounds();
         }
         buffers_[info.buffer_index]->write_transform(
             ent, transform_comp.get_world_matrix(), tr_bounds);
@@ -348,8 +340,7 @@ void combined_buffer_pool<C>::update_transforms_(
     transform_pending_entities_.swap(merge_buffer_);
 }
 
-template <typename C>
-const combined_buffer_pool_stats& combined_buffer_pool<C>::get_stats() const {
+inline const combined_buffer_pool_stats& combined_buffer_pool::get_stats() const {
     stats_.vertex_load_min   = 0.0f;
     stats_.vertex_load_max   = 0.0f;
     stats_.vertex_load_avg   = 0.0f;

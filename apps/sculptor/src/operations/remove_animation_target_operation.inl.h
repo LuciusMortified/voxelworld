@@ -33,7 +33,7 @@ inline auto remove_animation_target_operation::find_animation_root_(
 
 inline void remove_animation_target_operation::execute() {
     auto& world    = engine_->get_world();
-    auto& anim_sys = world.template system<gfx::animation_system>();
+    auto& anim_sys = world.system<gfx::animation_system>();
 
     const auto ent          = state_->scene.name_to_entity[params_.entity_name];
     const auto& target_comp = world.get<gfx::animation_target_component>(ent);
@@ -41,7 +41,7 @@ inline void remove_animation_target_operation::execute() {
 
     const auto root = find_animation_root_(ent);
 
-    world.modify(ent).template without<gfx::animation_target_component>();
+    world.modify(ent).without<gfx::animation_target_component>();
 
     if (root.is_valid()) {
         anim_sys.modify_player(root).rebuild_target_map();
@@ -51,14 +51,14 @@ inline void remove_animation_target_operation::execute() {
 
 inline void remove_animation_target_operation::undo() {
     auto& world    = engine_->get_world();
-    auto& anim_sys = world.template system<gfx::animation_system>();
+    auto& anim_sys = world.system<gfx::animation_system>();
 
     if (!state_->scene.name_to_entity.contains(params_.entity_name)) {
         return;
     }
     const auto ent = state_->scene.name_to_entity[params_.entity_name];
 
-    world.modify(ent).template with<gfx::animation_target_component>();
+    world.modify(ent).with<gfx::animation_target_component>();
     auto target_mod = anim_sys.modify_target(ent);
     target_mod.set_target_name(saved_target_name_);
     if (world.has<gfx::transform_component>(ent)) {

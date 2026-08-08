@@ -8,11 +8,11 @@
 namespace vw::arena {
 
 inline arena_app::arena_app(
-    gfx::engine<>& eng
+    gfx::engine& eng
 )
     : app{eng}
     , parser_(eng.get_block_registry())
-    , assets_(parser_, eng.get_world().template resource<asset::model_registry>())
+    , assets_(parser_, eng.get_world().resource<asset::model_registry>())
     , input_controller_(get_engine().get_window())
     , camera_controller_(
           get_engine().get_camera(),
@@ -121,7 +121,7 @@ inline auto arena_app::handle_key_press(
             if (player_->is_placed()) {
                 get_engine()
                     .get_world()
-                    .template system<gfx::physics_system>()
+                    .system<gfx::physics_system>()
                     .modify(player_->get_entity())
                     .add_external_impulse({0.0f, 0.0f, 500.0f});
             }

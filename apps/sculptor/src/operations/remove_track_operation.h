@@ -18,7 +18,7 @@ struct remove_track_params {
 
 class remove_track_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     remove_track_operation(engine_type& eng, app_state& state, remove_track_params params);
 

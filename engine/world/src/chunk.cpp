@@ -1,23 +1,18 @@
-#pragma once
+#include "vw/ecs/systems/world_grid/chunk.h"
 
-#ifndef VW_ECS_SYSTEMS_WORLD_GRID_CHUNK_INL_H
-#define VW_ECS_SYSTEMS_WORLD_GRID_CHUNK_INL_H
-
-#include "vw/asset/model/model.h"
 #include "vw/ecs/world.h"
+#include "vw/asset/model/model.h"
 
 namespace vw::ecs {
 
-
-template <typename WD>
-chunk<WD>::chunk(
+chunk::chunk(
     world_type& w, vec3i coord, std::shared_ptr<vw::asset::model> mdl, int32 voxel_scale
 )
     : world_(&w)
     , ent_(w.create()
-        .template with<transform_component>()
-        .template with<model_component>()
-        .template with<spatial_component>()
+        .with<transform_component>()
+        .with<model_component>()
+        .with<spatial_component>()
         .get_entity())
     , model_(std::move(mdl)) {
     auto world_pos = vec3f{
@@ -27,26 +22,24 @@ chunk<WD>::chunk(
     };
 
     auto vs = static_cast<float32>(voxel_scale);
-    w.template system<transform_system>().modify(ent_)
+    w.system<transform_system>().modify(ent_)
         .set_position(world_pos)
         .set_scale({vs, vs, vs});
     {
-        auto modifier = w.template system<model_system>().modify(ent_);
+        auto modifier = w.system<model_system>().modify(ent_);
         modifier.set_model(model_);
         modifier.set_top_brightness(true);
     }
-    w.template system<spatial_system>().modify(ent_).set_layer(spatial_layer::terrain);
+    w.system<spatial_system>().modify(ent_).set_layer(spatial_layer::terrain);
 }
 
-template <typename WD>
-chunk<WD>::~chunk() {
+chunk::~chunk() {
     if (world_ != nullptr && ent_.is_valid()) {
         world_->destroy(ent_);
     }
 }
 
-template <typename WD>
-chunk<WD>::chunk(
+chunk::chunk(
     chunk&& other
 ) noexcept
     : world_(other.world_)
@@ -56,8 +49,7 @@ chunk<WD>::chunk(
     other.ent_   = invalid_entity;
 }
 
-template <typename WD>
-auto chunk<WD>::operator=(
+auto chunk::operator=(
     chunk&& other
 ) noexcept -> chunk& {
     if (this != &other) {
@@ -73,51 +65,43 @@ auto chunk<WD>::operator=(
     return *this;
 }
 
-template <typename WD>
-auto chunk<WD>::get_voxel(
+auto chunk::get_voxel(
     int32 x, int32 y, int32 z
 ) const -> voxel {
     return model_->get_voxel(x, y, z);
 }
 
-template <typename WD>
-auto chunk<WD>::get_voxel(
+auto chunk::get_voxel(
     vec3i local
 ) const -> voxel {
     return model_->get_voxel(local);
 }
 
-template <typename WD>
-void chunk<WD>::set_voxel(
+void chunk::set_voxel(
     int32 x, int32 y, int32 z, const voxel& v
 ) const {
     model_->set_voxel(x, y, z, v);
 }
 
-template <typename WD>
-void chunk<WD>::set_voxel(
+void chunk::set_voxel(
     vec3i local, const voxel& v
 ) const {
     model_->set_voxel(local, v);
 }
 
-template <typename WD>
-auto chunk<WD>::is_empty(
+auto chunk::is_empty(
     int32 x, int32 y, int32 z
 ) const -> bool {
     return model_->is_empty(x, y, z);
 }
 
-template <typename WD>
-auto chunk<WD>::get_model() const -> std::shared_ptr<vw::asset::model> {
+auto chunk::get_model() const -> std::shared_ptr<vw::asset::model> {
     return model_;
 }
 
-template <typename WD>
-auto chunk<WD>::get_entity() const -> entity {
+auto chunk::get_entity() const -> entity {
     return ent_;
 }
 
 }  // namespace vw::ecs
 
-#endif  // VW_ECS_SYSTEMS_WORLD_GRID_CHUNK_INL_H

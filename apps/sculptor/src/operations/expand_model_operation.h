@@ -16,7 +16,7 @@ struct expand_model_params {
 
 class expand_model_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     expand_model_operation(engine_type& eng, app_state& st, const expand_model_params& params);
 

@@ -10,7 +10,7 @@ namespace vw::sculptor {
 
 class save_as_modal final {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     save_as_modal(engine_type& eng, app_state& st, file_service& file_svc);
 

@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+import vw.core;
 import vw.ecs;
 
 using namespace vw;

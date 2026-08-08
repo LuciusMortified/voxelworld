@@ -17,7 +17,7 @@ struct close_clip_params {
 
 class close_clip_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     close_clip_operation(engine_type& engine, app_state& state, const close_clip_params& params);
 

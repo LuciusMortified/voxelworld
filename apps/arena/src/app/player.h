@@ -17,7 +17,7 @@ namespace vw::arena {
 
 class player {
 public:
-    explicit player(gfx::engine<>& engine, asset::asset_storage& assets);
+    explicit player(gfx::engine& engine, asset::asset_storage& assets);
     ~player();
 
     player(const player&)                    = delete;
@@ -42,7 +42,7 @@ private:
     [[nodiscard]] auto can_attack() const -> bool;
     auto setup_animation_fsm() const -> void;
 
-    gfx::engine<>& engine_;
+    gfx::engine& engine_;
     asset::asset_storage& assets_;
 
     gfx::entity root_;

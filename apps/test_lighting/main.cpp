@@ -13,9 +13,9 @@ struct point_light_info {
     float32 phase;
 };
 
-class lighting_app final : public gfx::app<> {
+class lighting_app final : public gfx::app {
 public:
-    explicit lighting_app(gfx::engine<>& eng)
+    explicit lighting_app(gfx::engine& eng)
         : app{eng} {
         auto& window = get_engine().get_window();
         auto& camera = get_engine().get_camera();
@@ -65,9 +65,9 @@ public:
 private:
     void setup_scene() {
         auto& world = get_engine().get_world();
-        auto& model_reg = world.template resource<asset::model_registry>();
-        auto& transform_sys = world.template system<gfx::transform_system>();
-        auto& model_sys = world.template system<gfx::model_system>();
+        auto& model_reg = world.resource<asset::model_registry>();
+        auto& transform_sys = world.system<gfx::transform_system>();
+        auto& model_sys = world.system<gfx::model_system>();
 
         floor_model_ = model_reg.create("floor", 80, 1, 80);
         for (uint32 x = 0; x < 80; ++x) {
@@ -140,8 +140,8 @@ private:
         }
 
         auto& world = get_engine().get_world();
-        auto& transform_sys = world.template system<gfx::transform_system>();
-        auto& light_sys = world.template system<gfx::light_system>();
+        auto& transform_sys = world.system<gfx::transform_system>();
+        auto& light_sys = world.system<gfx::light_system>();
 
         if (target > current) {
             light_infos_.resize(target);
@@ -186,7 +186,7 @@ private:
 
     void update_point_lights() {
         auto& world = get_engine().get_world();
-        auto& transform_sys = world.template system<gfx::transform_system>();
+        auto& transform_sys = world.system<gfx::transform_system>();
         auto& renderer = get_engine().get_renderer();
 
         for (uint32 i = 0; i < light_entities_.size(); ++i) {
@@ -285,7 +285,7 @@ private:
 
 int main() {
     try {
-        std::make_unique<gfx::engine<>>(1280, 720, "Voxel World - Lighting Test")
+        std::make_unique<gfx::engine>(1280, 720, "Voxel World - Lighting Test")
             ->run<lighting_app>();
     } catch (const std::exception& e) {
         log::error("Error: {}", e.what());

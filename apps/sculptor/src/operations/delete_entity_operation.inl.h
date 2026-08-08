@@ -52,22 +52,22 @@ inline void delete_entity_operation::execute() {
 
 inline void delete_entity_operation::undo() {
     auto& world            = engine_->get_world();
-    auto& hierarchy_sys = world.template system<gfx::hierarchy_system>();
-    auto& transform_sys = world.template system<gfx::transform_system>();
+    auto& hierarchy_sys = world.system<gfx::hierarchy_system>();
+    auto& transform_sys = world.system<gfx::transform_system>();
 
     auto modifier = world.create()
-        .template with<gfx::hierarchy_component>()
-        .template with<gfx::transform_component>()
-        .template with<gfx::spatial_component>();
+        .with<gfx::hierarchy_component>()
+        .with<gfx::transform_component>()
+        .with<gfx::spatial_component>();
 
     const auto ent = modifier.get_entity();
 
     transform_sys.modify(ent).set_transform(transform_);
 
     if (with_model_) {
-        modifier.template with<gfx::model_component>();
+        modifier.with<gfx::model_component>();
 
-        auto& model_sys = world.template system<gfx::model_system>();
+        auto& model_sys = world.system<gfx::model_system>();
         model_sys.modify(ent).set_model(saved_model_);
     }
 

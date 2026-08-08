@@ -7,7 +7,6 @@
 
 namespace vw::ecs {
 
-template <typename>
 class physics_system;
 
 struct rigid_body_component final {
@@ -19,8 +18,7 @@ private:
     bool grounded_ = false;
     bool frozen_ = false;
 
-    template <typename>
-    friend class physics_system;
+        friend class physics_system;
 
 public:
     [[nodiscard]] auto get_velocity() const -> const vec3f&;

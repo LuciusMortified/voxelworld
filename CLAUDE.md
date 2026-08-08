@@ -4,10 +4,14 @@
 
 ## Architecture
 Идёт миграция на C++ модули (`docs/modules-migration-plan.md`). Движок сейчас в
-переходном состоянии: `vw.core` — модульная статическая библиотека, остальное
-пока header-only.
+переходном состоянии: `vw.core` и `vw.ecs` — модульные статические библиотеки,
+`vw_world` — обычная статическая, остальное пока header-only.
 
 - **vw.core**: модуль (`engine/core/src/*.cppm` + `*.cpp`), таргет `vw_core`
+- **vw.ecs**: модуль (`engine/ecs/src/*.cppm` + `*.cpp`), таргет `vw_ecs` —
+  entity, type-erased пул, реестр с рантайм-идентификаторами компонентов
+- **vw_world**: статическая библиотека (`engine/world/src/*.cpp`) — тела мира и
+  систем; станет модулем `vw.world` в M3
 - **Engine**: header-only INTERFACE библиотека (`engine/include/vw/`) — остальные модули
 - **Apps**: компилируемые executable (`apps/sculptor/`, `apps/test_*`)
 - **Shaders**: GLSL → SPIR-V (`shaders/`)
@@ -15,7 +19,10 @@
   - `vw::core` — типы, math, transform, voxel, block_registry
   - `vw::spatial` — чистая геометрия (aabb, frustum, plane, ray)
   - `vw::asset` — модели, анимации, vox/voxa parsers, asset_storage
-  - `vw::ecs` — entity/registry/world, компоненты, системы, world_grid, dynamic_aabb_tree
+  - `vw::ecs` — entity/registry/world, компоненты, системы, world_grid, dynamic_aabb_tree.
+    Компоненты регистрируются лениво по первому обращению; шаблонов с
+    параметром-миром больше нет. Для пер-кадрового обхода используй
+    `registry::for_each<Cs...>`, а не `view` — он заметно быстрее
   - `vw::gfx` — Vulkan renderer, окно, камера, ImGui, debug
 - **Undo/Redo**: command паттерн через `base_operation`
 - **Deps**: vcpkg (glfw3, imgui, spdlog, catch2, Vulkan SDK)

@@ -16,16 +16,12 @@
 
 namespace vw::ecs {
 
-template <typename>
 class transform_system;
 
-template <typename>
 class spatial_system;
 
-template <typename>
 class world_grid;
 
-template <typename>
 class world;
 
 class debug_primitives;
@@ -40,12 +36,10 @@ struct physics_stats {
     int32 entity_query_results   = 0;
 };
 
-template <typename WD>
 class physics_system final {
 public:
-    using world_type    = world<WD>;
-    using components    = typename WD::components;
-    using registry_type = typename entity_registry_from_tuple<components>::type;
+    using world_type    = world;
+    using registry_type = registry;
 
     static constexpr int32 max_collision_iterations = 4;
     static constexpr float32 fixed_dt = 1.0f / 60.0f;
@@ -117,15 +111,5 @@ private:
 };
 
 }  // namespace vw::ecs
-
-template <>
-struct vw::ecs::system_trait<vw::ecs::physics_system> {
-    using components = std::tuple<
-        vw::ecs::rigid_body_component,
-        vw::ecs::box_collider_component>;
-    using resources  = std::tuple<>;
-};
-
-#include "vw/ecs/systems/physics_system.inl.h"
 
 #endif  // VW_ECS_SYSTEMS_PHYSICS_SYSTEM_H

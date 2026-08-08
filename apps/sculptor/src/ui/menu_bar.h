@@ -13,7 +13,7 @@ namespace vw::sculptor {
 
 class menu_bar final {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     menu_bar(engine_type& eng, app_state& state, operation_manager& op_manager,
              file_service& file_svc);

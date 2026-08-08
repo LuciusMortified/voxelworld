@@ -15,9 +15,9 @@
 namespace vw::arena {
 
 inline auto render_debug_hud(
-    const gfx::engine<>& engine,
+    const gfx::engine& engine,
     const player& player,
-    const gfx::third_person_camera_controller<>& camera_controller,
+    const gfx::third_person_camera_controller& camera_controller,
     bool show_colliders
 ) -> void {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
@@ -77,7 +77,7 @@ inline auto render_debug_hud(
         ImGui::Text("Colliders: %s", show_colliders ? "visible" : "hidden");
     }
 
-    const auto& wgs = engine.get_world().template system<gfx::world_grid_system>();
+    const auto& wgs = engine.get_world().system<gfx::world_grid_system>();
     if (const auto* grid = wgs.grid()) {
         ImGui::Separator();
         ImGui::Text("Loaded chunks: %u", grid->chunk_count());

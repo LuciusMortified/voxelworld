@@ -19,7 +19,7 @@ struct remove_keyframe_params {
 
 class remove_keyframe_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     remove_keyframe_operation(
         engine_type& engine, app_state& state, const remove_keyframe_params& params

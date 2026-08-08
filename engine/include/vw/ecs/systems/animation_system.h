@@ -23,19 +23,14 @@
 
 namespace vw::ecs {
 
-
-template <typename>
 class transform_system;
 
-template <typename>
 class world;
 
-template <typename WD>
 class animation_system final {
 public:
-    using components    = typename WD::components;
-    using registry_type = typename entity_registry_from_tuple<components>::type;
-    using world_type    = world<WD>;
+    using registry_type = registry;
+    using world_type    = world;
 
     explicit animation_system(world_type& w);
 
@@ -143,15 +138,5 @@ private:
 };
 
 }  // namespace vw::ecs
-
-template <>
-struct vw::ecs::system_trait<vw::ecs::animation_system> {
-    using components = std::tuple<
-        animation_player_component,
-        animation_target_component>;
-    using resources  = std::tuple<asset::animation_clip_registry>;
-};
-
-#include "vw/ecs/systems/animation_system.inl.h"
 
 #endif  // VW_ECS_ANIMATION_SYSTEM_H

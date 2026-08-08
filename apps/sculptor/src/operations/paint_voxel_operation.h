@@ -21,7 +21,7 @@ struct paint_voxel_params {
 
 class paint_voxel_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     paint_voxel_operation(engine_type& eng, app_state& st, const paint_voxel_params& params);
 

@@ -13,9 +13,9 @@ inline void expand_model_operation::execute() {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
-    auto& model_reg = world.template resource<asset::model_registry>();
-    auto& model_sys = world.template system<gfx::model_system>();
-    auto& transform_sys = world.template system<gfx::transform_system>();
+    auto& model_reg = world.resource<asset::model_registry>();
+    auto& model_sys = world.system<gfx::model_system>();
+    auto& transform_sys = world.system<gfx::transform_system>();
 
     const auto& model_comp = world.get<gfx::model_component>(ent);
     const auto model = model_comp.get_model();
@@ -64,9 +64,9 @@ inline void expand_model_operation::undo() {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
-    auto& model_reg = world.template resource<asset::model_registry>();
-    auto& model_sys = world.template system<gfx::model_system>();
-    auto& transform_sys = world.template system<gfx::transform_system>();
+    auto& model_reg = world.resource<asset::model_registry>();
+    auto& model_sys = world.system<gfx::model_system>();
+    auto& transform_sys = world.system<gfx::transform_system>();
 
     auto& model_comp = world.get<gfx::model_component>(ent);
     auto model = model_comp.get_model();

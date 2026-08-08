@@ -1,8 +1,6 @@
-#pragma once
+#include "vw/ecs/systems/spatial_system.h"
 
-#ifndef VW_ECS_SYSTEMS_SPATIAL_SYSTEM_INL_H
-#define VW_ECS_SYSTEMS_SPATIAL_SYSTEM_INL_H
-
+#include "vw/ecs/world.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -11,74 +9,67 @@
 #include "vw/ecs/components/model_component.h"
 #include "vw/ecs/components/transform_component.h"
 #include "vw/ecs/systems/spatial_system.h"
-#include "vw/ecs/world.h"
 #include "vw/spatial/aabb.h"
 
 namespace vw::ecs {
 
-template <typename WD>
-spatial_system<WD>::spatial_system(
+spatial_system::spatial_system(
     world_type& w
 )
     : world_(&w) {}
 
-template <typename WD>
-auto spatial_system<WD>::modify(entity ent) -> spatial_modifier {
+auto spatial_system::modify(entity ent) -> spatial_modifier {
     return spatial_modifier(this, ent);
 }
 
-template <typename WD>
-spatial_system<WD>::spatial_modifier::spatial_modifier(
+spatial_system::spatial_modifier::spatial_modifier(
     spatial_system* system, entity ent
 )
     : system_(system)
     , entity_(ent) {}
 
-template <typename WD>
-auto spatial_system<WD>::spatial_modifier::set_layer(
+auto spatial_system::spatial_modifier::set_layer(
     spatial_layer_mask layer
 ) -> spatial_modifier& {
     auto& reg = system_->world_->registry();
-    if (!reg.template has<spatial_component>(entity_)) {
+    if (!reg.has<spatial_component>(entity_)) {
         return *this;
     }
-    auto& spatial = reg.template get<spatial_component>(entity_);
+    auto& spatial = reg.get<spatial_component>(entity_);
     spatial.layer_ = layer;
     return *this;
 }
 
-template <typename WD>
-void spatial_system<WD>::update(float32 /*dt*/) {
+void spatial_system::update(float32 /*dt*/) {
     auto& reg       = world_->registry();
-    auto& requested = reg.template requested<spatial_component>();
+    auto& requested = reg.requested<spatial_component>();
     if (requested.empty()) {
         return;
     }
 
     for (entity ent : requested) {
         const bool can_be_updated =  //
-            reg.template has<model_component>(ent) &&
-            reg.template has<transform_component>(ent) &&
-            reg.template has<spatial_component>(ent);
+            reg.has<model_component>(ent) &&
+            reg.has<transform_component>(ent) &&
+            reg.has<spatial_component>(ent);
         if (!can_be_updated) {
             continue;
         }
         update_entity(ent);
-        reg.template notify_changed<spatial_component>(ent);
+        reg.notify_changed<spatial_component>(ent);
     }
 
-    reg.template clear_requested<spatial_component>();
+    reg.clear_requested<spatial_component>();
 }
 
-template <typename WD>
-void spatial_system<WD>::update_entity(
+void spatial_system::update_entity(
     entity ent
 ) {
     auto& reg     = world_->registry();
-    auto& spatial = reg.template get<spatial_component>(ent);
+    auto& spatial = reg.get<spatial_component>(ent);
 
-    const auto& model_comp     = reg.template get<model_component>(ent);
-    const auto& transform_comp = reg.template get<transform_component>(ent);
+    const auto& model_comp     = reg.get<model_component>(ent);
+    const auto& transform_comp = reg.get<transform_component>(ent);
     vw::spatial::aabb new_bounds = calculate_aabb_from_model(ent, model_comp, transform_comp);
 
     const bool bounds_changed =  //
@@ -113,8 +104,7 @@ void spatial_system<WD>::update_entity(
     }
 }
 
-template <typename WD>
-auto spatial_system<WD>::expand_aabb_for_fat(
+auto spatial_system::expand_aabb_for_fat(
     const vw::spatial::aabb& bounds
 ) -> vw::spatial::aabb {
     constexpr float expansion_factor = 0.1f;
@@ -133,8 +123,7 @@ auto spatial_system<WD>::expand_aabb_for_fat(
     };
 }
 
-template <typename WD>
-auto spatial_system<WD>::calculate_aabb_from_model(
+auto spatial_system::calculate_aabb_from_model(
     entity ent, const model_component& model_comp, const transform_component& transform_comp
 ) const -> vw::spatial::aabb {
     if (!model_comp.has_model()) {
@@ -181,44 +170,38 @@ auto spatial_system<WD>::calculate_aabb_from_model(
     return vw::spatial::aabb{min_point, max_point};
 }
 
-template <typename WD>
-void spatial_system<WD>::query_all(
+void spatial_system::query_all(
     const vw::spatial::frustum& f, std::vector<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
     tree_.query_all(f, result_out, layer_mask);
 }
 
-template <typename WD>
-void spatial_system<WD>::query_all_any(
+void spatial_system::query_all_any(
     std::span<const vw::spatial::frustum> frustums, std::vector<entity>& result_out
 ) const {
     tree_.query_all_any(frustums, result_out);
     std::sort(result_out.begin(), result_out.end());
 }
 
-template <typename WD>
-void spatial_system<WD>::query_all(
+void spatial_system::query_all(
     const vw::spatial::ray& r, std::vector<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
     tree_.query_all(r, result_out, layer_mask);
 }
 
-template <typename WD>
-void spatial_system<WD>::query_all(
+void spatial_system::query_all(
     const vw::spatial::aabb& bounds, std::vector<entity>& result_out, spatial_layer_mask layer_mask
 ) const {
     tree_.query_all(bounds, result_out, layer_mask);
 }
 
-template <typename WD>
-void spatial_system<WD>::cleanup(
+void spatial_system::cleanup(
     entity ent
 ) {
     tree_.remove(ent);
 }
 
-template <typename WD>
-auto spatial_system<WD>::voxel_ray_cast(
+auto spatial_system::voxel_ray_cast(
     const vw::spatial::ray& r, std::vector<entity>& candidates, spatial_layer_mask layer_mask
 ) const -> std::optional<voxel_ray_hit> {
     query_all(r, candidates, layer_mask);
@@ -229,14 +212,14 @@ auto spatial_system<WD>::voxel_ray_cast(
 
     for (entity ent : candidates) {
         const bool can_be_processed =  //
-            reg.template has<model_component>(ent) &&
-            reg.template has<transform_component>(ent);
+            reg.has<model_component>(ent) &&
+            reg.has<transform_component>(ent);
         if (!can_be_processed) {
             continue;
         }
 
-        const auto& model_comp     = reg.template get<model_component>(ent);
-        const auto& transform_comp = reg.template get<transform_component>(ent);
+        const auto& model_comp     = reg.get<model_component>(ent);
+        const auto& transform_comp = reg.get<transform_component>(ent);
 
         if (!model_comp.has_model()) {
             continue;
@@ -393,4 +376,3 @@ auto spatial_system<WD>::voxel_ray_cast(
 
 }  // namespace vw::ecs
 
-#endif  // VW_ECS_SYSTEMS_SPATIAL_SYSTEM_INL_H

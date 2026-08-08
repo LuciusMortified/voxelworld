@@ -10,8 +10,7 @@
 
 namespace vw::gfx {
 
-template <typename C>
-renderer<C>::renderer(
+inline renderer::renderer(
     vulkan_context& context, window& window, const block_registry& registry
 )
     : context_(&context)
@@ -83,8 +82,7 @@ renderer<C>::renderer(
     );
 }
 
-template <typename C>
-renderer<C>::~renderer() {
+inline renderer::~renderer() {
     mesh_pool_.stop_gen_threads();
     wait_idle();
 
@@ -109,8 +107,7 @@ renderer<C>::~renderer() {
     cleanup_descriptor_pool();
 }
 
-template <typename C>
-void renderer<C>::begin_frame() {
+inline void renderer::begin_frame() {
     // Ждем завершения предыдущего кадра
     vkWaitForFences(
         context_->get_device(), 1, &in_flight_fences_[current_frame_], VK_TRUE, UINT64_MAX
@@ -156,8 +153,7 @@ void renderer<C>::begin_frame() {
     ImGui::NewFrame();
 }
 
-template <typename C>
-void renderer<C>::end_frame() {
+inline void renderer::end_frame() {
     VkSubmitInfo submit_info{};
     submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
 
@@ -206,98 +202,87 @@ void renderer<C>::end_frame() {
     current_frame_ = (current_frame_ + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
-template <typename C>
-const renderer_stats& renderer<C>::get_stats() const {
+inline const renderer_stats& renderer::get_stats() const {
     stats_.combined_buffers = combined_buffer_pool_->get_stats();
     return stats_;
 }
 
-template <typename C>
-auto renderer<C>::get_directional_light_settings() -> directional_light_settings& {
+inline auto renderer::get_directional_light_settings() -> directional_light_settings& {
     return directional_light_settings_;
 }
 
-template <typename C>
-auto renderer<C>::get_fog_settings() -> fog_settings& {
+inline auto renderer::get_fog_settings() -> fog_settings& {
     return fog_settings_;
 }
 
-template <typename C>
-void renderer<C>::draw_colliders(
-    world<C>& w, color col
+inline void renderer::draw_colliders(
+    world& w, color col
 ) {
     for (auto [ent, box, tc] :
-         w.registry().template view<box_collider_component, transform_component>()) {
+         w.registry().view<box_collider_component, transform_component>()) {
         auto pos  = tc.get_position() + box.get_offset();
         auto half = box.get_extents() * 0.5f;
         draw_box(pos - half, box.get_extents(), col);
     }
 }
 
-template <typename C>
-void renderer<C>::set_clear_color(
+inline void renderer::set_clear_color(
     float r, float g, float b, float a
 ) {
     clear_color_ = {r, g, b, a};
 }
 
-template <typename C>
-void renderer<C>::set_clear_color(
+inline void renderer::set_clear_color(
     vec4f color
 ) {
     clear_color_ = color;
 }
 
-template <typename C>
-void renderer<C>::wait_idle() const {
+inline void renderer::wait_idle() const {
     vkDeviceWaitIdle(context_->get_device());
 }
 
-template <typename C>
-void renderer<C>::handle_resize() {
+inline void renderer::handle_resize() {
     framebuffer_resized_ = true;
 }
 
-template <typename C>
-void renderer<C>::set_render_mode(
+inline void renderer::set_render_mode(
     render_mode mode
 ) {
     current_render_mode_ = mode;
 }
 
-template <typename WC>
-render_mode renderer<WC>::get_render_mode() const {
+inline render_mode renderer::get_render_mode() const {
     return current_render_mode_;
 }
 
-template <typename C>
-void renderer<C>::sync_meshes_(world_type& world) {
+inline void renderer::sync_meshes_(world_type& world) {
     mesh_pool_.process_completed();
 
     auto& registry = world.registry();
 
     for (auto it = pending_mesh_entities_.begin(); it != pending_mesh_entities_.end();) {
         auto ent = *it;
-        if (!registry.template has<model_component>(ent)) {
+        if (!registry.has<model_component>(ent)) {
             it = pending_mesh_entities_.erase(it);
             continue;
         }
-        auto& comp = registry.template get<model_component>(ent);
+        auto& comp = registry.get<model_component>(ent);
         if (!comp.has_model()) {
             it = pending_mesh_entities_.erase(it);
             continue;
         }
         if (mesh_pool_.has(comp.get_identity())) {
             it = pending_mesh_entities_.erase(it);
-            registry.template notify_changed<model_component>(ent);
+            registry.notify_changed<model_component>(ent);
         } else {
             ++it;
         }
     }
 
-    for (auto ent : registry.template changed<model_component>()) {
-        if (!registry.template has<model_component>(ent)) continue;
-        auto& comp = registry.template get<model_component>(ent);
+    for (auto ent : registry.changed<model_component>()) {
+        if (!registry.has<model_component>(ent)) continue;
+        auto& comp = registry.get<model_component>(ent);
         if (!comp.has_model()) continue;
         auto identity = comp.get_identity();
         if (!mesh_pool_.has(identity) && !mesh_pool_.is_pending(identity)) {
@@ -309,8 +294,7 @@ void renderer<C>::sync_meshes_(world_type& world) {
     }
 }
 
-template <typename C>
-void renderer<C>::render(
+inline void renderer::render(
     world_type& world, camera& camera
 ) {
     // Начинаем запись в command buffer
@@ -403,57 +387,49 @@ void renderer<C>::render(
     }
 }
 
-template <typename C>
-void renderer<C>::draw_line(
+inline void renderer::draw_line(
     const vec3f& a, const vec3f& b, color col
 ) {
     debug_primitives_.add_line(a, b, col);
 }
 
-template <typename C>
-void renderer<C>::draw_box(
+inline void renderer::draw_box(
     const mat4f& matrix, const vec3f& size, const color col
 ) {
     debug_primitives_.add_box(matrix, size, col);
 }
 
-template <typename C>
-void renderer<C>::draw_box(
+inline void renderer::draw_box(
     const transform& transform, const vec3f& size, color col
 ) {
     debug_primitives_.add_box(transform, size, col);
 }
 
-template <typename C>
-void renderer<C>::draw_box(
+inline void renderer::draw_box(
     const vec3f& position, const vec3f& size, color col
 ) {
     debug_primitives_.add_box(position, size, col);
 }
 
-template <typename C>
-void renderer<C>::draw_grid(
+inline void renderer::draw_grid(
     const mat4f& matrix, float cell_size, int cols, int rows, color clr
 ) {
     debug_primitives_.add_grid(matrix, cell_size, cols, rows, clr);
 }
 
-template <typename C>
-void renderer<C>::draw_grid(
+inline void renderer::draw_grid(
     const transform& transform, float cell_size, int cols, int rows, color clr
 ) {
     debug_primitives_.add_grid(transform, cell_size, cols, rows, clr);
 }
 
-template <typename C>
-void renderer<C>::draw_grid(
+inline void renderer::draw_grid(
     const vec3f& position, float cell_size, int cols, int rows, color clr
 ) {
     debug_primitives_.add_grid(position, cell_size, cols, rows, clr);
 }
 
-template <typename C>
-void renderer<C>::create_swapchain() {
+inline void renderer::create_swapchain() {
     auto swapchain_support = context_->query_swapchain_support_();
 
     VkSurfaceFormatKHR surface_format = choose_swap_surface_format(swapchain_support.formats);
@@ -508,8 +484,7 @@ void renderer<C>::create_swapchain() {
     swapchain_extent_       = extent;
 }
 
-template <typename C>
-void renderer<C>::create_image_views() {
+inline void renderer::create_image_views() {
     swapchain_image_views_.resize(swapchain_images_.size());
 
     for (size_t i = 0; i < swapchain_images_.size(); i++) {
@@ -536,8 +511,7 @@ void renderer<C>::create_image_views() {
     }
 }
 
-template <typename C>
-void renderer<C>::create_color_resources() {
+inline void renderer::create_color_resources() {
     create_image(
         color_image_,
         color_image_memory_,
@@ -552,8 +526,7 @@ void renderer<C>::create_color_resources() {
         create_image_view(color_image_, swapchain_image_format_, VK_IMAGE_ASPECT_COLOR_BIT);
 }
 
-template <typename C>
-void renderer<C>::create_depth_resources() {
+inline void renderer::create_depth_resources() {
     VkFormat depth_format = find_depth_format();
 
     create_image(
@@ -569,8 +542,7 @@ void renderer<C>::create_depth_resources() {
     depth_image_view_ = create_image_view(depth_image_, depth_format, VK_IMAGE_ASPECT_DEPTH_BIT);
 }
 
-template <typename C>
-void renderer<C>::create_render_pass() {
+inline void renderer::create_render_pass() {
     // Attachment 0: MSAA color (render target)
     VkAttachmentDescription color_attachment{};
     color_attachment.format         = swapchain_image_format_;
@@ -685,8 +657,7 @@ void renderer<C>::create_render_pass() {
     }
 }
 
-template <typename C>
-void renderer<C>::create_descriptor_set_layouts() {
+inline void renderer::create_descriptor_set_layouts() {
     // Uniform buffer descriptor set layout (set 0, binding 0)
     VkDescriptorSetLayoutBinding ubo_layout_binding{};
     ubo_layout_binding.binding         = 0;
@@ -752,8 +723,7 @@ void renderer<C>::create_descriptor_set_layouts() {
     }
 }
 
-template <typename C>
-void renderer<C>::create_graphics_pipeline() {
+inline void renderer::create_graphics_pipeline() {
     // Используем уже созданные шейдеры
     VkPipelineShaderStageCreateInfo shader_stages[] = {
         vertex_shader_->get_stage_info(), fragment_shader_->get_stage_info()
@@ -880,8 +850,7 @@ void renderer<C>::create_graphics_pipeline() {
         throw std::runtime_error("failed to create graphics pipeline");
     }
 }
-template <typename C>
-void renderer<C>::create_wireframe_pipeline() {
+inline void renderer::create_wireframe_pipeline() {
     VkPipelineShaderStageCreateInfo shader_stages[] = {
         vertex_shader_->get_stage_info(), fragment_shader_->get_stage_info()
     };
@@ -980,8 +949,7 @@ void renderer<C>::create_wireframe_pipeline() {
     }
 }
 
-template <typename C>
-void renderer<C>::create_debug_pipeline() {
+inline void renderer::create_debug_pipeline() {
     // Используем уже созданные шейдеры
     VkPipelineShaderStageCreateInfo shader_stages[] = {
         debug_vertex_shader_->get_stage_info(), debug_fragment_shader_->get_stage_info()
@@ -1106,8 +1074,7 @@ void renderer<C>::create_debug_pipeline() {
     }
 }
 
-template <typename C>
-void renderer<C>::create_framebuffers() {
+inline void renderer::create_framebuffers() {
     framebuffers_.resize(swapchain_image_views_.size());
 
     for (size_t i = 0; i < swapchain_image_views_.size(); i++) {
@@ -1134,8 +1101,7 @@ void renderer<C>::create_framebuffers() {
     }
 }
 
-template <typename C>
-void renderer<C>::create_command_buffers() {
+inline void renderer::create_command_buffers() {
     command_buffers_.resize(framebuffers_.size());
 
     VkCommandBufferAllocateInfo alloc_info{};
@@ -1150,8 +1116,7 @@ void renderer<C>::create_command_buffers() {
     }
 }
 
-template <typename C>
-void renderer<C>::create_sync_objects() {
+inline void renderer::create_sync_objects() {
     // Семафоры создаем по количеству кадров в полете
     image_available_semaphores_.resize(MAX_FRAMES_IN_FLIGHT);
     render_finished_semaphores_.resize(swapchain_images_.size());
@@ -1194,8 +1159,7 @@ void renderer<C>::create_sync_objects() {
     }
 }
 
-template <typename C>
-void renderer<C>::create_uniform_buffers() {
+inline void renderer::create_uniform_buffers() {
     VkDeviceSize buffer_size = sizeof(uniform_buffer_object);
     uniform_buffers_.resize(MAX_FRAMES_IN_FLIGHT);
 
@@ -1204,8 +1168,7 @@ void renderer<C>::create_uniform_buffers() {
     }
 }
 
-template <typename C>
-void renderer<C>::create_descriptor_pool() {
+inline void renderer::create_descriptor_pool() {
     constexpr uint32_t MAX_DESCRIPTOR_SETS  = 512;
     constexpr uint32_t STORAGE_BUFFER_COUNT = 1024;
 
@@ -1234,8 +1197,7 @@ void renderer<C>::create_descriptor_pool() {
     }
 }
 
-template <typename C>
-void renderer<C>::create_descriptor_sets() {
+inline void renderer::create_descriptor_sets() {
     // Создаем descriptor sets для uniform buffer (set 0)
     std::vector layouts(MAX_FRAMES_IN_FLIGHT, uniform_descriptor_set_layout_);
     VkDescriptorSetAllocateInfo alloc_info{};
@@ -1269,8 +1231,7 @@ void renderer<C>::create_descriptor_sets() {
     }
 }
 
-template <typename C>
-void renderer<C>::init_imgui() {
+inline void renderer::init_imgui() {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io    = ImGui::GetIO();
@@ -1304,14 +1265,12 @@ void renderer<C>::init_imgui() {
     }
 }
 
-template <typename C>
-void renderer<C>::setup_imgui_style() {
+inline void renderer::setup_imgui_style() {
     // ImGuiStyle& style = ImGui::GetStyle();
     // TODO: setup imgui style
 }
 
-template <typename C>
-void renderer<C>::create_imgui_descriptor_pool() {
+inline void renderer::create_imgui_descriptor_pool() {
     std::array pool_sizes = {
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_SAMPLER, 1000},
         VkDescriptorPoolSize{VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1000},
@@ -1340,8 +1299,7 @@ void renderer<C>::create_imgui_descriptor_pool() {
     }
 }
 
-template <typename C>
-void renderer<C>::cleanup_imgui() {
+inline void renderer::cleanup_imgui() {
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
@@ -1352,24 +1310,21 @@ void renderer<C>::cleanup_imgui() {
     }
 }
 
-template <typename C>
-void renderer<C>::cleanup_descriptor_pool() {
+inline void renderer::cleanup_descriptor_pool() {
     if (descriptor_pool_ != VK_NULL_HANDLE) {
         vkDestroyDescriptorPool(context_->get_device(), descriptor_pool_, nullptr);
         descriptor_pool_ = VK_NULL_HANDLE;
     }
 }
 
-template <typename C>
-void renderer<C>::cleanup_render_pass() {
+inline void renderer::cleanup_render_pass() {
     if (render_pass_ != VK_NULL_HANDLE) {
         vkDestroyRenderPass(context_->get_device(), render_pass_, nullptr);
         render_pass_ = VK_NULL_HANDLE;
     }
 }
 
-template <typename C>
-void renderer<C>::cleanup_descriptor_set_layouts() {
+inline void renderer::cleanup_descriptor_set_layouts() {
     if (storage_descriptor_set_layout_ != VK_NULL_HANDLE) {
         vkDestroyDescriptorSetLayout(
             context_->get_device(), storage_descriptor_set_layout_, nullptr
@@ -1390,8 +1345,7 @@ void renderer<C>::cleanup_descriptor_set_layouts() {
     }
 }
 
-template <typename C>
-void renderer<C>::cleanup_pipelines() {
+inline void renderer::cleanup_pipelines() {
     if (graphics_pipeline_ != VK_NULL_HANDLE) {
         vkDestroyPipeline(context_->get_device(), graphics_pipeline_, nullptr);
         graphics_pipeline_ = VK_NULL_HANDLE;
@@ -1406,8 +1360,7 @@ void renderer<C>::cleanup_pipelines() {
     }
 }
 
-template <typename C>
-void renderer<C>::cleanup_shadow_pipeline() {
+inline void renderer::cleanup_shadow_pipeline() {
     if (shadow_pipeline_ != VK_NULL_HANDLE) {
         vkDestroyPipeline(context_->get_device(), shadow_pipeline_, nullptr);
         shadow_pipeline_ = VK_NULL_HANDLE;
@@ -1418,8 +1371,7 @@ void renderer<C>::cleanup_shadow_pipeline() {
     }
 }
 
-template <typename C>
-void renderer<C>::cleanup_debug_pipeline() {
+inline void renderer::cleanup_debug_pipeline() {
     if (debug_pipeline_ != VK_NULL_HANDLE) {
         vkDestroyPipeline(context_->get_device(), debug_pipeline_, nullptr);
         debug_pipeline_ = VK_NULL_HANDLE;
@@ -1430,8 +1382,7 @@ void renderer<C>::cleanup_debug_pipeline() {
     }
 }
 
-template <typename C>
-void renderer<C>::cleanup_swapchain() {
+inline void renderer::cleanup_swapchain() {
     for (auto* framebuffer : framebuffers_) {
         vkDestroyFramebuffer(context_->get_device(), framebuffer, nullptr);
     }
@@ -1456,8 +1407,7 @@ void renderer<C>::cleanup_swapchain() {
     }
 }
 
-template <typename C>
-void renderer<C>::cleanup_color_resources() {
+inline void renderer::cleanup_color_resources() {
     if (color_image_view_ != VK_NULL_HANDLE) {
         vkDestroyImageView(context_->get_device(), color_image_view_, nullptr);
         color_image_view_ = VK_NULL_HANDLE;
@@ -1472,8 +1422,7 @@ void renderer<C>::cleanup_color_resources() {
     }
 }
 
-template <typename C>
-void renderer<C>::cleanup_depth_resources() {
+inline void renderer::cleanup_depth_resources() {
     if (depth_image_view_ != VK_NULL_HANDLE) {
         vkDestroyImageView(context_->get_device(), depth_image_view_, nullptr);
         depth_image_view_ = VK_NULL_HANDLE;
@@ -1488,8 +1437,7 @@ void renderer<C>::cleanup_depth_resources() {
     }
 }
 
-template <typename C>
-void renderer<C>::recreate_swapchain() {
+inline void renderer::recreate_swapchain() {
     int width  = 0;
     int height = 0;
     window_->get_framebuffer_size(&width, &height);
@@ -1519,8 +1467,7 @@ void renderer<C>::recreate_swapchain() {
     current_image_index_ = 0;
 }
 
-template <typename WC>
-void renderer<WC>::render_world_pass(
+inline void renderer::render_world_pass(
     world_type& world, const camera& camera
 ) {
     stats_.timing.world_pass_uniform_ms = measure_ms([&] { update_uniform_buffer(camera); });
@@ -1572,8 +1519,7 @@ void renderer<WC>::render_world_pass(
     vkCmdEndRenderPass(command_buffers_[current_image_index_]);
 }
 
-template <typename WC>
-void renderer<WC>::render_world(
+inline void renderer::render_world(
     world_type& world, const camera& camera
 ) {
     // Обновить light buffer
@@ -1692,8 +1638,7 @@ void renderer<WC>::render_world(
     }
 }
 
-template <typename C>
-void renderer<C>::update_uniform_buffer(
+inline void renderer::update_uniform_buffer(
     const camera& camera
 ) const {
     uniform_buffer_object ubo{};
@@ -1733,8 +1678,7 @@ void renderer<C>::update_uniform_buffer(
     uniform_buffers_[current_frame_]->copy_from_struct(ubo);
 }
 
-template <typename C>
-void renderer<C>::render_debug_primitives() {
+inline void renderer::render_debug_primitives() {
     if (debug_primitives_.is_empty()) {
         return;
     }
@@ -1769,8 +1713,7 @@ void renderer<C>::render_debug_primitives() {
     );
 }
 
-template <typename C>
-void renderer<C>::update_debug_vertex_buffer() {
+inline void renderer::update_debug_vertex_buffer() {
     const auto& debug_vertices = debug_primitives_.get_vertices();
 
     const VkDeviceSize required_size = sizeof(debug_vertex) * debug_vertices.size();
@@ -1781,14 +1724,12 @@ void renderer<C>::update_debug_vertex_buffer() {
     debug_vertex_buffer_->copy_from_vector(debug_vertices);
 }
 
-template <typename C>
-void renderer<C>::render_imgui() const {
+inline void renderer::render_imgui() const {
     ImGui::Render();
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), command_buffers_[current_image_index_]);
 }
 
-template <typename C>
-void* renderer<C>::get_shadow_map_texture_id(
+inline void* renderer::get_shadow_map_texture_id(
     uint32 cascade_index
 ) const {
     struct Cache {
@@ -1824,8 +1765,7 @@ void* renderer<C>::get_shadow_map_texture_id(
     return cache.sets[cascade_index];
 }
 
-template <typename C>
-VkFormat renderer<C>::find_depth_format() {
+inline VkFormat renderer::find_depth_format() {
     return find_supported_format(
         {
             VK_FORMAT_D32_SFLOAT,
@@ -1837,8 +1777,7 @@ VkFormat renderer<C>::find_depth_format() {
     );
 }
 
-template <typename C>
-VkFormat renderer<C>::find_supported_format(
+inline VkFormat renderer::find_supported_format(
     const std::vector<VkFormat>& candidates, VkImageTiling tiling, VkFormatFeatureFlags features
 ) {
     for (VkFormat format : candidates) {
@@ -1856,8 +1795,7 @@ VkFormat renderer<C>::find_supported_format(
     throw std::runtime_error("failed to find supported format for physical device");
 }
 
-template <typename C>
-void renderer<C>::create_image(
+inline void renderer::create_image(
     VkImage& image,
     VkDeviceMemory& image_memory,
     VkExtent2D extent,
@@ -1902,8 +1840,7 @@ void renderer<C>::create_image(
     vkBindImageMemory(context_->get_device(), image, image_memory, 0);
 }
 
-template <typename C>
-VkImageView renderer<C>::create_image_view(
+inline VkImageView renderer::create_image_view(
     VkImage image, VkFormat format, VkImageAspectFlags aspect_flags
 ) {
     VkImageViewCreateInfo view_info{};
@@ -1925,8 +1862,7 @@ VkImageView renderer<C>::create_image_view(
     return image_view;
 }
 
-template <typename C>
-uint32 renderer<C>::find_memory_type(
+inline uint32 renderer::find_memory_type(
     uint32 typeFilter, VkMemoryPropertyFlags properties
 ) {
     VkPhysicalDeviceMemoryProperties mem_properties;
@@ -1942,8 +1878,7 @@ uint32 renderer<C>::find_memory_type(
     throw std::runtime_error("Failed to find suitable memory type");
 }
 
-template <typename C>
-VkSurfaceFormatKHR renderer<C>::choose_swap_surface_format(
+inline VkSurfaceFormatKHR renderer::choose_swap_surface_format(
     const std::vector<VkSurfaceFormatKHR>& available_formats
 ) {
     for (const auto& available_format : available_formats) {
@@ -1955,8 +1890,7 @@ VkSurfaceFormatKHR renderer<C>::choose_swap_surface_format(
     return available_formats[0];
 }
 
-template <typename C>
-VkPresentModeKHR renderer<C>::choose_swap_present_mode(
+inline VkPresentModeKHR renderer::choose_swap_present_mode(
     const std::vector<VkPresentModeKHR>& available_present_modes
 ) {
     for (const auto& available_present_mode : available_present_modes) {
@@ -1967,8 +1901,7 @@ VkPresentModeKHR renderer<C>::choose_swap_present_mode(
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-template <typename C>
-VkExtent2D renderer<C>::choose_swap_extent(
+inline VkExtent2D renderer::choose_swap_extent(
     const VkSurfaceCapabilitiesKHR& capabilities
 ) {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
@@ -1990,8 +1923,7 @@ VkExtent2D renderer<C>::choose_swap_extent(
     return actual_extent;
 }
 
-template <typename C>
-auto renderer<C>::get_max_usable_sample_count() const -> VkSampleCountFlagBits {
+inline auto renderer::get_max_usable_sample_count() const -> VkSampleCountFlagBits {
     VkPhysicalDeviceProperties props;
     vkGetPhysicalDeviceProperties(context_->get_physical_device(), &props);
 

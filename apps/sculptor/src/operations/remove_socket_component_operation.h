@@ -7,7 +7,6 @@
 #include <vector>
 
 #include <vw/gfx/engine/engine.h>
-#include <vw/ecs/base_world_def.h>
 
 #include "app/app_state.h"
 #include "base_operation.h"
@@ -20,7 +19,7 @@ struct remove_socket_component_params {
 
 class remove_socket_component_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     remove_socket_component_operation(
         engine_type& engine, app_state& state, const remove_socket_component_params& params

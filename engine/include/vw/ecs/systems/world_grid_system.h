@@ -15,10 +15,8 @@
 
 namespace vw::ecs {
 
-template <typename>
 class world_grid;
 
-template <typename>
 class world;
 
 struct world_grid_system_stats {
@@ -36,13 +34,11 @@ struct world_grid_system_stats {
     uint32 deferred_remesh_count = 0;
 };
 
-template <typename WD>
 class world_grid_system {
 public:
-    using components    = typename WD::components;
-    using registry_type = typename entity_registry_from_tuple<components>::type;
-    using world_type    = world<WD>;
-    using grid_type     = world_grid<WD>;
+    using registry_type = registry;
+    using world_type    = world;
+    using grid_type     = world_grid;
 
     explicit world_grid_system(world_type& w);
     ~world_grid_system();
@@ -110,13 +106,5 @@ private:
 };
 
 }  // namespace vw::ecs
-
-template <>
-struct vw::ecs::system_trait<vw::ecs::world_grid_system> {
-    using components = std::tuple<vw::ecs::world_view_component>;
-    using resources  = std::tuple<>;
-};
-
-#include "vw/ecs/systems/world_grid_system.inl.h"
 
 #endif  // VW_ECS_SYSTEMS_WORLD_GRID_SYSTEM_H

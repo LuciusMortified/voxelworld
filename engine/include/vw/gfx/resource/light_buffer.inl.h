@@ -13,8 +13,7 @@ namespace vw::gfx {
 
 using namespace ::vw::ecs;
 
-template <typename WC>
-light_buffer<WC>::light_buffer(
+inline light_buffer::light_buffer(
     vulkan_context& context,
     VkDescriptorPool descriptor_pool,
     VkDescriptorSetLayout descriptor_set_layout
@@ -43,23 +42,21 @@ light_buffer<WC>::light_buffer(
     update_descriptor_set();
 }
 
-template <typename WC>
-light_buffer<WC>::~light_buffer() {
+inline light_buffer::~light_buffer() {
     if (descriptor_set_ != VK_NULL_HANDLE && descriptor_pool_ != VK_NULL_HANDLE) {
         vkFreeDescriptorSets(context_->get_device(), descriptor_pool_, 1, &descriptor_set_);
     }
 }
 
-template <typename WC>
-void light_buffer<WC>::update(world_type& world) {
-    auto& light_changed = world.template changed<light_component>();
+inline void light_buffer::update(world_type& world) {
+    auto& light_changed = world.changed<light_component>();
     if (light_changed.empty()) {
         return;
     }
 
     std::vector<point_light_data> point_lights_data;
 
-    auto view = world.template view<light_component, transform_component>();
+    auto view = world.view<light_component, transform_component>();
     for (const auto& [ent, light_comp, transform_comp] : view) {
         point_light_data light_data;
         const vec3f& pos = transform_comp.get_position();
@@ -84,23 +81,19 @@ void light_buffer<WC>::update(world_type& world) {
     }
 }
 
-template <typename WC>
-VkDescriptorSet light_buffer<WC>::get_descriptor_set() const {
+inline VkDescriptorSet light_buffer::get_descriptor_set() const {
     return descriptor_set_;
 }
 
-template <typename WC>
-bool light_buffer<WC>::is_empty() const {
+inline bool light_buffer::is_empty() const {
     return lights_count_ == 0;
 }
 
-template <typename WC>
-uint32 light_buffer<WC>::get_lights_count() const {
+inline uint32 light_buffer::get_lights_count() const {
     return lights_count_;
 }
 
-template <typename WC>
-void light_buffer<WC>::expand_buffer_if_needed(uint32 required_count) {
+inline void light_buffer::expand_buffer_if_needed(uint32 required_count) {
     if (required_count <= capacity_) {
         return;
     }
@@ -123,8 +116,7 @@ void light_buffer<WC>::expand_buffer_if_needed(uint32 required_count) {
     update_descriptor_set();
 }
 
-template <typename WC>
-void light_buffer<WC>::update_descriptor_set() {
+inline void light_buffer::update_descriptor_set() {
     VkDescriptorBufferInfo storage_buffer_info{};
     storage_buffer_info.buffer = lights_buffer_->get_buffer();
     storage_buffer_info.offset = 0;

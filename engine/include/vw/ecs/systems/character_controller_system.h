@@ -11,18 +11,14 @@
 
 namespace vw::ecs {
 
-template <typename>
 class transform_system;
 
-template <typename>
 class world;
 
-template <typename WD>
 class character_controller_system final {
 public:
-    using world_type    = world<WD>;
-    using components    = typename WD::components;
-    using registry_type = typename entity_registry_from_tuple<components>::type;
+    using world_type    = world;
+    using registry_type = registry;
 
     explicit character_controller_system(world_type& w);
 
@@ -52,15 +48,5 @@ private:
 };
 
 }  // namespace vw::ecs
-
-template <>
-struct vw::ecs::system_trait<vw::ecs::character_controller_system> {
-    using components = std::tuple<
-        vw::ecs::character_controller_component,
-        vw::ecs::movement_intent_component>;
-    using resources  = std::tuple<>;
-};
-
-#include "vw/ecs/systems/character_controller_system.inl.h"
 
 #endif  // VW_ECS_SYSTEMS_CHARACTER_CONTROLLER_SYSTEM_H

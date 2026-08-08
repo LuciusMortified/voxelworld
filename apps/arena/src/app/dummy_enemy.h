@@ -12,7 +12,7 @@ namespace vw::arena {
 
 class dummy_enemy {
 public:
-    explicit dummy_enemy(gfx::engine<>& engine, const vec2f& spawn_xz);
+    explicit dummy_enemy(gfx::engine& engine, const vec2f& spawn_xz);
     ~dummy_enemy();
 
     dummy_enemy(const dummy_enemy&)                    = delete;
@@ -28,7 +28,7 @@ public:
 private:
     auto create_model() -> std::shared_ptr<asset::model>;
 
-    gfx::engine<>& engine_;
+    gfx::engine& engine_;
     gfx::entity ent_;
     vec2f spawn_xz_;
     bool placed_ = false;

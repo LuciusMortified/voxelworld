@@ -9,16 +9,15 @@
 #include "vw/core/transform.h"
 #include "vw/asset/animation/animation_types.h"
 #include "vw/asset/animation/keyframe.h"
-#include "vw/ecs/base_world_def.h"
 #include "vw/ecs/entity.h"
 
 namespace vw::ecs {
-template <typename> class world;
+class world;
 }  // namespace vw::ecs
 
 namespace vw::sculptor {
 
-using world_type    = ecs::world<ecs::base_world_def>;
+using world_type    = ecs::world;
 using keyframe_value = std::variant<asset::keyframe_vec3f, asset::keyframe_quat>;
 
 enum class tools : uint8 {

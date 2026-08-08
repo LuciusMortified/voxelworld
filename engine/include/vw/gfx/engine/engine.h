@@ -33,13 +33,12 @@ struct engine_stats {
     uint64 vram_usage_bytes = 0;
 };
 
-template <typename WC = base_world_def>
 class engine final {
 public:
-    using renderer_type     = renderer<WC>;
-    using world_type        = world<WC>;
-    using debug_window_type = debug_window<WC>;
-    using app_type          = app<WC>;
+    using renderer_type     = renderer;
+    using world_type        = world;
+    using debug_window_type = debug_window;
+    using app_type          = app;
 
     engine(int width, int height, std::string_view title);
     ~engine();
@@ -95,6 +94,7 @@ private:
 
 }  // namespace vw::gfx
 
+#include "vw/gfx/debug/debug_window.inl.h"
 #include "vw/gfx/engine/engine.inl.h"
 
 #endif  // VW_GFX_ENGINE_H

@@ -28,11 +28,9 @@ public:
     [[nodiscard]] auto get_scale() const -> const vec3f&;
     [[nodiscard]] auto get_origin() const -> const vec3f&;
 
-    template <typename>
-    friend class hierarchy_system;
+        friend class hierarchy_system;
 
-    template <typename>
-    friend class transform_system;
+        friend class transform_system;
 };
 
 }  // namespace vw::ecs

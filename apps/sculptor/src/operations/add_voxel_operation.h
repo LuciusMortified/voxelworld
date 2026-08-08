@@ -21,7 +21,7 @@ struct add_voxel_params {
 
 class add_voxel_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     add_voxel_operation(engine_type& eng, app_state& st, const add_voxel_params& params);
 

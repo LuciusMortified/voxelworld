@@ -3,7 +3,6 @@
 #ifndef VW_ECS_H
 #define VW_ECS_H
 
-#include "vw/ecs/base_world_def.h"
 #include "vw/ecs/components/animation_fsm_component.h"
 #include "vw/ecs/components/animation_player_component.h"
 #include "vw/ecs/components/animation_target_component.h"
@@ -34,7 +33,6 @@
 #include "vw/ecs/systems/transform_system.h"
 #include "vw/ecs/systems/world_grid_system.h"
 #include "vw/ecs/world.h"
-#include "vw/ecs/world_def.h"
 #include "vw/ecs/systems/world_grid/chunk.h"
 #include "vw/ecs/systems/world_grid/chunk_loader.h"
 #include "vw/ecs/systems/world_grid/gen_column.h"

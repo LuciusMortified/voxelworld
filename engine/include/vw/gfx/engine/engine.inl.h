@@ -20,8 +20,7 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-engine<WC>::engine(
+inline engine::engine(
     int width, int height, std::string_view title
 ) {
     window_         = std::make_unique<window>(width, height, title);
@@ -59,63 +58,52 @@ engine<WC>::engine(
     last_memory_update_time_ = std::chrono::high_resolution_clock::now();
 }
 
-template <typename WC>
-engine<WC>::~engine() {
+inline engine::~engine() {
     shutdown();
 }
 
-template <typename WC>
 template <typename TApp, typename... TArgs>
-void engine<WC>::run(
+void engine::run(
     TArgs&&... args
 ) {
     app_ = std::make_unique<TApp>(*this, std::forward<TArgs>(args)...);
     main_loop();
 }
 
-template <typename WC>
-void engine<WC>::shutdown() {
+inline void engine::shutdown() {
     running_ = false;
     renderer_->wait_idle();
 }
 
-template <typename WC>
-auto engine<WC>::get_window() const -> window& {
+inline auto engine::get_window() const -> window& {
     return *window_;
 }
 
-template <typename WC>
-auto engine<WC>::get_vulkan_context() const -> vulkan_context& {
+inline auto engine::get_vulkan_context() const -> vulkan_context& {
     return *vulkan_context_;
 }
 
-template <typename WC>
-auto engine<WC>::get_renderer() const -> renderer_type& {
+inline auto engine::get_renderer() const -> renderer_type& {
     return *renderer_;
 }
 
-template <typename WC>
-auto engine<WC>::get_camera() const -> camera& {
+inline auto engine::get_camera() const -> camera& {
     return *camera_;
 }
 
-template <typename WC>
-auto engine<WC>::get_world() const -> world_type& {
+inline auto engine::get_world() const -> world_type& {
     return *world_;
 }
 
-template <typename WC>
-auto engine<WC>::get_block_registry() const -> const block_registry& {
+inline auto engine::get_block_registry() const -> const block_registry& {
     return block_registry_;
 }
 
-template <typename WC>
-auto engine<WC>::get_debug_tool() const -> debug_window_type& {
+inline auto engine::get_debug_tool() const -> debug_window_type& {
     return *debug_tool_;
 }
 
-template <typename WC>
-void engine<WC>::main_loop() {
+inline void engine::main_loop() {
     running_         = true;
     last_frame_time_ = std::chrono::high_resolution_clock::now();
 
@@ -135,8 +123,7 @@ void engine<WC>::main_loop() {
     }
 }
 
-template <typename WC>
-void engine<WC>::render(
+inline void engine::render(
     float delta_time
 ) {
     stats_.world_update_ms = measure_ms([&] { world_->update(delta_time); });
@@ -154,13 +141,11 @@ void engine<WC>::render(
     world_->clear_changed();
 }
 
-template <typename WC>
-const engine_stats& engine<WC>::get_stats() const {
+inline const engine_stats& engine::get_stats() const {
     return stats_;
 }
 
-template <typename WC>
-void engine<WC>::update_stats() {
+inline void engine::update_stats() {
     const auto current_time = std::chrono::high_resolution_clock::now();
     stats_.frame_ms =
         std::chrono::duration<float32>(current_time - frame_start_time_).count() * 1000.0f;
@@ -179,8 +164,7 @@ void engine<WC>::update_stats() {
     }
 }
 
-template <typename WC>
-auto engine<WC>::calculate_ram_usage() -> uint64 {
+inline auto engine::calculate_ram_usage() -> uint64 {
 #ifdef _WIN32
     PROCESS_MEMORY_COUNTERS_EX pmc{};
     if (GetProcessMemoryInfo(
@@ -192,8 +176,7 @@ auto engine<WC>::calculate_ram_usage() -> uint64 {
     return 0;
 }
 
-template <typename WC>
-auto engine<WC>::calculate_vram_usage() const -> uint64 {
+inline auto engine::calculate_vram_usage() const -> uint64 {
     const auto& vk_context                 = *vulkan_context_;
     const VkPhysicalDevice physical_device = vk_context.get_physical_device();
 

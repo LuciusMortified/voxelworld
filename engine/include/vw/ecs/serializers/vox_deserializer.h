@@ -10,10 +10,9 @@
 
 namespace vw::ecs {
 
-template <typename WC = base_world_def>
 class vox_deserializer final {
 public:
-    using world_type = world<WC>;
+    using world_type = world;
 
     using error_type = vw::asset::vox_parser::error_type;
 
@@ -31,7 +30,9 @@ public:
 
     vox_deserializer(world_type& world, vw::asset::vox_parser& parser);
 
-    auto deserialize(const std::filesystem::path& filepath, const options& opts = {})
+    auto deserialize(const std::filesystem::path& filepath)
+        -> std::expected<result, error_type>;
+    auto deserialize(const std::filesystem::path& filepath, const options& opts)
         -> std::expected<result, error_type>;
 
 private:

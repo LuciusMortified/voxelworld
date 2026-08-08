@@ -4,7 +4,6 @@
 #define VW_SCULPTOR_DELETE_ENTITY_OPERATION_H
 
 #include <vw/gfx/engine/engine.h>
-#include <vw/ecs/base_world_def.h>
 
 #include "app/app_state.h"
 #include "base_operation.h"
@@ -17,7 +16,7 @@ struct delete_entity_params {
 
 class delete_entity_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     delete_entity_operation(
         engine_type& engine, app_state& state, const delete_entity_params& params

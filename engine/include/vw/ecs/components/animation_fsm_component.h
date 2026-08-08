@@ -17,8 +17,7 @@ private:
     std::vector<vw::asset::animation_fsm> machines_;
     trigger_set triggers_;
 
-    template <typename>
-    friend class animation_fsm_system;
+        friend class animation_fsm_system;
 
 public:
     [[nodiscard]] auto machine_count() const -> size_t;

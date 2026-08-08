@@ -12,26 +12,26 @@ inline create_entity_operation::create_entity_operation(
 
 inline void create_entity_operation::execute() {
     auto& world            = engine_->get_world();
-    auto& hierarchy_sys = world.template system<gfx::hierarchy_system>();
-    auto& transform_sys = world.template system<gfx::transform_system>();
-    auto& model_reg = world.template resource<asset::model_registry>();
-    auto& model_sys = world.template system<gfx::model_system>();
+    auto& hierarchy_sys = world.system<gfx::hierarchy_system>();
+    auto& transform_sys = world.system<gfx::transform_system>();
+    auto& model_reg = world.resource<asset::model_registry>();
+    auto& model_sys = world.system<gfx::model_system>();
 
     auto modifier = world.create()
-        .template with<gfx::hierarchy_component>()
-        .template with<gfx::transform_component>()
-        .template with<gfx::spatial_component>();
+        .with<gfx::hierarchy_component>()
+        .with<gfx::transform_component>()
+        .with<gfx::spatial_component>();
 
     std::shared_ptr<asset::model> model = nullptr;
     if (params_.with_model) {
-        modifier.template with<gfx::model_component>();
+        modifier.with<gfx::model_component>();
 
         model = model_reg.create(params_.name, params_.size);
         model->fill(voxel{state_->tool.selected_block});
     }
 
     if (params_.with_socket) {
-        modifier.template with<gfx::socket_component>();
+        modifier.with<gfx::socket_component>();
     }
 
     const auto ent = modifier.get_entity();

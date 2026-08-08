@@ -16,7 +16,7 @@ struct create_clip_params {
 
 class create_clip_operation final : public base_operation {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     create_clip_operation(engine_type& engine, app_state& state, const create_clip_params& params);
 

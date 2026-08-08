@@ -29,10 +29,9 @@ struct point_light_data {
     alignas(4) float32 attenuation_quadratic;
 };
 
-template <typename WC>
 class light_buffer {
 public:
-    using world_type = world<WC>;
+    using world_type = world;
 
     explicit light_buffer(
         vulkan_context& context,

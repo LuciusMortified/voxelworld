@@ -6,12 +6,16 @@
 namespace vw::ecs {
 
 
-template <typename WC>
-vox_deserializer<WC>::vox_deserializer(world_type& world, vw::asset::vox_parser& parser)
+inline vox_deserializer::vox_deserializer(world_type& world, vw::asset::vox_parser& parser)
     : world_(&world), parser_(&parser) {}
 
-template <typename WC>
-auto vox_deserializer<WC>::deserialize(
+inline auto vox_deserializer::deserialize(
+    const std::filesystem::path& filepath
+) -> std::expected<result, error_type> {
+    return deserialize(filepath, options{});
+}
+
+inline auto vox_deserializer::deserialize(
     const std::filesystem::path& filepath, const options& opts
 ) -> std::expected<result, error_type> {
     auto prefab = parser_->parse(filepath);
@@ -29,14 +33,13 @@ auto vox_deserializer<WC>::deserialize(
     return res;
 }
 
-template <typename WC>
-void vox_deserializer<WC>::apply_entity_(
+inline void vox_deserializer::apply_entity_(
     const vw::asset::vox_entity_data& data, result& res, const options& opts
 ) {
     const auto ent = world_->create()
-        .template with<hierarchy_component>()
-        .template with<transform_component>()
-        .template with<spatial_component>()
+        .with<hierarchy_component>()
+        .with<transform_component>()
+        .with<spatial_component>()
         .get_entity();
 
     res.name_to_entity[data.name] = ent;
@@ -44,12 +47,12 @@ void vox_deserializer<WC>::apply_entity_(
 
     if (!data.parent_name.empty() && res.name_to_entity.contains(data.parent_name)) {
         auto parent_entity     = res.name_to_entity[data.parent_name];
-        auto& hierarchy_sys = world_->template system<hierarchy_system>();
+        auto& hierarchy_sys = world_->system<hierarchy_system>();
         hierarchy_sys.modify(ent).set_parent(parent_entity);
     }
 
     if (data.has_transform) {
-        auto& transform_sys = world_->template system<transform_system>();
+        auto& transform_sys = world_->system<transform_system>();
         transform_sys.modify(ent)
             .set_position(data.position)
             .set_rotation_euler(data.rotation)
@@ -58,8 +61,8 @@ void vox_deserializer<WC>::apply_entity_(
     }
 
     if (data.animation_target_name.has_value() && !opts.skip_targets) {
-        world_->modify(ent).template with<animation_target_component>();
-        auto& anim_sys = world_->template system<animation_system>();
+        world_->modify(ent).with<animation_target_component>();
+        auto& anim_sys = world_->system<animation_system>();
         auto target_mod = anim_sys.modify_target(ent);
         target_mod.set_target_name(*data.animation_target_name);
         if (data.has_transform) {
@@ -73,8 +76,8 @@ void vox_deserializer<WC>::apply_entity_(
     }
 
     if (data.has_sockets && !opts.skip_sockets) {
-        world_->modify(ent).template with<socket_component>();
-        auto& socket_sys = world_->template system<socket_system>();
+        world_->modify(ent).with<socket_component>();
+        auto& socket_sys = world_->system<socket_system>();
         for (const auto& sp : data.sockets) {
             socket_sys.modify(ent).add_socket(
                 sp.name, sp.position, math::euler_to_quat(sp.rotation), sp.scale
@@ -83,12 +86,12 @@ void vox_deserializer<WC>::apply_entity_(
     }
 
     if (data.model.has_value()) {
-        auto& model_reg = world_->template resource<vw::asset::model_registry>();
+        auto& model_reg = world_->resource<vw::asset::model_registry>();
         auto model_ptr = model_reg.create(data.name, data.model->size);
 
-        world_->modify(ent).template with<model_component>();
+        world_->modify(ent).with<model_component>();
 
-        auto& model_sys = world_->template system<model_system>();
+        auto& model_sys = world_->system<model_system>();
         model_sys.modify(ent).set_model(model_ptr);
 
         for (const auto& [pos, v] : data.model->voxels) {

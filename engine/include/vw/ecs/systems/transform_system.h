@@ -14,18 +14,14 @@ namespace vw::ecs {
 struct transform_component;
 struct spatial_component;
 
-template <typename>
 class hierarchy_system;
 
-template <typename>
 class world;
 
-template <typename WD>
 class transform_system final {
 public:
-    using world_type    = world<WD>;
-    using components    = typename WD::components;
-    using registry_type = typename entity_registry_from_tuple<components>::type;
+    using world_type    = world;
+    using registry_type = registry;
 
     explicit transform_system(world_type& w);
 
@@ -70,13 +66,5 @@ private:
 };
 
 }  // namespace vw::ecs
-
-template <>
-struct vw::ecs::system_trait<vw::ecs::transform_system> {
-    using components = std::tuple<vw::ecs::transform_component>;
-    using resources  = std::tuple<>;
-};
-
-#include "vw/ecs/systems/transform_system.inl.h"
 
 #endif  // VW_ECS_TRANSFORM_SYSTEM_H

@@ -12,7 +12,7 @@ inline add_socket_operation::add_socket_operation(
 
 inline void add_socket_operation::execute() {
     auto& world         = engine_->get_world();
-    auto& socket_sys = world.template system<gfx::socket_system>();
+    auto& socket_sys = world.system<gfx::socket_system>();
 
     const auto ent = state_->scene.name_to_entity[params_.entity_name];
     socket_sys  //
@@ -23,7 +23,7 @@ inline void add_socket_operation::execute() {
 
 inline void add_socket_operation::undo() {
     auto& world         = engine_->get_world();
-    auto& socket_sys = world.template system<gfx::socket_system>();
+    auto& socket_sys = world.system<gfx::socket_system>();
 
     const auto ent  = state_->scene.name_to_entity[params_.entity_name];
     const auto pkey = socket_state::socket_preview_key(params_.entity_name, params_.socket_name);

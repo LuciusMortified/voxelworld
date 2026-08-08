@@ -20,11 +20,9 @@
 
 namespace vw::ecs {
 
-
 struct model_component;
 struct transform_component;
 
-template <typename>
 class world;
 
 struct voxel_ray_hit {
@@ -33,12 +31,10 @@ struct voxel_ray_hit {
     vec3i empty_pos;
 };
 
-template <typename WD>
 class spatial_system {
 public:
-    using components    = typename WD::components;
-    using registry_type = typename entity_registry_from_tuple<components>::type;
-    using world_type    = world<WD>;
+    using registry_type = registry;
+    using world_type    = world;
 
     explicit spatial_system(
         world_type& w
@@ -111,13 +107,5 @@ private:
 };
 
 }  // namespace vw::ecs
-
-template <>
-struct vw::ecs::system_trait<vw::ecs::spatial_system> {
-    using components = std::tuple<vw::ecs::spatial_component>;
-    using resources  = std::tuple<>;
-};
-
-#include "vw/ecs/systems/spatial_system.inl.h"
 
 #endif  // VW_ECS_SYSTEMS_SPATIAL_SYSTEM_H

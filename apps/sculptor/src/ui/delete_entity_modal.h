@@ -4,7 +4,6 @@
 #define VW_SCULPTOR_DELETE_ENTITY_MODAL_H
 
 #include <vw/gfx/engine/engine.h>
-#include <vw/ecs/base_world_def.h>
 
 #include "app/app_state.h"
 #include "operations/operation_manager.h"
@@ -14,7 +13,7 @@ namespace vw::sculptor {
 
 class delete_entity_modal final {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     delete_entity_modal(engine_type& eng, app_state& state, operation_manager& op_manager);
 

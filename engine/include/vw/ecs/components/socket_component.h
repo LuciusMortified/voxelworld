@@ -11,7 +11,6 @@
 
 namespace vw::ecs {
 
-template <typename>
 class socket_system;
 
 struct socket_point {
@@ -34,8 +33,7 @@ public:
 private:
     std::vector<socket_point> sockets_;
 
-    template <typename>
-    friend class socket_system;
+        friend class socket_system;
 };
 
 }  // namespace vw::ecs

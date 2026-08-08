@@ -10,7 +10,7 @@ namespace vw::sculptor {
 
 class open_file_modal final {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     open_file_modal(engine_type& eng, app_state& st);
 

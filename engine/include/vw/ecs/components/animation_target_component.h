@@ -9,7 +9,6 @@
 
 namespace vw::ecs {
 
-template <typename>
 class animation_system;
 
 struct animation_target_component final {
@@ -23,8 +22,7 @@ private:
     std::string target_name_;
     transform rest_transform_;
 
-    template <typename>
-    friend class animation_system;
+        friend class animation_system;
 };
 
 }  // namespace vw::ecs

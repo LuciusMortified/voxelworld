@@ -92,7 +92,7 @@ inline auto open_file_modal::open_file_() -> bool {
     namespace fs = std::filesystem;
 
     asset::vox_parser_plain parser{engine_->get_block_registry()};
-    gfx::vox_deserializer<> deserializer{engine_->get_world(), parser};
+    gfx::vox_deserializer deserializer{engine_->get_world(), parser};
 
     const fs::path filepath =  //
         fs::path{app_state::asset_dir_name} / fs::path{filename_};

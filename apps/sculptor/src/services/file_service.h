@@ -10,7 +10,7 @@ namespace vw::sculptor {
 
 class file_service final {
 public:
-    using engine_type = gfx::engine<>;
+    using engine_type = gfx::engine;
 
     file_service(engine_type& eng, app_state& state);
 

@@ -3,10 +3,10 @@
 
 using namespace vw;
 
-class simple_model_app final : public gfx::app<> {
+class simple_model_app final : public gfx::app {
 public:
     explicit simple_model_app(
-        gfx::engine<>& eng
+        gfx::engine& eng
     )
         : app{eng} {
         auto& window = get_engine().get_window();
@@ -92,9 +92,9 @@ public:
 private:
     void create_flower_model() {
         auto& world            = get_engine().get_world();
-        auto& model_reg = world.template resource<asset::model_registry>();
-        auto& transform_sys = world.template system<gfx::transform_system>();
-        auto& model_sys = world.template system<gfx::model_system>();
+        auto& model_reg = world.resource<asset::model_registry>();
+        auto& transform_sys = world.system<gfx::transform_system>();
+        auto& model_sys = world.system<gfx::model_system>();
 
         // Создаем модель и регистрируем ее
         model_ = model_reg.create("flower", 3, 6, 3);
@@ -138,7 +138,7 @@ private:
         }
 
         auto& world            = get_engine().get_world();
-        auto& transform_sys = world.template system<gfx::transform_system>();
+        auto& transform_sys = world.system<gfx::transform_system>();
         transform_sys.modify(flower_).set_rotation(math::euler_to_quat({0.0f, object_rotation_, 0.0f}));
 
         if (world.has<gfx::transform_component>(flower_)) {
@@ -265,7 +265,7 @@ private:
 
 int main() {
     try {
-        std::make_unique<gfx::engine<>>(1280, 720, "Voxel World - Test Simple Model")
+        std::make_unique<gfx::engine>(1280, 720, "Voxel World - Test Simple Model")
             ->run<simple_model_app>();
     } catch (const std::exception& e) {
         log::error("Ошибка исполнения: {}", e.what());

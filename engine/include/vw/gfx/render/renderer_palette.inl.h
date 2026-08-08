@@ -8,8 +8,7 @@
 
 namespace vw::gfx {
 
-template <typename WC>
-void renderer<WC>::create_palette_descriptor_set_layout() {
+inline void renderer::create_palette_descriptor_set_layout() {
     VkDescriptorSetLayoutBinding palette_layout_binding{};
     palette_layout_binding.binding            = 0;
     palette_layout_binding.descriptorType     = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
@@ -30,8 +29,7 @@ void renderer<WC>::create_palette_descriptor_set_layout() {
     }
 }
 
-template <typename WC>
-void renderer<WC>::cleanup_palette_resources() {
+inline void renderer::cleanup_palette_resources() {
     if (palette_descriptor_set_layout_ != VK_NULL_HANDLE) {
         vkDestroyDescriptorSetLayout(
             context_->get_device(), palette_descriptor_set_layout_, nullptr

@@ -13,13 +13,11 @@ namespace vw::asset { class model; }
 
 namespace vw::ecs {
 
-template <typename>
 class world;
 
-template <typename WD>
 class chunk {
 public:
-    using world_type = world<WD>;
+    using world_type = world;
 
     static constexpr int32 size = 64;
     static constexpr int32 volume = size * size * size;
@@ -52,7 +50,5 @@ private:
 };
 
 }  // namespace vw::ecs
-
-#include "vw/ecs/systems/world_grid/chunk.inl.h"
 
 #endif  // VW_ECS_SYSTEMS_WORLD_GRID_CHUNK_H

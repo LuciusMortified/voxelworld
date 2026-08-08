@@ -16,7 +16,7 @@ inline void remove_voxel_operation::execute() {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
-    auto& model_sys = world.template system<gfx::model_system>();
+    auto& model_sys = world.system<gfx::model_system>();
 
     auto& model_comp = world.get<gfx::model_component>(ent);
     previous_block_  = model_comp.get_voxel(params_.position).id;
@@ -29,7 +29,7 @@ inline void remove_voxel_operation::undo() {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
-    auto& model_sys = world.template system<gfx::model_system>();
+    auto& model_sys = world.system<gfx::model_system>();
 
     model_sys.modify(ent).set_voxel(params_.position, voxel{previous_block_});
     state_->file.has_unsaved_changes = true;

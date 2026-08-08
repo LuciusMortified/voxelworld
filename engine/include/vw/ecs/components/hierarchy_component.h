@@ -21,11 +21,9 @@ public:
     [[nodiscard]] auto has_child(entity child) const -> bool;
     [[nodiscard]] auto get_children() const -> const std::vector<entity>&;
 
-    template <typename>
-    friend class hierarchy_system;
+        friend class hierarchy_system;
 
-    template <typename>
-    friend class transform_system;
+        friend class transform_system;
 };
 
 }  // namespace vw::ecs

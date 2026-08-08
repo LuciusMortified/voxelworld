@@ -107,12 +107,11 @@ struct renderer_stats {
     render_timing_stats timing;
 };
 
-template <typename WC = base_world_def>
 class renderer final {
 public:
-    using world_type                = world<WC>;
-    using combined_buffer_pool_type = combined_buffer_pool<WC>;
-    using light_buffer_type         = light_buffer<WC>;
+    using world_type                = world;
+    using combined_buffer_pool_type = combined_buffer_pool;
+    using light_buffer_type         = light_buffer;
 
     renderer(vulkan_context& context, window& window, const block_registry& registry);
     ~renderer();

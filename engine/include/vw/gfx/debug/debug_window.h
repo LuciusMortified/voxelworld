@@ -12,13 +12,11 @@
 
 namespace vw::gfx {
 
-template <typename WC>
 class engine;
 
-template <typename WC>
 class debug_window final {
 public:
-    using engine_type = engine<WC>;
+    using engine_type = engine;
 
     explicit debug_window(engine_type& engine);
     ~debug_window() = default;
@@ -66,6 +64,5 @@ private:
 
 }  // namespace vw::gfx
 
-#include "vw/gfx/debug/debug_window.inl.h"
 
 #endif  // VW_GFX_DEBUG_WINDOW_H
