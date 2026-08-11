@@ -18,6 +18,7 @@ if(NOT CMAKE_GENERATOR MATCHES "Ninja")
 endif()
 
 include(vw_std_module)
+include(vw_vulkan_module)
 
 option(VW_BUILD_APPS "Build applications" ON)
 option(VW_BUILD_TESTS "Build unit tests" ON)
