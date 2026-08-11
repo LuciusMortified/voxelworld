@@ -14,19 +14,23 @@ Review staged and unstaged changes for style and convention violations.
 ## Steps
 
 1. **Get changes**: Run `git diff` and `git diff --cached` to see all modifications
-2. **Read** the project rules from `.claude/rules/cpp-style.md`
+2. **Read** the project rules from `.claude/skills/cpp-style/SKILL.md`
 3. **Check** each changed file for violations
 
 ## Checklist
 
 - [ ] **Trailing return type**: All methods use `auto foo() -> type;` syntax
 - [ ] **Naming**: snake_case for types/functions/members, PascalCase for template params
-- [ ] **Project types**: Uses `vw::uint32` etc. instead of `std::uint32_t` or built-in types
-- [ ] **Header guards**: Both `#pragma once` AND `#ifndef VW_*_H` present
-- [ ] **Include order**: stdlib → third-party → vw/... → local
-- [ ] **Comments**: No redundant comments in implementations, no section separators
-- [ ] **Namespaces**: Correct namespace (vw::, vw::gfx::, vw::sculptor::)
+- [ ] **Project types**: Uses `uint32`, `float32` etc. instead of `std::uint32_t` or built-in types
+- [ ] **Comments**: No comments in implementations, no section separators, no obvious ones
+- [ ] **Namespaces**: Correct namespace (vw::, vw::spatial::, vw::asset::, vw::ecs::, vw::gfx::, vw::sculptor::)
 - [ ] **No exceptions** in hot paths
+- [ ] **Modules**: no `inline` in `.cpp`; `import std` only in implementation units and internal
+      partitions; a new `#include` in a `module;` block is mirrored in the matching
+      `vw/<lib>/detail/module_prelude.h`; no forward declarations of module entities
+      from outside their module
+- [ ] **Headers** (only for the surviving header-only gfx tree): `#pragma once` AND
+      `#ifndef VW_*_H`, include order stdlib → third-party → vw/... → local
 
 ## Output Format
 
