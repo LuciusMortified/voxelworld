@@ -3,19 +3,8 @@
 #ifndef VW_SPATIAL_PLANE_H
 #define VW_SPATIAL_PLANE_H
 
-#include "vw/core.h"
+#include "vw/core/detail/module_prelude.h"
 
-namespace vw::spatial {
-
-struct plane {
-    vec3f normal;
-    float distance;
-
-    [[nodiscard]] float distance_to_point(const vec3f& point) const;
-};
-
-}  // namespace vw::spatial
-
-#include "vw/spatial/plane.inl.h"
+import vw.core;
 
 #endif  // VW_SPATIAL_PLANE_H

@@ -3,30 +3,10 @@
 #ifndef VW_ECS_COMPONENTS_ANIMATION_FSM_COMPONENT_H
 #define VW_ECS_COMPONENTS_ANIMATION_FSM_COMPONENT_H
 
-#include <vector>
+#include "vw/world/detail/module_prelude.h"
 
-#include "vw/asset/animation/animation_fsm.h"
-
-namespace vw::ecs {
-
-
-struct animation_fsm_component final {
-private:
-    using trigger_set = vw::asset::animation_fsm::trigger_set;
-
-    std::vector<vw::asset::animation_fsm> machines_;
-    trigger_set triggers_;
-
-        friend class animation_fsm_system;
-
-public:
-    [[nodiscard]] auto machine_count() const -> size_t;
-    [[nodiscard]] auto get_machine(size_t index) -> vw::asset::animation_fsm&;
-    [[nodiscard]] auto get_machine(size_t index) const -> const vw::asset::animation_fsm&;
-};
-
-}  // namespace vw::ecs
-
-#include "animation_fsm_component.inl.h"
+import vw.core;
+import vw.ecs;
+import vw.world;
 
 #endif  // VW_ECS_COMPONENTS_ANIMATION_FSM_COMPONENT_H

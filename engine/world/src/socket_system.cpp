@@ -1,15 +1,10 @@
-#include "vw/ecs/systems/socket_system.h"
+module vw.world;
 
-#include "vw/ecs/world.h"
-#include <algorithm>
-
-#include "vw/ecs/systems/hierarchy_system.h"
-#include "vw/ecs/systems/socket_system.h"
-#include "vw/ecs/systems/transform_system.h"
+import std;
 
 namespace vw::ecs {
 
-socket_system::socket_system(world_type& w)
+socket_system::socket_system(world& w)
     : world_(&w) {}
 
 void socket_system::update(float32 /*dt*/) {}
@@ -120,4 +115,3 @@ auto socket_system::socket_modifier::remove_socket(
 }
 
 }  // namespace vw::ecs
-

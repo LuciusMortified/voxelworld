@@ -3,32 +3,10 @@
 #ifndef VW_ECS_COMPONENTS_CHARACTER_CONTROLLER_COMPONENT_H
 #define VW_ECS_COMPONENTS_CHARACTER_CONTROLLER_COMPONENT_H
 
-#include "vw/core.h"
+#include "vw/world/detail/module_prelude.h"
 
-namespace vw::ecs {
-
-class character_controller_system;
-
-struct character_controller_component final {
-private:
-    vec3f move_input_{0.0f, 0.0f, 0.0f};
-    vec3f facing_direction_{0.0f, 0.0f, 1.0f};
-    float32 move_speed_     = 100.0f;
-    float32 jump_impulse_   = 150.0f;
-    float32 rotation_speed_ = 5.0f;
-    bool jump_requested_    = false;
-
-        friend class character_controller_system;
-
-public:
-    [[nodiscard]] auto get_move_speed() const -> float32;
-    [[nodiscard]] auto get_jump_impulse() const -> float32;
-    [[nodiscard]] auto get_rotation_speed() const -> float32;
-    [[nodiscard]] auto get_facing_direction() const -> const vec3f&;
-};
-
-}  // namespace vw::ecs
-
-#include "character_controller_component.inl.h"
+import vw.core;
+import vw.ecs;
+import vw.world;
 
 #endif  // VW_ECS_COMPONENTS_CHARACTER_CONTROLLER_COMPONENT_H

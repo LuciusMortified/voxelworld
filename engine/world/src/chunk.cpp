@@ -1,12 +1,11 @@
-#include "vw/ecs/systems/world_grid/chunk.h"
+module vw.world;
 
-#include "vw/ecs/world.h"
-#include "vw/asset/model/model.h"
+import std;
 
 namespace vw::ecs {
 
 chunk::chunk(
-    world_type& w, vec3i coord, std::shared_ptr<vw::asset::model> mdl, int32 voxel_scale
+    world& w, vec3i coord, std::shared_ptr<asset::model> mdl, int32 voxel_scale
 )
     : world_(&w)
     , ent_(w.create()
@@ -95,7 +94,7 @@ auto chunk::is_empty(
     return model_->is_empty(x, y, z);
 }
 
-auto chunk::get_model() const -> std::shared_ptr<vw::asset::model> {
+auto chunk::get_model() const -> std::shared_ptr<asset::model> {
     return model_;
 }
 
@@ -104,4 +103,3 @@ auto chunk::get_entity() const -> entity {
 }
 
 }  // namespace vw::ecs
-

@@ -1,11 +1,10 @@
-#include "vw/ecs/systems/light_system.h"
+module vw.world;
 
-#include "vw/ecs/world.h"
-#include "vw/ecs/systems/light_system.h"
+import std;
 
 namespace vw::ecs {
 
-light_system::light_system(world_type& w)
+light_system::light_system(world& w)
     : world_(&w) {}
 
 template <typename C>

@@ -13,10 +13,9 @@
 #include <unordered_set>
 #include <vector>
 
+#include "vw/asset/model/model.h"
 #include "vw/asset/model/model_identity.h"
 #include "vw/gfx/resource/mesh.h"
-
-namespace vw::asset { class model; }
 
 namespace vw::gfx {
 

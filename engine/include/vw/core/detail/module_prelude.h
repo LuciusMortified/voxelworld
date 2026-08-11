@@ -11,8 +11,10 @@
 // shim therefore reproduces the module's global module fragment before
 // importing, so the ordering holds no matter which shim a consumer reaches
 // first. Keep in sync with the `module;` sections of engine/core/src/*.cppm.
+#include <algorithm>
 #include <array>
 #include <chrono>
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>

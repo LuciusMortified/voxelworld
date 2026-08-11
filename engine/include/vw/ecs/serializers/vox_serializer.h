@@ -3,46 +3,10 @@
 #ifndef VW_ECS_VOX_SERIALIZER_H
 #define VW_ECS_VOX_SERIALIZER_H
 
-#include <expected>
-#include <filesystem>
-#include <unordered_set>
+#include "vw/world/detail/module_prelude.h"
 
-#include "vw/ecs/serializers/vox_writer.h"
-#include "vw/ecs/world.h"
-
-namespace vw::ecs {
-
-class vox_serializer final {
-public:
-    using world_type        = world;
-    using entity_names_type = std::unordered_map<entity, std::string>;
-
-    using error_type = vox_writer::error_type;
-
-    struct options {
-        std::optional<entity_names_type> entity_names;
-        std::unordered_set<entity> excluded;
-    };
-
-    vox_serializer(world_type& world, vox_writer& writer, entity root, options opts = {});
-
-    auto serialize(const std::filesystem::path& filepath) -> std::expected<void, error_type>;
-
-    [[nodiscard]] auto extract() const -> vw::asset::vox_prefab_data;
-
-private:
-    void generate_entity_names_();
-    [[nodiscard]] auto extract_entity_(entity ent) const -> vw::asset::vox_entity_data;
-
-    world_type* world_;
-    vox_writer* writer_;
-    entity root_;
-    entity_names_type entity_names_;
-    std::unordered_set<entity> excluded_;
-};
-
-}  // namespace vw::ecs
-
-#include "vox_serializer.inl.h"
+import vw.core;
+import vw.ecs;
+import vw.world;
 
 #endif  // VW_ECS_VOX_SERIALIZER_H

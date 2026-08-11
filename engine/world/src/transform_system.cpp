@@ -1,17 +1,10 @@
-#include "vw/ecs/systems/transform_system.h"
+module vw.world;
 
-#include "vw/ecs/world.h"
-#include <algorithm>
-#include <stdexcept>
-
-#include "vw/ecs/components/hierarchy_component.h"
-#include "vw/ecs/components/spatial_component.h"
-#include "vw/ecs/components/transform_component.h"
-#include "vw/ecs/systems/hierarchy_system.h"
+import std;
 
 namespace vw::ecs {
 
-transform_system::transform_system(world_type& w)
+transform_system::transform_system(world& w)
     : world_(&w) {}
 
 template <typename C>

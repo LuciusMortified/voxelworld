@@ -1,12 +1,10 @@
-#include "vw/ecs/systems/character_controller_system.h"
+module vw.world;
 
-#include "vw/ecs/world.h"
-#include "vw/ecs/components/transform_component.h"
-#include "vw/ecs/systems/transform_system.h"
+import std;
 
 namespace vw::ecs {
 
-character_controller_system::character_controller_system(world_type& w)
+character_controller_system::character_controller_system(world& w)
     : world_(&w) {}
 
 void character_controller_system::update(float32 delta_time) {
@@ -126,4 +124,3 @@ auto character_controller_system::controller_modifier::request_jump(
 }
 
 }  // namespace vw::ecs
-

@@ -6,6 +6,12 @@ add_subdirectory(core)
 add_subdirectory(ecs)
 add_subdirectory(world)
 
+# The headless half of the engine stops here: core, ecs and world know nothing
+# about a GPU, and a build with VW_BUILD_GFX=OFF never looks for one.
+if(NOT VW_BUILD_GFX)
+    return()
+endif()
+
 add_library(${PROJECT_NAME} INTERFACE)
 
 target_include_directories(${PROJECT_NAME} INTERFACE include)

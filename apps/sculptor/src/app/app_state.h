@@ -10,10 +10,7 @@
 #include "vw/asset/animation/animation_types.h"
 #include "vw/asset/animation/keyframe.h"
 #include "vw/ecs/entity.h"
-
-namespace vw::ecs {
-class world;
-}  // namespace vw::ecs
+#include "vw/ecs/world.h"
 
 namespace vw::sculptor {
 

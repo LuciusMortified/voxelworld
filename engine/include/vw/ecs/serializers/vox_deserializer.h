@@ -2,48 +2,11 @@
 
 #ifndef VW_ECS_VOX_DESERIALIZER_H
 #define VW_ECS_VOX_DESERIALIZER_H
-#include <expected>
-#include <filesystem>
 
-#include "vw/asset/vox/vox_parser.h"
-#include "vw/ecs/world.h"
+#include "vw/world/detail/module_prelude.h"
 
-namespace vw::ecs {
-
-class vox_deserializer final {
-public:
-    using world_type = world;
-
-    using error_type = vw::asset::vox_parser::error_type;
-
-    struct options {
-        bool skip_sockets = false;
-        bool skip_targets = false;
-    };
-
-    struct result {
-        std::string root_name;
-        std::unordered_map<std::string, entity> name_to_entity;
-        std::unordered_map<entity, std::string> entity_to_name;
-        std::vector<entity> entities;
-    };
-
-    vox_deserializer(world_type& world, vw::asset::vox_parser& parser);
-
-    auto deserialize(const std::filesystem::path& filepath)
-        -> std::expected<result, error_type>;
-    auto deserialize(const std::filesystem::path& filepath, const options& opts)
-        -> std::expected<result, error_type>;
-
-private:
-    void apply_entity_(const vw::asset::vox_entity_data& data, result& res, const options& opts);
-
-    world_type* world_;
-    vw::asset::vox_parser* parser_;
-};
-
-}  // namespace vw::ecs
-
-#include "vox_deserializer.inl.h"
+import vw.core;
+import vw.ecs;
+import vw.world;
 
 #endif  // VW_ECS_VOX_DESERIALIZER_H

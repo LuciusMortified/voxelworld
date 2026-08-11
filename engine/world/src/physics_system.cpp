@@ -1,17 +1,10 @@
-#include "vw/ecs/systems/physics_system.h"
+module vw.world;
 
-#include "vw/ecs/world.h"
-#include <chrono>
-#include <cmath>
-
-#include "vw/ecs/systems/spatial_system.h"
-#include "vw/ecs/systems/transform_system.h"
-#include "vw/ecs/systems/world_grid_system.h"
-#include "vw/ecs/systems/world_grid/world_grid.h"
+import std;
 
 namespace vw::ecs {
 
-physics_system::physics_system(world_type& w)
+physics_system::physics_system(world& w)
     : world_(&w) {}
 
 void physics_system::set_gravity(float32 g) {
@@ -252,7 +245,7 @@ auto physics_system::resolve_entity_collisions(
 ) -> void {
     using clock = std::chrono::high_resolution_clock;
     auto center = position + offset;
-    vw::spatial::aabb entity_aabb{center - half_extents, center + half_extents};
+    spatial::aabb entity_aabb{center - half_extents, center + half_extents};
 
     const auto q_start = clock::now();
     world_->system<spatial_system>().query_all(entity_aabb, entity_query_cache_, spatial_layer::character);
@@ -424,4 +417,3 @@ auto physics_system::collider_modifier::set_offset(
 }
 
 }  // namespace vw::ecs
-

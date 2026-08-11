@@ -1,18 +1,10 @@
-#pragma once
+module vw.world;
 
-#ifndef VW_ECS_SPATIAL_DYNAMIC_AABB_TREE_INL_H
-#define VW_ECS_SPATIAL_DYNAMIC_AABB_TREE_INL_H
-
-#include <algorithm>
-#include <limits>
-
-#include "vw/core/math.h"
-#include "vw/ecs/spatial/dynamic_aabb_tree.h"
-#include "vw/spatial/aabb.h"
+import std;
 
 namespace vw::ecs {
 
-inline dynamic_aabb_tree::dynamic_aabb_tree() {
+dynamic_aabb_tree::dynamic_aabb_tree() {
     nodes_.reserve(256);
     free_nodes_.reserve(64);
     entity_to_node_.reserve(128);
@@ -20,7 +12,7 @@ inline dynamic_aabb_tree::dynamic_aabb_tree() {
     sibling_stack_.reserve(256);
 }
 
-inline auto dynamic_aabb_tree::allocate_node() -> uint32 {
+auto dynamic_aabb_tree::allocate_node() -> uint32 {
     // Сначала проверить пул свободных узлов
     if (!free_nodes_.empty()) {
         uint32 index = free_nodes_.back();
@@ -39,7 +31,7 @@ inline auto dynamic_aabb_tree::allocate_node() -> uint32 {
     return static_cast<uint32>(nodes_.size() - 1);
 }
 
-inline void dynamic_aabb_tree::free_node(uint32 index) {
+void dynamic_aabb_tree::free_node(uint32 index) {
     if (index >= nodes_.size()) {
         return;
     }
@@ -51,22 +43,22 @@ inline void dynamic_aabb_tree::free_node(uint32 index) {
     free_nodes_.push_back(index);
 }
 
-inline auto dynamic_aabb_tree::size() const -> size_t {
+auto dynamic_aabb_tree::size() const -> size_t {
     return entity_to_node_.size();
 }
 
-inline auto dynamic_aabb_tree::empty() const -> bool {
+auto dynamic_aabb_tree::empty() const -> bool {
     return entity_to_node_.empty();
 }
 
-inline void dynamic_aabb_tree::clear() {
+void dynamic_aabb_tree::clear() {
     nodes_.clear();
     free_nodes_.clear();
     entity_to_node_.clear();
     root_index_ = invalid_node_index;
 }
 
-inline auto dynamic_aabb_tree::find_best_sibling(uint32 new_node_index) const -> uint32 {
+auto dynamic_aabb_tree::find_best_sibling(uint32 new_node_index) const -> uint32 {
     if (root_index_ == invalid_node_index) {
         return invalid_node_index;
     }
@@ -115,7 +107,7 @@ inline auto dynamic_aabb_tree::find_best_sibling(uint32 new_node_index) const ->
     return best_sibling;
 }
 
-inline void dynamic_aabb_tree::insert_leaf(uint32 leaf_index) {
+void dynamic_aabb_tree::insert_leaf(uint32 leaf_index) {
     if (root_index_ == invalid_node_index) {
         root_index_ = leaf_index;
         return;
@@ -163,7 +155,7 @@ inline void dynamic_aabb_tree::insert_leaf(uint32 leaf_index) {
     refit(new_parent);
 }
 
-inline void dynamic_aabb_tree::remove_leaf(uint32 leaf_index) {
+void dynamic_aabb_tree::remove_leaf(uint32 leaf_index) {
     if (leaf_index == root_index_) {
         root_index_ = invalid_node_index;
         return;
@@ -199,7 +191,7 @@ inline void dynamic_aabb_tree::remove_leaf(uint32 leaf_index) {
     free_node(parent);
 }
 
-inline void dynamic_aabb_tree::refit(uint32 index) {
+void dynamic_aabb_tree::refit(uint32 index) {
     while (index != invalid_node_index) {
         node& current = nodes_[index];
         if (!current.is_leaf) {
@@ -219,7 +211,7 @@ inline void dynamic_aabb_tree::refit(uint32 index) {
     }
 }
 
-inline void dynamic_aabb_tree::rotate(uint32 a_idx) {
+void dynamic_aabb_tree::rotate(uint32 a_idx) {
     node& a = nodes_[a_idx];
     int32 balance = nodes_[a.right].height - nodes_[a.left].height;
 
@@ -273,7 +265,7 @@ inline void dynamic_aabb_tree::rotate(uint32 a_idx) {
     b.height = std::max(bl.height, br.height) + 1;
 }
 
-inline void dynamic_aabb_tree::insert(entity e, const vw::spatial::aabb& bounds, spatial_layer_mask layer) {
+void dynamic_aabb_tree::insert(entity e, const vw::spatial::aabb& bounds, spatial_layer_mask layer) {
     if (entity_to_node_.find(e) != entity_to_node_.end()) {
         update(e, bounds, layer);
         return;
@@ -293,7 +285,7 @@ inline void dynamic_aabb_tree::insert(entity e, const vw::spatial::aabb& bounds,
     entity_to_node_[e] = new_node;
 }
 
-inline void dynamic_aabb_tree::remove(entity e) {
+void dynamic_aabb_tree::remove(entity e) {
     auto it = entity_to_node_.find(e);
     if (it == entity_to_node_.end()) {
         return;
@@ -305,7 +297,7 @@ inline void dynamic_aabb_tree::remove(entity e) {
     free_node(node_index);
 }
 
-inline void dynamic_aabb_tree::update(entity e, const vw::spatial::aabb& new_bounds, spatial_layer_mask layer) {
+void dynamic_aabb_tree::update(entity e, const vw::spatial::aabb& new_bounds, spatial_layer_mask layer) {
     auto it = entity_to_node_.find(e);
     if (it == entity_to_node_.end()) {
         insert(e, new_bounds, layer);
@@ -331,7 +323,7 @@ inline void dynamic_aabb_tree::update(entity e, const vw::spatial::aabb& new_bou
     insert_leaf(node_index);
 }
 
-inline void dynamic_aabb_tree::query_all(
+void dynamic_aabb_tree::query_all(
     const vw::spatial::frustum& f,
     std::vector<entity>& result_out,
     spatial_layer_mask layer_mask
@@ -364,7 +356,7 @@ inline void dynamic_aabb_tree::query_all(
     }
 }
 
-inline void dynamic_aabb_tree::query_all_any(
+void dynamic_aabb_tree::query_all_any(
     std::span<const vw::spatial::frustum> frustums,
     std::vector<entity>& result_out
 ) const {
@@ -403,7 +395,7 @@ inline void dynamic_aabb_tree::query_all_any(
     }
 }
 
-inline void dynamic_aabb_tree::query_all(
+void dynamic_aabb_tree::query_all(
     const vw::spatial::ray& r,
     std::vector<entity>& result_out,
     spatial_layer_mask layer_mask
@@ -436,7 +428,7 @@ inline void dynamic_aabb_tree::query_all(
     }
 }
 
-inline void dynamic_aabb_tree::query_all(
+void dynamic_aabb_tree::query_all(
     const vw::spatial::aabb& bounds,
     std::vector<entity>& result_out,
     spatial_layer_mask layer_mask
@@ -470,5 +462,3 @@ inline void dynamic_aabb_tree::query_all(
 }
 
 }  // namespace vw::ecs
-
-#endif  // VW_ECS_SPATIAL_DYNAMIC_AABB_TREE_INL_H

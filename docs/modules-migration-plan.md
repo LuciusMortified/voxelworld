@@ -17,7 +17,7 @@
 | M0 | Тулчейн-спайк: CMake 4.x, Ninja, `import std`, `import vulkan`, матрица MSVC+Clang | низкий | ✅ **выполнено**, отчёт: `docs/m0-toolchain-spike.md` |
 | M1 | `vw.core`: типы, математика, лог (выпил spdlog), block_registry | низкий | ✅ **выполнено**, отчёт: `docs/m1-vw-core.md` |
 | M2 | Де-шаблонизация ECS → `vw.ecs` | **высокий** | ✅ **выполнено** (кроме бенчмарка итерации), отчёт: `docs/m2-vw-ecs.md` |
-| M3 | `vw.world`: вынос мира из vw::gfx, headless-сборка | средний | тесты мира без GPU в CI |
+| M3 | `vw.world`: вынос мира из vw::gfx, headless-сборка | средний | ✅ **выполнено**, отчёт: `docs/m3-vw-world.md` |
 | M4 | `vw.platform`: окно/ввод, GLFW спрятан | низкий | — |
 | M5 | `vw.gfx`: конверсия + миграция на Vulkan-Hpp | **высокий** | рендер на vk::, import vulkan |
 | M6 | Приложения, тесты, зачистка, обновление CLAUDE.md | низкий | удалено старое include-дерево |
@@ -444,10 +444,15 @@ private:
 
 ```cpp
 export module vw.world;
-export import :model;     // воксельные данные, страницы, палитры
-export import :grid;      // chunk, world_grid, колонки
-export import :gen;       // terrain_generator (виртуальный интерфейс — уже есть)
-export import :serial;    // vox/voxa
+export import :model;       // воксельные данные, страницы, палитры
+export import :anim;        // клипы, треки, слои, FSM
+export import :serial;      // vox/voxa
+export import :index;       // слои и дерево широкой фазы
+export import :components;  // компоненты мира
+export import :terrain;     // генератор и загрузчик колонок
+export import :grid;        // chunk, world_grid
+export import :systems;     // системы
+// класс world живёт в этом же первичном юните
 ```
 
 Генерация в потоках (`gen_thread_function`) остаётся внутри библиотеки — `std::jthread` и очереди не требуют ничего из gfx.
@@ -457,6 +462,8 @@ export import :serial;    // vox/voxa
 - Таргет `vw_world` линкуется и тестируется **без** Vulkan, GLFW, imgui — отдельный CI-джоб без GPU-зависимостей зелёный.
 - `import vw.world` ни транзитивно, ни явно не тащит vk::/GLFW-символы (проверка: тестовый TU с `import vw.world;` собирается при отсутствии Vulkan SDK в окружении CI-джоба).
 - Sculptor и приложения работают в смешанном режиме (модули core/ecs/world + header-only gfx).
+
+✅ **выполнено.** Конфигурация `-DVW_BUILD_GFX=OFF -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON` собирается и проходит 140/140 без единой GPU-зависимости; `world_tests` импортирует `vw.world` напрямую и зависит только от CRT. Геометрия `vw::spatial` при этом уехала в `vw.core:spatial`, а не в мир, — обоснование в отчёте. Dirty-set не понадобился: мир и так ничего не знает о мешах.
 
 ---
 

@@ -36,7 +36,6 @@
 #include "vw/ecs/systems/world_grid/chunk.h"
 #include "vw/ecs/systems/world_grid/chunk_loader.h"
 #include "vw/ecs/systems/world_grid/gen_column.h"
-#include "vw/ecs/systems/world_grid/generators/flat_terrain_generator.h"
 #include "vw/ecs/systems/world_grid/generators/perlin_terrain_generator.h"
 #include "vw/ecs/systems/world_grid/terrain_generator.h"
 #include "vw/ecs/systems/world_grid/world_grid.h"

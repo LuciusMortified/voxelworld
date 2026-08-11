@@ -1,24 +1,136 @@
-#pragma once
+module vw.world;
 
-#ifndef VW_ECS_SYSTEMS_WORLD_GRID_GENERATORS_PERLIN_TERRAIN_GENERATOR_INL_H
-#define VW_ECS_SYSTEMS_WORLD_GRID_GENERATORS_PERLIN_TERRAIN_GENERATOR_INL_H
 
-#include <algorithm>
-#include <cmath>
+import std;
 
-#include "vw/core/color.h"
-#include "vw/asset/model/model.h"
-#include "vw/ecs/systems/world_grid/chunk.h"
+
+namespace vw::ecs {
+
+chunk_loader::chunk_loader(
+    std::unique_ptr<terrain_generator> generator
+)
+    : generator_(std::move(generator)) {
+    auto count = std::min(std::thread::hardware_concurrency(), 4u);
+    if (count == 0) {
+        count = 1;
+    }
+    for (uint32 i = 0; i < count; ++i) {
+        gen_threads_.emplace_back(&chunk_loader::gen_thread_function_, this);
+    }
+}
+
+chunk_loader::~chunk_loader() {
+    {
+        std::scoped_lock lock(gen_mutex_);
+        gen_running_ = false;
+    }
+    gen_cv_.notify_all();
+
+    for (auto& t : gen_threads_) {
+        if (t.joinable()) {
+            t.join();
+        }
+    }
+}
+
+auto chunk_loader::request(
+    vec2i coord
+) -> bool {
+    if (pending_columns_.contains(coord)) {
+        return false;
+    }
+    pending_columns_.insert(coord);
+
+    {
+        std::scoped_lock lock(gen_mutex_);
+        gen_queue_.push({coord});
+    }
+    gen_cv_.notify_one();
+    return true;
+}
+
+auto chunk_loader::try_pop_completed() -> std::unique_ptr<gen_column> {
+    std::unique_ptr<gen_column> col;
+    {
+        std::scoped_lock lock(completed_mutex_);
+        if (completed_queue_.empty()) {
+            return nullptr;
+        }
+        col = std::move(completed_queue_.front());
+        completed_queue_.pop();
+    }
+    pending_columns_.erase(col->get_coord());
+    return col;
+}
+
+auto chunk_loader::is_pending(
+    vec2i coord
+) const -> bool {
+    return pending_columns_.contains(coord);
+}
+
+auto chunk_loader::pending_count() const -> uint32 {
+    return static_cast<uint32>(pending_columns_.size());
+}
+
+void chunk_loader::gen_thread_function_() {
+    while (true) {
+        gen_task task{};
+
+        {
+            std::unique_lock lock(gen_mutex_);
+            gen_cv_.wait(lock, [this] -> bool { return !gen_queue_.empty() || !gen_running_; });
+
+            if (!gen_running_ && gen_queue_.empty()) {
+                break;
+            }
+
+            if (!gen_queue_.empty()) {
+                task = gen_queue_.front();
+                gen_queue_.pop();
+            } else {
+                continue;
+            }
+        }
+
+        auto col = std::make_unique<gen_column>(task.coord.x, task.coord.y);
+
+        terrain_context ctx{
+            .cx           = task.coord.x,
+            .cz           = task.coord.y,
+            .create_chunk = [&col](int32 y) -> chunk_data& {
+                return col->create_chunk(y, chunk_data{});
+            }
+        };
+
+        generator_->generate(ctx);
+        col->set_phase(column_phase::terrain);
+
+        for (auto& [y, cd] : col->get_all_chunk_data()) {
+            cd.chunk_model->compute_own_boundaries();
+        }
+
+        {
+            std::scoped_lock lock(completed_mutex_);
+            completed_queue_.push(std::move(col));
+        }
+    }
+}
+
+}  // namespace vw::ecs
+
+
+
 
 namespace vw::ecs {
 
 
-inline perlin_terrain_generator::perlin_terrain_generator(
+perlin_terrain_generator::perlin_terrain_generator(
     vw::asset::model_identity_pool& identity_pool, vw::asset::page_pool& pool
 )
     : perlin_terrain_generator(identity_pool, pool, params{}) {}
 
-inline perlin_terrain_generator::perlin_terrain_generator(
+perlin_terrain_generator::perlin_terrain_generator(
     vw::asset::model_identity_pool& identity_pool, vw::asset::page_pool& pool, params p
 )
     : identity_pool_(&identity_pool), page_pool_(&pool), params_(p) {
@@ -38,19 +150,19 @@ inline perlin_terrain_generator::perlin_terrain_generator(
     }
 }
 
-inline auto perlin_terrain_generator::fade(
+auto perlin_terrain_generator::fade(
     float64 t
 ) -> float64 {
     return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
 }
 
-inline auto perlin_terrain_generator::lerp(
+auto perlin_terrain_generator::lerp(
     float64 t, float64 a, float64 b
 ) -> float64 {
     return a + t * (b - a);
 }
 
-inline auto perlin_terrain_generator::grad(
+auto perlin_terrain_generator::grad(
     int32 hash, float64 x, float64 y
 ) -> float64 {
     int32 h   = hash & 3;
@@ -59,7 +171,7 @@ inline auto perlin_terrain_generator::grad(
     return ((h & 1) ? -u : u) + ((h & 2) ? -v : v);
 }
 
-inline auto perlin_terrain_generator::noise2d(
+auto perlin_terrain_generator::noise2d(
     float64 x, float64 y
 ) const -> float64 {
     int32 xi = static_cast<int32>(std::floor(x)) & 255;
@@ -82,7 +194,7 @@ inline auto perlin_terrain_generator::noise2d(
     return lerp(v, x1, x2);
 }
 
-inline auto perlin_terrain_generator::octave_noise(
+auto perlin_terrain_generator::octave_noise(
     float64 x, float64 y
 ) const -> float64 {
     float64 total   = 0.0;
@@ -100,7 +212,7 @@ inline auto perlin_terrain_generator::octave_noise(
     return total / max_amp;
 }
 
-inline auto perlin_terrain_generator::ridged_noise(
+auto perlin_terrain_generator::ridged_noise(
     float64 x, float64 y
 ) const -> float64 {
     float64 total   = 0.0;
@@ -121,14 +233,14 @@ inline auto perlin_terrain_generator::ridged_noise(
     return total / max_amp;
 }
 
-inline auto perlin_terrain_generator::continent_at(
+auto perlin_terrain_generator::continent_at(
     float64 nx, float64 nz
 ) const -> float64 {
     float64 c = octave_noise(nx * params_.continent_frequency, nz * params_.continent_frequency);
     return (c + 1.0) * 0.5;
 }
 
-inline auto perlin_terrain_generator::height_at(
+auto perlin_terrain_generator::height_at(
     int32 wx, int32 wz
 ) const -> int32 {
     auto nx = static_cast<float64>(wx);
@@ -178,7 +290,7 @@ inline auto perlin_terrain_generator::height_at(
     return base_h + static_cast<int32>(mixed * amplitude);
 }
 
-inline auto perlin_terrain_generator::block_at(
+auto perlin_terrain_generator::block_at(
     int32 y, int32 surface_y, float64 continent
 ) const -> block_id {
     int32 depth = surface_y - y;
@@ -204,13 +316,13 @@ inline auto perlin_terrain_generator::block_at(
     return blocks::gray_3;
 }
 
-inline auto perlin_terrain_generator::surface_height_at(
+auto perlin_terrain_generator::surface_height_at(
     int32 wx, int32 wz
 ) const -> int32 {
     return height_at(wx, wz);
 }
 
-inline void perlin_terrain_generator::generate(
+void perlin_terrain_generator::generate(
     terrain_context& ctx
 ) {
     constexpr int32 s      = 64;
@@ -245,7 +357,7 @@ inline void perlin_terrain_generator::generate(
     }
 }
 
-inline void perlin_terrain_generator::generate_chunk(
+void perlin_terrain_generator::generate_chunk(
     terrain_context& ctx, int32 chunk_y
 ) {
     constexpr int32 s = 64;
@@ -279,4 +391,3 @@ inline void perlin_terrain_generator::generate_chunk(
 
 }  // namespace vw::ecs
 
-#endif  // VW_ECS_SYSTEMS_WORLD_GRID_GENERATORS_PERLIN_TERRAIN_GENERATOR_INL_H

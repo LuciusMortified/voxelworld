@@ -1,14 +1,10 @@
-#include "vw/ecs/systems/hierarchy_system.h"
+module vw.world;
 
-#include "vw/ecs/world.h"
-#include <stdexcept>
-
-#include "vw/ecs/entity.h"
-#include "vw/ecs/systems/transform_system.h"
+import std;
 
 namespace vw::ecs {
 
-hierarchy_system::hierarchy_system(world_type& w)
+hierarchy_system::hierarchy_system(world& w)
     : world_{&w} {}
 
 void hierarchy_system::update(float32 /*dt*/) {}
@@ -150,4 +146,3 @@ auto hierarchy_system::check_hierarchy_cycle(entity parent, entity child) const 
 }
 
 }  // namespace vw::ecs
-

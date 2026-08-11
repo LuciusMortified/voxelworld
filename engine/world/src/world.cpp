@@ -1,6 +1,6 @@
-#include "vw/ecs/world.h"
+module vw.world;
 
-#include <utility>
+import std;
 
 namespace vw::ecs {
 namespace {
@@ -14,7 +14,15 @@ auto make_systems(world& w, std::index_sequence<Is...> /*unused*/) -> Tuple {
 
 world::world()
     : systems_{make_systems<systems>(
-          *this, std::make_index_sequence<std::tuple_size_v<systems>>{})} {}
+          *this, std::make_index_sequence<std::tuple_size_v<systems>>{})} {
+    const uint32 transform_id = component_id_of<transform_component>();
+    const uint32 model_id     = component_id_of<model_component>();
+
+    registry_.add_change_dep(transform_id, component_id_of<spatial_component>());
+    registry_.add_change_dep(transform_id, component_id_of<world_view_component>());
+    registry_.add_change_dep(transform_id, component_id_of<light_component>());
+    registry_.add_change_dep(model_id, component_id_of<spatial_component>());
+}
 
 world::~world() {
     std::apply([](auto&... s) { (detail::invoke_shutdown(s), ...); }, systems_);

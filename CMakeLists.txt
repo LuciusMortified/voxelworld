@@ -20,8 +20,13 @@ endif()
 include(vw_std_module)
 include(vw_vulkan_module)
 
+option(VW_BUILD_GFX "Build the Vulkan renderer and everything that needs a GPU" ON)
 option(VW_BUILD_APPS "Build applications" ON)
 option(VW_BUILD_TESTS "Build unit tests" ON)
+
+if(VW_BUILD_APPS AND NOT VW_BUILD_GFX)
+    message(FATAL_ERROR "VW_BUILD_APPS needs VW_BUILD_GFX: every app opens a window")
+endif()
 
 enable_testing()
 

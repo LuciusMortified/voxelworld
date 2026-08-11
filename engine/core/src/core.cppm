@@ -7,4 +7,5 @@ export import :vector;
 export import :matrix;
 export import :color;
 export import :math;
+export import :spatial;
 export import :blocks;

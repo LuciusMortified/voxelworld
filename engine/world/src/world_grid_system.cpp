@@ -1,18 +1,11 @@
-#include "vw/ecs/systems/world_grid_system.h"
+module vw.world;
 
-#include "vw/ecs/world.h"
-#include <algorithm>
-
-#include "vw/asset/model/model.h"
-#include "vw/core/timing.h"
-#include "vw/ecs/components/transform_component.h"
-#include "vw/ecs/systems/model_system.h"
-#include "vw/ecs/systems/world_grid/world_grid.h"
+import std;
 
 namespace vw::ecs {
 
 world_grid_system::world_grid_system(
-    world_type& w
+    world& w
 )
     : world_(&w) {}
 
@@ -23,7 +16,7 @@ world_grid_system::world_grid_system(world_grid_system&&) noexcept = default;
 auto world_grid_system::operator=(world_grid_system&&) noexcept -> world_grid_system& = default;
 
 void world_grid_system::set_grid(
-    std::unique_ptr<grid_type> grid
+    std::unique_ptr<world_grid> grid
 ) {
     clear_grid_transient_state_();
     grid_ = std::move(grid);
@@ -36,11 +29,11 @@ void world_grid_system::set_loader(
     loader_ = std::move(loader);
 }
 
-auto world_grid_system::grid() -> grid_type* {
+auto world_grid_system::grid() -> world_grid* {
     return grid_.get();
 }
 
-auto world_grid_system::grid() const -> const grid_type* {
+auto world_grid_system::grid() const -> const world_grid* {
     return grid_.get();
 }
 
@@ -344,4 +337,3 @@ void world_grid_system::clear_loader_transient_state_() {
 }
 
 }  // namespace vw::ecs
-

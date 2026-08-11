@@ -1,15 +1,25 @@
 {
+  "name": "voxel-world",
+  "version-string": "0.0.1",
   "dependencies": [
-    "catch2",
-    "glfw3",
-    {
-      "name": "imgui",
-      "features": [
-        "glfw-binding",
-        "vulkan-binding"
+    "catch2"
+  ],
+  "default-features": [
+    "gfx"
+  ],
+  "features": {
+    "gfx": {
+      "description": "Window, renderer and debug UI dependencies",
+      "dependencies": [
+        "glfw3",
+        {
+          "name": "imgui",
+          "features": [
+            "glfw-binding",
+            "vulkan-binding"
+          ]
+        }
       ]
     }
-  ],
-  "version-string": "0.0.1",
-  "name": "voxel-world"
+  }
 }

@@ -3,31 +3,10 @@
 #ifndef VW_ECS_HIERARCHY_COMPONENT_H
 #define VW_ECS_HIERARCHY_COMPONENT_H
 
-#include <vector>
+#include "vw/world/detail/module_prelude.h"
 
-#include "vw/ecs/entity.h"
-
-namespace vw::ecs {
-
-struct hierarchy_component final {
-private:
-    entity parent_;
-    std::vector<entity> children_;
-
-public:
-    [[nodiscard]] auto has_parent() const -> bool;
-    [[nodiscard]] auto get_parent() const -> entity;
-
-    [[nodiscard]] auto has_child(entity child) const -> bool;
-    [[nodiscard]] auto get_children() const -> const std::vector<entity>&;
-
-        friend class hierarchy_system;
-
-        friend class transform_system;
-};
-
-}  // namespace vw::ecs
-
-#include "vw/ecs/components/hierarchy_component.inl.h"
+import vw.core;
+import vw.ecs;
+import vw.world;
 
 #endif  // VW_ECS_HIERARCHY_COMPONENT_H

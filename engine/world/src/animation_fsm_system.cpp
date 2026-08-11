@@ -1,11 +1,10 @@
-#include "vw/ecs/systems/animation_fsm_system.h"
+module vw.world;
 
-#include "vw/ecs/world.h"
-#include "vw/ecs/systems/animation_system.h"
+import std;
 
 namespace vw::ecs {
 
-animation_fsm_system::animation_fsm_system(world_type& w)
+animation_fsm_system::animation_fsm_system(world& w)
     : world_(&w) {}
 
 void animation_fsm_system::update(float32 /*dt*/) {
@@ -27,7 +26,7 @@ void animation_fsm_system::update(float32 /*dt*/) {
 
             auto lm = pm.layer(i);
 
-            if (layer.state == vw::asset::animation_state::stopped && !layer.clip) {
+            if (layer.state == asset::animation_state::stopped && !layer.clip) {
                 const auto* state = machine.get_current_state_node();
                 if (!state) {
                     continue;
@@ -70,7 +69,7 @@ animation_fsm_system::modifier::modifier(
     : component_(component) {}
 
 void animation_fsm_system::modifier::add_machine(
-    size_t index, vw::asset::animation_fsm machine
+    size_t index, asset::animation_fsm machine
 ) const {
     if (index >= component_->machines_.size()) {
         component_->machines_.resize(index + 1);
@@ -92,4 +91,3 @@ auto animation_fsm_system::modify(
 }
 
 }  // namespace vw::ecs
-

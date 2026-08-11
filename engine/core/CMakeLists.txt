@@ -15,10 +15,12 @@ target_sources(vw_core
             src/matrix.cppm
             src/color.cppm
             src/math.cppm
+            src/spatial.cppm
             src/blocks.cppm
     PRIVATE
         src/log.cpp
         src/math.cpp
+        src/spatial.cpp
         src/blocks.cpp
 )
 

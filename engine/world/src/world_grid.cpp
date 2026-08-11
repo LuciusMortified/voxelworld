@@ -1,10 +1,11 @@
-#include "vw/ecs/systems/world_grid/world_grid.h"
+module vw.world;
 
-#include "vw/ecs/world.h"
+import std;
+
 namespace vw::ecs {
 
 world_grid::world_grid(
-    world_type& w, int32 voxel_scale
+    world& w, int32 voxel_scale
 )
     : world_(&w), voxel_scale_(voxel_scale) {}
 
@@ -40,7 +41,7 @@ auto world_grid::has_chunk(
 
 auto world_grid::get_chunk(
     vec3i chunk_coord
-) -> chunk_type* {
+) -> chunk* {
     auto it = chunks_.find(chunk_coord);
     return it != chunks_.end() ? it->second.get() : nullptr;
 }
@@ -99,10 +100,10 @@ auto world_grid::chunk_count() const -> uint32 {
 
 auto world_grid::place_chunk(
     vec3i chunk_coord, std::shared_ptr<asset::model> mdl
-) -> chunk_type* {
+) -> chunk* {
     auto [it, inserted] = chunks_.emplace(
         chunk_coord,
-        std::make_unique<chunk_type>(*world_, chunk_coord, std::move(mdl), voxel_scale_)
+        std::make_unique<chunk>(*world_, chunk_coord, std::move(mdl), voxel_scale_)
     );
     return it->second.get();
 }
@@ -156,4 +157,3 @@ auto world_grid::chunk_to_world_coord(
 }
 
 }  // namespace vw::ecs
-
