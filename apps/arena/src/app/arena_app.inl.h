@@ -29,11 +29,11 @@ inline arena_app::arena_app(
           }
       ) {
     auto& window = get_engine().get_window();
-    window.sub<gfx::key_press_event>([this](const gfx::key_press_event& event) -> bool {
+    window.sub<plat::key_press_event>([this](const plat::key_press_event& event) -> bool {
         handle_key_press(event.key);
         return true;
     });
-    window.sub<gfx::window_close_event>([this](gfx::window_close_event&) -> bool {
+    window.sub<plat::window_close_event>([this](plat::window_close_event&) -> bool {
         get_engine().shutdown();
         return true;
     });
@@ -108,16 +108,16 @@ inline auto arena_app::load_assets() -> void {
 }
 
 inline auto arena_app::handle_key_press(
-    gfx::keyboard::keys key
+    plat::keyboard::keys key
 ) -> void {
     switch (key) {
-        case gfx::keyboard::keys::ESCAPE:
+        case plat::keyboard::keys::ESCAPE:
             get_engine().shutdown();
             break;
-        case gfx::keyboard::keys::KEY_1:
+        case plat::keyboard::keys::KEY_1:
             player_->toggle_sword();
             break;
-        case gfx::keyboard::keys::F:
+        case plat::keyboard::keys::F:
             if (player_->is_placed()) {
                 get_engine()
                     .get_world()
@@ -126,10 +126,10 @@ inline auto arena_app::handle_key_press(
                     .add_external_impulse({0.0f, 0.0f, 500.0f});
             }
             break;
-        case gfx::keyboard::keys::F1:
+        case plat::keyboard::keys::F1:
             input_controller_.set_mouse_captured(!input_controller_.is_mouse_captured());
             break;
-        case gfx::keyboard::keys::F2:
+        case plat::keyboard::keys::F2:
             show_colliders_ = !show_colliders_;
             break;
         default:

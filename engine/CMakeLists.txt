@@ -12,6 +12,8 @@ if(NOT VW_BUILD_GFX)
     return()
 endif()
 
+add_subdirectory(platform)
+
 add_library(${PROJECT_NAME} INTERFACE)
 
 target_include_directories(${PROJECT_NAME} INTERFACE include)
@@ -27,6 +29,7 @@ target_link_libraries(${PROJECT_NAME} INTERFACE
         vw_core
         vw_ecs
         vw_world
+        vw_platform
         ${Vulkan_LIBRARIES}
         glfw
         imgui::imgui

@@ -28,7 +28,7 @@ public:
     void render(float delta_time) override;
 
 private:
-    auto handle_key_press(gfx::keyboard::keys key) -> void;
+    auto handle_key_press(plat::keyboard::keys key) -> void;
     auto load_assets() -> void;
 
     asset::vox_parser_plain parser_;

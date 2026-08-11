@@ -18,7 +18,7 @@
 | M1 | `vw.core`: типы, математика, лог (выпил spdlog), block_registry | низкий | ✅ **выполнено**, отчёт: `docs/m1-vw-core.md` |
 | M2 | Де-шаблонизация ECS → `vw.ecs` | **высокий** | ✅ **выполнено** (кроме бенчмарка итерации), отчёт: `docs/m2-vw-ecs.md` |
 | M3 | `vw.world`: вынос мира из vw::gfx, headless-сборка | средний | ✅ **выполнено**, отчёт: `docs/m3-vw-world.md` |
-| M4 | `vw.platform`: окно/ввод, GLFW спрятан | низкий | — |
+| M4 | `vw.platform`: окно/ввод, GLFW спрятан | низкий | ✅ **выполнено**, отчёт: `docs/m4-vw-platform.md` |
 | M5 | `vw.gfx`: конверсия + миграция на Vulkan-Hpp | **высокий** | рендер на vk::, import vulkan |
 | M6 | Приложения, тесты, зачистка, обновление CLAUDE.md | низкий | удалено старое include-дерево |
 
@@ -509,6 +509,13 @@ import std;
 
 - `grep -r "GLFW" --include="*.cppm"` пуст (GLFW только в .cpp).
 - Sculptor работает на новой оконной обвязке.
+
+✅ **выполнено.** GLFW остался в одном юните — `engine/platform/src/window.cpp`;
+в `.cppm` слово встречается только в двух комментариях. Namespace стал
+`vw::plat`, сюрфейс уходит наружу сырым `uint64`, нативный хэндл — `void*`.
+Колбэки бэкенда добираются до приватных хуков окна через
+`friend struct detail::window_callbacks`. Sculptor и `test_window` запущены и
+работают.
 
 ---
 

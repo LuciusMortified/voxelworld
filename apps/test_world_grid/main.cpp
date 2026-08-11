@@ -21,12 +21,12 @@ public:
         camera_controller_ = std::make_unique<gfx::free_camera_controller>(0.1f, 60.0f);
         camera_controller_->setup(window, camera);
 
-        window.sub<gfx::key_press_event>([this](const gfx::key_press_event& event) -> bool {
+        window.sub<plat::key_press_event>([this](const plat::key_press_event& event) -> bool {
             handle_key_press(event.key);
             return true;
         });
 
-        window.sub<gfx::window_close_event>([this](gfx::window_close_event&) -> bool {
+        window.sub<plat::window_close_event>([this](plat::window_close_event&) -> bool {
             get_engine().shutdown();
             return true;
         });
@@ -158,13 +158,13 @@ private:
     }
 
     void handle_key_press(
-        gfx::keyboard::keys key
+        plat::keyboard::keys key
     ) const {
         switch (key) {
-            case gfx::keyboard::keys::ESCAPE:
+            case plat::keyboard::keys::ESCAPE:
                 get_engine().shutdown();
                 break;
-            case gfx::keyboard::keys::F1:
+            case plat::keyboard::keys::F1:
                 camera_controller_->toggle_mouse_captured();
                 camera_controller_->toggle_keyboard_control_enabled();
                 break;

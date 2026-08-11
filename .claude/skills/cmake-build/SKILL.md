@@ -1,6 +1,6 @@
 ---
 name: cmake-build
-description: Сборка voxelworld — генератор Ninja и окружение vcvars, таргеты vw_core/vw_ecs/vw_world/vwengine, опции VW_BUILD_*, подключение нового модульного юнита, тесты и headless-конфигурация без Vulkan. Читай при правке CMakeLists.txt, cmake/*.cmake, vcpkg.json и перед запуском сборки или тестов.
+description: Сборка voxelworld — генератор Ninja и окружение vcvars, таргеты vw_core/vw_ecs/vw_world/vw_platform/vwengine, опции VW_BUILD_*, подключение нового модульного юнита, тесты и headless-конфигурация без Vulkan. Читай при правке CMakeLists.txt, cmake/*.cmake, vcpkg.json и перед запуском сборки или тестов.
 ---
 
 # Сборка voxelworld
@@ -51,6 +51,7 @@ cmake -S . -B build/headless -G Ninja -DCMAKE_BUILD_TYPE=Release \
 | `vw_core` | модуль `vw.core` (`engine/core/`) |
 | `vw_ecs` | модуль `vw.ecs` (`engine/ecs/`) |
 | `vw_world` | модуль `vw.world` (`engine/world/`) |
+| `vw_platform` | модуль `vw.platform` (`engine/platform/`); только при `VW_BUILD_GFX=ON` |
 | `vwengine` | INTERFACE-библиотека header-only gfx; существует только при `VW_BUILD_GFX=ON` |
 | `core_tests` `ecs_tests` `world_tests` | тесты Catch2; линкуются на модульные таргеты, никогда на `vwengine` |
 | `view_bench` | микробенчмарк обхода ECS (регрессионный сторож из M2) |

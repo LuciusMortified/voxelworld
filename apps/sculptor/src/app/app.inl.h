@@ -53,25 +53,25 @@ inline app::app(
     camera_controller_.setup(window, camera);
     camera_controller_.set_camera_speed(20.f);
 
-    window.sub<gfx::key_press_event>([this](const gfx::key_press_event& ev) -> bool {
+    window.sub<plat::key_press_event>([this](const plat::key_press_event& ev) -> bool {
         handle_key_press(ev);
         return true;
     });
 
-    window.sub<gfx::window_close_event>([this](const gfx::window_close_event&) -> bool {
+    window.sub<plat::window_close_event>([this](const plat::window_close_event&) -> bool {
         get_engine().shutdown();
         return true;
     });
 
-    window.sub<gfx::mouse_move_event>([this](const gfx::mouse_move_event& ev) -> bool {
+    window.sub<plat::mouse_move_event>([this](const plat::mouse_move_event& ev) -> bool {
         handle_mouse_move(ev);
         return true;
     });
-    window.sub<gfx::mouse_press_event>([this](const gfx::mouse_press_event& ev) -> bool {
+    window.sub<plat::mouse_press_event>([this](const plat::mouse_press_event& ev) -> bool {
         handle_mouse_press(ev);
         return true;
     });
-    window.sub<gfx::mouse_release_event>([this](const gfx::mouse_release_event& ev) -> bool {
+    window.sub<plat::mouse_release_event>([this](const plat::mouse_release_event& ev) -> bool {
         handle_mouse_release(ev);
         return true;
     });
@@ -182,7 +182,7 @@ inline void app::render(
 }
 
 inline void app::handle_key_press(
-    const gfx::key_press_event& ev
+    const plat::key_press_event& ev
 ) {
     const auto& io = ImGui::GetIO();
 
@@ -192,8 +192,8 @@ inline void app::handle_key_press(
         return;
     }
 
-    using keys = gfx::keyboard::keys;
-    using mods = gfx::keyboard::mods;
+    using keys = plat::keyboard::keys;
+    using mods = plat::keyboard::mods;
 
     if (ev.key == keys::Z && ev.with(mods::CTRL) && !ev.with(mods::SHIFT)) {
         op_manager_.undo();
@@ -243,10 +243,10 @@ inline void app::handle_key_press(
 }
 
 inline void app::handle_file_shortcuts(
-    const gfx::key_press_event& ev
+    const plat::key_press_event& ev
 ) {
-    using keys = gfx::keyboard::keys;
-    using mods = gfx::keyboard::mods;
+    using keys = plat::keyboard::keys;
+    using mods = plat::keyboard::mods;
 
     if (ev.key == keys::N && ev.with(mods::CTRL)) {
         state_.ui.need_new_file_modal = true;
@@ -267,7 +267,7 @@ inline void app::handle_file_shortcuts(
 }
 
 inline void app::handle_mouse_move(
-    const gfx::mouse_move_event& ev
+    const plat::mouse_move_event& ev
 ) {
     const auto& io = ImGui::GetIO();
     if (io.WantCaptureMouse) {
@@ -280,14 +280,14 @@ inline void app::handle_mouse_move(
 }
 
 inline void app::handle_mouse_press(
-    const gfx::mouse_press_event& ev
+    const plat::mouse_press_event& ev
 ) {
     auto& io = ImGui::GetIO();
     if (io.WantCaptureMouse) {
         return;
     }
 
-    if (!camera_movement_enabled_ && ev.button == gfx::mouse::buttons::RIGHT) {
+    if (!camera_movement_enabled_ && ev.button == plat::mouse::buttons::RIGHT) {
         camera_movement_enabled_ = true;
         camera_controller_.set_mouse_captured(camera_movement_enabled_);
         camera_controller_.set_keyboard_control_enabled(camera_movement_enabled_);
@@ -306,14 +306,14 @@ inline void app::handle_mouse_press(
 }
 
 inline void app::handle_mouse_release(
-    const gfx::mouse_release_event& ev
+    const plat::mouse_release_event& ev
 ) {
     auto& io = ImGui::GetIO();
     if (io.WantCaptureMouse) {
         return;
     }
 
-    if (camera_movement_enabled_ && ev.button == gfx::mouse::buttons::RIGHT) {
+    if (camera_movement_enabled_ && ev.button == plat::mouse::buttons::RIGHT) {
         camera_movement_enabled_ = false;
         camera_controller_.set_mouse_captured(camera_movement_enabled_);
         camera_controller_.set_keyboard_control_enabled(camera_movement_enabled_);

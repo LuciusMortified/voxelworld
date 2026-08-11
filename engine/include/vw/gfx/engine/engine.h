@@ -12,13 +12,14 @@
 #include "vw/gfx/engine/app.h"
 #include "vw/gfx/render/renderer.h"
 #include "vw/gfx/render/vulkan_context.h"
-#include "vw/gfx/window/event.h"
-#include "vw/gfx/window/window.h"
+#include "vw/platform/event.h"
+#include "vw/platform/window.h"
 #include "vw/ecs/world.h"
 
 namespace vw::gfx {
 
 using namespace ::vw::ecs;
+using namespace ::vw::plat;
 
 struct engine_stats {
     float32 fps             = 0.0f;

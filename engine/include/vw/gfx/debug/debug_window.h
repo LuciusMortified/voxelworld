@@ -12,6 +12,8 @@
 
 namespace vw::gfx {
 
+using namespace ::vw::plat;
+
 class engine;
 
 class debug_window final {

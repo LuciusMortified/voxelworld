@@ -38,11 +38,11 @@ public:
     void render(float delta_time) override;
 
 private:
-    void handle_key_press(const gfx::key_press_event& ev);
-    void handle_file_shortcuts(const gfx::key_press_event& ev);
-    void handle_mouse_move(const gfx::mouse_move_event& ev);
-    void handle_mouse_press(const gfx::mouse_press_event& ev);
-    void handle_mouse_release(const gfx::mouse_release_event& ev);
+    void handle_key_press(const plat::key_press_event& ev);
+    void handle_file_shortcuts(const plat::key_press_event& ev);
+    void handle_mouse_move(const plat::mouse_move_event& ev);
+    void handle_mouse_press(const plat::mouse_press_event& ev);
+    void handle_mouse_release(const plat::mouse_release_event& ev);
 
     void handle_animation_actions_();
     void update_title_();

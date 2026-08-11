@@ -3,7 +3,7 @@
 #ifndef VW_GFX_CAMERA_FREE_CAMERA_CONTROLLER_INL_H
 #define VW_GFX_CAMERA_FREE_CAMERA_CONTROLLER_INL_H
 
-#include "vw/gfx/window/window.h"
+#include "vw/platform/window.h"
 
 namespace vw::gfx {
 

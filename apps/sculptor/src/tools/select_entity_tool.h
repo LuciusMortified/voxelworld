@@ -17,10 +17,10 @@ public:
     select_entity_tool(engine_type& eng, app_state& st);
 
     void render(float delta_time) override;
-    void on_key_press(const gfx::key_press_event& ev) override;
-    void on_mouse_move(const gfx::mouse_move_event& ev) override;
-    void on_mouse_press(const gfx::mouse_press_event& ev) override;
-    void on_mouse_release(const gfx::mouse_release_event& ev) override;
+    void on_key_press(const plat::key_press_event& ev) override;
+    void on_mouse_move(const plat::mouse_move_event& ev) override;
+    void on_mouse_press(const plat::mouse_press_event& ev) override;
+    void on_mouse_release(const plat::mouse_release_event& ev) override;
     void on_activate() override;
 
 private:

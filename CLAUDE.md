@@ -5,8 +5,8 @@
 
 ## Architecture
 
-Движок наполовину модульный: `vw.core`, `vw.ecs` и `vw.world` — модульные
-статические библиотеки, gfx пока header-only.
+Движок наполовину модульный: `vw.core`, `vw.ecs`, `vw.world` и `vw.platform` —
+модульные статические библиотеки, gfx пока header-only.
 
 - **vw.core** (`engine/core/src/`, таргет `vw_core`) — типы, math, transform,
   лог, блоки, геометрия `vw::spatial`
@@ -14,7 +14,9 @@
   реестр с рантайм-идентификаторами компонентов
 - **vw.world** (`engine/world/src/`, таргет `vw_world`) — модели, анимации,
   сериализаторы, компоненты, системы, сетка чанков. Собирается без Vulkan
-- **gfx** (`engine/include/vw/gfx/`) — header-only Vulkan renderer, окно, камера,
+- **vw.platform** (`engine/platform/src/`, таргет `vw_platform`) — окно, ввод,
+  события; GLFW живёт ровно в одном `.cpp`
+- **gfx** (`engine/include/vw/gfx/`) — header-only Vulkan renderer, камера,
   ImGui, debug; станет `vw.gfx` в M5
 - **Apps** — `apps/sculptor/`, `apps/test_*`, `apps/arena/`
 - **Shaders** — GLSL → SPIR-V (`shaders/`)
@@ -22,8 +24,8 @@
 Остальное в `engine/include/` — шимы к модулям, удаляются в M6.
 
 Пространства имён: `vw` (core), `vw::spatial` (геометрия), `vw::asset` (данные
-ассетов), `vw::ecs` (реестр, мир, компоненты, системы), `vw::gfx`,
-`vw::sculptor`. Модуль ≠ namespace: `vw.world` экспортирует и `vw::asset`, и
+ассетов), `vw::ecs` (реестр, мир, компоненты, системы), `vw::plat` (окно и ввод),
+`vw::gfx`, `vw::sculptor`. Модуль ≠ namespace: `vw.world` экспортирует и `vw::asset`, и
 `vw::ecs`.
 
 Undo/redo в Sculptor — command-паттерн через `base_operation`.

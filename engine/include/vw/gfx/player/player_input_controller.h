@@ -5,12 +5,13 @@
 
 #include "vw/core.h"
 #include "vw/gfx/player/player_input_state.h"
-#include "vw/gfx/window/event.h"
-#include "vw/gfx/window/input.h"
+#include "vw/platform/event.h"
+#include "vw/platform/input.h"
+#include "vw/platform/window.h"
 
 namespace vw::gfx {
 
-class window;
+using namespace ::vw::plat;
 
 struct player_input_params {
     float32 mouse_sensitivity = 0.1f;

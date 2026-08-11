@@ -8,7 +8,7 @@
 #include <stdexcept>
 
 #include "vw/log.h"
-#include "vw/gfx/window/window.h"
+#include "vw/platform/window.h"
 
 #ifndef NDEBUG
 inline VkBool32 vw::gfx::debug_callback(
@@ -161,7 +161,7 @@ inline void vulkan_context::create_instance_() {
     create_info.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
 #endif
 
-    auto extensions = window::get_required_extensions();
+    auto extensions = plat::window::required_extensions();
 
 #ifndef NDEBUG
     extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
@@ -241,7 +241,8 @@ inline void vulkan_context::create_instance_() {
 }
 
 inline void vulkan_context::create_surface_() {
-    surface_ = window_->create_surface(instance_);
+    surface_ = reinterpret_cast<VkSurfaceKHR>(
+        window_->create_surface(reinterpret_cast<uint64>(instance_)));
 }
 
 inline void vulkan_context::pick_physical_device_() {

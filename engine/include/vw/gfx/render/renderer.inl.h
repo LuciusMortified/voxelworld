@@ -1241,7 +1241,8 @@ inline void renderer::init_imgui() {
     setup_imgui_style();
 
     constexpr bool install_callbacks = true;
-    ImGui_ImplGlfw_InitForVulkan(window_->get_handle(), install_callbacks);
+    ImGui_ImplGlfw_InitForVulkan(
+        static_cast<GLFWwindow*>(window_->native_handle()), install_callbacks);
 
     ImGui_ImplVulkan_InitInfo init_info = {};
     init_info.ApiVersion                = VK_API_VERSION_1_2;
@@ -1438,11 +1439,9 @@ inline void renderer::cleanup_depth_resources() {
 }
 
 inline void renderer::recreate_swapchain() {
-    int width  = 0;
-    int height = 0;
-    window_->get_framebuffer_size(&width, &height);
-    while (width == 0 || height == 0) {
-        window_->get_framebuffer_size(&width, &height);
+    vec2i size = window_->framebuffer_size();
+    while (size.x == 0 || size.y == 0) {
+        size = window_->framebuffer_size();
         window_->poll_events();
 
         // Добавляем небольшую задержку, чтобы не нагружать CPU
@@ -1908,10 +1907,9 @@ inline VkExtent2D renderer::choose_swap_extent(
         return capabilities.currentExtent;
     }
 
-    int width, height;
-    window_->get_framebuffer_size(&width, &height);
+    const vec2i size = window_->framebuffer_size();
 
-    VkExtent2D actual_extent = {static_cast<uint32_t>(width), static_cast<uint32_t>(height)};
+    VkExtent2D actual_extent = {static_cast<uint32>(size.x), static_cast<uint32>(size.y)};
 
     actual_extent.width = std::clamp(
         actual_extent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width

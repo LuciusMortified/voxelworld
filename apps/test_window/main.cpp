@@ -9,7 +9,7 @@ using namespace vw;
 int main() {
     try {
         // Создание окна
-        gfx::window window(1280, 720, "Voxel World - Test Window");
+        plat::window window(1280, 720, "Voxel World - Test Window");
 
         // Главный цикл
         while (!window.should_close()) {
@@ -17,25 +17,25 @@ int main() {
             window.poll_events();
 
             // Проверка нажатий клавиш (используем алиасы)
-            if (window.is_key_pressed(gfx::keyboard::keys::W)) {
+            if (window.is_key_pressed(plat::keyboard::keys::W)) {
                 log::info("Нажата клавиша W");
             }
-            if (window.is_key_pressed(gfx::keyboard::keys::A)) {
+            if (window.is_key_pressed(plat::keyboard::keys::A)) {
                 log::info("Нажата клавиша A");
             }
-            if (window.is_key_pressed(gfx::keyboard::keys::S)) {
+            if (window.is_key_pressed(plat::keyboard::keys::S)) {
                 log::info("Нажата клавиша S");
             }
-            if (window.is_key_pressed(gfx::keyboard::keys::D)) {
+            if (window.is_key_pressed(plat::keyboard::keys::D)) {
                 log::info("Нажата клавиша D");
             }
 
             // Проверка кнопок мыши
-            if (window.is_mouse_button_pressed(gfx::mouse::buttons::LEFT)) {
+            if (window.is_mouse_button_pressed(plat::mouse::buttons::LEFT)) {
                 vec2d mouse_pos = window.get_cursor_pos();
                 log::info("Нажата левая кнопка мыши ({}, {})", mouse_pos.x, mouse_pos.y);
             }
-            if (window.is_mouse_button_pressed(gfx::mouse::buttons::RIGHT)) {
+            if (window.is_mouse_button_pressed(plat::mouse::buttons::RIGHT)) {
                 vec2d mouse_pos = window.get_cursor_pos();
                 log::info("Нажата правая кнопка мыши ({}, {})", mouse_pos.x, mouse_pos.y);
             }

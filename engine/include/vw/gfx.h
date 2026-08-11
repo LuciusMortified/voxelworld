@@ -18,8 +18,8 @@
 #include "vw/gfx/resource/mesh.h"
 #include "vw/gfx/resource/mesh_pool.h"
 #include "vw/gfx/resource/shader.h"
-#include "vw/gfx/window/event.h"
-#include "vw/gfx/window/input.h"
-#include "vw/gfx/window/window.h"
+#include "vw/platform/event.h"
+#include "vw/platform/input.h"
+#include "vw/platform/window.h"
 
 #endif  //  VW_GFX_H

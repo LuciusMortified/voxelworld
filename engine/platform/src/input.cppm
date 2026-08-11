@@ -1,13 +1,12 @@
-#pragma once
+export module vw.platform:input;
 
-#ifndef VW_GFX_INPUT_H
-#define VW_GFX_INPUT_H
+import vw.core;
 
-namespace vw::gfx {
+export namespace vw::plat {
 
 namespace keyboard {
-enum class keys {
-    // Буквы
+
+enum class keys : int32 {
     A = 65,
     B = 66,
     C = 67,
@@ -35,7 +34,6 @@ enum class keys {
     Y = 89,
     Z = 90,
 
-    // Цифры
     KEY_0 = 48,
     KEY_1 = 49,
     KEY_2 = 50,
@@ -47,7 +45,6 @@ enum class keys {
     KEY_8 = 56,
     KEY_9 = 57,
 
-    // Функциональные клавиши
     F1  = 290,
     F2  = 291,
     F3  = 292,
@@ -61,7 +58,6 @@ enum class keys {
     F11 = 300,
     F12 = 301,
 
-    // Специальные клавиши
     ESCAPE    = 256,
     ENTER     = 257,
     TAB       = 258,
@@ -74,13 +70,11 @@ enum class keys {
     PAGE_UP   = 266,
     PAGE_DOWN = 267,
 
-    // Стрелки
     LEFT  = 263,
     RIGHT = 262,
     UP    = 265,
     DOWN  = 264,
 
-    // Модификаторы
     LEFT_SHIFT    = 340,
     RIGHT_SHIFT   = 344,
     LEFT_CONTROL  = 341,
@@ -88,10 +82,9 @@ enum class keys {
     LEFT_ALT      = 342,
     RIGHT_ALT     = 346,
     LEFT_SUPER    = 343,
-    RIGHT_SUPER   = 347,  // Windows/Command
+    RIGHT_SUPER   = 347,
 
-    // Дополнительные клавиши
-    GRAVE_ACCENT  = 96,  // `
+    GRAVE_ACCENT  = 96,
     MINUS         = 45,
     EQUAL         = 61,
     LEFT_BRACKET  = 91,
@@ -103,7 +96,6 @@ enum class keys {
     PERIOD        = 46,
     SLASH         = 47,
 
-    // Numpad
     NUM_0        = 320,
     NUM_1        = 321,
     NUM_2        = 322,
@@ -123,7 +115,7 @@ enum class keys {
     NUM_EQUAL    = 336
 };
 
-enum class mods : int {
+enum class mods : int32 {
     SHIFT     = 0x0001,
     CTRL      = 0x0002,
     ALT       = 0x0004,
@@ -132,14 +124,15 @@ enum class mods : int {
     NUM_LOCK  = 0x0020
 };
 
-[[nodiscard]] inline auto operator&(mods lhs, mods rhs) -> bool {
-    return (static_cast<int>(lhs) & static_cast<int>(rhs)) != 0;
+[[nodiscard]] auto operator&(mods lhs, mods rhs) -> bool {
+    return (static_cast<int32>(lhs) & static_cast<int32>(rhs)) != 0;
 }
 
 }  // namespace keyboard
 
 namespace mouse {
-enum class buttons {
+
+enum class buttons : int32 {
     LEFT     = 0,
     RIGHT    = 1,
     MIDDLE   = 2,
@@ -149,22 +142,23 @@ enum class buttons {
     BUTTON_7 = 6,
     BUTTON_8 = 7
 };
+
 }  // namespace mouse
 
-enum class cursor_modes {
-    NORMAL   = 0x00034001,  // Обычный курсор
-    HIDDEN   = 0x00034002,  // Скрытый курсор
-    DISABLED = 0x00034003   // Заблокированный курсор (для FPS камеры)
+// The values match the GLFW constants: the window backend takes them as they
+// are, so no translation table is needed.
+enum class cursor_modes : int32 {
+    NORMAL   = 0x00034001,
+    HIDDEN   = 0x00034002,
+    DISABLED = 0x00034003
 };
 
-enum class input_modes {
-    CURSOR               = 0x00033001,  // Режим курсора
-    STICKY_KEYS          = 0x00033002,  // Залипающие клавиши
-    STICKY_MOUSE_BUTTONS = 0x00033003,  // Залипающие кнопки мыши
-    LOCK_KEY_MODS        = 0x00033004,  // Блокировка модификаторов
-    RAW_MOUSE_MOTION     = 0x00033005   // Сырое движение мыши
+enum class input_modes : int32 {
+    CURSOR               = 0x00033001,
+    STICKY_KEYS          = 0x00033002,
+    STICKY_MOUSE_BUTTONS = 0x00033003,
+    LOCK_KEY_MODS        = 0x00033004,
+    RAW_MOUSE_MOTION     = 0x00033005
 };
 
-}  // namespace vw::gfx
-
-#endif  // VW_GFX_INPUT_H
+}  // namespace vw::plat

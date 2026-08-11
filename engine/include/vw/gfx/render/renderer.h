@@ -20,12 +20,13 @@
 #include "vw/gfx/resource/mesh_pool.h"
 #include "vw/gfx/resource/palette_buffer.h"
 #include "vw/gfx/resource/shader.h"
-#include "vw/gfx/window/window.h"
+#include "vw/platform/window.h"
 #include "vw/ecs/world.h"
 
 namespace vw::gfx {
 
 using namespace ::vw::ecs;
+using namespace ::vw::plat;
 
 enum class render_mode : uint8 { lit, wireframe };
 

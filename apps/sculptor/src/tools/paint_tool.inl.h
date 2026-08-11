@@ -49,19 +49,19 @@ inline void paint_tool::render(
 }
 
 inline void paint_tool::on_key_press(
-    const gfx::key_press_event& ev
+    const plat::key_press_event& ev
 ) {}
 
 inline void paint_tool::on_mouse_move(
-    const gfx::mouse_move_event& ev
+    const plat::mouse_move_event& ev
 ) {
     update_hovered_voxel_();
 }
 
 inline void paint_tool::on_mouse_press(
-    const gfx::mouse_press_event& ev
+    const plat::mouse_press_event& ev
 ) {
-    using buttons = gfx::mouse::buttons;
+    using buttons = plat::mouse::buttons;
 
     if (ev.button == buttons::LEFT) {
         if (hovered_voxel_ == vec3i{-1, -1, -1}) {
@@ -100,7 +100,7 @@ inline void paint_tool::on_mouse_press(
 }
 
 inline void paint_tool::on_mouse_release(
-    const gfx::mouse_release_event& ev
+    const plat::mouse_release_event& ev
 ) {}
 
 inline void paint_tool::on_activate() {

@@ -15,17 +15,17 @@ public:
         camera_controller_ = std::make_unique<gfx::free_camera_controller>(0.1f, 5.0f);
         camera_controller_->setup(window, camera);
 
-        window.sub<gfx::key_press_event>([this](const gfx::key_press_event& event) {
+        window.sub<plat::key_press_event>([this](const plat::key_press_event& event) {
             handle_key_press(event.key);
             return true;
         });
 
-        window.sub<gfx::window_close_event>([this](gfx::window_close_event&) {
+        window.sub<plat::window_close_event>([this](plat::window_close_event&) {
             get_engine().shutdown();
             return true;
         });
 
-        window.sub<gfx::mouse_press_event>([this](gfx::mouse_press_event& ev) {
+        window.sub<plat::mouse_press_event>([this](plat::mouse_press_event& ev) {
             handle_mouse_press(ev);
             return true;
         });
@@ -157,13 +157,13 @@ private:
     }
 
     void handle_key_press(
-        gfx::keyboard::keys key
+        plat::keyboard::keys key
     ) const {
         switch (key) {
-            case gfx::keyboard::keys::ESCAPE:
+            case plat::keyboard::keys::ESCAPE:
                 get_engine().shutdown();
                 break;
-            case gfx::keyboard::keys::F1:
+            case plat::keyboard::keys::F1:
                 camera_controller_->toggle_mouse_captured();
                 camera_controller_->toggle_keyboard_control_enabled();
                 break;
@@ -173,9 +173,9 @@ private:
     }
 
     void handle_mouse_press(
-        const gfx::mouse_press_event& event
+        const plat::mouse_press_event& event
     ) {
-        if (event.button == gfx::mouse::buttons::LEFT) {
+        if (event.button == plat::mouse::buttons::LEFT) {
             const auto& world  = get_engine().get_world();
             const auto& window = get_engine().get_window();
             const auto& camera = get_engine().get_camera();

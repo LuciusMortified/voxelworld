@@ -4,12 +4,13 @@
 #define VW_GFX_CAMERA_CAMERA_CONTROLLER_H
 
 #include "vw/gfx/camera/camera.h"
-#include "vw/gfx/window/event.h"
-#include "vw/gfx/window/input.h"
+#include "vw/platform/event.h"
+#include "vw/platform/input.h"
+#include "vw/platform/window.h"
 
 namespace vw::gfx {
-class window;
 
+using namespace ::vw::plat;
 class fps_camera_controller {
 public:
     explicit fps_camera_controller(float mouse_sensitivity = 0.1f, float camera_speed = 5.0f);

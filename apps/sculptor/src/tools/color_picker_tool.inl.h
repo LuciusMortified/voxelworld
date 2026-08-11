@@ -47,19 +47,19 @@ inline void color_picker_tool::render(
 }
 
 inline void color_picker_tool::on_key_press(
-    const gfx::key_press_event& ev
+    const plat::key_press_event& ev
 ) {}
 
 inline void color_picker_tool::on_mouse_move(
-    const gfx::mouse_move_event& ev
+    const plat::mouse_move_event& ev
 ) {
     update_hovered_voxel_();
 }
 
 inline void color_picker_tool::on_mouse_press(
-    const gfx::mouse_press_event& ev
+    const plat::mouse_press_event& ev
 ) {
-    if (ev.button != gfx::mouse::buttons::LEFT) {
+    if (ev.button != plat::mouse::buttons::LEFT) {
         return;
     }
 
@@ -89,7 +89,7 @@ inline void color_picker_tool::on_mouse_press(
 }
 
 inline void color_picker_tool::on_mouse_release(
-    const gfx::mouse_release_event& ev
+    const plat::mouse_release_event& ev
 ) {}
 
 inline void color_picker_tool::on_activate() {

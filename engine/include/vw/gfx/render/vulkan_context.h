@@ -10,8 +10,11 @@
 
 #include "vw/core.h"
 #include "vw/log.h"
+#include "vw/platform/window.h"
 
 namespace vw::gfx {
+
+using namespace ::vw::plat;
 
 #ifndef NDEBUG
 VkBool32 debug_callback(
@@ -21,8 +24,6 @@ VkBool32 debug_callback(
     void* p_user_data
 );
 #endif
-
-class window;
 
 struct queue_family_indices {
     std::optional<uint32> graphics_family;
