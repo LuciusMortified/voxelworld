@@ -1,3 +1,4 @@
+#include <imgui.h>
 #include <vw/core.h>
 #include <vw/gfx.h>
 
@@ -59,7 +60,7 @@ public:
         const auto cam_pos = camera.get_position();
 
         auto& world            = get_engine().get_world();
-        auto& transform_sys = world.system<gfx::transform_system>();
+        auto& transform_sys = world.system<ecs::transform_system>();
         transform_sys.modify(viewer_).set_position(cam_pos);
 
         auto& renderer = get_engine().get_renderer();
@@ -89,27 +90,27 @@ private:
 
     void setup_world_grid() {
         auto& world       = get_engine().get_world();
-        auto& grid_system = world.system<gfx::world_grid_system>();
+        auto& grid_system = world.system<ecs::world_grid_system>();
 
         generator_params_ = {
             .voxel_scale = 8,
         };
         auto& registry = world.resource<asset::model_registry>();
-        auto generator = std::make_unique<gfx::perlin_terrain_generator>(
+        auto generator = std::make_unique<ecs::perlin_terrain_generator>(
             registry.get_identity_pool(), registry.get_page_pool(), generator_params_);
         generator_  = generator.get();
-        auto grid   = std::make_unique<gfx::world_grid>(
+        auto grid   = std::make_unique<ecs::world_grid>(
             world, generator_params_.voxel_scale
         );
         world_grid_  = grid.get();
-        auto loader  = std::make_unique<gfx::chunk_loader>(std::move(generator));
-        auto& gs     = world.system<gfx::world_grid_system>();
+        auto loader  = std::make_unique<ecs::chunk_loader>(std::move(generator));
+        auto& gs     = world.system<ecs::world_grid_system>();
         gs.set_grid(std::move(grid));
         gs.set_loader(std::move(loader));
 
         viewer_ = world.create()
-            .with<gfx::transform_component>()
-            .with<gfx::world_view_component>()
+            .with<ecs::transform_component>()
+            .with<ecs::world_view_component>()
             .get_entity();
     }
 
@@ -139,7 +140,7 @@ private:
                 {static_cast<int32>(pos.x), static_cast<int32>(pos.y), static_cast<int32>(pos.z)}
             );
             ImGui::Text("Chunk: (%d, %d, %d)", chunk_coord.x, chunk_coord.y, chunk_coord.z);
-            const auto& wgs = get_engine().get_world().system<gfx::world_grid_system>();
+            const auto& wgs = get_engine().get_world().system<ecs::world_grid_system>();
             ImGui::Text("Loaded columns: %u", world_grid_->column_count());
             ImGui::Text("Loaded chunks: %u", world_grid_->chunk_count());
             ImGui::Text("Pending columns: %u", wgs.get_stats().pending_count);
@@ -174,10 +175,10 @@ private:
     }
 
     std::unique_ptr<gfx::free_camera_controller> camera_controller_;
-    gfx::world_grid* world_grid_ = nullptr;
-    gfx::entity viewer_ = gfx::invalid_entity;
-    gfx::perlin_terrain_generator* generator_ = nullptr;
-    gfx::perlin_terrain_generator::params generator_params_;
+    ecs::world_grid* world_grid_ = nullptr;
+    ecs::entity viewer_ = ecs::invalid_entity;
+    ecs::perlin_terrain_generator* generator_ = nullptr;
+    ecs::perlin_terrain_generator::params generator_params_;
     bool camera_placed_ = false;
 };
 

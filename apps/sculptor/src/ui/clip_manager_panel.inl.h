@@ -3,6 +3,7 @@
 #ifndef VW_SCULPTOR_CLIP_MANAGER_PANEL_INL_H
 #define VW_SCULPTOR_CLIP_MANAGER_PANEL_INL_H
 
+#include <imgui.h>
 #include <filesystem>
 
 namespace vw::sculptor {

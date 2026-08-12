@@ -29,14 +29,14 @@ public:
     auto try_place(float32 voxel_scale) -> void;
     auto toggle_sword() -> void;
 
-    [[nodiscard]] auto get_entity() const -> gfx::entity;
+    [[nodiscard]] auto get_entity() const -> ecs::entity;
     [[nodiscard]] auto has_sword() const -> bool;
     [[nodiscard]] auto is_placed() const -> bool;
 
 private:
     [[nodiscard]] auto create_body_part(
         std::string_view prefab_name, std::string_view part_name
-    ) const -> gfx::entity;
+    ) const -> ecs::entity;
 
     auto handle_attack() const -> void;
     [[nodiscard]] auto can_attack() const -> bool;
@@ -45,14 +45,14 @@ private:
     gfx::engine& engine_;
     asset::asset_storage& assets_;
 
-    gfx::entity root_;
-    gfx::entity body_;
-    gfx::entity head_;
-    gfx::entity hand_right_;
-    gfx::entity hand_left_;
-    gfx::entity foot_right_;
-    gfx::entity foot_left_;
-    gfx::entity sword_;
+    ecs::entity root_;
+    ecs::entity body_;
+    ecs::entity head_;
+    ecs::entity hand_right_;
+    ecs::entity hand_left_;
+    ecs::entity foot_right_;
+    ecs::entity foot_left_;
+    ecs::entity sword_;
 
     static constexpr float32 default_rotation_speed_ = 5.0f;
     static constexpr float32 attack_rotation_speed_  = 25.0f;

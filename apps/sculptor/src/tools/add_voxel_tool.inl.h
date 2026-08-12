@@ -27,13 +27,13 @@ inline void add_voxel_tool::render(
     const auto ent = state_->scene.name_to_entity[state_->scene.selected_name];
 
     const bool is_renderable =  //
-        world.has<gfx::transform_component>(ent) &&
-        world.has<gfx::model_component>(ent);
+        world.has<ecs::transform_component>(ent) &&
+        world.has<ecs::model_component>(ent);
     if (!is_renderable) {
         return;
     }
 
-    const auto& model_comp = world.get<gfx::model_component>(ent);
+    const auto& model_comp = world.get<ecs::model_component>(ent);
     const bool is_outside  =  //
         hovered_voxel_.x < 0 || hovered_voxel_.x >= model_comp.width() || hovered_voxel_.y < 0 ||
         hovered_voxel_.y >= model_comp.height() || hovered_voxel_.z < 0 ||
@@ -46,7 +46,7 @@ inline void add_voxel_tool::render(
     };
 
     const auto voxel_world_pos =  //
-        world.get<gfx::transform_component>(ent).get_world_matrix() *
+        world.get<ecs::transform_component>(ent).get_world_matrix() *
         math::translation_matrix(voxel_local_pos) *       //
         math::scale_matrix(vec3f{1.01f, 1.01f, 1.01f}) *  //
         math::translation_matrix(vec3f{-0.005f, -0.005f, -0.005f});
@@ -85,13 +85,13 @@ inline void add_voxel_tool::on_mouse_press(
 
         auto& world        = engine_->get_world();
         const bool is_renderable =  //
-            world.has<gfx::transform_component>(ent) &&
-            world.has<gfx::model_component>(ent);
+            world.has<ecs::transform_component>(ent) &&
+            world.has<ecs::model_component>(ent);
         if (!is_renderable) {
             return;
         }
 
-        const auto& model_comp = world.get<gfx::model_component>(ent);
+        const auto& model_comp = world.get<ecs::model_component>(ent);
         const bool is_outside  =  //
             hovered_voxel_.x < 0 || hovered_voxel_.x >= model_comp.width() ||
             hovered_voxel_.y < 0 || hovered_voxel_.y >= model_comp.height() ||
@@ -149,7 +149,7 @@ inline void add_voxel_tool::update_hovered_voxel_() {
     const auto& camera = engine_->get_camera();
 
     const auto ray = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
-    const auto hit = world.system<gfx::spatial_system>().voxel_ray_cast(ray, ray_cast_entities_);
+    const auto hit = world.system<ecs::spatial_system>().voxel_ray_cast(ray, ray_cast_entities_);
     if (!hit) {
         hovered_voxel_ = vec3i{-1, -1, -1};
         return;

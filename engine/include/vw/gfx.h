@@ -3,6 +3,8 @@
 #ifndef VW_GFX_H
 #define VW_GFX_H
 
+#include "vw/log.h"
+
 #include "vw/gfx/camera/camera.h"
 #include "vw/gfx/camera/free_camera_controller.h"
 #include "vw/gfx/camera/third_person_camera_controller.h"

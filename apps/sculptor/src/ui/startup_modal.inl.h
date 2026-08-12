@@ -2,6 +2,8 @@
 
 #ifndef VW_SCULPTOR_STARTUP_MODAL_INL_H
 #define VW_SCULPTOR_STARTUP_MODAL_INL_H
+#include <imgui.h>
+
 
 namespace vw::sculptor {
 

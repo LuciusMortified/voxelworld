@@ -20,7 +20,7 @@ public:
     void render(float delta_time);
 
 private:
-    void render_socket_(const gfx::socket_point& sp, std::string& socket_to_remove);
+    void render_socket_(const ecs::socket_point& sp, std::string& socket_to_remove);
     void render_add_socket_();
     void render_add_socket_modal_();
     void render_preview_file_list_();

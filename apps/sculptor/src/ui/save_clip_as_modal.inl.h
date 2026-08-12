@@ -3,6 +3,7 @@
 #ifndef VW_SCULPTOR_SAVE_CLIP_AS_MODAL_INL_H
 #define VW_SCULPTOR_SAVE_CLIP_AS_MODAL_INL_H
 
+#include <imgui.h>
 #include <filesystem>
 
 #include "ui_utils.h"

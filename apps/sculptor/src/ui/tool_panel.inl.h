@@ -2,6 +2,8 @@
 
 #ifndef VW_SCULPTOR_TOOL_PANEL_INL_H
 #define VW_SCULPTOR_TOOL_PANEL_INL_H
+#include <imgui.h>
+
 
 namespace vw::sculptor {
 

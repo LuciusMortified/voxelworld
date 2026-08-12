@@ -47,14 +47,14 @@ inline void add_track_operation::execute() {
     if (state_->scene.name_to_entity.contains(params_.track_name)) {
         const auto ent = state_->scene.name_to_entity[params_.track_name];
         auto& world    = engine_->get_world();
-        if (!world.has<gfx::animation_target_component>(ent)) {
+        if (!world.has<ecs::animation_target_component>(ent)) {
             added_target_component_ = true;
-            world.modify(ent).with<gfx::animation_target_component>();
-            auto target_mod = world.system<gfx::animation_system>().modify_target(ent);
+            world.modify(ent).with<ecs::animation_target_component>();
+            auto target_mod = world.system<ecs::animation_system>().modify_target(ent);
             target_mod.set_target_name(params_.track_name);
-            if (world.has<gfx::transform_component>(ent)) {
+            if (world.has<ecs::transform_component>(ent)) {
                 target_mod.set_rest_transform(
-                    world.get<gfx::transform_component>(ent).get_transform()
+                    world.get<ecs::transform_component>(ent).get_transform()
                 );
             }
         }

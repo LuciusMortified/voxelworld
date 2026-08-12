@@ -3,6 +3,7 @@
 #ifndef VW_SCULPTOR_NEW_FILE_MODAL_INL_H
 #define VW_SCULPTOR_NEW_FILE_MODAL_INL_H
 
+#include <imgui.h>
 #include <filesystem>
 
 #include "ui_utils.h"

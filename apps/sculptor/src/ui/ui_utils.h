@@ -2,6 +2,8 @@
 
 #ifndef VW_SCULPTOR_UI_UTILS_H
 #define VW_SCULPTOR_UI_UTILS_H
+#include <imgui.h>
+
 
 namespace vw::sculptor {
 

@@ -1,14 +1,13 @@
-#pragma once
+module vw.gfx;
 
-#ifndef VW_GFX_COMBINED_BUFFER_POOL_INL_H
-#define VW_GFX_COMBINED_BUFFER_POOL_INL_H
-
-#include <algorithm>
-#include <numeric>
-#include <ranges>
-
-#include "vw/core/timing.h"
-#include "vw/log/logger.h"
+import std;
+import vulkan;
+import vw.core;
+import vw.ecs;
+import vw.world;
+import vw.platform;
+import :logging;
+import :vk;
 
 namespace vw::gfx {
 
@@ -16,14 +15,14 @@ namespace {
 
 constexpr log::log_category lc_cbp_{"cbuf_pool"};
 
-inline void sorted_insert(std::vector<entity>& v, entity e) {
+void sorted_insert(std::vector<entity>& v, entity e) {
     auto it = std::lower_bound(v.begin(), v.end(), e);
     if (it == v.end() || *it != e) {
         v.insert(it, e);
     }
 }
 
-inline void sorted_erase(std::vector<entity>& v, entity e) {
+void sorted_erase(std::vector<entity>& v, entity e) {
     auto it = std::lower_bound(v.begin(), v.end(), e);
     if (it != v.end() && *it == e) {
         v.erase(it);
@@ -31,7 +30,7 @@ inline void sorted_erase(std::vector<entity>& v, entity e) {
 }
 
 template <typename Iter>
-inline void sorted_merge_range(
+void sorted_merge_range(
     std::vector<entity>& dst, Iter first, Iter last
 ) {
     if (first == last) return;
@@ -44,11 +43,11 @@ inline void sorted_merge_range(
 
 }  // namespace
 
-inline combined_buffer_pool::combined_buffer_pool(
+combined_buffer_pool::combined_buffer_pool(
     vulkan_context& context,
-    VkDescriptorPool descriptor_pool,
-    VkDescriptorSetLayout descriptor_set_layout,
-    VkDescriptorSetLayout compute_descriptor_set_layout
+    vk::DescriptorPool descriptor_pool,
+    vk::DescriptorSetLayout descriptor_set_layout,
+    vk::DescriptorSetLayout compute_descriptor_set_layout
 )
     : context_(&context)
     , staging_(context, 32 * 1024 * 1024)
@@ -56,10 +55,10 @@ inline combined_buffer_pool::combined_buffer_pool(
     , descriptor_set_layout_(descriptor_set_layout)
     , compute_descriptor_set_layout_(compute_descriptor_set_layout) {}
 
-inline void combined_buffer_pool::update(
+void combined_buffer_pool::update(
     world_type& world,
     const camera& camera,
-    VkCommandBuffer cmd,
+    vk::CommandBuffer cmd,
     mesh_pool& pool
 ) {
     staging_.begin_frame();
@@ -81,11 +80,11 @@ inline void combined_buffer_pool::update(
     });
 }
 
-inline const std::vector<std::unique_ptr<combined_buffer>>& combined_buffer_pool::get_buffers() const {
+const std::vector<std::unique_ptr<combined_buffer>>& combined_buffer_pool::get_buffers() const {
     return buffers_;
 }
 
-inline void combined_buffer_pool::process_destroyed_(world_type& world) {
+void combined_buffer_pool::process_destroyed_(world_type& world) {
     for (auto ent : world.destroyed()) {
         if (entity_buffer_infos_.contains(ent)) {
             auto& info = entity_buffer_infos_[ent];
@@ -107,7 +106,7 @@ inline void combined_buffer_pool::process_destroyed_(world_type& world) {
     }
 }
 
-inline buffer_chunk_size combined_buffer_pool::get_chunk_size_for_mesh(
+buffer_chunk_size combined_buffer_pool::get_chunk_size_for_mesh(
     uint32 vertex_count, uint32 index_count
 ) {
     uint32 vertex_chunk = 256;
@@ -123,7 +122,7 @@ inline buffer_chunk_size combined_buffer_pool::get_chunk_size_for_mesh(
     return buffer_chunk_size{vertex_chunk, index_chunk};
 }
 
-inline combined_buffer* combined_buffer_pool::get_or_create_buffer(
+combined_buffer* combined_buffer_pool::get_or_create_buffer(
     const buffer_chunk_size& chunk_size
 ) {
     if (chunk_size_to_buffer_index_.contains(chunk_size)) {
@@ -143,7 +142,7 @@ inline combined_buffer* combined_buffer_pool::get_or_create_buffer(
     return buffers_[buffer_index].get();
 }
 
-inline void combined_buffer_pool::update_meshes_(
+void combined_buffer_pool::update_meshes_(
     world_type& world, const vec3f& camera_pos, mesh_pool& pool
 ) {
     auto& model_changed = world.changed<model_component>();
@@ -228,7 +227,7 @@ inline void combined_buffer_pool::update_meshes_(
 
         buffer_chunk_size required_chunk_size = get_chunk_size_for_mesh(vertex_count, index_count);
 
-        const VkDeviceSize mesh_staging_cost =
+        const vk::DeviceSize mesh_staging_cost =
             required_chunk_size.vertex_count * sizeof(vertex) +
             required_chunk_size.index_count * sizeof(uint32) +
             sizeof(uint32) + sizeof(draw_command) + sizeof(mat4f) * 2;
@@ -292,7 +291,7 @@ inline void combined_buffer_pool::update_meshes_(
     mesh_pending_entities_.swap(merge_buffer_);
 }
 
-inline void combined_buffer_pool::update_transforms_(
+void combined_buffer_pool::update_transforms_(
     world_type& world
 ) {
     auto& transform_changed = world.changed<transform_component>();
@@ -340,7 +339,7 @@ inline void combined_buffer_pool::update_transforms_(
     transform_pending_entities_.swap(merge_buffer_);
 }
 
-inline const combined_buffer_pool_stats& combined_buffer_pool::get_stats() const {
+const combined_buffer_pool_stats& combined_buffer_pool::get_stats() const {
     stats_.vertex_load_min   = 0.0f;
     stats_.vertex_load_max   = 0.0f;
     stats_.vertex_load_avg   = 0.0f;
@@ -395,5 +394,3 @@ inline const combined_buffer_pool_stats& combined_buffer_pool::get_stats() const
 }
 
 }  // namespace vw::gfx
-
-#endif  // VW_GFX_COMBINED_BUFFER_POOL_INL_H

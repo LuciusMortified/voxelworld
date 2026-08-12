@@ -1,26 +1,33 @@
-#pragma once
+module;
 
-#ifndef VW_GFX_ENGINE_INL_H
-#define VW_GFX_ENGINE_INL_H
+#ifdef _WIN32
+#define NOMINMAX
+#define WIN32_LEAN_AND_MEAN
+#include <Windows.h>
+#include <Psapi.h>
+#endif
 
-#include <vector>
+module vw.gfx;
 
-#include "vw/core/timing.h"
-#include "vw/gfx/engine/engine.h"
+import std;
+import vulkan;
+import vw.core;
+import vw.ecs;
+import vw.world;
+import vw.platform;
+import :vk;
 
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
 
-#include <Windows.h>
 
-#include <Psapi.h>
 #endif
 
 namespace vw::gfx {
 
-inline engine::engine(
+engine::engine(
     int width, int height, std::string_view title
 ) {
     window_         = std::make_unique<window>(width, height, title);
@@ -58,52 +65,44 @@ inline engine::engine(
     last_memory_update_time_ = std::chrono::high_resolution_clock::now();
 }
 
-inline engine::~engine() {
+engine::~engine() {
     shutdown();
 }
 
-template <typename TApp, typename... TArgs>
-void engine::run(
-    TArgs&&... args
-) {
-    app_ = std::make_unique<TApp>(*this, std::forward<TArgs>(args)...);
-    main_loop();
-}
-
-inline void engine::shutdown() {
+void engine::shutdown() {
     running_ = false;
     renderer_->wait_idle();
 }
 
-inline auto engine::get_window() const -> window& {
+auto engine::get_window() const -> window& {
     return *window_;
 }
 
-inline auto engine::get_vulkan_context() const -> vulkan_context& {
+auto engine::get_vulkan_context() const -> vulkan_context& {
     return *vulkan_context_;
 }
 
-inline auto engine::get_renderer() const -> renderer_type& {
+auto engine::get_renderer() const -> renderer_type& {
     return *renderer_;
 }
 
-inline auto engine::get_camera() const -> camera& {
+auto engine::get_camera() const -> camera& {
     return *camera_;
 }
 
-inline auto engine::get_world() const -> world_type& {
+auto engine::get_world() const -> world_type& {
     return *world_;
 }
 
-inline auto engine::get_block_registry() const -> const block_registry& {
+auto engine::get_block_registry() const -> const block_registry& {
     return block_registry_;
 }
 
-inline auto engine::get_debug_tool() const -> debug_window_type& {
+auto engine::get_debug_tool() const -> debug_window_type& {
     return *debug_tool_;
 }
 
-inline void engine::main_loop() {
+void engine::main_loop() {
     running_         = true;
     last_frame_time_ = std::chrono::high_resolution_clock::now();
 
@@ -123,7 +122,7 @@ inline void engine::main_loop() {
     }
 }
 
-inline void engine::render(
+void engine::render(
     float delta_time
 ) {
     stats_.world_update_ms = measure_ms([&] { world_->update(delta_time); });
@@ -141,11 +140,11 @@ inline void engine::render(
     world_->clear_changed();
 }
 
-inline const engine_stats& engine::get_stats() const {
+const engine_stats& engine::get_stats() const {
     return stats_;
 }
 
-inline void engine::update_stats() {
+void engine::update_stats() {
     const auto current_time = std::chrono::high_resolution_clock::now();
     stats_.frame_ms =
         std::chrono::duration<float32>(current_time - frame_start_time_).count() * 1000.0f;
@@ -164,7 +163,7 @@ inline void engine::update_stats() {
     }
 }
 
-inline auto engine::calculate_ram_usage() -> uint64 {
+auto engine::calculate_ram_usage() -> uint64 {
 #ifdef _WIN32
     PROCESS_MEMORY_COUNTERS_EX pmc{};
     if (GetProcessMemoryInfo(
@@ -176,44 +175,21 @@ inline auto engine::calculate_ram_usage() -> uint64 {
     return 0;
 }
 
-inline auto engine::calculate_vram_usage() const -> uint64 {
-    const auto& vk_context                 = *vulkan_context_;
-    const VkPhysicalDevice physical_device = vk_context.get_physical_device();
+auto engine::calculate_vram_usage() const -> uint64 {
+    const auto chain = vulkan_context_->get_physical_device().getMemoryProperties2<
+        vk::PhysicalDeviceMemoryProperties2,
+        vk::PhysicalDeviceMemoryBudgetPropertiesEXT>();
 
-    VkPhysicalDeviceMemoryBudgetPropertiesEXT budget_props{};
-    budget_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_BUDGET_PROPERTIES_EXT;
+    const auto& mem_props = chain.get<vk::PhysicalDeviceMemoryProperties2>().memoryProperties;
+    const auto& budget    = chain.get<vk::PhysicalDeviceMemoryBudgetPropertiesEXT>();
 
-    VkPhysicalDeviceMemoryProperties2 mem_props{};
-    mem_props.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2;
-    mem_props.pNext = &budget_props;
-
-    auto vkGetPhysicalDeviceMemoryProperties2 =
-        reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties2KHR>(
-            vkGetInstanceProcAddr(vk_context.get_instance(), "vkGetPhysicalDeviceMemoryProperties2")
-        );
-    if (vkGetPhysicalDeviceMemoryProperties2 == nullptr) {
-        vkGetPhysicalDeviceMemoryProperties2 =
-            reinterpret_cast<PFN_vkGetPhysicalDeviceMemoryProperties2KHR>(vkGetInstanceProcAddr(
-                vk_context.get_instance(), "vkGetPhysicalDeviceMemoryProperties2KHR"
-            ));
-    }
-
-    if (vkGetPhysicalDeviceMemoryProperties2 != nullptr) {
-        vkGetPhysicalDeviceMemoryProperties2(physical_device, &mem_props);
-
-        uint64 total_usage = 0;
-        for (uint32 i = 0; i < mem_props.memoryProperties.memoryHeapCount; ++i) {
-            if ((mem_props.memoryProperties.memoryHeaps[i].flags &
-                 VK_MEMORY_HEAP_DEVICE_LOCAL_BIT) != 0) {
-                total_usage += budget_props.heapUsage[i];
-            }
+    uint64 total_usage = 0;
+    for (uint32 i = 0; i < mem_props.memoryHeapCount; ++i) {
+        if (mem_props.memoryHeaps[i].flags & vk::MemoryHeapFlagBits::eDeviceLocal) {
+            total_usage += budget.heapUsage[i];
         }
-        return total_usage;
     }
-
-    return 0;
+    return total_usage;
 }
 
 }  // namespace vw::gfx
-
-#endif  // VW_GFX_ENGINE_INL_H

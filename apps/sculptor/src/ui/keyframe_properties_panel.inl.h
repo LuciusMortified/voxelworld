@@ -3,6 +3,7 @@
 #ifndef VW_SCULPTOR_KEYFRAME_PROPERTIES_PANEL_INL_H
 #define VW_SCULPTOR_KEYFRAME_PROPERTIES_PANEL_INL_H
 
+#include <imgui.h>
 #include "operations/modify_keyframe_operation.h"
 #include "operations/remove_keyframe_operation.h"
 

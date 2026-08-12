@@ -13,6 +13,7 @@ if(NOT VW_BUILD_GFX)
 endif()
 
 add_subdirectory(platform)
+add_subdirectory(gfx)
 
 add_library(${PROJECT_NAME} INTERFACE)
 
@@ -23,14 +24,12 @@ find_package(Vulkan REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(imgui CONFIG REQUIRED)
 
-target_include_directories(${PROJECT_NAME} SYSTEM INTERFACE ${Vulkan_INCLUDE_DIRS})
-
 target_link_libraries(${PROJECT_NAME} INTERFACE
         vw_core
         vw_ecs
         vw_world
         vw_platform
-        ${Vulkan_LIBRARIES}
+        vw_gfx
         glfw
         imgui::imgui
 )

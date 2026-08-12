@@ -1,3 +1,4 @@
+#include <imgui.h>
 #include <cmath>
 #include <vector>
 
@@ -66,8 +67,8 @@ private:
     void setup_scene() {
         auto& world = get_engine().get_world();
         auto& model_reg = world.resource<asset::model_registry>();
-        auto& transform_sys = world.system<gfx::transform_system>();
-        auto& model_sys = world.system<gfx::model_system>();
+        auto& transform_sys = world.system<ecs::transform_system>();
+        auto& model_sys = world.system<ecs::model_system>();
 
         floor_model_ = model_reg.create("floor", 80, 1, 80);
         for (uint32 x = 0; x < 80; ++x) {
@@ -78,10 +79,10 @@ private:
         }
 
         floor_entity_ = world.create()
-            .with<gfx::transform_component>()
-            .with<gfx::model_component>()
-            .with<gfx::hierarchy_component>()
-            .with<gfx::spatial_component>()
+            .with<ecs::transform_component>()
+            .with<ecs::model_component>()
+            .with<ecs::hierarchy_component>()
+            .with<ecs::spatial_component>()
             .get_entity();
 
         transform_sys.modify(floor_entity_)
@@ -101,10 +102,10 @@ private:
         }
 
         pillar_entity_ = world.create()
-            .with<gfx::transform_component>()
-            .with<gfx::model_component>()
-            .with<gfx::hierarchy_component>()
-            .with<gfx::spatial_component>()
+            .with<ecs::transform_component>()
+            .with<ecs::model_component>()
+            .with<ecs::hierarchy_component>()
+            .with<ecs::spatial_component>()
             .get_entity();
 
         transform_sys.modify(pillar_entity_)
@@ -140,8 +141,8 @@ private:
         }
 
         auto& world = get_engine().get_world();
-        auto& transform_sys = world.system<gfx::transform_system>();
-        auto& light_sys = world.system<gfx::light_system>();
+        auto& transform_sys = world.system<ecs::transform_system>();
+        auto& light_sys = world.system<ecs::light_system>();
 
         if (target > current) {
             light_infos_.resize(target);
@@ -155,9 +156,9 @@ private:
             light_entities_.reserve(target);
             for (uint32 i = current; i < target; ++i) {
                 auto ent = world.create()
-                    .with<gfx::transform_component>()
-                    .with<gfx::light_component>()
-                    .with<gfx::hierarchy_component>()
+                    .with<ecs::transform_component>()
+                    .with<ecs::light_component>()
+                    .with<ecs::hierarchy_component>()
                     .get_entity();
                 light_entities_.push_back(ent);
 
@@ -186,7 +187,7 @@ private:
 
     void update_point_lights() {
         auto& world = get_engine().get_world();
-        auto& transform_sys = world.system<gfx::transform_system>();
+        auto& transform_sys = world.system<ecs::transform_system>();
         auto& renderer = get_engine().get_renderer();
 
         for (uint32 i = 0; i < light_entities_.size(); ++i) {
@@ -269,10 +270,10 @@ private:
 
     std::shared_ptr<asset::model> floor_model_;
     std::shared_ptr<asset::model> pillar_model_;
-    gfx::entity floor_entity_  = gfx::invalid_entity;
-    gfx::entity pillar_entity_ = gfx::invalid_entity;
+    ecs::entity floor_entity_  = ecs::invalid_entity;
+    ecs::entity pillar_entity_ = ecs::invalid_entity;
 
-    std::vector<gfx::entity> light_entities_;
+    std::vector<ecs::entity> light_entities_;
     std::vector<point_light_info> light_infos_;
 
     float32 elapsed_time_{0.0f};

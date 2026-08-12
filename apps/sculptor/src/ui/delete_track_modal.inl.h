@@ -3,6 +3,7 @@
 #ifndef VW_SCULPTOR_DELETE_TRACK_MODAL_INL_H
 #define VW_SCULPTOR_DELETE_TRACK_MODAL_INL_H
 
+#include <imgui.h>
 #include "operations/remove_track_operation.h"
 
 namespace vw::sculptor {

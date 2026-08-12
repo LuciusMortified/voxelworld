@@ -1,13 +1,22 @@
-#pragma once
+module;
 
-#ifndef VW_GFX_MESH_INL_H
-#define VW_GFX_MESH_INL_H
+#include <cstddef>
+
+module vw.gfx;
+
+import std;
+import vulkan;
+import vw.core;
+import vw.ecs;
+import vw.world;
+import vw.platform;
+import :vk;
 
 namespace vw::gfx {
 
 // ==================== vertex ====================
 
-inline auto vertex::pack(
+auto vertex::pack(
     int x,
     int y,
     int z,
@@ -33,40 +42,40 @@ inline auto vertex::pack(
     return v;
 }
 
-inline auto vertex::get_binding_descriptions() -> std::vector<VkVertexInputBindingDescription> {
+auto vertex::get_binding_descriptions() -> std::vector<vk::VertexInputBindingDescription> {
     std::vector binding_descriptions = {
-        VkVertexInputBindingDescription{
+        vk::VertexInputBindingDescription{
             .binding   = 0,
             .stride    = sizeof(vertex),
-            .inputRate = VK_VERTEX_INPUT_RATE_VERTEX,
+            .inputRate = vk::VertexInputRate::eVertex,
         },
-        VkVertexInputBindingDescription{
+        vk::VertexInputBindingDescription{
             .binding   = 1,
             .stride    = sizeof(uint32),
-            .inputRate = VK_VERTEX_INPUT_RATE_INSTANCE,
+            .inputRate = vk::VertexInputRate::eInstance,
         },
     };
     return binding_descriptions;
 }
 
-inline auto vertex::get_attribute_descriptions() -> std::vector<VkVertexInputAttributeDescription> {
+auto vertex::get_attribute_descriptions() -> std::vector<vk::VertexInputAttributeDescription> {
     std::vector attribute_descriptions = {
-        VkVertexInputAttributeDescription{
+        vk::VertexInputAttributeDescription{
             .location = 0,
             .binding  = 0,
-            .format   = VK_FORMAT_R32_UINT,
+            .format   = vk::Format::eR32Uint,
             .offset   = offsetof(vertex, data0),
         },
-        VkVertexInputAttributeDescription{
+        vk::VertexInputAttributeDescription{
             .location = 1,
             .binding  = 0,
-            .format   = VK_FORMAT_R32_UINT,
+            .format   = vk::Format::eR32Uint,
             .offset   = offsetof(vertex, data1),
         },
-        VkVertexInputAttributeDescription{
+        vk::VertexInputAttributeDescription{
             .location = 2,
             .binding  = 1,
-            .format   = VK_FORMAT_R32_UINT,
+            .format   = vk::Format::eR32Uint,
             .offset   = 0,
         },
     };
@@ -106,7 +115,7 @@ static constexpr std::array<vec3i, 6> ao_tangent_v = {
 
 namespace detail {
 
-inline face_axis_mapping::face_axis_mapping(
+face_axis_mapping::face_axis_mapping(
     const vw::asset::model& mdl, int face_dir
 )
     : face_direction(face_dir), voxel_scale(mdl.voxel_scale()) {
@@ -129,7 +138,7 @@ inline face_axis_mapping::face_axis_mapping(
     }
 }
 
-[[nodiscard]] inline auto face_axis_mapping::to_model_coords(
+[[nodiscard]] auto face_axis_mapping::to_model_coords(
     int u, int v, int layer
 ) const -> std::tuple<int, int, int> {
     int d = (face_direction % 2 == 0) ? layer : depth - 1 - layer;
@@ -143,7 +152,7 @@ inline face_axis_mapping::face_axis_mapping(
     }
 }
 
-[[nodiscard]] inline auto face_axis_mapping::to_local_min_max(
+[[nodiscard]] auto face_axis_mapping::to_local_min_max(
     int u, int v, int w, int h, int layer
 ) const -> std::pair<vec3i, vec3i> {
     int d_lo = (face_direction % 2 == 0) ? layer : depth - 1 - layer;
@@ -161,7 +170,7 @@ inline face_axis_mapping::face_axis_mapping(
     }
 }
 
-inline auto is_solid_at(
+auto is_solid_at(
     const vw::asset::model& mdl, vec3i p
 ) -> bool {
     const bool ox = p.x < 0 || p.x >= mdl.width();
@@ -197,7 +206,7 @@ inline auto is_solid_at(
     return false;
 }
 
-inline auto compute_corner_darkness(
+auto compute_corner_darkness(
     const vw::asset::model& mdl, int x, int y, int z, int face
 ) -> uint8 {
     const vec3i n = vec3i{x, y, z} + ao_normal[face];
@@ -229,7 +238,7 @@ inline auto compute_corner_darkness(
     return static_cast<uint8>(c0 | (c1 << 2) | (c2 << 4) | (c3 << 6));
 }
 
-inline auto compute_corner_brightness(
+auto compute_corner_brightness(
     const vw::asset::model& mdl, int x, int y, int z, int face
 ) -> uint8 {
     const vec3i host = vec3i{x, y, z};
@@ -261,7 +270,7 @@ inline auto compute_corner_brightness(
     return static_cast<uint8>(c0 | (c1 << 2) | (c2 << 4) | (c3 << 6));
 }
 
-inline auto is_face_visible(
+auto is_face_visible(
     const vw::asset::model& mdl, int x, int y, int z, int face_direction
 ) -> bool {
     static constexpr int dx[6] = {1, -1, 0, 0, 0, 0};
@@ -283,7 +292,7 @@ inline auto is_face_visible(
     return mdl.is_empty(nx, ny, nz);
 }
 
-inline void build_face_mask(
+void build_face_mask(
     mesh_generation_storage& storage,
     const vw::asset::model& mdl,
     const face_axis_mapping& axes,
@@ -363,7 +372,7 @@ inline void build_face_mask(
     }
 }
 
-inline void add_quad(
+void add_quad(
     std::vector<vertex>& vertices,
     std::vector<uint32>& indices,
     int face_direction,
@@ -440,7 +449,7 @@ inline void add_quad(
     indices.push_back(base_vertex + 0);
 }
 
-inline void emit_rect(
+void emit_rect(
     mesh_generation_storage& storage,
     const vw::asset::model& mdl,
     const face_axis_mapping& axes,
@@ -477,7 +486,7 @@ inline void emit_rect(
 
 // ==================== simple_mesh_generator ====================
 
-inline auto simple_mesh_generator::generate_mesh_data(
+auto simple_mesh_generator::generate_mesh_data(
     const std::shared_ptr<vw::asset::model>& mdl, const block_registry& registry, mesh_options opts
 ) -> mesh {
     if (!mdl) {
@@ -506,7 +515,7 @@ inline auto simple_mesh_generator::generate_mesh_data(
     return mesh{.vertices = std::move(vertices), .indices = std::move(indices)};
 }
 
-inline void simple_mesh_generator::add_cube_face(
+void simple_mesh_generator::add_cube_face(
     std::vector<vertex>& vertices,
     std::vector<uint32>& indices,
     const std::shared_ptr<vw::asset::model>& mdl,
@@ -534,7 +543,7 @@ inline void simple_mesh_generator::add_cube_face(
     );
 }
 
-inline auto simple_mesh_generator::is_face_visible(
+auto simple_mesh_generator::is_face_visible(
     const std::shared_ptr<vw::asset::model>& mdl, int x, int y, int z, int face_direction
 ) -> bool {
     if (!mdl)
@@ -558,7 +567,7 @@ inline auto simple_mesh_generator::is_face_visible(
 
 // ==================== strip_mesh_generator ====================
 
-inline auto strip_mesh_generator::generate_mesh_data(
+auto strip_mesh_generator::generate_mesh_data(
     mesh_generation_storage& storage,
     const vw::asset::model& mdl,
     const block_registry& registry,
@@ -583,7 +592,7 @@ inline auto strip_mesh_generator::generate_mesh_data(
     return mesh{storage.vertices, storage.indices};
 }
 
-inline void strip_mesh_generator::merge_and_emit_strips(
+void strip_mesh_generator::merge_and_emit_strips(
     mesh_generation_storage& storage,
     const vw::asset::model& mdl,
     const detail::face_axis_mapping& axes,
@@ -630,7 +639,7 @@ inline void strip_mesh_generator::merge_and_emit_strips(
     }
 }
 
-inline void strip_mesh_generator::generate_face_quads(
+void strip_mesh_generator::generate_face_quads(
     mesh_generation_storage& storage,
     const vw::asset::model& mdl,
     int face_direction,
@@ -681,7 +690,7 @@ inline void strip_mesh_generator::generate_face_quads(
 
 // ==================== greedy_mesh_generator ====================
 
-inline auto greedy_mesh_generator::generate_mesh_data(
+auto greedy_mesh_generator::generate_mesh_data(
     mesh_generation_storage& storage,
     const vw::asset::model& mdl,
     const block_registry& registry,
@@ -706,7 +715,7 @@ inline auto greedy_mesh_generator::generate_mesh_data(
     return mesh{storage.vertices, storage.indices};
 }
 
-inline void greedy_mesh_generator::merge_and_emit_rects(
+void greedy_mesh_generator::merge_and_emit_rects(
     mesh_generation_storage& storage,
     const vw::asset::model& mdl,
     const detail::face_axis_mapping& axes,
@@ -760,7 +769,7 @@ inline void greedy_mesh_generator::merge_and_emit_rects(
     }
 }
 
-inline void greedy_mesh_generator::generate_face_quads(
+void greedy_mesh_generator::generate_face_quads(
     mesh_generation_storage& storage,
     const vw::asset::model& mdl,
     int face_direction,
@@ -810,5 +819,3 @@ inline void greedy_mesh_generator::generate_face_quads(
 }
 
 }  // namespace vw::gfx
-
-#endif  // VW_GFX_MESH_INL_H

@@ -3,63 +3,12 @@
 #ifndef VW_GFX_DEBUG_PRIMITIVE_H
 #define VW_GFX_DEBUG_PRIMITIVE_H
 
-#include <vulkan/vulkan_core.h>
+#include "vw/gfx/detail/module_prelude.h"
 
-#include <vector>
-
-#include "vw/core.h"
-#include "vw/core/transform.h"
-
-namespace vw::gfx {
-
-class vulkan_context;
-
-struct debug_vertex {
-    vec3f pos;
-    color col;
-
-    explicit debug_vertex(
-        vec3f pos, color col = colors::red
-    )
-        : pos(pos), col(col) {}
-
-    [[nodiscard]]
-    static auto get_binding_descriptions() -> std::vector<VkVertexInputBindingDescription>;
-
-    [[nodiscard]]
-    static auto get_attribute_descriptions() -> std::vector<VkVertexInputAttributeDescription>;
-};
-
-class debug_primitives {
-public:
-    void add_line(const vec3f& begin, const vec3f& end, color clr = colors::red);
-
-    void add_box(const mat4f& matrix, const vec3f& size, color clr = colors::red);
-    void add_box(const transform& transform, const vec3f& size, color clr = colors::red);
-    void add_box(const vec3f& pos, const vec3f& size, color clr = colors::red);
-
-    void add_grid(
-        const mat4f& matrix, float cell_size, int cols, int rows, color clr = colors::red
-    );
-    void add_grid(
-        const transform& transform, float cell_size, int cols, int rows, color clr = colors::red
-    );
-    void add_grid(const vec3f& pos, float cell_size, int cols, int rows, color clr = colors::red);
-
-    [[nodiscard]]
-    auto get_vertices() const -> const std::vector<debug_vertex>&;
-
-    [[nodiscard]]
-    auto is_empty() const -> bool;
-
-    void clear();
-
-private:
-    std::vector<debug_vertex> vertices_;
-};
-
-}  // namespace vw::gfx
-
-#include "vw/gfx/debug/debug_primitive.inl.h"
+import vw.core;
+import vw.ecs;
+import vw.world;
+import vw.platform;
+import vw.gfx;
 
 #endif  // VW_GFX_DEBUG_PRIMITIVE_H

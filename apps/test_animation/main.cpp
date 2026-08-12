@@ -1,3 +1,4 @@
+#include <imgui.h>
 #include <vw/core.h>
 #include <vw/gfx.h>
 
@@ -59,10 +60,10 @@ private:
     void setup_scene() {
         auto& world            = get_engine().get_world();
         auto& model_reg = world.resource<asset::model_registry>();
-        auto& transform_sys = world.system<gfx::transform_system>();
-        auto& model_sys = world.system<gfx::model_system>();
-        auto& hierarchy_sys = world.system<gfx::hierarchy_system>();
-        auto& anim_sys = world.system<gfx::animation_system>();
+        auto& transform_sys = world.system<ecs::transform_system>();
+        auto& model_sys = world.system<ecs::model_system>();
+        auto& hierarchy_sys = world.system<ecs::hierarchy_system>();
+        auto& anim_sys = world.system<ecs::animation_system>();
 
         auto red_cube_model = model_reg.create("red_cube", 3, 3, 3);
         red_cube_model->fill(voxel{blocks::red_3});
@@ -74,10 +75,10 @@ private:
         blue_cube_model->fill(voxel{blocks::blue_3});
 
         root_ = world.create()
-            .with<gfx::transform_component>()
-            .with<gfx::hierarchy_component>()
-            .with<gfx::animation_player_component>()
-            .with<gfx::animation_target_component>()
+            .with<ecs::transform_component>()
+            .with<ecs::hierarchy_component>()
+            .with<ecs::animation_player_component>()
+            .with<ecs::animation_target_component>()
             .get_entity();
         auto root_ent = root_;
 
@@ -86,11 +87,11 @@ private:
             .set_target_name("root");
 
         red_ = world.create()
-            .with<gfx::transform_component>()
-            .with<gfx::hierarchy_component>()
-            .with<gfx::spatial_component>()
-            .with<gfx::model_component>()
-            .with<gfx::animation_target_component>()
+            .with<ecs::transform_component>()
+            .with<ecs::hierarchy_component>()
+            .with<ecs::spatial_component>()
+            .with<ecs::model_component>()
+            .with<ecs::animation_target_component>()
             .get_entity();
 
         auto red_ent = red_;
@@ -113,11 +114,11 @@ private:
             .set_parent(root_ent);
 
         green_ = world.create()
-            .with<gfx::transform_component>()
-            .with<gfx::hierarchy_component>()
-            .with<gfx::spatial_component>()
-            .with<gfx::model_component>()
-            .with<gfx::animation_target_component>()
+            .with<ecs::transform_component>()
+            .with<ecs::hierarchy_component>()
+            .with<ecs::spatial_component>()
+            .with<ecs::model_component>()
+            .with<ecs::animation_target_component>()
             .get_entity();
 
         auto green_ent = green_;
@@ -135,11 +136,11 @@ private:
             .set_parent(root_ent);
 
         blue_ = world.create()
-            .with<gfx::transform_component>()
-            .with<gfx::hierarchy_component>()
-            .with<gfx::spatial_component>()
-            .with<gfx::model_component>()
-            .with<gfx::animation_target_component>()
+            .with<ecs::transform_component>()
+            .with<ecs::hierarchy_component>()
+            .with<ecs::spatial_component>()
+            .with<ecs::model_component>()
+            .with<ecs::animation_target_component>()
             .get_entity();
 
         auto blue_ent = blue_;
@@ -222,7 +223,7 @@ private:
             clip->add_track(track);
         }
 
-        auto& anim_sys = world.system<gfx::animation_system>();
+        auto& anim_sys = world.system<ecs::animation_system>();
         auto layer_mod = anim_sys.modify_player(root_).layer(0);
         layer_mod.blend_to_by_name("bounce");
         layer_mod.set_loop_mode(asset::animation_loop_mode::loop);
@@ -454,10 +455,10 @@ private:
         ImGui::Separator();
 
         auto& world            = get_engine().get_world();
-        auto& anim_sys = world.system<gfx::animation_system>();
+        auto& anim_sys = world.system<ecs::animation_system>();
         auto modifier = anim_sys.modify_player(root_).layer(0);
         auto& animation_comp =
-            world.get<gfx::animation_player_component>(root_);
+            world.get<ecs::animation_player_component>(root_);
 
         asset::transition blend_t{.duration = 0.5f};
 
@@ -538,8 +539,8 @@ private:
         ImGui::Separator();
         ImGui::Text("Current: %s", current_animation_.c_str());
 
-        if (world.has<gfx::animation_player_component>(root_)) {
-            auto& comp = world.get<gfx::animation_player_component>(root_);
+        if (world.has<ecs::animation_player_component>(root_)) {
+            auto& comp = world.get<ecs::animation_player_component>(root_);
 
             ImGui::Separator();
             ImGui::Text("Animation State:");
@@ -578,10 +579,10 @@ private:
     }
 
     std::unique_ptr<gfx::free_camera_controller> camera_controller_;
-    gfx::entity root_  = gfx::invalid_entity;
-    gfx::entity red_   = gfx::invalid_entity;
-    gfx::entity green_ = gfx::invalid_entity;
-    gfx::entity blue_  = gfx::invalid_entity;
+    ecs::entity root_  = ecs::invalid_entity;
+    ecs::entity red_   = ecs::invalid_entity;
+    ecs::entity green_ = ecs::invalid_entity;
+    ecs::entity blue_  = ecs::invalid_entity;
     std::string current_animation_ = "bounce";
 };
 

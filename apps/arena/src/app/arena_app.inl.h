@@ -121,7 +121,7 @@ inline auto arena_app::handle_key_press(
             if (player_->is_placed()) {
                 get_engine()
                     .get_world()
-                    .system<gfx::physics_system>()
+                    .system<ecs::physics_system>()
                     .modify(player_->get_entity())
                     .add_external_impulse({0.0f, 0.0f, 500.0f});
             }

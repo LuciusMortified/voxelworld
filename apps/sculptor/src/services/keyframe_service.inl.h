@@ -31,11 +31,11 @@ inline void keyframe_service::add_keyframe() {
     auto prop        = state_->anim.selected_property;
     float32 time     = state_->anim.timeline_cursor;
 
-    if (!world.has<gfx::transform_component>(ent)) {
+    if (!world.has<ecs::transform_component>(ent)) {
         return;
     }
 
-    auto& tc = world.get<gfx::transform_component>(ent);
+    auto& tc = world.get<ecs::transform_component>(ent);
 
     keyframe_value kf_val;
     if (prop == asset::animation_property::rotation) {

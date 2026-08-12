@@ -5,8 +5,6 @@
 # storage macro -- `import vulkan;` and a no-argument `init()` are enough. The
 # configuration macros must sit on this target: they change the module
 # interface, and a consumer defining them textually would not agree with it.
-#
-# Nothing calls this yet; gfx picks it up when it becomes a module in M5.
 
 function(vw_add_vulkan_module)
     if(TARGET VulkanHppModule)
@@ -23,8 +21,13 @@ function(vw_add_vulkan_module)
                 ${Vulkan_INCLUDE_DIR}/vulkan/vulkan.cppm
     )
 
+    # VULKAN_HPP_USE_STD_EXPECTED turns every fallible call into
+    # `std::expected<T, vk::Result>`. Without it the return type is
+    # `vk::ResultValue`, which vulkan.cppm does not export at all -- our own
+    # error helpers would have no type to name in their signatures.
     target_compile_definitions(VulkanHppModule PUBLIC
         VULKAN_HPP_NO_EXCEPTIONS
+        VULKAN_HPP_USE_STD_EXPECTED
         VULKAN_HPP_NO_CONSTRUCTORS
         VULKAN_HPP_NO_SMART_HANDLE
         VULKAN_HPP_DISPATCH_LOADER_DYNAMIC=1

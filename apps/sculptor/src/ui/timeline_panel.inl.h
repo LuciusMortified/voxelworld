@@ -3,6 +3,7 @@
 #ifndef VW_SCULPTOR_TIMELINE_PANEL_INL_H
 #define VW_SCULPTOR_TIMELINE_PANEL_INL_H
 
+#include <imgui.h>
 #include "operations/add_track_operation.h"
 #include "operations/remove_keyframe_operation.h"
 
@@ -75,7 +76,7 @@ inline void timeline_panel::render(
         const auto root_ent  = state_->scene.name_to_entity[state_->scene.root_name];
         const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
         const auto& player =
-            engine_->get_world().get<gfx::animation_player_component>(root_ent);
+            engine_->get_world().get<ecs::animation_player_component>(root_ent);
         state_->anim.timeline_cursor = player.get_layer(layer_idx).time;
         prev_cursor_time_            = state_->anim.timeline_cursor;
     } else if (clip_changed) {
@@ -83,7 +84,7 @@ inline void timeline_panel::render(
             const auto root_ent  = state_->scene.name_to_entity[state_->scene.root_name];
             const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
             const auto& player =
-                engine_->get_world().get<gfx::animation_player_component>(root_ent);
+                engine_->get_world().get<ecs::animation_player_component>(root_ent);
             state_->anim.timeline_cursor = player.get_layer(layer_idx).time;
         } else {
             state_->anim.timeline_cursor = 0.f;
@@ -113,7 +114,7 @@ inline void timeline_panel::render(
     if (!is_current_layer_playing() && (cursor_changed || state_->anim.need_apply_pose)) {
         if (const auto root = try_get_root_entity()) {
             ensure_clip_on_layer(*root);
-            auto& anim_sys       = engine_->get_world().system<gfx::animation_system>();
+            auto& anim_sys       = engine_->get_world().system<ecs::animation_system>();
             const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
             auto player          = anim_sys.modify_player(*root);
             player.layer(layer_idx).set_time(state_->anim.timeline_cursor);
@@ -218,8 +219,8 @@ inline void timeline_panel::render_toolbar(
         const auto root_ent  = state_->scene.name_to_entity[state_->scene.root_name];
         const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
         auto& world          = engine_->get_world();
-        if (world.has<gfx::animation_player_component>(root_ent)) {
-            auto& anim_sys = world.system<gfx::animation_system>();
+        if (world.has<ecs::animation_player_component>(root_ent)) {
+            auto& anim_sys = world.system<ecs::animation_system>();
             if (speed_changed) {
                 anim_sys.modify_player(root_ent).layer(layer_idx).set_playback_speed(
                     cs.playback_speed
@@ -415,10 +416,10 @@ inline auto timeline_panel::is_current_layer_playing() const -> bool {
         return false;
     }
     auto& world = engine_->get_world();
-    if (!world.has<gfx::animation_player_component>(*root)) {
+    if (!world.has<ecs::animation_player_component>(*root)) {
         return false;
     }
-    const auto& player = world.get<gfx::animation_player_component>(*root);
+    const auto& player = world.get<ecs::animation_player_component>(*root);
     const auto idx     = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
     if (!player.has_layer(idx)) {
         return false;
@@ -440,9 +441,9 @@ inline void timeline_panel::handle_pause(
     ecs::entity root
 ) const {
     auto& world = engine_->get_world();
-    if (world.has<gfx::animation_player_component>(root)) {
+    if (world.has<ecs::animation_player_component>(root)) {
         const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
-        world.system<gfx::animation_system>().modify_player(root).layer(layer_idx).pause();
+        world.system<ecs::animation_system>().modify_player(root).layer(layer_idx).pause();
     }
 }
 
@@ -451,12 +452,12 @@ inline void timeline_panel::handle_play(
 ) const {
     auto& world = engine_->get_world();
 
-    if (!world.has<gfx::animation_player_component>(root)) {
-        world.modify(root).with<gfx::animation_player_component>();
+    if (!world.has<ecs::animation_player_component>(root)) {
+        world.modify(root).with<ecs::animation_player_component>();
     }
 
-    auto& anim_sys       = world.system<gfx::animation_system>();
-    const auto& player   = world.get<gfx::animation_player_component>(root);
+    auto& anim_sys       = world.system<ecs::animation_system>();
+    const auto& player   = world.get<ecs::animation_player_component>(root);
     const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
 
     auto layer = anim_sys.modify_player(root).layer(layer_idx);
@@ -494,8 +495,8 @@ inline void timeline_panel::handle_stop(
 ) const {
     auto& world          = engine_->get_world();
     const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
-    if (world.has<gfx::animation_player_component>(root)) {
-        world.system<gfx::animation_system>().modify_player(root).layer(layer_idx).stop();
+    if (world.has<ecs::animation_player_component>(root)) {
+        world.system<ecs::animation_system>().modify_player(root).layer(layer_idx).stop();
     }
     state_->anim.timeline_cursor = 0.f;
 }
@@ -850,10 +851,10 @@ inline auto timeline_panel::is_clip_on_layer() const -> bool {
         return false;
     }
     auto& world = engine_->get_world();
-    if (!world.has<gfx::animation_player_component>(*root)) {
+    if (!world.has<ecs::animation_player_component>(*root)) {
         return false;
     }
-    const auto& player = world.get<gfx::animation_player_component>(*root);
+    const auto& player = world.get<ecs::animation_player_component>(*root);
     const auto idx     = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
     return player.has_layer(idx) && player.get_layer(idx).clip &&
         player.get_layer(idx).clip->get_name() == state_->anim.selected_clip_name;
@@ -872,11 +873,11 @@ inline void timeline_panel::ensure_clip_on_layer(
         return;
     }
 
-    if (!world.has<gfx::animation_player_component>(root)) {
-        world.modify(root).with<gfx::animation_player_component>();
+    if (!world.has<ecs::animation_player_component>(root)) {
+        world.modify(root).with<ecs::animation_player_component>();
     }
 
-    auto& anim_sys       = world.system<gfx::animation_system>();
+    auto& anim_sys       = world.system<ecs::animation_system>();
     const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
     const auto& cs       = state_->anim.get_clip_settings(state_->anim.selected_clip_name);
 

@@ -1,25 +1,23 @@
-#pragma once
+module;
 
-#ifndef VOXELWORLD_DEBUG_WINDOW_INL
-#define VOXELWORLD_DEBUG_WINDOW_INL
-
-#include <algorithm>
-#include <array>
-#include <cfloat>
-#include <cstdio>
 #include <imgui.h>
 
-#include "vw/gfx/debug/debug_window.h"
-#include "vw/gfx/render/renderer.h"
+module vw.gfx;
+
+import std;
+import vw.core;
+import vw.ecs;
+import vw.world;
+import vw.platform;
 
 namespace vw::gfx {
 
-inline debug_window::debug_window(
+debug_window::debug_window(
     engine_type& engine
 )
     : engine_(&engine) {}
 
-inline void debug_window::render(
+void debug_window::render(
     [[maybe_unused]] float delta_time
 ) {
     if (!visible_) {
@@ -38,20 +36,20 @@ inline void debug_window::render(
     }
 }
 
-inline void debug_window::toggle_visibility() {
+void debug_window::toggle_visibility() {
     visible_ = !visible_;
 }
 
-inline void debug_window::set_visible(
+void debug_window::set_visible(
     bool visible
 ) {
     visible_ = visible;
 }
-inline bool debug_window::is_visible() const {
+bool debug_window::is_visible() const {
     return visible_;
 }
 
-inline void debug_window::render_fps_window() {
+void debug_window::render_fps_window() {
     ImGuiWindowFlags window_flags =          //
         ImGuiWindowFlags_NoResize |          //
         ImGuiWindowFlags_NoScrollbar |       //
@@ -170,7 +168,7 @@ inline void debug_window::render_fps_window() {
     ImGui::End();
 }
 
-inline void debug_window::render_render_mode_controls() const {
+void debug_window::render_render_mode_controls() const {
     ImGui::Spacing();
     if (ImGui::Button("lit")) {
         engine_->get_renderer().set_render_mode(render_mode::lit);
@@ -181,7 +179,7 @@ inline void debug_window::render_render_mode_controls() const {
     }
 }
 
-inline void debug_window::render_systems_detail() {
+void debug_window::render_systems_detail() {
     ImGuiWindowFlags window_flags =          //
         ImGuiWindowFlags_NoCollapse |        //
         ImGuiWindowFlags_NoSavedSettings |   //
@@ -196,7 +194,7 @@ inline void debug_window::render_systems_detail() {
     ImGui::End();
 }
 
-inline void debug_window::render_combined_buffers_detail() {
+void debug_window::render_combined_buffers_detail() {
     ImGuiWindowFlags window_flags =          //
         ImGuiWindowFlags_NoCollapse |        //
         ImGuiWindowFlags_NoSavedSettings |   //
@@ -244,7 +242,7 @@ inline void debug_window::render_combined_buffers_detail() {
     ImGui::End();
 }
 
-inline void debug_window::render_render_detail() {
+void debug_window::render_render_detail() {
     ImGuiWindowFlags window_flags =          //
         ImGuiWindowFlags_NoCollapse |        //
         ImGuiWindowFlags_NoSavedSettings |   //
@@ -307,5 +305,3 @@ inline void debug_window::render_render_detail() {
 }
 
 }  // namespace vw::gfx
-
-#endif  // VOXELWORLD_DEBUG_WINDOW_INL

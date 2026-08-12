@@ -22,14 +22,14 @@ public:
 
     auto try_place() -> void;
 
-    [[nodiscard]] auto get_entity() const -> gfx::entity;
+    [[nodiscard]] auto get_entity() const -> ecs::entity;
     [[nodiscard]] auto is_placed() const -> bool;
 
 private:
     auto create_model() -> std::shared_ptr<asset::model>;
 
     gfx::engine& engine_;
-    gfx::entity ent_;
+    ecs::entity ent_;
     vec2f spawn_xz_;
     bool placed_ = false;
 };

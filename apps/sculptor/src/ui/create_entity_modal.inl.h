@@ -2,6 +2,7 @@
 
 #ifndef VW_SCULPTOR_CREATE_ENTITY_MODAL_INL_H
 #define VW_SCULPTOR_CREATE_ENTITY_MODAL_INL_H
+#include <imgui.h>
 #include "operations/create_entity_operation.h"
 
 namespace vw::sculptor {

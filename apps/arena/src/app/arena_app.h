@@ -40,7 +40,7 @@ private:
     std::unique_ptr<player> player_;
     std::vector<std::unique_ptr<dummy_enemy>> enemies_;
 
-    gfx::perlin_terrain_generator::params generator_params_;
+    ecs::perlin_terrain_generator::params generator_params_;
     bool show_colliders_ = true;
 };
 

@@ -3,13 +3,16 @@
 #ifndef VW_SCULPTOR_MENU_BAR_INL_H
 #define VW_SCULPTOR_MENU_BAR_INL_H
 
+#include <imgui.h>
 #include <filesystem>
 #include <string>
 
 #ifdef _WIN32
+#define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
-#include <shellapi.h>
 #include <windows.h>
+
+#include <shellapi.h>
 #else
 #include <cstdlib>
 #endif

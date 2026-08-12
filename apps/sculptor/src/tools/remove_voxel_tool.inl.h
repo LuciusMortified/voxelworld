@@ -26,8 +26,8 @@ inline void remove_voxel_tool::render(
 
     auto& world        = engine_->get_world();
     bool is_renderable =  //
-        world.has<gfx::transform_component>(ent) &&
-        world.has<gfx::model_component>(ent);
+        world.has<ecs::transform_component>(ent) &&
+        world.has<ecs::model_component>(ent);
     if (!is_renderable) {
         return;
     }
@@ -40,7 +40,7 @@ inline void remove_voxel_tool::render(
     };
 
     auto voxel_world_pos =  //
-        world.get<gfx::transform_component>(ent).get_world_matrix() *
+        world.get<ecs::transform_component>(ent).get_world_matrix() *
         math::translation_matrix(voxel_local_pos) *         //
         math::scale_matrix(vec3f{1.1f, 1.1f, 1.1f}) *  //
         math::translation_matrix(vec3f{-0.05f, -0.05f, -0.05f});
@@ -99,7 +99,7 @@ inline void remove_voxel_tool::update_hovered_voxel_() {
     const auto& camera = engine_->get_camera();
 
     const auto ray = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
-    const auto hit = world.system<gfx::spatial_system>().voxel_ray_cast(ray, ray_cast_entities_);
+    const auto hit = world.system<ecs::spatial_system>().voxel_ray_cast(ray, ray_cast_entities_);
     if (!hit) {
         hovered_voxel_ = vec3i{-1, -1, -1};
         return;

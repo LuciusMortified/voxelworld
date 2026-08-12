@@ -3,6 +3,10 @@
 #ifndef VW_SCULPTOR_STATE_H
 #define VW_SCULPTOR_STATE_H
 
+#include <format>
+#include <ranges>
+#include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <variant>
 

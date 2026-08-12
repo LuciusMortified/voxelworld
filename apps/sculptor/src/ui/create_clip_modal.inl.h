@@ -3,6 +3,7 @@
 #ifndef VW_SCULPTOR_CREATE_CLIP_MODAL_INL_H
 #define VW_SCULPTOR_CREATE_CLIP_MODAL_INL_H
 
+#include <imgui.h>
 #include <filesystem>
 
 #include "operations/create_clip_operation.h"

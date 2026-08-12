@@ -14,7 +14,7 @@ inline void set_socket_transform_operation::execute() {
     auto& world = engine_->get_world();
     auto ent    = state_->scene.name_to_entity[params_.entity_name];
 
-    auto& socket_comp = world.get<gfx::socket_component>(ent);
+    auto& socket_comp = world.get<ecs::socket_component>(ent);
     const auto* sp    = socket_comp.find(params_.socket_name);
     if (!sp) {
         return;
@@ -24,7 +24,7 @@ inline void set_socket_transform_operation::execute() {
     previous_rotation_ = sp->rotation;
     previous_scale_    = sp->scale;
 
-    auto& sockets = const_cast<std::vector<gfx::socket_point>&>(socket_comp.get_sockets());
+    auto& sockets = const_cast<std::vector<ecs::socket_point>&>(socket_comp.get_sockets());
     for (auto& slot : sockets) {
         if (slot.name == params_.socket_name) {
             slot.position = params_.position;
@@ -43,8 +43,8 @@ inline void set_socket_transform_operation::undo() {
     auto& world = engine_->get_world();
     auto ent    = state_->scene.name_to_entity[params_.entity_name];
 
-    auto& socket_comp = world.get<gfx::socket_component>(ent);
-    auto& sockets     = const_cast<std::vector<gfx::socket_point>&>(socket_comp.get_sockets());
+    auto& socket_comp = world.get<ecs::socket_component>(ent);
+    auto& sockets     = const_cast<std::vector<ecs::socket_point>&>(socket_comp.get_sockets());
     for (auto& slot : sockets) {
         if (slot.name == params_.socket_name) {
             slot.position = previous_position_;
@@ -65,13 +65,13 @@ inline void set_socket_transform_operation::update_attached_(
     auto& world = engine_->get_world();
     auto ent    = state_->scene.name_to_entity[params_.entity_name];
 
-    auto& socket_comp = world.get<gfx::socket_component>(ent);
+    auto& socket_comp = world.get<ecs::socket_component>(ent);
     const auto* sp    = socket_comp.find(params_.socket_name);
     if (!sp || !sp->attached.is_valid()) {
         return;
     }
 
-    auto& transform_sys = world.system<gfx::transform_system>();
+    auto& transform_sys = world.system<ecs::transform_system>();
     transform_sys.modify(sp->attached)
         .set_position(position)
         .set_rotation(rotation)
@@ -92,7 +92,7 @@ inline void set_socket_transform_operation::update_preview_(
         return;
     }
 
-    auto& transform_sys = engine_->get_world().system<gfx::transform_system>();
+    auto& transform_sys = engine_->get_world().system<ecs::transform_system>();
     transform_sys.modify(preview.entities[0])
         .set_position(position)
         .set_rotation(rotation)

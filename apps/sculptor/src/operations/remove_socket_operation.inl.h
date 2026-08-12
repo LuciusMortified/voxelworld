@@ -12,11 +12,11 @@ inline remove_socket_operation::remove_socket_operation(
 
 inline void remove_socket_operation::execute() {
     auto& world         = engine_->get_world();
-    auto& socket_sys = world.system<gfx::socket_system>();
+    auto& socket_sys = world.system<ecs::socket_system>();
 
     auto ent = state_->scene.name_to_entity[params_.entity_name];
 
-    auto& socket_comp   = world.get<gfx::socket_component>(ent);
+    auto& socket_comp   = world.get<ecs::socket_component>(ent);
     const auto* sp      = socket_comp.find(params_.socket_name);
     if (sp) {
         saved_position_ = sp->position;
@@ -32,7 +32,7 @@ inline void remove_socket_operation::execute() {
 
 inline void remove_socket_operation::undo() {
     auto& world         = engine_->get_world();
-    auto& socket_sys = world.system<gfx::socket_system>();
+    auto& socket_sys = world.system<ecs::socket_system>();
 
     auto ent = state_->scene.name_to_entity[params_.entity_name];
     socket_sys.modify(ent).add_socket(params_.socket_name, saved_position_, saved_rotation_,

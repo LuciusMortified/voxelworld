@@ -5,8 +5,8 @@
 
 ## Architecture
 
-Движок наполовину модульный: `vw.core`, `vw.ecs`, `vw.world` и `vw.platform` —
-модульные статические библиотеки, gfx пока header-only.
+Движок модульный: `vw.core`, `vw.ecs`, `vw.world`, `vw.platform` и `vw.gfx` —
+модульные статические библиотеки. Приложения ещё ходят через шимы-заголовки.
 
 - **vw.core** (`engine/core/src/`, таргет `vw_core`) — типы, math, transform,
   лог, блоки, геометрия `vw::spatial`
@@ -16,8 +16,8 @@
   сериализаторы, компоненты, системы, сетка чанков. Собирается без Vulkan
 - **vw.platform** (`engine/platform/src/`, таргет `vw_platform`) — окно, ввод,
   события; GLFW живёт ровно в одном `.cpp`
-- **gfx** (`engine/include/vw/gfx/`) — header-only Vulkan renderer, камера,
-  ImGui, debug; станет `vw.gfx` в M5
+- **vw.gfx** (`engine/gfx/src/`, таргет `vw_gfx`) — рендер на `vk::` через
+  `import vulkan`, камера, ImGui, debug; C API Vulkan в исходниках нет
 - **Apps** — `apps/sculptor/`, `apps/test_*`, `apps/arena/`
 - **Shaders** — GLSL → SPIR-V (`shaders/`)
 

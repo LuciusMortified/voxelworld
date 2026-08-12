@@ -3,6 +3,7 @@
 #ifndef VW_SCULPTOR_APP_INL_H
 #define VW_SCULPTOR_APP_INL_H
 
+#include <imgui.h>
 #include <filesystem>
 
 #include "sculptor_version.h"

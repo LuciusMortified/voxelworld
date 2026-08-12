@@ -1,20 +1,22 @@
-#pragma once
+module vw.gfx;
 
-#ifndef VW_GFX_RESOURCE_MESH_POOL_INL_H
-#define VW_GFX_RESOURCE_MESH_POOL_INL_H
+import std;
+import vw.core;
+import vw.ecs;
+import vw.world;
+import vw.platform;
+import :logging;
 
-#include <algorithm>
-#include <functional>
-
-#include "vw/asset/model/model.h"
-#include "vw/gfx/render/vulkan_context.h"
-#include "vw/gfx/resource/mesh.h"
-#include "vw/gfx/resource/mesh_pool.h"
+namespace vw::gfx {
+namespace {
+constexpr log::log_category lc_{"mesh_pool"};
+}
+}
 
 namespace vw::gfx {
 
 
-inline mesh_pool::mesh_pool(
+mesh_pool::mesh_pool(
     vulkan_context& context, const block_registry& registry
 )
     : context_{&context}, registry_{&registry} {
@@ -27,11 +29,11 @@ inline mesh_pool::mesh_pool(
     }
 }
 
-inline mesh_pool::~mesh_pool() {
+mesh_pool::~mesh_pool() {
     stop_gen_threads();
 }
 
-inline void mesh_pool::stop_gen_threads() {
+void mesh_pool::stop_gen_threads() {
     {
         std::scoped_lock lock(gen_mutex_);
         if (!gen_running_) {
@@ -48,19 +50,19 @@ inline void mesh_pool::stop_gen_threads() {
     }
 }
 
-[[nodiscard]] inline auto mesh_pool::has(
+[[nodiscard]] auto mesh_pool::has(
     const vw::asset::model_identity& identity
 ) const -> bool {
     return meshes_.contains(identity);
 }
 
-[[nodiscard]] inline auto mesh_pool::is_pending(
+[[nodiscard]] auto mesh_pool::is_pending(
     const vw::asset::model_identity& identity
 ) const -> bool {
     return pending_meshes_.contains(identity);
 }
 
-inline void mesh_pool::request_mesh(
+void mesh_pool::request_mesh(
     const std::shared_ptr<vw::asset::model>& model_ptr, mesh_options opts
 ) {
     vw::asset::model_identity identity = model_ptr->get_identity();
@@ -92,14 +94,14 @@ inline void mesh_pool::request_mesh(
     gen_cv_.notify_one();
 }
 
-[[nodiscard]] inline auto mesh_pool::get(
+[[nodiscard]] auto mesh_pool::get(
     const vw::asset::model_identity& identity
 ) const -> std::shared_ptr<mesh> {
     auto iter = meshes_.find(identity);
     return iter != meshes_.end() ? iter->second : nullptr;
 }
 
-inline void mesh_pool::remove(
+void mesh_pool::remove(
     const vw::asset::model_identity& identity
 ) {
     meshes_.erase(identity);
@@ -108,14 +110,14 @@ inline void mesh_pool::remove(
     pending_indices_.erase(identity.index);
 }
 
-inline void mesh_pool::evict(
+void mesh_pool::evict(
     const vw::asset::model_identity& identity
 ) {
     meshes_.erase(identity);
     pending_indices_.erase(identity.index);
 }
 
-inline void mesh_pool::sweep_orphaned_() {
+void mesh_pool::sweep_orphaned_() {
     for (auto it = model_refs_.begin(); it != model_refs_.end();) {
         if (it->second.expired()) {
             meshes_.erase(it->first);
@@ -128,7 +130,7 @@ inline void mesh_pool::sweep_orphaned_() {
     }
 }
 
-inline void mesh_pool::process_completed() {
+void mesh_pool::process_completed() {
     if (++sweep_counter_ >= sweep_interval_) {
         sweep_orphaned_();
         sweep_counter_ = 0;
@@ -163,11 +165,11 @@ inline void mesh_pool::process_completed() {
     }
 }
 
-inline auto mesh_pool::get_pending_count() const -> uint32 {
+auto mesh_pool::get_pending_count() const -> uint32 {
     return static_cast<uint32>(pending_meshes_.size());
 }
 
-inline void mesh_pool::gen_thread_function() {
+void mesh_pool::gen_thread_function() {
     mesh_generation_storage storage;
 
     while (true) {
@@ -207,5 +209,3 @@ inline void mesh_pool::gen_thread_function() {
 }
 
 }  // namespace vw::gfx
-
-#endif  // VW_GFX_RESOURCE_MESH_POOL_INL_H

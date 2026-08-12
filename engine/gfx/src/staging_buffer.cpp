@@ -1,45 +1,47 @@
-#pragma once
-
-#ifndef VW_GFX_STAGING_BUFFER_INL_H
-#define VW_GFX_STAGING_BUFFER_INL_H
+module;
 
 #include <cassert>
-#include <cstring>
-#include <stdexcept>
 
-#include "vw/gfx/render/vulkan_context.h"
+module vw.gfx;
+
+import std;
+import vulkan;
+import vw.core;
+import vw.ecs;
+import vw.world;
+import vw.platform;
+import :vk;
 
 namespace vw::gfx {
 
-inline staging_buffer::staging_buffer(
-    vulkan_context& context, VkDeviceSize frame_capacity, uint32 max_frames_in_flight
+staging_buffer::staging_buffer(
+    vulkan_context& context, vk::DeviceSize frame_capacity, uint32 max_frames_in_flight
 )
     : context_(&context)
     , frame_capacity_(frame_capacity)
     , max_frames_in_flight_(max_frames_in_flight)
     , current_frame_index_(max_frames_in_flight - 1) {
-    const VkDeviceSize total_capacity = frame_capacity_ * max_frames_in_flight_;
+    const vk::DeviceSize total_capacity = frame_capacity_ * max_frames_in_flight_;
 
-    VkBufferCreateInfo buffer_info{};
-    buffer_info.sType       = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    buffer_info.size        = total_capacity;
-    buffer_info.usage       = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    const vk::Device device = context_->get_device();
 
-    if (vkCreateBuffer(context_->get_device(), &buffer_info, nullptr, &buffer_) != VK_SUCCESS) {
-        throw std::runtime_error("failed to create staging buffer");
-    }
+    buffer_ = vk_must(
+        device.createBuffer({
+            .size        = total_capacity,
+            .usage       = vk::BufferUsageFlagBits::eTransferSrc,
+            .sharingMode = vk::SharingMode::eExclusive,
+        }),
+        "create staging buffer"
+    );
 
-    VkMemoryRequirements mem_requirements;
-    vkGetBufferMemoryRequirements(context_->get_device(), buffer_, &mem_requirements);
-
-    VkPhysicalDeviceMemoryProperties mem_properties;
-    vkGetPhysicalDeviceMemoryProperties(context_->get_physical_device(), &mem_properties);
+    const vk::MemoryRequirements mem_requirements = device.getBufferMemoryRequirements(buffer_);
+    const vk::PhysicalDeviceMemoryProperties mem_properties =
+        context_->get_physical_device().getMemoryProperties();
 
     uint32 memory_type_index = 0;
     bool found               = false;
     for (uint32 i = 0; i < mem_properties.memoryTypeCount; i++) {
-        auto required = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        auto required = vk::MemoryPropertyFlagBits::eHostVisible | vk::MemoryPropertyFlagBits::eHostCoherent;
         if ((mem_requirements.memoryTypeBits & (1 << i)) &&
             (mem_properties.memoryTypes[i].propertyFlags & required) == required) {
             memory_type_index = i;
@@ -51,40 +53,40 @@ inline staging_buffer::staging_buffer(
         throw std::runtime_error("failed to find suitable memory type for staging buffer");
     }
 
-    VkMemoryAllocateInfo alloc_info{};
-    alloc_info.sType           = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    alloc_info.allocationSize  = mem_requirements.size;
-    alloc_info.memoryTypeIndex = memory_type_index;
+    memory_ = vk_must(
+        device.allocateMemory({
+            .allocationSize  = mem_requirements.size,
+            .memoryTypeIndex = memory_type_index,
+        }),
+        "allocate staging buffer memory"
+    );
 
-    if (vkAllocateMemory(context_->get_device(), &alloc_info, nullptr, &memory_) != VK_SUCCESS) {
-        throw std::runtime_error("failed to allocate staging buffer memory");
-    }
-
-    vkBindBufferMemory(context_->get_device(), buffer_, memory_, 0);
-    vkMapMemory(context_->get_device(), memory_, 0, total_capacity, 0, &mapped_);
+    vk_must(device.bindBufferMemory(buffer_, memory_, 0), "bind staging buffer memory");
+    mapped_ = vk_must(device.mapMemory(memory_, 0, total_capacity), "map staging buffer");
 }
 
-inline staging_buffer::~staging_buffer() {
-    if (mapped_) {
-        vkUnmapMemory(context_->get_device(), memory_);
+staging_buffer::~staging_buffer() {
+    const vk::Device device = context_->get_device();
+    if (mapped_ != nullptr) {
+        device.unmapMemory(memory_);
     }
-    if (buffer_ != VK_NULL_HANDLE) {
-        vkDestroyBuffer(context_->get_device(), buffer_, nullptr);
+    if (buffer_) {
+        device.destroyBuffer(buffer_);
     }
-    if (memory_ != VK_NULL_HANDLE) {
-        vkFreeMemory(context_->get_device(), memory_, nullptr);
+    if (memory_) {
+        device.freeMemory(memory_);
     }
 }
 
-inline void staging_buffer::begin_frame() {
+void staging_buffer::begin_frame() {
     current_frame_index_ = (current_frame_index_ + 1) % max_frames_in_flight_;
     write_offset_        = current_frame_index_ * frame_capacity_;
     frame_end_offset_    = write_offset_ + frame_capacity_;
 }
 
-inline auto staging_buffer::stage(
-    const void* data, VkDeviceSize size
-) -> VkDeviceSize {
+auto staging_buffer::stage(
+    const void* data, vk::DeviceSize size
+) -> vk::DeviceSize {
     assert(write_offset_ + size <= frame_end_offset_);
     const auto offset = write_offset_;
     std::memcpy(static_cast<std::byte*>(mapped_) + offset, data, size);
@@ -92,14 +94,14 @@ inline auto staging_buffer::stage(
     return offset;
 }
 
-inline void staging_buffer::copy_to(
-    VkBuffer dst, VkDeviceSize dst_offset, VkDeviceSize staging_offset, VkDeviceSize size
+void staging_buffer::copy_to(
+    vk::Buffer dst, vk::DeviceSize dst_offset, vk::DeviceSize staging_offset, vk::DeviceSize size
 ) {
     pending_copies_.push_back({buffer_, dst, {staging_offset, dst_offset, size}});
 }
 
-inline void staging_buffer::zero_region(
-    VkBuffer dst, VkDeviceSize dst_offset, VkDeviceSize size
+void staging_buffer::zero_region(
+    vk::Buffer dst, vk::DeviceSize dst_offset, vk::DeviceSize size
 ) {
     assert(write_offset_ + size <= frame_end_offset_);
     auto offset = write_offset_;
@@ -108,15 +110,15 @@ inline void staging_buffer::zero_region(
     copy_to(dst, dst_offset, offset, size);
 }
 
-inline void staging_buffer::replace_buffer(VkBuffer old_buf, VkBuffer new_buf) {
+void staging_buffer::replace_buffer(vk::Buffer old_buf, vk::Buffer new_buf) {
     for (auto& copy : pending_copies_) {
         if (copy.src == old_buf) copy.src = new_buf;
         if (copy.dst == old_buf) copy.dst = new_buf;
     }
 }
 
-inline void staging_buffer::flush(
-    VkCommandBuffer cmd
+void staging_buffer::flush(
+    vk::CommandBuffer cmd
 ) {
     if (pending_copies_.empty()) {
         return;
@@ -152,11 +154,7 @@ inline void staging_buffer::flush(
             }
         }
 
-        vkCmdCopyBuffer(
-            cmd, it->src, it->dst,
-            static_cast<uint32_t>(flush_regions_.size()),
-            flush_regions_.data()
-        );
+        cmd.copyBuffer(it->src, it->dst, flush_regions_);
 
         it = batch_end;
     }
@@ -165,5 +163,3 @@ inline void staging_buffer::flush(
 }
 
 }  // namespace vw::gfx
-
-#endif  // VW_GFX_STAGING_BUFFER_INL_H

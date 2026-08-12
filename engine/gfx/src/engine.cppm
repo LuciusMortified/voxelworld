@@ -1,0 +1,209 @@
+module;
+
+#include <chrono>
+#include <memory>
+#include <utility>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
+
+export module vw.gfx:engine;
+
+import vw.core;
+import vw.ecs;
+import vw.world;
+import vw.platform;
+import :camera;
+import :render;
+import :renderer;
+
+namespace vw::gfx {
+using namespace ::vw::ecs;
+using namespace ::vw::plat;
+}
+
+// ---- from vw/gfx/engine/app.h
+export namespace vw::gfx {
+
+
+class engine;
+
+class app {
+public:
+    using engine_type = engine;
+
+    explicit app(
+        engine_type& eng
+    )
+        : engine_(&eng) {}
+
+    virtual ~app() = default;
+
+    app(const app&)                    = delete;
+    auto operator=(const app&) -> app& = delete;
+
+    virtual void render(
+        [[maybe_unused]] float delta_time
+    ) {}
+
+protected:
+    [[nodiscard]] auto get_engine() const -> engine_type& {
+        return *engine_;
+    }
+
+private:
+    engine_type* engine_ = nullptr;
+};
+}  // namespace vw::gfx
+
+// ---- from vw/gfx/debug/debug_window.h
+export namespace vw::gfx {
+
+
+class engine;
+
+class debug_window final {
+public:
+    using engine_type = engine;
+
+    explicit debug_window(engine_type& engine);
+    ~debug_window() = default;
+
+    debug_window(const debug_window&)            = delete;
+    auto operator=(const debug_window&) -> debug_window& = delete;
+
+    debug_window(debug_window&&)            = default;
+    debug_window& operator=(debug_window&&) = default;
+
+    void render(float delta_time);
+
+    void toggle_visibility();
+    void set_visible(bool visible);
+
+    [[nodiscard]] bool is_visible() const;
+
+private:
+    void render_fps_window();
+    void render_render_mode_controls() const;
+    void render_combined_buffers_detail();
+    void render_systems_detail();
+    void render_render_detail();
+
+    engine_type* engine_;
+
+    bool visible_                      = false;
+    bool show_combined_buffers_detail_ = false;
+    bool show_systems_detail_          = false;
+    bool show_render_detail_           = false;
+
+    std::unordered_map<std::string, float32> metric_max_;
+
+    static constexpr size_t fps_bucket_count_      = 200;
+    static constexpr float32 fps_bucket_duration_ms_ = 50.0f;
+
+    std::array<float32, fps_bucket_count_> fps_bucket_max_{};
+    std::array<float32, fps_bucket_count_> fps_bucket_min_{};
+    size_t  fps_bucket_index_         = 0;
+    size_t  fps_bucket_filled_count_  = 0;
+    float32 fps_bucket_accum_ms_      = 0.0f;
+    float32 fps_bucket_current_max_   = 0.0f;
+    float32 fps_bucket_current_min_   = FLT_MAX;
+};
+
+}  // namespace vw::gfx
+
+// ---- from vw/gfx/engine/engine.h
+export namespace vw::gfx {
+
+
+struct engine_stats {
+    float32 fps             = 0.0f;
+    float32 frame_ms        = 0.0f;
+    float32 world_update_ms = 0.0f;
+    float32 world_render_ms = 0.0f;
+    float32 begin_frame_ms  = 0.0f;
+    float32 app_render_ms   = 0.0f;
+    float32 renderer_ms     = 0.0f;
+    float32 end_frame_ms    = 0.0f;
+    uint64 ram_usage_bytes  = 0;
+    uint64 vram_usage_bytes = 0;
+};
+
+class engine final {
+public:
+    using renderer_type     = renderer;
+    using world_type        = world;
+    using debug_window_type = debug_window;
+    using app_type          = app;
+
+    engine(int width, int height, std::string_view title);
+    ~engine();
+
+    engine(const engine&)                    = delete;
+    auto operator=(const engine&) -> engine& = delete;
+
+    template <typename TApp, typename... TArgs>
+    void run(TArgs&&... args) {
+        app_ = std::make_unique<TApp>(*this, std::forward<TArgs>(args)...);
+        main_loop();
+    }
+
+    void shutdown();
+
+    [[nodiscard]] auto get_window() const -> window&;
+    [[nodiscard]] auto get_vulkan_context() const -> vulkan_context&;
+    [[nodiscard]] auto get_renderer() const -> renderer_type&;
+    [[nodiscard]] auto get_camera() const -> camera&;
+    [[nodiscard]] auto get_world() const -> world_type&;
+    [[nodiscard]] auto get_block_registry() const -> const block_registry&;
+    [[nodiscard]] auto get_debug_tool() const -> debug_window_type&;
+    [[nodiscard]] const engine_stats& get_stats() const;
+
+private:
+    void main_loop();
+
+    void render(float delta_time);
+
+    std::unique_ptr<window> window_;
+    std::unique_ptr<vulkan_context> vulkan_context_;
+    std::unique_ptr<renderer_type> renderer_;
+    std::unique_ptr<camera> camera_;
+    block_registry block_registry_;
+    std::unique_ptr<world_type> world_;
+    std::unique_ptr<debug_window_type> debug_tool_;
+
+    std::unique_ptr<app_type> app_;
+
+    bool running_ = false;
+    std::chrono::high_resolution_clock::time_point last_frame_time_;
+
+    mutable engine_stats stats_;
+    std::chrono::high_resolution_clock::time_point frame_start_time_;
+    std::chrono::high_resolution_clock::time_point last_memory_update_time_;
+
+    static constexpr float MEMORY_UPDATE_INTERVAL_SEC = 1.0f;
+
+    void update_stats();
+    [[nodiscard]] static uint64 calculate_ram_usage();
+    [[nodiscard]] uint64 calculate_vram_usage() const;
+
+    event_sub<window_resize_event> window_resize_sub_;
+    event_sub<key_press_event> key_press_sub_;
+};
+
+}  // namespace vw::gfx
+
+// ---- from vw/gfx/animation.h
+// Агрегирующий заголовок для системы анимаций
+// Включает все необходимые файлы для работы с анимациями
+
+// Базовые типы и перечисления
+
+// Структуры данных анимации
+
+// Реестр анимационных клипов
+
+// ECS компоненты
+
+// Система анимаций

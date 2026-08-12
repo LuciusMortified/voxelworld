@@ -21,8 +21,8 @@ inline auto file_service::save() -> bool {
         return false;
     }
 
-    gfx::vox_writer_plain writer;
-    gfx::vox_serializer serializer{
+    ecs::vox_writer_plain writer;
+    ecs::vox_serializer serializer{
         engine_->get_world(),
         writer,
         state_->scene.name_to_entity.at(state_->scene.root_name),
@@ -50,8 +50,8 @@ inline auto file_service::save_as(
         return false;
     }
 
-    gfx::vox_writer_plain writer;
-    gfx::vox_serializer serializer{
+    ecs::vox_writer_plain writer;
+    ecs::vox_serializer serializer{
         engine_->get_world(),
         writer,
         state_->scene.name_to_entity.at(state_->scene.root_name),

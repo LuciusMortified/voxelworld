@@ -1,59 +1,58 @@
-#pragma once
-
-#ifndef VW_GFX_DEBUG_PRIMITIVE_INL_H
-#define VW_GFX_DEBUG_PRIMITIVE_INL_H
-
-#include <vulkan/vulkan_core.h>
+module;
 
 #include <cstddef>
-#include <vector>
 
-#include "vw/core/color.h"
-#include "vw/core/mat4.h"
-#include "vw/core/vec3.h"
-#include "vw/gfx/debug/debug_primitive.h"
+module vw.gfx;
+
+import std;
+import vulkan;
+import vw.core;
+import vw.ecs;
+import vw.world;
+import vw.platform;
+import :vk;
 
 namespace vw::gfx {
 
-inline auto debug_vertex::get_binding_descriptions()
-    -> std::vector<VkVertexInputBindingDescription> {
-    std::vector<VkVertexInputBindingDescription> bindings(1);
+auto debug_vertex::get_binding_descriptions()
+    -> std::vector<vk::VertexInputBindingDescription> {
+    std::vector<vk::VertexInputBindingDescription> bindings(1);
 
     bindings[0].binding   = 0;
     bindings[0].stride    = sizeof(debug_vertex);
-    bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+    bindings[0].inputRate = vk::VertexInputRate::eVertex;
 
     return bindings;
 }
 
-inline auto debug_vertex::get_attribute_descriptions()
-    -> std::vector<VkVertexInputAttributeDescription> {
-    std::vector<VkVertexInputAttributeDescription> attributes(2);
+auto debug_vertex::get_attribute_descriptions()
+    -> std::vector<vk::VertexInputAttributeDescription> {
+    std::vector<vk::VertexInputAttributeDescription> attributes(2);
 
     attributes[0].binding  = 0;
     attributes[0].location = 0;
-    attributes[0].format   = VK_FORMAT_R32G32B32_SFLOAT;
+    attributes[0].format   = vk::Format::eR32G32B32Sfloat;
     attributes[0].offset   = offsetof(debug_vertex, pos);
 
     attributes[1].binding  = 0;
     attributes[1].location = 1;
-    attributes[1].format   = VK_FORMAT_R32_UINT;
+    attributes[1].format   = vk::Format::eR32Uint;
     attributes[1].offset   = offsetof(debug_vertex, col);
 
     return attributes;
 }
 
-inline void debug_primitives::clear() {
+void debug_primitives::clear() {
     vertices_.clear();
 }
 
-inline void debug_primitives::add_line(
+void debug_primitives::add_line(
     const vec3f& begin, const vec3f& end, color clr
 ) {
     vertices_.emplace_back(begin, clr);
     vertices_.emplace_back(end, clr);
 }
-inline void debug_primitives::add_box(
+void debug_primitives::add_box(
     const mat4f& matrix, const vec3f& size, color clr
 ) {
     const vec3f p0 = matrix * vec3f{0.0f, 0.0f, 0.0f};
@@ -81,23 +80,23 @@ inline void debug_primitives::add_box(
     add_line(p3, p7, clr);
 }
 
-inline auto debug_primitives::get_vertices() const -> const std::vector<debug_vertex>& {
+auto debug_primitives::get_vertices() const -> const std::vector<debug_vertex>& {
     return vertices_;
 }
 
-inline void debug_primitives::add_box(
+void debug_primitives::add_box(
     const transform& transform, const vec3f& size, color clr
 ) {
     add_box(transform.calc_matrix(), size, clr);
 }
 
-inline void debug_primitives::add_box(
+void debug_primitives::add_box(
     const vec3f& pos, const vec3f& size, color clr
 ) {
     add_box(math::translation_matrix(pos), size, clr);
 }
 
-inline void debug_primitives::add_grid(
+void debug_primitives::add_grid(
     const mat4f& matrix, float cell_size, int cols, int rows, color clr
 ) {
     const float cols_size = cell_size * static_cast<float>(cols);
@@ -115,22 +114,20 @@ inline void debug_primitives::add_grid(
     }
 }
 
-inline void debug_primitives::add_grid(
+void debug_primitives::add_grid(
     const transform& transform, float cell_size, int cols, int rows, color clr
 ) {
     add_grid(transform.calc_matrix(), cell_size, cols, rows, clr);
 }
 
-inline void debug_primitives::add_grid(
+void debug_primitives::add_grid(
     const vec3f& pos, float cell_size, int cols, int rows, color clr
 ) {
     add_grid(math::translation_matrix(pos), cell_size, cols, rows, clr);
 }
 
-inline auto debug_primitives::is_empty() const -> bool {
+auto debug_primitives::is_empty() const -> bool {
     return vertices_.empty();
 }
 
 }  // namespace vw::gfx
-
-#endif  // VW_GFX_DEBUG_PRIMITIVE_INL_H

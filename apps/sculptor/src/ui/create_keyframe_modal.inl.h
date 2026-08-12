@@ -3,6 +3,7 @@
 #ifndef VW_SCULPTOR_CREATE_KEYFRAME_MODAL_INL_H
 #define VW_SCULPTOR_CREATE_KEYFRAME_MODAL_INL_H
 
+#include <imgui.h>
 #include "operations/add_keyframe_operation.h"
 #include "operations/add_track_operation.h"
 
@@ -29,8 +30,8 @@ inline void create_keyframe_modal::open(
     if (state_->scene.name_to_entity.contains(track_name)) {
         auto ent    = state_->scene.name_to_entity[track_name];
         auto& world = engine_->get_world();
-        if (world.has<gfx::transform_component>(ent)) {
-            auto& tc = world.get<gfx::transform_component>(ent);
+        if (world.has<ecs::transform_component>(ent)) {
+            auto& tc = world.get<ecs::transform_component>(ent);
 
             auto prop = static_cast<asset::animation_property>(property_index_);
             if (prop == asset::animation_property::position) {
@@ -79,8 +80,8 @@ inline void create_keyframe_modal::render(
         if (prev_prop != property_index_ && state_->scene.name_to_entity.contains(track_name_)) {
             auto ent    = state_->scene.name_to_entity[track_name_];
             auto& world = engine_->get_world();
-            if (world.has<gfx::transform_component>(ent)) {
-                auto& tc  = world.get<gfx::transform_component>(ent);
+            if (world.has<ecs::transform_component>(ent)) {
+                auto& tc  = world.get<ecs::transform_component>(ent);
                 auto prop = static_cast<asset::animation_property>(property_index_);
                 if (prop == asset::animation_property::position) {
                     value_vec3f_ = tc.get_position();

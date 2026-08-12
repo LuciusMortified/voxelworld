@@ -9,20 +9,20 @@ inline player::player(
 )
     : engine_{engine}, assets_{assets} {
     auto& world         = engine_.get_world();
-    auto& transform_sys = world.system<gfx::transform_system>();
-    auto& physics_sys   = world.system<gfx::physics_system>();
+    auto& transform_sys = world.system<ecs::transform_system>();
+    auto& physics_sys   = world.system<ecs::physics_system>();
 
     root_ = world.create()
-        .with<gfx::hierarchy_component>()
-        .with<gfx::transform_component>()
-        .with<gfx::spatial_component>()
-        .with<gfx::rigid_body_component>()
-        .with<gfx::box_collider_component>()
-        .with<gfx::character_controller_component>()
-        .with<gfx::movement_intent_component>()
-        .with<gfx::world_view_component>()
-        .with<gfx::animation_player_component>()
-        .with<gfx::animation_fsm_component>()
+        .with<ecs::hierarchy_component>()
+        .with<ecs::transform_component>()
+        .with<ecs::spatial_component>()
+        .with<ecs::rigid_body_component>()
+        .with<ecs::box_collider_component>()
+        .with<ecs::character_controller_component>()
+        .with<ecs::movement_intent_component>()
+        .with<ecs::world_view_component>()
+        .with<ecs::animation_player_component>()
+        .with<ecs::animation_fsm_component>()
         .get_entity();
 
     transform_sys.modify(root_)
@@ -33,7 +33,7 @@ inline player::player(
         .set_extents({12.0f, 28.0f, 12.0f})
         .set_offset({0.0f, 2.0f, 0.0f});
 
-    world.system<gfx::spatial_system>().modify(root_).set_layer(gfx::spatial_layer::character);
+    world.system<ecs::spatial_system>().modify(root_).set_layer(ecs::spatial_layer::character);
 
     body_       = create_body_part("m_human", "body");
     head_       = create_body_part("m_human", "head");
@@ -63,7 +63,7 @@ inline auto player::update(
     const auto ent = root_;
     auto& world    = engine_.get_world();
     auto& camera   = engine_.get_camera();
-    const auto& rb = world.get<gfx::rigid_body_component>(ent);
+    const auto& rb = world.get<ecs::rigid_body_component>(ent);
 
     auto forward = camera.get_forward();
     forward.y    = 0.0f;
@@ -76,10 +76,10 @@ inline auto player::update(
     const vec3f move_dir =
         math::normalize(forward * input.move_input.x + right * input.move_input.y);
 
-    auto modifier = world.system<gfx::character_controller_system>().modify(ent);
+    auto modifier = world.system<ecs::character_controller_system>().modify(ent);
     modifier.set_move_input(move_dir);
 
-    const auto& anim_player  = world.get<gfx::animation_player_component>(ent);
+    const auto& anim_player  = world.get<ecs::animation_player_component>(ent);
     const auto& action_layer = anim_player.get_layer(1);
     is_attacking_            = action_layer.is_active();
 
@@ -119,7 +119,7 @@ inline auto player::try_place(
         return;
     }
 
-    const auto grid    = engine_.get_world().system<gfx::world_grid_system>().grid();
+    const auto grid    = engine_.get_world().system<ecs::world_grid_system>().grid();
     const auto surface = grid->get_surface_y(0, 0);
     if (!surface) {
         return;
@@ -128,7 +128,7 @@ inline auto player::try_place(
     float32 spawn_y = (static_cast<float32>(*surface) + 6.0f) * voxel_scale;
 
     engine_.get_world()
-        .system<gfx::transform_system>()
+        .system<ecs::transform_system>()
         .modify(root_)
         .set_position({0.0f, spawn_y, 0.0f});
 
@@ -144,40 +144,40 @@ inline auto player::toggle_sword() -> void {
     const auto hand_ent = hand_right_;
 
     if (sword_.is_valid()) {
-        world.system<gfx::socket_system>().modify(hand_ent).detach("hand_right");
+        world.system<ecs::socket_system>().modify(hand_ent).detach("hand_right");
         world.destroy(sword_);
-        sword_ = gfx::invalid_entity;
+        sword_ = ecs::invalid_entity;
     } else {
         sword_ = world.create()
-            .with<gfx::hierarchy_component>()
-            .with<gfx::transform_component>()
-            .with<gfx::spatial_component>()
-            .with<gfx::model_component>()
+            .with<ecs::hierarchy_component>()
+            .with<ecs::transform_component>()
+            .with<ecs::spatial_component>()
+            .with<ecs::model_component>()
             .get_entity();
 
         const auto& ent_data = assets_.get_entity("m_sword", "root");
 
-        world.system<gfx::transform_system>().modify(sword_).set_origin(ent_data.origin);
-        world.system<gfx::model_system>().modify(sword_).set_model(assets_.get_model("m_sword", "root"));
-        world.system<gfx::socket_system>().modify(hand_ent).attach("hand_right", sword_);
-        world.system<gfx::spatial_system>().modify(sword_).set_layer(gfx::spatial_layer::character);
+        world.system<ecs::transform_system>().modify(sword_).set_origin(ent_data.origin);
+        world.system<ecs::model_system>().modify(sword_).set_model(assets_.get_model("m_sword", "root"));
+        world.system<ecs::socket_system>().modify(hand_ent).attach("hand_right", sword_);
+        world.system<ecs::spatial_system>().modify(sword_).set_layer(ecs::spatial_layer::character);
     }
 }
 
 inline auto player::handle_attack() const -> void {
     engine_.get_world()
-        .system<gfx::animation_fsm_system>()
+        .system<ecs::animation_fsm_system>()
         .modify(root_)
         .fire_trigger("attack");
 }
 
 inline auto player::can_attack() const -> bool {
     const auto& anim_player =
-        engine_.get_world().get<gfx::animation_player_component>(root_);
+        engine_.get_world().get<ecs::animation_player_component>(root_);
     return sword_.is_valid() && !anim_player.get_layer(1).is_active();
 }
 
-inline auto player::get_entity() const -> gfx::entity {
+inline auto player::get_entity() const -> ecs::entity {
     return root_;
 }
 
@@ -191,23 +191,23 @@ inline auto player::is_placed() const -> bool {
 
 inline auto player::create_body_part(
     std::string_view prefab_name, std::string_view part_name
-) const -> gfx::entity {
+) const -> ecs::entity {
     auto& world         = engine_.get_world();
-    auto& hierarchy_sys = world.system<gfx::hierarchy_system>();
-    auto& transform_sys = world.system<gfx::transform_system>();
-    auto& model_sys     = world.system<gfx::model_system>();
-    auto& anim_sys      = world.system<gfx::animation_system>();
+    auto& hierarchy_sys = world.system<ecs::hierarchy_system>();
+    auto& transform_sys = world.system<ecs::transform_system>();
+    auto& model_sys     = world.system<ecs::model_system>();
+    auto& anim_sys      = world.system<ecs::animation_system>();
 
     auto modifier = world.create()
-        .with<gfx::hierarchy_component>()
-        .with<gfx::transform_component>()
-        .with<gfx::spatial_component>()
-        .with<gfx::model_component>()
-        .with<gfx::animation_target_component>();
+        .with<ecs::hierarchy_component>()
+        .with<ecs::transform_component>()
+        .with<ecs::spatial_component>()
+        .with<ecs::model_component>()
+        .with<ecs::animation_target_component>();
 
     const auto& ent_data = assets_.get_entity(prefab_name, part_name);
     if (ent_data.has_sockets) {
-        modifier.with<gfx::socket_component>();
+        modifier.with<ecs::socket_component>();
     }
 
     const auto ent = modifier.get_entity();
@@ -230,7 +230,7 @@ inline auto player::create_body_part(
     target_mod.set_rest_transform(rest);
 
     if (ent_data.has_sockets) {
-        auto& socket_sys = world.system<gfx::socket_system>();
+        auto& socket_sys = world.system<ecs::socket_system>();
         for (const auto& sp : ent_data.sockets) {
             socket_sys.modify(ent).add_socket(
                 sp.name, sp.position, math::euler_to_quat(sp.rotation), sp.scale
@@ -246,25 +246,25 @@ inline auto player::setup_animation_fsm() const -> void {
     auto& world    = engine_.get_world();
 
     auto is_walk = [&, ent]() -> bool {
-        const auto& move = world.get<gfx::movement_intent_component>(ent);
+        const auto& move = world.get<ecs::movement_intent_component>(ent);
         const auto& v    = move.get_wish_velocity();
         return v.x != 0.0f || v.z != 0.0f;
     };
     auto is_idle = [&, ent]() -> bool {
-        const auto& move = world.get<gfx::movement_intent_component>(ent);
+        const auto& move = world.get<ecs::movement_intent_component>(ent);
         const auto& v    = move.get_wish_velocity();
         return v.x == 0.0f && v.z == 0.0f;
     };
     auto is_jump_left = [&, ent]() -> bool {
-        const auto& rb = world.get<gfx::rigid_body_component>(ent);
+        const auto& rb = world.get<ecs::rigid_body_component>(ent);
         return jump_counter_ == 0 && !rb.is_grounded();
     };
     auto is_jump_right = [&, ent]() -> bool {
-        const auto& rb = world.get<gfx::rigid_body_component>(ent);
+        const auto& rb = world.get<ecs::rigid_body_component>(ent);
         return jump_counter_ == 1 && !rb.is_grounded();
     };
     auto is_grounded = [&, ent]() -> bool {
-        const auto& rb = world.get<gfx::rigid_body_component>(ent);
+        const auto& rb = world.get<ecs::rigid_body_component>(ent);
         return rb.is_grounded();
     };
 
@@ -351,7 +351,7 @@ inline auto player::setup_animation_fsm() const -> void {
 
     fsm_movement.set_entry_state("idle");
 
-    world.system<gfx::animation_fsm_system>().modify(ent).add_machine(0, std::move(fsm_movement));
+    world.system<ecs::animation_fsm_system>().modify(ent).add_machine(0, std::move(fsm_movement));
 
     asset::animation_fsm fsm_action;
 
@@ -387,7 +387,7 @@ inline auto player::setup_animation_fsm() const -> void {
 
     fsm_action.set_entry_state("none");
 
-    world.system<gfx::animation_fsm_system>().modify(ent).add_machine(1, std::move(fsm_action));
+    world.system<ecs::animation_fsm_system>().modify(ent).add_machine(1, std::move(fsm_action));
 }
 
 }  // namespace vw::arena

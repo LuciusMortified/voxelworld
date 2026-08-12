@@ -1,3 +1,4 @@
+#include <imgui.h>
 #include <vw/core.h>
 #include <vw/gfx.h>
 
@@ -93,8 +94,8 @@ private:
     void create_flower_model() {
         auto& world            = get_engine().get_world();
         auto& model_reg = world.resource<asset::model_registry>();
-        auto& transform_sys = world.system<gfx::transform_system>();
-        auto& model_sys = world.system<gfx::model_system>();
+        auto& transform_sys = world.system<ecs::transform_system>();
+        auto& model_sys = world.system<ecs::model_system>();
 
         // Создаем модель и регистрируем ее
         model_ = model_reg.create("flower", 3, 6, 3);
@@ -111,10 +112,10 @@ private:
         model_->set_voxel(2, 4, 1, voxel{blocks::white});
 
         flower_ = world.create()
-            .with<gfx::transform_component>()
-            .with<gfx::model_component>()
-            .with<gfx::hierarchy_component>()
-            .with<gfx::spatial_component>()
+            .with<ecs::transform_component>()
+            .with<ecs::model_component>()
+            .with<ecs::hierarchy_component>()
+            .with<ecs::spatial_component>()
             .get_entity();
 
         transform_sys.modify(flower_)
@@ -138,18 +139,18 @@ private:
         }
 
         auto& world            = get_engine().get_world();
-        auto& transform_sys = world.system<gfx::transform_system>();
+        auto& transform_sys = world.system<ecs::transform_system>();
         transform_sys.modify(flower_).set_rotation(math::euler_to_quat({0.0f, object_rotation_, 0.0f}));
 
-        if (world.has<gfx::transform_component>(flower_)) {
+        if (world.has<ecs::transform_component>(flower_)) {
             const auto matrix =
-                world.get<gfx::transform_component>(flower_)
+                world.get<ecs::transform_component>(flower_)
                     .get_world_matrix();
             get_engine().get_renderer().draw_grid(matrix, 1.f, 3, 3, colors::white);
         }
 
 #if 0
-        auto transform_view = world.view<gfx::transform_component>();
+        auto transform_view = world.view<ecs::transform_component>();
         for (const auto& [entity, transform_comp] : transform_view) {
             transform_sys.modify(entity).set_rotation(math::euler_to_quat({0.0f, object_rotation_, 0.0f}));
         }
@@ -183,7 +184,7 @@ private:
             auto ray    = camera.screen_to_world_ray(window.get_cursor_pos(), window.get_size());
             select_ray_ = ray;
 
-            auto voxel_hit = world.system<gfx::spatial_system>().voxel_ray_cast(ray, selected_entities_);
+            auto voxel_hit = world.system<ecs::spatial_system>().voxel_ray_cast(ray, selected_entities_);
             if (voxel_hit.has_value()) {
                 selected_entity_    = voxel_hit->ent;
                 selected_voxel_     = voxel_hit->voxel_pos;
@@ -200,7 +201,7 @@ private:
                     selected_empty_pos_.z
                 );
             } else {
-                selected_entity_    = gfx::invalid_entity;
+                selected_entity_    = ecs::invalid_entity;
                 selected_voxel_     = vec3i{-1, -1, -1};
                 selected_empty_pos_ = vec3i{-1, -1, -1};
                 log::info("No voxel hit");
@@ -213,14 +214,14 @@ private:
 
         const bool can_be_rendered =  //
             selected_entity_.is_valid() &&
-            world.has<gfx::transform_component>(selected_entity_);
+            world.has<ecs::transform_component>(selected_entity_);
         if (!can_be_rendered) {
             return;
         }
 
         auto& renderer = get_engine().get_renderer();
         const auto& transform_matrix =
-            world.get<gfx::transform_component>(selected_entity_).get_world_matrix();
+            world.get<ecs::transform_component>(selected_entity_).get_world_matrix();
 
         auto voxel_local_pos = vec3f{
             static_cast<float>(selected_voxel_.x),
@@ -254,10 +255,10 @@ private:
     float object_rotation_{};
     float object_rotation_speed_{};
 
-    gfx::entity flower_ = gfx::invalid_entity;
+    ecs::entity flower_ = ecs::invalid_entity;
 
-    std::vector<gfx::entity> selected_entities_;
-    gfx::entity selected_entity_ = gfx::invalid_entity;
+    std::vector<ecs::entity> selected_entities_;
+    ecs::entity selected_entity_ = ecs::invalid_entity;
     vec3i selected_voxel_{-1, -1, -1};
     vec3i selected_empty_pos_{-1, -1, -1};
     spatial::ray select_ray_{vec3f{}, vec3f{}};

@@ -14,10 +14,10 @@ inline void expand_model_operation::execute() {
 
     auto& world        = engine_->get_world();
     auto& model_reg = world.resource<asset::model_registry>();
-    auto& model_sys = world.system<gfx::model_system>();
-    auto& transform_sys = world.system<gfx::transform_system>();
+    auto& model_sys = world.system<ecs::model_system>();
+    auto& transform_sys = world.system<ecs::transform_system>();
 
-    const auto& model_comp = world.get<gfx::model_component>(ent);
+    const auto& model_comp = world.get<ecs::model_component>(ent);
     const auto model = model_comp.get_model();
 
     const auto size = model->size();
@@ -50,7 +50,7 @@ inline void expand_model_operation::execute() {
 
     model_sys.modify(ent).set_model(new_model);
 
-    auto& transform_comp = world.get<gfx::transform_component>(ent);
+    auto& transform_comp = world.get<ecs::transform_component>(ent);
     auto new_origin = transform_comp.get_origin() - vec3f{
         static_cast<float>(zeroed_dir.x),
         static_cast<float>(zeroed_dir.y),
@@ -65,10 +65,10 @@ inline void expand_model_operation::undo() {
 
     auto& world        = engine_->get_world();
     auto& model_reg = world.resource<asset::model_registry>();
-    auto& model_sys = world.system<gfx::model_system>();
-    auto& transform_sys = world.system<gfx::transform_system>();
+    auto& model_sys = world.system<ecs::model_system>();
+    auto& transform_sys = world.system<ecs::transform_system>();
 
-    auto& model_comp = world.get<gfx::model_component>(ent);
+    auto& model_comp = world.get<ecs::model_component>(ent);
     auto model = model_comp.get_model();
 
     auto size = model->size();
@@ -111,7 +111,7 @@ inline void expand_model_operation::undo() {
 
     model_sys.modify(ent).set_model(new_model);
 
-    auto& transform_comp = world.get<gfx::transform_component>(ent);
+    auto& transform_comp = world.get<ecs::transform_component>(ent);
     auto new_origin = transform_comp.get_origin() + vec3f{
         static_cast<float>(zeroed_dir.x),
         static_cast<float>(zeroed_dir.y),

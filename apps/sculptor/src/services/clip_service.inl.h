@@ -161,8 +161,8 @@ inline void clip_service::save_transforms() {
     state_->anim.saved_transforms.clear();
 
     for (const auto& [name, ent] : state_->scene.name_to_entity) {
-        if (world.has<gfx::transform_component>(ent)) {
-            auto& tc                             = world.get<gfx::transform_component>(ent);
+        if (world.has<ecs::transform_component>(ent)) {
+            auto& tc                             = world.get<ecs::transform_component>(ent);
             state_->anim.saved_transforms[name] = tc.get_transform();
         }
     }
@@ -176,12 +176,12 @@ inline void clip_service::restore_transforms() {
     }
 
     auto& world            = engine_->get_world();
-    auto& transform_sys = world.system<gfx::transform_system>();
+    auto& transform_sys = world.system<ecs::transform_system>();
 
     for (const auto& [name, t] : state_->anim.saved_transforms) {
         if (state_->scene.name_to_entity.contains(name)) {
             const auto ent = state_->scene.name_to_entity[name];
-            if (world.has<gfx::transform_component>(ent)) {
+            if (world.has<ecs::transform_component>(ent)) {
                 transform_sys.modify(ent).set_transform(t);
             }
         }
@@ -196,11 +196,11 @@ inline void clip_service::reset_all() {
 
     if (state_->anim.has_saved_transforms) {
         auto& world            = engine_->get_world();
-        auto& transform_sys = world.system<gfx::transform_system>();
+        auto& transform_sys = world.system<ecs::transform_system>();
         for (const auto& [name, t] : state_->anim.saved_transforms) {
             if (state_->scene.name_to_entity.contains(name)) {
                 const auto ent = state_->scene.name_to_entity[name];
-                if (world.has<gfx::transform_component>(ent)) {
+                if (world.has<ecs::transform_component>(ent)) {
                     transform_sys.modify(ent).set_transform(t);
                 }
             }
@@ -220,15 +220,15 @@ inline void clip_service::stop_layer_for_clip(
 
     auto root   = state_->scene.name_to_entity[state_->scene.root_name];
     auto& world = engine_->get_world();
-    if (!world.has<gfx::animation_player_component>(root)) {
+    if (!world.has<ecs::animation_player_component>(root)) {
         return;
     }
 
     const auto layer_idx = state_->anim.get_layer_for_clip(clip_name);
-    const auto& player   = world.get<gfx::animation_player_component>(root);
+    const auto& player   = world.get<ecs::animation_player_component>(root);
     if (player.has_layer(layer_idx) && player.get_layer(layer_idx).clip &&
         player.get_layer(layer_idx).clip->get_name() == clip_name) {
-        world.system<gfx::animation_system>().modify_player(root).layer(layer_idx).stop();
+        world.system<ecs::animation_system>().modify_player(root).layer(layer_idx).stop();
     }
 }
 
@@ -240,12 +240,12 @@ inline void clip_service::stop_all_layers() {
 
     const auto root = state_->scene.name_to_entity[state_->scene.root_name];
     auto& world     = engine_->get_world();
-    if (!world.has<gfx::animation_player_component>(root)) {
+    if (!world.has<ecs::animation_player_component>(root)) {
         return;
     }
 
-    const auto& player = world.get<gfx::animation_player_component>(root);
-    auto& anim_sys     = world.system<gfx::animation_system>();
+    const auto& player = world.get<ecs::animation_player_component>(root);
+    auto& anim_sys     = world.system<ecs::animation_system>();
     for (size_t i = 0; i < player.layer_count(); ++i) {
         if (player.has_layer(i)) {
             anim_sys.modify_player(root).layer(i).clear();
