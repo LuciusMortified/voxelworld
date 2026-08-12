@@ -1,6 +1,10 @@
 #include <sculptor_version.h>
 
-#include "app/app.h"
+import std;
+
+import vw.core;
+import vw.gfx;
+import vw.sculptor;
 
 auto main() -> int {
     try {

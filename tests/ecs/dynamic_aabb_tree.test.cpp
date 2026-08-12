@@ -1,6 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <vw/ecs/spatial/dynamic_aabb_tree.h>
+import std;
+
+import vw.core;
+import vw.ecs;
+import vw.world;
 
 using namespace vw;
 using namespace vw::ecs;

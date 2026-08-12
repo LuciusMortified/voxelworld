@@ -1,19 +1,6 @@
-module;
-
-#include <algorithm>
-#include <expected>
-#include <functional>
-#include <limits>
-#include <memory>
-#include <optional>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <unordered_set>
-#include <variant>
-#include <vector>
-
 export module vw.world:anim;
+
+import std;
 
 import vw.core;
 

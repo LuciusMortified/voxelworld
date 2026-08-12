@@ -26,8 +26,8 @@ target_link_libraries(core_tests PRIVATE
     Catch2::Catch2WithMain
 )
 
-target_include_directories(core_tests PRIVATE ${CMAKE_SOURCE_DIR}/engine/include)
 target_compile_features(core_tests PRIVATE cxx_std_23)
+vw_use_std_module(core_tests)
 
 catch_discover_tests(core_tests)
 
@@ -48,6 +48,7 @@ target_link_libraries(ecs_tests PRIVATE
 )
 
 target_compile_features(ecs_tests PRIVATE cxx_std_23)
+vw_use_std_module(ecs_tests)
 
 catch_discover_tests(ecs_tests)
 
@@ -61,9 +62,11 @@ target_link_libraries(world_tests PRIVATE
 )
 
 target_compile_features(world_tests PRIVATE cxx_std_23)
+vw_use_std_module(world_tests)
 
 catch_discover_tests(world_tests)
 
 add_executable(view_bench ecs/view_bench.cpp)
 target_link_libraries(view_bench PRIVATE vw_core vw_ecs)
 target_compile_features(view_bench PRIVATE cxx_std_23)
+vw_use_std_module(view_bench)

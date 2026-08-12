@@ -1,12 +1,6 @@
-module;
-
-#include <concepts>
-#include <cstddef>
-#include <functional>
-#include <map>
-#include <type_traits>
-
 export module vw.platform:event;
+
+import std;
 
 import vw.core;
 import :input;

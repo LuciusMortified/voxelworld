@@ -4,7 +4,6 @@ target_sources(vw_world
     PUBLIC
         FILE_SET CXX_MODULES BASE_DIRS src FILES
             src/world.cppm
-            src/logging.cppm
             src/model.cppm
             src/anim.cppm
             src/serial.cppm
@@ -36,7 +35,6 @@ target_sources(vw_world
         src/world_grid.cpp
 )
 
-target_include_directories(vw_world PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 target_link_libraries(vw_world PUBLIC vw_core vw_ecs)
 target_compile_features(vw_world PUBLIC cxx_std_23)
 vw_use_std_module(vw_world)

@@ -1,7 +1,8 @@
-#include <vw/core.h>
-#include <vw/gfx.h>
+import std;
 
-#include "app/arena_app.h"
+import vw.core;
+import vw.gfx;
+import vw.arena;
 
 auto main() -> int {
     try {

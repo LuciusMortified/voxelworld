@@ -1,13 +1,6 @@
-module;
-
-#include <array>
-#include <memory>
-#include <optional>
-#include <span>
-#include <string>
-#include <vector>
-
 export module vw.gfx:render;
+
+import std;
 
 import vw.core;
 import vw.ecs;

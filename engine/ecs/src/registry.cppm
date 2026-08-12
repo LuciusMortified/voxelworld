@@ -1,17 +1,6 @@
-module;
-
-#include <algorithm>
-#include <array>
-#include <cstddef>
-#include <memory>
-#include <span>
-#include <tuple>
-#include <type_traits>
-#include <unordered_set>
-#include <utility>
-#include <vector>
-
 export module vw.ecs:registry;
+
+import std;
 
 import vw.core;
 import :entity;

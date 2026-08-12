@@ -1,9 +1,6 @@
-module;
-
-#include <string_view>
-#include <vector>
-
 export module vw.platform:window;
+
+import std;
 
 import vw.core;
 import :event;

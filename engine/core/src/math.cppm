@@ -1,9 +1,6 @@
-module;
-
-#include <expected>
-#include <limits>
-
 export module vw.core:math;
+
+import std;
 
 import :types;
 import :vector;

@@ -1,10 +1,6 @@
-module;
-
-#include <array>
-#include <cstddef>
-#include <cstring>
-
 export module vw.core:matrix;
+
+import std;
 
 import :types;
 import :vector;

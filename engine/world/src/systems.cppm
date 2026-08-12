@@ -1,18 +1,6 @@
-module;
-
-#include <concepts>
-#include <deque>
-#include <memory>
-#include <optional>
-#include <queue>
-#include <span>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
-
 export module vw.world:systems;
+
+import std;
 
 import vw.core;
 import vw.ecs;

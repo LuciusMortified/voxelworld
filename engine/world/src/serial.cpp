@@ -2,7 +2,6 @@ module vw.world;
 
 
 import std;
-import :logging;
 
 
 namespace vw::asset {

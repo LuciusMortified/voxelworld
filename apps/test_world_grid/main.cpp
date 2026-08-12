@@ -1,12 +1,12 @@
 #include <imgui.h>
-#include <vw/core.h>
-#include <vw/gfx.h>
 
-#include <algorithm>
+import std;
 
-#include "vw/ecs/systems/world_grid/chunk_loader.h"
-#include "vw/ecs/systems/world_grid/generators/perlin_terrain_generator.h"
-#include "vw/ecs/systems/world_grid/world_grid.h"
+import vw.core;
+import vw.ecs;
+import vw.world;
+import vw.platform;
+import vw.gfx;
 
 using namespace vw;
 

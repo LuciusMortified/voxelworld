@@ -5,8 +5,8 @@
 
 ## Architecture
 
-Движок модульный: `vw.core`, `vw.ecs`, `vw.world`, `vw.platform` и `vw.gfx` —
-модульные статические библиотеки. Приложения ещё ходят через шимы-заголовки.
+Всё — именованные модули C++: движок из пяти библиотек плюс приложения
+`vw.sculptor` и `vw.arena`. Заголовков движка не существует, только `import`.
 
 - **vw.core** (`engine/core/src/`, таргет `vw_core`) — типы, math, transform,
   лог, блоки, геометрия `vw::spatial`
@@ -18,10 +18,10 @@
   события; GLFW живёт ровно в одном `.cpp`
 - **vw.gfx** (`engine/gfx/src/`, таргет `vw_gfx`) — рендер на `vk::` через
   `import vulkan`, камера, ImGui, debug; C API Vulkan в исходниках нет
-- **Apps** — `apps/sculptor/`, `apps/test_*`, `apps/arena/`
+- **Apps** — `apps/sculptor/` (модуль `vw.sculptor`, партиции `:state`,
+  `:operations`, `:services`, `:tools`, `:ui`, `:app`), `apps/arena/`
+  (`vw.arena`), `apps/test_*` (по одному `main.cpp`)
 - **Shaders** — GLSL → SPIR-V (`shaders/`)
-
-Остальное в `engine/include/` — шимы к модулям, удаляются в M6.
 
 Пространства имён: `vw` (core), `vw::spatial` (геометрия), `vw::asset` (данные
 ассетов), `vw::ecs` (реестр, мир, компоненты, системы), `vw::plat` (окно и ввод),
@@ -47,6 +47,8 @@ Undo/redo в Sculptor — command-паттерн через `base_operation`.
 - ALWAYS запускай тесты после изменений в `engine/`
 - NEVER форвард-объявляй сущности модулей вне их модуля — только импортируй
 - NEVER исключения в горячих путях
+- NEVER `#include` своих заголовков и `.inl.h` — их больше нет, только `import`
+- NEVER текстовые std-заголовки: `import std;` (макросы — исключение, см. `cpp-style`)
 - NEVER коммить и создавать ветки без прямой просьбы пользователя
 
 ## Skills

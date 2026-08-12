@@ -5,7 +5,6 @@ import vw.core;
 import vw.ecs;
 import vw.world;
 import vw.platform;
-import :logging;
 
 namespace vw::gfx {
 namespace {

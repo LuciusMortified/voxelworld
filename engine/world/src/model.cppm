@@ -1,17 +1,6 @@
-module;
-
-#include <array>
-#include <functional>
-#include <limits>
-#include <memory>
-#include <mutex>
-#include <span>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <vector>
-
 export module vw.world:model;
+
+import std;
 
 import vw.core;
 

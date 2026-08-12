@@ -1,8 +1,6 @@
-module;
-
-#include <array>
-
 export module vw.core:blocks;
+
+import std;
 
 import :types;
 import :color;

@@ -8,7 +8,6 @@ module;
 module vw.platform;
 
 import std;
-import :logging;
 
 namespace vw::plat {
 namespace {

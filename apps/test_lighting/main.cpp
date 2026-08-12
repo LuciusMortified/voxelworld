@@ -1,9 +1,12 @@
 #include <imgui.h>
-#include <cmath>
-#include <vector>
 
-#include <vw/core.h>
-#include <vw/gfx.h>
+import std;
+
+import vw.core;
+import vw.ecs;
+import vw.world;
+import vw.platform;
+import vw.gfx;
 
 using namespace vw;
 

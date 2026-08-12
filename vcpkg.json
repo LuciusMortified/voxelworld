@@ -2,7 +2,10 @@
   "name": "voxel-world",
   "version-string": "0.0.1",
   "dependencies": [
-    "catch2"
+    {
+      "name": "catch2",
+      "version>=": "3.15.3"
+    }
   ],
   "default-features": [
     "gfx"
@@ -11,15 +14,24 @@
     "gfx": {
       "description": "Window, renderer and debug UI dependencies",
       "dependencies": [
-        "glfw3",
+        {
+          "name": "glfw3",
+          "version>=": "3.4"
+        },
         {
           "name": "imgui",
+          "version>=": "1.92.8",
           "features": [
             "glfw-binding",
             "vulkan-binding"
           ]
+        },
+        {
+          "name": "vulkan-headers",
+          "version>=": "1.4.350.1"
         }
       ]
     }
-  }
+  },
+  "builtin-baseline": "39344dff01c5a5a0134caf2624cdd492f05d30ea"
 }

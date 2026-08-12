@@ -3,7 +3,6 @@ module vw.gfx:vk;
 import std;
 import vulkan;
 import vw.core;
-import :logging;
 
 // An implementation partition: `import vulkan` stops here and never reaches an
 // importer of vw.gfx. Holds the fatal half of the error policy, so every

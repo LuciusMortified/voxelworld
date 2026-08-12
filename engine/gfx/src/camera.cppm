@@ -1,11 +1,6 @@
-module;
-
-#include <memory>
-#include <optional>
-#include <string>
-#include <vector>
-
 export module vw.gfx:camera;
+
+import std;
 
 import vw.core;
 import vw.ecs;

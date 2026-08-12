@@ -1,17 +1,6 @@
-module;
-
-#include <expected>
-#include <filesystem>
-#include <optional>
-#include <string>
-#include <tuple>
-#include <type_traits>
-#include <unordered_map>
-#include <unordered_set>
-#include <utility>
-#include <vector>
-
 export module vw.world;
+
+import std;
 
 export import :model;
 export import :anim;

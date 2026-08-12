@@ -1,11 +1,6 @@
-module;
-
-#include <chrono>
-#include <memory>
-#include <unordered_set>
-#include <vector>
-
 export module vw.gfx:renderer;
+
+import std;
 
 import vw.core;
 import vw.ecs;

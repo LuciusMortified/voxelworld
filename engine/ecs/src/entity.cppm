@@ -1,11 +1,6 @@
-module;
-
-#include <cstddef>
-#include <functional>
-#include <limits>
-#include <vector>
-
 export module vw.ecs:entity;
+
+import std;
 
 import vw.core;
 

@@ -1,9 +1,6 @@
-module;
-
-#include <cstddef>
-#include <functional>
-
 export module vw.core:vector;
+
+import std;
 
 import :types;
 

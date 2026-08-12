@@ -2,108 +2,83 @@ name: CI
 
 on: push
 
+# The build is Windows-only by construction: `import std` needs a std module,
+# and the Clang half of the matrix builds it from MSVC's own std.ixx (see
+# cmake/vw_std_module.cmake). A Linux or macOS job cannot configure at all.
 jobs:
-  test-windows:
+  build:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler: [msvc, clang]
+        config: [Debug, Release]
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Vulkan SDK
+        uses: humbletim/install-vulkan-sdk@v1.2
+        with:
+          version: latest
+          cache: true
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+
+      - name: Configure
+        run: >
+          cmake -B build -S . -G Ninja
+          -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+          ${{ matrix.compiler == 'clang' && '-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang++' || '' }}
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  headless:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install Vulkan SDK
-        uses: humbletim/install-vulkan-sdk@v1.2
-        with:
-          version: latest
-          cache: true
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
 
-      - name: Configure CMake
+      # No Vulkan SDK on purpose: vw.core, vw.ecs and vw.world must build and
+      # test on a machine that has never seen a GPU.
+      - name: Configure without a GPU
         run: >
-          cmake -B build -S .
+          cmake -B build-headless -S . -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DVW_BUILD_GFX=OFF -DVW_BUILD_APPS=OFF
+          -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
-      - name: Build tests
-        run: cmake --build build --config Release --target core_tests ecs_tests
+      - name: Build
+        run: cmake --build build-headless
 
-      - name: Run tests
-        run: ctest --test-dir build --build-config Release --output-on-failure
+      - name: Test
+        run: ctest --test-dir build-headless --output-on-failure
 
-      - name: Build sculptor
-        run: cmake --build build --config Release --target sculptor
-
-  test-ubuntu:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install gcc 13
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-13 g++-13
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
-          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
-
-      - name: Install X11 and GLFW dependencies
-        run: |
-          sudo apt-get install -y \
-            libx11-dev \
-            libxrandr-dev \
-            libxinerama-dev \
-            libxcursor-dev \
-            libxi-dev \
-            libgl1-mesa-dev
-
-      - name: Install Vulkan SDK
-        uses: humbletim/install-vulkan-sdk@v1.2
-        with:
-          version: latest
-          cache: true
-
-      - name: Setup cmake
-        uses: lukka/get-cmake@latest
-
-      - name: Setup and run vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          runVcpkgInstall: true
-
-      - name: Configure CMake
-        run: >
-          cmake -B build -S .
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-
-      - name: Build tests
-        run: cmake --build build --config Release --target core_tests ecs_tests
-
-      - name: Run tests
-        run: ctest --test-dir build --build-config Release --output-on-failure
-
-      - name: Build sculptor
-        run: cmake --build build --config Release --target sculptor
-
-  test-macos:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Install Vulkan SDK
-        run: brew install vulkan-loader vulkan-headers shaderc
-
-      - name: Setup vcpkg
-        uses: lukka/run-vcpkg@v11
-        with:
-          runVcpkgInstall: true
-
-      - name: Configure CMake
-        run: >
-          cmake -B build -S .
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-
-      - name: Build tests
-        run: cmake --build build --config Release --target core_tests ecs_tests
-
-      - name: Run tests
-        run: ctest --test-dir build --build-config Release --output-on-failure
-
-      - name: Build sculptor
-        run: cmake --build build --config Release --target sculptor
+      - name: Interface hygiene
+        run: python scripts/lint_modules.py

@@ -1,18 +1,6 @@
-module;
-
-#include <expected>
-#include <filesystem>
-#include <fstream>
-#include <memory>
-#include <optional>
-#include <sstream>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <utility>
-#include <vector>
-
 export module vw.world:serial;
+
+import std;
 
 import vw.core;
 import :anim;

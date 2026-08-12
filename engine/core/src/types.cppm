@@ -1,8 +1,6 @@
-module;
-
-#include <cstdint>
-
 export module vw.core:types;
+
+import std;
 
 export namespace vw {
 

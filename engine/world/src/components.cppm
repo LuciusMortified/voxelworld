@@ -1,11 +1,6 @@
-module;
-
-#include <algorithm>
-#include <memory>
-#include <string>
-#include <vector>
-
 export module vw.world:components;
+
+import std;
 
 import vw.core;
 import vw.ecs;

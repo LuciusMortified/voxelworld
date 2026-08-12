@@ -10,7 +10,6 @@ target_sources(vw_gfx
     PUBLIC
         FILE_SET CXX_MODULES BASE_DIRS src FILES
             src/gfx.cppm
-            src/logging.cppm
             src/vk.cppm
             src/camera.cppm
             src/resource.cppm
@@ -38,7 +37,6 @@ target_sources(vw_gfx
         src/engine.cpp
 )
 
-target_include_directories(vw_gfx PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../include)
 target_link_libraries(vw_gfx
     PUBLIC vw_core vw_ecs vw_world vw_platform VulkanHppModule
     PRIVATE glfw imgui::imgui)

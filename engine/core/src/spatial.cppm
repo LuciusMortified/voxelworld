@@ -1,9 +1,6 @@
-module;
-
-#include <algorithm>
-#include <cmath>
-
 export module vw.core:spatial;
+
+import std;
 
 import :types;
 import :vector;

@@ -1,11 +1,6 @@
-module;
-
-#include <memory>
-#include <optional>
-#include <unordered_map>
-#include <vector>
-
 export module vw.world:grid;
+
+import std;
 
 import vw.core;
 import vw.ecs;

@@ -1,17 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include <vw/asset/animation/animation_layer.h>
-#include <vw/asset/animation/animation_types.h>
-#include <vw/ecs/components/animation_player_component.h>
-#include <vw/ecs/components/animation_target_component.h>
-#include <vw/ecs/components/hierarchy_component.h>
-#include <vw/ecs/components/spatial_component.h>
-#include <vw/ecs/components/transform_component.h>
-#include <vw/ecs/systems/animation_system.h>
-#include <vw/ecs/systems/hierarchy_system.h>
-#include <vw/ecs/systems/spatial_system.h>
-#include <vw/ecs/systems/transform_system.h>
-#include <vw/ecs/world.h>
+import std;
+
+import vw.core;
+import vw.ecs;
+import vw.world;
 
 using namespace vw;
 using namespace vw::ecs;

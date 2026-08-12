@@ -1,8 +1,6 @@
-module;
-
-#include <array>
-
 export module vw.core:color;
+
+import std;
 
 import :types;
 

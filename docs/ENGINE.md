@@ -1,323 +1,105 @@
-# Архитектура Воксельного Движка на Vulkan
-
-## Обзор
-
-Воксельный движок построен на модульной архитектуре с четким разделением ответственности между компонентами. Использует современный C++23 и Vulkan API для высокопроизводительного рендеринга. Движок реализован как header-only библиотека с собственной математической библиотекой (vw::vec3, vw::mat4 и др.).
-
-## Основные компоненты
-
-### 1. Engine (engine.h, engine.inl.h)
-
-- **Назначение**: Главный координатор всех подсистем
-- **Ответственность**:
-  - Инициализация всех подсистем
-  - Главный игровой цикл
-  - Управление временем и обновлениями
-
-### 2. Window (window.h, window.inl.h)
-
-- **Назначение**: Управление окном и GLFW
-- **Ответственность**:
-  - Создание и управление окном
-  - Обработка событий ввода
-  - Создание Vulkan surface
-  - Получение расширений для Vulkan
-
-### 3. Vulkan Context (vulkan_context.h, vulkan_context.inl.h)
-
-- **Назначение**: Инициализация и управление Vulkan
-- **Ответственность**:
-  - Создание Vulkan instance
-  - Выбор физического устройства
-  - Создание логического устройства
-  - Управление очередями команд
-  - Создание command pool
-
-### 4. Renderer (renderer.h, renderer.inl.h)
-
-- **Назначение**: Главный рендерер
-- **Ответственность**:
-  - Создание swapchain
-  - Управление render pass
-  - Создание graphics pipeline
-  - Рендеринг кадров
-  - Синхронизация GPU/CPU
-
-### 5. Camera (camera.h, camera.inl.h)
-
-- **Назначение**: Система камеры
-- **Ответственность**:
-  - Управление позицией и ориентацией
-  - Генерация матриц view и projection
-  - Обработка пользовательского ввода
-
-### 6. World (world.h, world.inl.h)
-
-- **Назначение**: Представление игрового мира
-- **Ответственность**:
-  - Хранение воксельных моделей
-  - Управление позициями объектов
-  - Предоставление данных для рендеринга
-
-### 7. Model (model.h, model.inl.h)
-
-- **Назначение**: Воксельная модель
-- **Ответственность**:
-  - Хранение 3D массива вокселей
-  - Операции с вокселями (установка/получение)
-
-### 8. Mesh (mesh.h, mesh.inl.h)
-
-- **Назначение**: Геометрическое представление для GPU
-- **Ответственность**:
-  - Хранение вершин и индексов
-  - Управление GPU буферами
-  - Привязка к command buffer
-  - Генерация мешей из воксельных моделей
-
-### 9. Buffer (buffer.h, buffer.inl.h)
-
-- **Назначение**: Управление Vulkan буферами
-- **Ответственность**:
-  - Создание различных типов буферов
-  - Копирование данных в GPU память
-  - Специализированные классы для vertex/index/uniform буферов
-
-### 10. Shader (shader.h, shader.inl.h)
-
-- **Назначение**: Управление шейдерами
-- **Ответственность**:
-  - Загрузка SPIR-V шейдеров
-  - Создание shader modules
-  - Управление шейдерными этапами
-
-## Рендер Пайплайн
-
-### Поток данных
-
-```text
-Voxel Model → Mesh Generator → Vertices + Indices → GPU Buffers → Vulkan Pipeline → Framebuffer
-```
-
-### Этапы рендеринга
-
-1. **Begin Frame**: Получение изображения из swapchain
-2. **Update Uniforms**: Обновление матриц и параметров освещения
-3. **Bind Pipeline**: Привязка graphics pipeline
-4. **Render World**:
-   - Для каждой модели в мире:
-     - Генерация или получение меша
-     - Обновление model матрицы
-     - Рендеринг меша
-5. **End Frame**: Презентация кадра
-
-### Графический конвейер Vulkan
-
-```text
-Vertex Input → Vertex Shader → Primitive Assembly → Rasterization → Fragment Shader → Color Blending → Framebuffer
-```
-
-## Шейдеры
-
-### Vertex Shader (voxel.vert)
-
-- **Входные данные**: Position, Normal, Color (упакованный)
-- **Uniform данные**: Model/View/Projection матрицы, позиция камеры, параметры освещения
-- **Выходные данные**: Трансформированная позиция, мировая позиция, нормаль, цвет
-- **Функции**: Трансформация вершин, распаковка цветов, передача данных освещения
-
-### Fragment Shader (voxel.frag)
-
-- **Входные данные**: Позиция фрагмента, нормаль, цвет
-- **Освещение**: Модель Фонга (ambient + diffuse + specular)
-- **Эффекты**: Туман на основе расстояния
-- **Выходные данные**: Финальный цвет пикселя
-
-### Shadow Shader (shadow.vert/shadow.frag)
-
-- **Назначение**: Рендеринг каскадных карт теней (Cascaded Shadow Maps)
-- **Каскады**: 4 уровня для разных дистанций
-- **Разрешение**: 4192×4192 на каскад
-
-### Debug Shader (debug.vert/debug.frag)
-
-- **Назначение**: Отладочная визуализация (AABB, лучи и т.д.)
-
-## Типы данных
-
-### Vertex Structure
-
-```cpp
-struct vertex {
-    vec3f position;  // 12 bytes
-    vec3f normal;    // 12 bytes
-    uint32 color;    // 4 bytes (RGBA packed)
-}; // Total: 28 bytes
-```
-
-### Uniform Buffer Object
-
-```cpp
-struct uniform_buffer_object {
-    mat4 model;      // 64 bytes
-    mat4 view;       // 64 bytes
-    mat4 projection; // 64 bytes
-    vec3f view_pos;  // 12 bytes + 4 padding
-    vec3f light_pos; // 12 bytes + 4 padding
-    vec3f light_color; // 12 bytes + 4 padding
-}; // Total: 240 bytes
-```
-
-## Инициализация и жизненный цикл
-
-### Инициализация движка
-
-```mermaid
-graph LR
-    A[Create Window] --> B[Create Vulkan Context]
-    B --> C[Create Renderer]
-    C --> D[Create Camera]
-    D --> E[Create World]
-    E --> F[Setup Event Handlers]
-    F --> G[Engine Ready]
-
-    style A fill:#e1f5fe,stroke:#000,color:#000
-    style G fill:#c8e6c9,stroke:#000,color:#000
-    style B fill:#fff3e0,stroke:#000,color:#000
-    style C fill:#fff3e0,stroke:#000,color:#000
-```
-
-### Главный игровой цикл
-
-```mermaid
-graph LR
-    A[Get Current Time] --> B[Calculate Delta Time]
-    B --> C[Process Input]
-    C --> D[Update World]
-    D --> E[Update Camera]
-    E --> F[Render Frame]
-    F --> G[Present Frame]
-    G --> H[Poll Window Events]
-    H --> I{Window Close?}
-    I -->|No| A
-    I -->|Yes| J[Exit]
-
-    style A fill:#e3f2fd,stroke:#000,color:#000
-    style F fill:#fff8e1,stroke:#000,color:#000
-    style I fill:#ffebee,stroke:#000,color:#000
-    style J fill:#f3e5f5,stroke:#000,color:#000
-```
-
-### Рендер кадра
-
-```mermaid
-graph LR
-    A[Begin Frame<br/>Acquire Image] --> B[Update Uniform Buffers]
-    B --> C[Bind Pipeline]
-    C --> D[For Each Model]
-
-    D --> E[Get/Generate Mesh]
-    E --> F[Calculate Transform]
-    F --> G[Update Uniform Buffer]
-    G --> H[Render Mesh]
-    H --> I{More Models?}
-    I -->|Yes| D
-    I -->|No| J[End Frame<br/>Present Image]
-
-    style A fill:#e8f5e8,stroke:#000,color:#000
-    style J fill:#e8f5e8,stroke:#000,color:#000
-    style D fill:#fff3e0,stroke:#000,color:#000
-    style H fill:#fce4ec,stroke:#000,color:#000
-```
-
-### Очистка ресурсов
-
-```mermaid
-graph LR
-    A[Wait for GPU Idle] --> B[Destroy Renderer<br/>Swapchain, Pipeline, Buffers]
-    B --> C[Destroy Vulkan Context<br/>Device, Instance]
-    C --> D[Destroy Window<br/>GLFW]
-    D --> E[Cleanup All Resources]
-
-    style A fill:#fff3e0,stroke:#000,color:#000
-    style E fill:#ffebee,stroke:#000,color:#000
-    style B fill:#e1f5fe,stroke:#000,color:#000
-    style C fill:#e1f5fe,stroke:#000,color:#000
-    style D fill:#e1f5fe,stroke:#000,color:#000
-```
-
-## Зависимости и требования
-
-### Зависимости
-
-- **Vulkan SDK** 1.3+
-- **GLFW** 3.3+
-- **ImGui** (с glfw-binding, vulkan-binding)
-- **spdlog** (>=1.15.3)
-- **C++23** компилятор
-
-> **Примечание**: Движок использует собственную математическую библиотеку (vw::vec3, vw::mat4 и др.) вместо GLM.
-
-### Поддерживаемые платформы
-
-- Windows (Visual Studio)
-- Linux (GCC/Clang)
-- macOS (через MoltenVK)
-
-## Использование
-
-```cpp
-#include "engine.h"
-
-int main() {
-    voxel::engine engine(1280, 720, "Voxel World");
-
-    // Создать простую модель
-    voxel::model model(4, 4, 4);
-    model.set_voxel(1, 1, 1, 0xFF0000FF); // Красный воксель
-
-    // Добавить в мир
-    engine.get_world().add_model(model, {0, 0, 0});
-
-    // Запустить движок
-    engine.run();
-
-    return 0;
-}
-```
+# Архитектура движка
+
+Воксельный движок на C++23 и Vulkan. Всё — именованные модули C++: заголовков
+движка не существует, потребитель пишет `import`.
+
+## Модули
+
+| Модуль | Каталог | Таргет | Содержимое |
+|---|---|---|---|
+| `vw.core` | `engine/core/src/` | `vw_core` | типы, векторы и матрицы, цвет, math+transform, логгер, блоки, геометрия `vw::spatial` |
+| `vw.ecs` | `engine/ecs/src/` | `vw_ecs` | `entity`, пулы, реестр с рантайм-идентификаторами компонентов |
+| `vw.world` | `engine/world/src/` | `vw_world` | модели, анимации, сериализаторы, компоненты, системы, сетка чанков |
+| `vw.platform` | `engine/platform/src/` | `vw_platform` | окно, ввод, события; GLFW ровно в одном `.cpp` |
+| `vw.gfx` | `engine/gfx/src/` | `vw_gfx` | рендер на Vulkan-Hpp, камера, ImGui, debug |
+
+Приложения тоже модули: `vw.sculptor` (`apps/sculptor/`) и `vw.arena`
+(`apps/arena/`). `apps/test_*` — по одному `main.cpp`.
+
+Зависимости строго односторонние: `core ← ecs ← world ← gfx`, `platform` стоит
+между `core` и `gfx`. `vw.world` собирается и тестируется без Vulkan — на этом
+держится headless-конфигурация.
+
+Модуль не равен пространству имён: `vw.world` экспортирует и `vw::asset`
+(данные ассетов), и `vw::ecs` (мир, компоненты, системы).
+
+## Партиции
+
+Партиция — один `.cppm`. Взаимно зависимые сущности обязаны лежать в одной
+партиции: циклы между партициями запрещены.
+
+- **`vw.core`**: `:types`, `:vector`, `:matrix`, `:math`, `:color`, `:blocks`,
+  `:timing`, `:log`, `:spatial` (aabb, plane, ray, frustum — они взаимно
+  зависимы).
+- **`vw.world`**: `:model`, `:anim`, `:serial`, `:index`, `:components`,
+  `:terrain`, `:grid`, `:systems`; класс `world` и оба ECS-сериализатора — в
+  первичном юните `world.cppm`.
+- **`vw.platform`**: `:input`, `:event`, `:window`.
+- **`vw.gfx`**: `:camera`, `:resource`, `:render`, `:renderer`, `:engine` плюс
+  неэкспортируемая `:vk` (хелперы ошибок и единственное упоминание
+  `vk::detail`).
+- **`vw.sculptor`**: `:state`, `:operations`, `:services`, `:tools`, `:ui`,
+  `:app`. Состояние вынесено в отдельную партицию, иначе граф зависимостей
+  замыкается в цикл.
+
+Интерфейс — в `.cppm`, тела нешаблонного кода — в `.cpp` (`module vw.x;`).
+В интерфейсе остаются шаблоны, `constexpr` и то, что зовут пер-воксельно:
+через границу модуля инлайнится только определение, лежащее в интерфейсе.
+
+## Рендер
+
+Vulkan-Hpp через официальный модуль `import vulkan` (Vulkan-Headers из vcpkg,
+не из SDK). Конфигурация биндинга задаётся один раз в
+`cmake/vw_vulkan_module.cmake` и в исходники не попадает: без исключений,
+`std::expected` вместо `ResultValue`, без конструкторов (designated
+initializers), без smart handles, динамический диспетчер.
+
+Диспетчер инициализируется в три шага в `vulkan_context` — загрузчик, инстанс,
+устройство. Из-за этого `vulkan-1` не линкуется вовсе.
+
+Ошибки — по двухуровневой политике: `vk_must` роняет процесс с контекстом
+(создание ресурсов), а вызовы с несколькими легальными кодами
+(`acquireNextImageKHR`, `presentKHR`) разбирают их по месту.
+
+Владение GPU-ресурсами — пулы и обёртки (`combined_buffer`, `mesh_pool`,
+`page_pool`), без `vk::raii`: скоуповый RAII враждует с кадрами в полёте.
+
+## Границы со сторонним кодом
+
+Три места, где C API легален, и все три проверяет линт:
+
+- `engine/platform/src/window.cpp` — GLFW создаёт `VkSurfaceKHR`; наружу сюрфейс
+  уходит как `uint64`, чтобы Vulkan не попал в интерфейс платформы.
+- `engine/gfx/src/renderer.cpp` — бэкенд `imgui_impl_vulkan` принимает только
+  C-хэндлы, на границе стоят четыре `static_cast`.
+- `engine/gfx/src/vulkan_context.cpp` — единственный файл, называющий
+  `vk::detail`, за собственным аксессором `dispatcher()`.
+
+ImGui и GLFW остаются заголовочными и живут только в global module fragment
+имплементационных юнитов. Наружу из `vw.gfx` их типы не выходят: debug-окна
+регистрируются колбэком, приложение зовёт ImGui через свой include.
 
 ## Сборка
 
-```bash
-mkdir build && cd build
-cmake ..
-make
+Только генератор Ninja и только из окружения `vcvars64.bat` — `import std`
+требует модуля стандартной библиотеки, а Clang здесь берёт его из `std.ixx` от
+MSVC. Отсюда же следует, что сборка возможна только на Windows.
+
+```
+cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build build/release
+ctest --test-dir build/release --output-on-failure
 ```
 
-## Расширения и будущие улучшения
+Опции: `VW_BUILD_GFX`, `VW_BUILD_APPS`, `VW_BUILD_TESTS`. Headless —
+`-DVW_BUILD_GFX=OFF -DVW_BUILD_APPS=OFF -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON`.
 
-### Приоритетные улучшения
+Зависимости: Catch2, GLFW, ImGui (glfw-binding, vulkan-binding), Vulkan-Headers.
+Версии зафиксированы в `vcpkg.json` через `builtin-baseline` и `version>=`.
 
-1. **Chunk System**: Разделение мира на чанки для эффективного LOD
-2. **Instanced Rendering**: Для множественных копий объектов
-3. **Compute Shaders**: Для процедурной генерации и физики
-4. **Texture Atlas**: Поддержка текстур вместо одиночных цветов
-5. ~~**Shadow Mapping**: Реалистичные тени~~ — **Реализовано** (Cascaded Shadow Maps, 4 каскада)
+Гигиену интерфейсов проверяет `python scripts/lint_modules.py`.
 
-### Оптимизации
+## Что за пределами
 
-1. **Face Culling**: Не генерируем грани, которые скрыты соседними вокселями
-2. **Frustum Culling**: Отсекаем объекты вне видимой области
-3. **Memory Management**:
-   - Использование staging buffers для эффективного копирования данных
-   - Переиспользование command buffers
-   - Упакованные цвета (32-bit) для экономии памяти
-4. **Батчинг**: Группировка схожих моделей для снижения количества draw calls
-
-### Долгосрочные цели
-
-1. **Deferred Rendering**: Для сложного освещения
-2. **Global Illumination**: Реалистичное освещение
-3. **Multithreading**: Параллельная генерация мешей и обновление мира
-4. **Editor Tools**: Инструменты редактирования
-5. **Pool алокаторы**: Для частых аллокаций ресурсов 
+Подробности каждой фазы миграции — в `docs/m0`…`docs/m6`. План и зафиксированные
+решения — `docs/modules-migration-plan.md`.

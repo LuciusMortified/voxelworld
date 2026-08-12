@@ -1,17 +1,6 @@
-module;
-
-#include <array>
-#include <condition_variable>
-#include <functional>
-#include <memory>
-#include <mutex>
-#include <queue>
-#include <thread>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
-
 export module vw.world:terrain;
+
+import std;
 
 import vw.core;
 import :model;

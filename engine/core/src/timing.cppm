@@ -1,8 +1,6 @@
-module;
-
-#include <chrono>
-
 export module vw.core:timing;
+
+import std;
 
 import :types;
 

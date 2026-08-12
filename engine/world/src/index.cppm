@@ -1,11 +1,6 @@
-module;
-
-#include <limits>
-#include <span>
-#include <unordered_map>
-#include <vector>
-
 export module vw.world:index;
+
+import std;
 
 import vw.core;
 import vw.ecs;

@@ -1,8 +1,10 @@
-#include <vw/gfx.h>
+import std;
 
-#include <chrono>
-#include <thread>
-
+import vw.core;
+import vw.ecs;
+import vw.world;
+import vw.platform;
+import vw.gfx;
 
 using namespace vw;
 

@@ -1,22 +1,6 @@
-module;
-
-#include <array>
-#include <chrono>
-#include <condition_variable>
-#include <cstddef>
-#include <future>
-#include <map>
-#include <memory>
-#include <mutex>
-#include <optional>
-#include <queue>
-#include <string>
-#include <thread>
-#include <unordered_map>
-#include <unordered_set>
-#include <vector>
-
 export module vw.gfx:resource;
+
+import std;
 
 import vw.core;
 import vw.ecs;

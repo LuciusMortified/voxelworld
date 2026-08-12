@@ -1,14 +1,6 @@
-module;
-
-#include <chrono>
-#include <memory>
-#include <utility>
-#include <string>
-#include <string_view>
-#include <unordered_map>
-#include <vector>
-
 export module vw.gfx:engine;
+
+import std;
 
 import vw.core;
 import vw.ecs;
@@ -108,7 +100,7 @@ private:
     size_t  fps_bucket_filled_count_  = 0;
     float32 fps_bucket_accum_ms_      = 0.0f;
     float32 fps_bucket_current_max_   = 0.0f;
-    float32 fps_bucket_current_min_   = FLT_MAX;
+    float32 fps_bucket_current_min_   = std::numeric_limits<float32>::max();
 };
 
 }  // namespace vw::gfx

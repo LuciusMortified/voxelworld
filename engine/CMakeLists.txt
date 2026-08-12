@@ -15,14 +15,12 @@ endif()
 add_subdirectory(platform)
 add_subdirectory(gfx)
 
+# vwengine is now nothing but a convenience bundle of the module libraries:
+# with the include tree gone there are no headers to hand out, and an
+# application reaches the engine through `import` alone.
 add_library(${PROJECT_NAME} INTERFACE)
 
-target_include_directories(${PROJECT_NAME} INTERFACE include)
 target_compile_features(${PROJECT_NAME} INTERFACE cxx_std_23)
-
-find_package(Vulkan REQUIRED)
-find_package(glfw3 CONFIG REQUIRED)
-find_package(imgui CONFIG REQUIRED)
 
 target_link_libraries(${PROJECT_NAME} INTERFACE
         vw_core
@@ -30,6 +28,4 @@ target_link_libraries(${PROJECT_NAME} INTERFACE
         vw_world
         vw_platform
         vw_gfx
-        glfw
-        imgui::imgui
 )

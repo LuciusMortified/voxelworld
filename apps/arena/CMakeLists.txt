@@ -1,19 +1,23 @@
 project(arena LANGUAGES CXX)
 
-add_executable(${PROJECT_NAME}
-    src/main.cpp
-    src/app/arena_app.h
-    src/app/arena_app.inl.h
-    src/app/dummy_enemy.h
-    src/app/dummy_enemy.inl.h
-    src/app/player.h
-    src/app/player.inl.h
-    src/app/world_setup.h
-    src/app/world_setup.inl.h
-    src/app/debug_hud.h
+find_package(imgui CONFIG REQUIRED)
+
+add_executable(${PROJECT_NAME})
+
+target_sources(${PROJECT_NAME}
+    PUBLIC
+        FILE_SET CXX_MODULES BASE_DIRS src FILES
+            src/arena.cppm
+    PRIVATE
+        src/main.cpp
+        src/app/arena_app.cpp
+        src/app/dummy_enemy.cpp
+        src/app/player.cpp
+        src/app/world_setup.cpp
+        src/app/debug_hud.cpp
 )
 
-target_link_libraries(${PROJECT_NAME} PRIVATE vwengine)
+target_link_libraries(${PROJECT_NAME} PRIVATE vwengine imgui::imgui)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
 
 if (MSVC)
