@@ -341,17 +341,23 @@ void renderer::render(
 
     sync_meshes_(world);
 
-    stats_.timing.shadow_map_update_ms =
-        measure_ms([&] { shadow_map_->update(camera, directional_light_settings_.direction); });
-
-    const auto& cascade_frustums = shadow_map_->get_cascade_frustums();
-
     stats_.timing.buffer_pool_update_ms = measure_ms([&] {
         gpu_timer_->begin(cmd, gpu_stage::buffer_upload);
         combined_buffer_pool_->update(
             world, camera, command_buffers_[current_image_index_], mesh_pool_);
         gpu_timer_->end(cmd, gpu_stage::buffer_upload);
     });
+
+    // The pool runs first so that the shadow map hears about this frame's
+    // geometry before it decides which cascades it can leave alone.
+    stats_.timing.shadow_map_update_ms = measure_ms([&] {
+        for (const auto& bounds : combined_buffer_pool_->get_touched_bounds()) {
+            shadow_map_->invalidate(bounds);
+        }
+        shadow_map_->update(camera, directional_light_settings_.direction);
+    });
+
+    const auto& cascade_frustums = shadow_map_->get_cascade_frustums();
 
     stats_.timing.compute_cull_ms = measure_ms([&] {
         gpu_timer_->begin(cmd, gpu_stage::compute_cull);
@@ -2073,8 +2079,22 @@ void renderer::render_shadow_pass(
 ) {
     update_shadow_uniform_buffer();
 
+    stats_.timing.shadow_cascades_drawn =
+        static_cast<float32>(shadow_map_->get_pending_count());
+
     // Рендерим каждый каскад отдельно
     for (uint32 cascade_index = 0; cascade_index < shadow_map::cascade_count; ++cascade_index) {
+        // A cascade that nothing invalidated keeps the depth it was drawn with:
+        // the map is in world space, so it stays valid until the camera leaves
+        // the padding it was built with.
+        if (!shadow_map_->is_cascade_pending(cascade_index)) {
+            continue;
+        }
+
+        const auto cascade_stage =
+            static_cast<gpu_stage>(static_cast<uint32>(gpu_stage::shadow_cascade_0) + cascade_index);
+        gpu_timer_->begin(command_buffers_[current_image_index_], cascade_stage);
+
         // Начинаем shadow render pass для текущего каскада
         vk::RenderPassBeginInfo render_pass_info{};
         render_pass_info.renderPass        = shadow_map_->get_render_pass();
@@ -2173,7 +2193,10 @@ void renderer::render_shadow_pass(
         }
 
         command_buffers_[current_image_index_].endRenderPass();
+        gpu_timer_->end(command_buffers_[current_image_index_], cascade_stage);
     }
+
+    shadow_map_->clear_pending();
 }
 
 }  // namespace vw::gfx

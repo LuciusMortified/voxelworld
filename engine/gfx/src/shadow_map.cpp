@@ -215,10 +215,44 @@ void shadow_map::create_framebuffers() {
     }
 }
 
+void shadow_map::invalidate(
+    const vw::spatial::aabb& bounds
+) {
+    for (uint32 i = 0; i < cascade_count; ++i) {
+        if (cascade_frustums_[i].intersects(bounds)) {
+            dirty_mask_ |= 1U << i;
+        }
+    }
+}
+
+void shadow_map::invalidate_all() {
+    dirty_mask_ = (1U << cascade_count) - 1;
+}
+
+auto shadow_map::is_cascade_pending(
+    uint32 cascade_index
+) const -> bool {
+    return (pending_mask_ & (1U << cascade_index)) != 0;
+}
+
+auto shadow_map::get_pending_count() const -> uint32 {
+    return static_cast<uint32>(std::popcount(pending_mask_));
+}
+
+void shadow_map::clear_pending() {
+    pending_mask_ = 0;
+}
+
 void shadow_map::update(
     const camera& camera, const vec3f& light_direction
 ) {
     const vec3f light_dir = math::normalize(light_direction);
+
+    const bool light_turned = math::length(light_dir - drawn_light_dir_) > 1e-4f;
+    if (light_turned) {
+        invalidate_all();
+    }
+    drawn_light_dir_ = light_dir;
 
     // Вычисляем split distances используя Practical Split Scheme
     const float cam_near    = camera.get_near();
@@ -241,7 +275,12 @@ void shadow_map::update(
     auto inv_result = math::inverse_matrix(cam_proj * cam_view);
     auto inv_cam    = inv_result.value_or(math::identity_matrix());
 
-    // Для каждого каскада вычисляем light space matrix
+    // Геометрия всех каскадов считается до решения о перерисовке: выбор
+    // раскладывает их по кадрам и потому должен видеть все четыре сразу.
+    std::array<std::array<vec3f, 8>, cascade_count> cascade_corners{};
+    std::array<vec3f, cascade_count> centers{};
+    std::array<float32, cascade_count> radii{};
+
     float last_cascade_split = 0.0f;
     for (uint32 cascade_index = 0; cascade_index < cascade_count; ++cascade_index) {
         const float cascade_split = cascade_splits_[cascade_index];
@@ -282,60 +321,140 @@ void shadow_map::update(
             radius         = std::max(radius, distance);
         }
 
-        const vec3f max_extents = vec3f{radius, radius, radius};
-        const vec3f min_extents = -max_extents;
-
-        vec3f target = frustum_center;
-        vec3f eye    = target - light_dir * shadow_dist;
-
-        auto up = vec3f{0.0f, 1.0f, 0.0f};
-        if (std::abs(math::dot(up, light_dir)) > 0.99f) {
-            up = vec3f{1.0f, 0.0f, 0.0f};
-        }
-
-        const mat4f light_view = math::look_at_matrix(eye, target, up);
-
-        float min_z = std::numeric_limits<float>::max();
-        float max_z = std::numeric_limits<float>::lowest();
-        for (const auto& corner : frustum_corners) {
-            auto lv = light_view * vec4f{corner.x, corner.y, corner.z, 1.0f};
-            min_z   = std::min(min_z, lv.z);
-            max_z   = std::max(max_z, lv.z);
-        }
-
-        float ortho_near = std::max(-max_z - shadow_dist, 0.001f);
-        float ortho_far  = -min_z;
-
-        auto light_proj = math::orthographic_matrix(
-            min_extents.x, max_extents.x, min_extents.y, max_extents.y, ortho_near, ortho_far
-        );
-
-        auto lsm = light_proj * light_view;
-
-        float half_size     = static_cast<float>(size_) * 0.5f;
-        vec4f shadow_origin = lsm * vec4f{0.0f, 0.0f, 0.0f, 1.0f};
-        float rounded_x     = std::round(shadow_origin.x * half_size);
-        float rounded_y     = std::round(shadow_origin.y * half_size);
-        lsm[0, 3] += (rounded_x - shadow_origin.x * half_size) / half_size;
-        lsm[1, 3] += (rounded_y - shadow_origin.y * half_size) / half_size;
-
-        light_space_matrices_[cascade_index] = lsm;
-        cascade_frustums_[cascade_index]    = vw::spatial::frustum::from_view_projection_matrix(lsm);
-
-#if 0
-        std::string matrix_values;
-        matrix_values += "\n";
-        for (int row = 0; row < 4; ++row) {
-            for (int col = 0; col < 4; ++col) {
-                matrix_values += std::to_string(lsm[row, col]) + " ";
-            }
-            matrix_values += "\n";
-        }
-        log::info("{}: {}", cascade_index, matrix_values);
-#endif
+        cascade_corners[cascade_index] = frustum_corners;
+        centers[cascade_index]         = frustum_center;
+        radii[cascade_index]           = radius;
 
         last_cascade_split = cascade_split;
     }
+
+    pending_mask_ |= select_cascades_(centers, radii);
+
+    for (uint32 cascade_index = 0; cascade_index < cascade_count; ++cascade_index) {
+        if ((pending_mask_ & (1U << cascade_index)) == 0) {
+            continue;
+        }
+
+        build_cascade_matrix_(
+            cascade_index,
+            cascade_corners[cascade_index],
+            centers[cascade_index],
+            radii[cascade_index],
+            light_dir,
+            shadow_dist
+        );
+    }
+
+    dirty_mask_ &= ~pending_mask_;
+}
+
+auto shadow_map::select_cascades_(
+    const std::array<vec3f, cascade_count>& centers,
+    const std::array<float32, cascade_count>& radii
+) -> uint32 {
+    uint32 selected = 0;
+    std::array<float32, cascade_count> priority{};
+
+    for (uint32 i = 0; i < cascade_count; ++i) {
+        const uint32 bit    = 1U << i;
+        const float32 drift = math::length(centers[i] - drawn_centers_[i]);
+        const float32 reach = radii[i] > 0.0f ? drift / radii[i] : 0.0f;
+
+        priority[i] = -1.0f;
+
+        if (reach > cascade_padding_ratio_ || radii[i] > drawn_radii_[i]) {
+            selected |= bit;
+            continue;
+        }
+
+        if ((dirty_mask_ & bit) != 0) {
+            priority[i] = 1.0f + reach;
+        } else if (reach > cascade_trigger_ratio_) {
+            priority[i] = reach;
+        }
+    }
+
+    const auto forced = static_cast<uint32>(std::popcount(selected));
+    uint32 budget =
+        forced >= max_cascade_updates_per_frame_ ? 0 : max_cascade_updates_per_frame_ - forced;
+
+    while (budget > 0) {
+        uint32 best        = cascade_count;
+        float32 best_score = 0.0f;
+
+        for (uint32 i = 0; i < cascade_count; ++i) {
+            if (priority[i] > best_score) {
+                best_score = priority[i];
+                best       = i;
+            }
+        }
+
+        if (best == cascade_count) {
+            break;
+        }
+
+        selected |= 1U << best;
+        priority[best] = -1.0f;
+        --budget;
+    }
+
+    return selected;
+}
+
+void shadow_map::build_cascade_matrix_(
+    uint32 cascade_index,
+    const std::array<vec3f, 8>& corners,
+    const vec3f& center,
+    float32 radius,
+    const vec3f& light_dir,
+    float32 shadow_dist
+) {
+    drawn_centers_[cascade_index] = center;
+    drawn_radii_[cascade_index]   = radius;
+
+    radius += radius * cascade_padding_ratio_;
+
+    const vec3f max_extents = vec3f{radius, radius, radius};
+    const vec3f min_extents = -max_extents;
+
+    const vec3f target = center;
+    const vec3f eye    = target - light_dir * shadow_dist;
+
+    auto up = vec3f{0.0f, 1.0f, 0.0f};
+    if (std::abs(math::dot(up, light_dir)) > 0.99f) {
+        up = vec3f{1.0f, 0.0f, 0.0f};
+    }
+
+    const mat4f light_view = math::look_at_matrix(eye, target, up);
+
+    float min_z = std::numeric_limits<float>::max();
+    float max_z = std::numeric_limits<float>::lowest();
+    for (const auto& corner : corners) {
+        auto lv = light_view * vec4f{corner.x, corner.y, corner.z, 1.0f};
+        min_z   = std::min(min_z, lv.z);
+        max_z   = std::max(max_z, lv.z);
+    }
+
+    // Depth needs the same slack as the extents: the segment drifts along the
+    // light too, and the near side already has shadow_dist of casters behind it.
+    const float ortho_near = std::max(-max_z - shadow_dist, 0.001f);
+    const float ortho_far  = -min_z + (radius * cascade_padding_ratio_);
+
+    auto light_proj = math::orthographic_matrix(
+        min_extents.x, max_extents.x, min_extents.y, max_extents.y, ortho_near, ortho_far
+    );
+
+    auto lsm = light_proj * light_view;
+
+    const float half_size = static_cast<float>(size_) * 0.5f;
+    vec4f shadow_origin   = lsm * vec4f{0.0f, 0.0f, 0.0f, 1.0f};
+    const float rounded_x = std::round(shadow_origin.x * half_size);
+    const float rounded_y = std::round(shadow_origin.y * half_size);
+    lsm[0, 3] += (rounded_x - shadow_origin.x * half_size) / half_size;
+    lsm[1, 3] += (rounded_y - shadow_origin.y * half_size) / half_size;
+
+    light_space_matrices_[cascade_index] = lsm;
+    cascade_frustums_[cascade_index] = vw::spatial::frustum::from_view_projection_matrix(lsm);
 }
 
 mat4f shadow_map::get_light_space_matrix(

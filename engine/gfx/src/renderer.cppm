@@ -93,6 +93,7 @@ struct render_timing_stats {
     float32 world_pass_geometry_ms  = 0.0f;
     float32 world_pass_debug_ms     = 0.0f;
     float32 world_pass_imgui_ms     = 0.0f;
+    float32 shadow_cascades_drawn   = 0.0f;
 };
 
 struct renderer_stats {

@@ -40,6 +40,7 @@ constexpr std::array cpu_stages{
     stage_desc{"world_pass_geometry", [](const frame_sample& s) -> float32 { return s.render.world_pass_geometry_ms; }},
     stage_desc{"world_pass_debug", [](const frame_sample& s) -> float32 { return s.render.world_pass_debug_ms; }},
     stage_desc{"world_pass_imgui", [](const frame_sample& s) -> float32 { return s.render.world_pass_imgui_ms; }},
+    stage_desc{"cascades drawn", [](const frame_sample& s) -> float32 { return s.render.shadow_cascades_drawn; }},
 };
 
 constexpr std::array gpu_stages{
@@ -47,6 +48,10 @@ constexpr std::array gpu_stages{
     gpu_stage_desc<gpu_stage::buffer_upload>(),
     gpu_stage_desc<gpu_stage::compute_cull>(),
     gpu_stage_desc<gpu_stage::shadow_pass>(),
+    gpu_stage_desc<gpu_stage::shadow_cascade_0>(),
+    gpu_stage_desc<gpu_stage::shadow_cascade_1>(),
+    gpu_stage_desc<gpu_stage::shadow_cascade_2>(),
+    gpu_stage_desc<gpu_stage::shadow_cascade_3>(),
     gpu_stage_desc<gpu_stage::world_pass>(),
     gpu_stage_desc<gpu_stage::world_geometry>(),
     gpu_stage_desc<gpu_stage::world_debug>(),

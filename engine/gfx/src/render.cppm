@@ -98,6 +98,10 @@ enum class gpu_stage : uint32 {
     buffer_upload,
     compute_cull,
     shadow_pass,
+    shadow_cascade_0,
+    shadow_cascade_1,
+    shadow_cascade_2,
+    shadow_cascade_3,
     world_pass,
     world_geometry,
     world_debug,
@@ -112,6 +116,10 @@ inline constexpr std::array<std::string_view, gpu_stage_count> gpu_stage_names{
     "gpu_buffer_upload",
     "gpu_compute_cull",
     "gpu_shadow_pass",
+    "gpu_cascade_0",
+    "gpu_cascade_1",
+    "gpu_cascade_2",
+    "gpu_cascade_3",
     "gpu_world_pass",
     "gpu_world_geometry",
     "gpu_world_debug",
@@ -185,6 +193,16 @@ public:
 
     void update(const camera& camera, const vec3f& light_direction);
 
+    // A cascade holds world-space depth, so a map drawn on an earlier frame
+    // stays correct as long as it still covers the segment it is asked about.
+    // Each cascade is therefore padded and only redrawn once the camera walks
+    // out of that padding, the light turns, or geometry inside it changes.
+    void invalidate(const vw::spatial::aabb& bounds);
+    void invalidate_all();
+    [[nodiscard]] auto is_cascade_pending(uint32 cascade_index) const -> bool;
+    [[nodiscard]] auto get_pending_count() const -> uint32;
+    void clear_pending();
+
     [[nodiscard]] auto get_light_space_matrix(uint32 cascade_index) const -> mat4f;
     [[nodiscard]] auto get_light_space_matrices() const -> const std::array<mat4f, cascade_count>&;
     [[nodiscard]] auto get_cascade_splits() const -> const std::array<float, cascade_count>&;
@@ -204,6 +222,20 @@ private:
     void create_render_pass();
     void cleanup();
 
+    [[nodiscard]] auto select_cascades_(
+        const std::array<vec3f, cascade_count>& centers,
+        const std::array<float32, cascade_count>& radii
+    ) -> uint32;
+
+    void build_cascade_matrix_(
+        uint32 cascade_index,
+        const std::array<vec3f, 8>& corners,
+        const vec3f& center,
+        float32 radius,
+        const vec3f& light_dir,
+        float32 shadow_dist
+    );
+
     vulkan_context* context_;
 
     vk::Image shadow_image_                                              = nullptr;
@@ -219,9 +251,27 @@ private:
     std::array<vw::spatial::frustum, cascade_count> cascade_frustums_   = {};
     std::array<float, cascade_count> cascade_splits_       = {};
 
+    std::array<vec3f, cascade_count> drawn_centers_ = {};
+    std::array<float32, cascade_count> drawn_radii_ = {};
+    vec3f drawn_light_dir_{};
+    uint32 dirty_mask_   = 0;
+    uint32 pending_mask_ = 0;
+
     uint32 size_;
     float split_lambda_ = 0.5f;
     float shadow_far_   = 1000.f;
+
+    // Coverage padding traded for update rate: the map is built this much
+    // larger than the segment needs, so it stays valid while the camera drifts
+    // that far. Costs resolution, buys frames with no shadow work at all.
+    float32 cascade_padding_ratio_ = 0.18f;
+
+    // Redraw is wanted slightly before the padding runs out. That narrow gap is
+    // the only thing a cascade can wait in, and waiting is what keeps four of
+    // them from falling due on the same frame.
+    float32 cascade_trigger_ratio_ = 0.15f;
+
+    uint32 max_cascade_updates_per_frame_ = 2;
 };
 
 }  // namespace vw::gfx

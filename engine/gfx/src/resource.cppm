@@ -936,6 +936,7 @@ class vulkan_context;
 struct entity_buffer_info {
     buffer_chunk_size chunk_size;
     size_t buffer_index;
+    vw::spatial::aabb bounds{};
 };
 
 struct buffer_pool_timing_stats {
@@ -993,6 +994,12 @@ public:
 
     [[nodiscard]] auto get_stats() const -> const combined_buffer_pool_stats&;
 
+    // Where geometry moved, appeared or went away this frame. Consumed by the
+    // shadow map, which only redraws the cascades those volumes touch.
+    [[nodiscard]] auto get_touched_bounds() const -> std::span<const vw::spatial::aabb> {
+        return touched_bounds_;
+    }
+
 private:
     auto get_or_create_buffer(const buffer_chunk_size& chunk_size) -> combined_buffer*;
 
@@ -1015,6 +1022,7 @@ private:
     std::vector<entity> mesh_pending_entities_;
     std::vector<entity> transform_pending_entities_;
     std::vector<entity> merge_buffer_;
+    std::vector<vw::spatial::aabb> touched_bounds_;
 
     mutable combined_buffer_pool_stats stats_;
 };
