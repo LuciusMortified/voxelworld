@@ -53,6 +53,14 @@ void camera::set_aspect_ratio(
     frustum_dirty_           = true;
 }
 
+auto camera::set_far(
+    float far
+) -> void {
+    far_                     = far;
+    projection_matrix_dirty_ = true;
+    frustum_dirty_           = true;
+}
+
 float camera::get_near() const {
     return near_;
 }
@@ -192,7 +200,7 @@ void camera::update_view_matrix() const {
 }
 
 void camera::update_projection_matrix() const {
-    projection_matrix_       = math::perspective_matrix(fov_, aspect_, near_, far_);
+    projection_matrix_       = math::perspective_matrix_reversed(fov_, aspect_, near_, far_);
     projection_matrix_dirty_ = false;
 }
 

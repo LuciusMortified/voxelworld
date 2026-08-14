@@ -625,6 +625,28 @@ TEST_CASE("math perspective_matrix", "[math][mat4]") {
     REQUIRE(p[3, 3] == 0.0f);
 }
 
+TEST_CASE("math perspective_matrix_reversed", "[math][mat4]") {
+    constexpr float near = 0.1f;
+    constexpr float far  = 100.0f;
+
+    auto p = math::perspective_matrix_reversed(90.0f, 1.0f, near, far);
+
+    auto depth_at = [&p](float z_eye) {
+        auto clip = p * vec4f{0.0f, 0.0f, z_eye, 1.0f};
+        return clip.z / clip.w;
+    };
+
+    SECTION("near maps to one and far to zero") {
+        REQUIRE(depth_at(-near) == Approx(1.0f).margin(1e-4f));
+        REQUIRE(depth_at(-far) == Approx(0.0f).margin(1e-4f));
+    }
+
+    SECTION("depth decreases with distance") {
+        REQUIRE(depth_at(-1.0f) > depth_at(-10.0f));
+        REQUIRE(depth_at(-10.0f) > depth_at(-50.0f));
+    }
+}
+
 TEST_CASE("math orthographic_matrix", "[math][mat4]") {
     auto o = math::orthographic_matrix(-1.0f, 1.0f, -1.0f, 1.0f, 0.1f, 100.0f);
     REQUIRE(o[0, 0] == Approx(1.0f));

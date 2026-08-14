@@ -418,6 +418,22 @@ auto perspective_matrix(
     return matrix;
 }
 
+auto perspective_matrix_reversed(
+    float fov, float aspect, float near, float far
+) -> mat4f {
+    mat4f matrix  = identity_matrix();
+    const float f = 1.0f / std::tan(radians(fov * 0.5f));
+
+    matrix[0, 0] = f / aspect;
+    matrix[1, 1] = -f;
+    matrix[2, 2] = near / (far - near);
+    matrix[2, 3] = (near * far) / (far - near);
+    matrix[3, 2] = -1.0f;
+    matrix[3, 3] = 0.0f;
+
+    return matrix;
+}
+
 auto orthographic_matrix(
     float left, float right, float bottom, float top, float near, float far
 ) -> mat4f {

@@ -46,6 +46,10 @@ public:
         fog.near_distance = 6 * 64 * 8;
         fog.far_distance = 9 * 64 * 8;
 
+        // Anything past the fog is solid fog colour, so drawing it is pure
+        // waste; the far plane is what makes the frustum test drop it.
+        camera.set_far(fog.far_distance);
+
         setup_world_grid();
         camera.set_rotation(0.0f, 0.0f);
     }

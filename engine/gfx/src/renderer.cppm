@@ -177,7 +177,6 @@ public:
 private:
     void create_swapchain();
     void create_image_views();
-    void create_color_resources();
     void create_depth_resources();
     void create_render_pass();
     void create_descriptor_set_layouts();
@@ -207,12 +206,8 @@ private:
     void cleanup_shadow_pipeline();
     void cleanup_debug_pipeline();
     void cleanup_swapchain();
-    void cleanup_color_resources();
     void cleanup_depth_resources();
     void recreate_swapchain();
-
-    [[nodiscard]]
-    auto get_max_usable_sample_count() const -> vk::SampleCountFlagBits;
 
     void create_point_lights_descriptor_set_layout();
     void cleanup_point_lights_resources();
@@ -282,12 +277,6 @@ private:
     vk::Extent2D swapchain_extent_{};
     vk::PresentModeKHR present_mode_   = vk::PresentModeKHR::eFifo;
     std::vector<vk::ImageView> swapchain_image_views_;
-
-    // MSAA
-    vk::SampleCountFlagBits msaa_samples_ = vk::SampleCountFlagBits::e1;
-    vk::Image color_image_                = nullptr;
-    vk::DeviceMemory color_image_memory_  = nullptr;
-    vk::ImageView color_image_view_       = nullptr;
 
     // Depth
     vk::Image depth_image_               = nullptr;

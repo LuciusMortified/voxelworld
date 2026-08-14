@@ -186,6 +186,12 @@ inline auto mix(const vec3f& a, const vec3f& b, float t) -> vec3f { return lerp(
 inline auto mix(const vec4f& a, const vec4f& b, float t) -> vec4f { return lerp(a, b, t); }
 
 auto perspective_matrix(float fov, float aspect, float near, float far) -> mat4f;
+
+// Depth runs 1 at the near plane down to 0 at the far one. Float precision is
+// densest near zero and the projection spends it fastest near the camera, so
+// the two cancel out instead of compounding: at near 0.1 the ordinary mapping
+// has nothing left a kilometre out. Needs eGreater and a clear of 0.
+auto perspective_matrix_reversed(float fov, float aspect, float near, float far) -> mat4f;
 auto orthographic_matrix(float left, float right, float bottom, float top, float near, float far) -> mat4f;
 auto look_at_matrix(const vec3f& eye, const vec3f& target) -> mat4f;
 auto look_at_matrix(const vec3f& eye, const vec3f& target, const vec3f& up) -> mat4f;

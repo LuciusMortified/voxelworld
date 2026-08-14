@@ -43,11 +43,8 @@ renderer::renderer(
 
     shadow_map_ = std::make_unique<shadow_map>(*context_);
 
-    msaa_samples_ = get_max_usable_sample_count();
-
     create_swapchain();
     create_image_views();
-    create_color_resources();
     create_depth_resources();
     create_render_pass();
     create_descriptor_set_layouts();
@@ -105,7 +102,6 @@ renderer::~renderer() {
     cleanup_imgui();
 
     cleanup_swapchain();
-    cleanup_color_resources();
     cleanup_depth_resources();
     cleanup_pipelines();
     cleanup_shadow_pipeline();
@@ -541,21 +537,6 @@ void renderer::create_image_views() {
     }
 }
 
-void renderer::create_color_resources() {
-    create_image(
-        color_image_,
-        color_image_memory_,
-        swapchain_extent_,
-        swapchain_image_format_,
-        vk::ImageTiling::eOptimal,
-        vk::ImageUsageFlagBits::eColorAttachment | vk::ImageUsageFlagBits::eTransientAttachment,
-        vk::MemoryPropertyFlagBits::eDeviceLocal,
-        msaa_samples_
-    );
-    color_image_view_ =
-        create_image_view(color_image_, swapchain_image_format_, vk::ImageAspectFlagBits::eColor);
-}
-
 void renderer::create_depth_resources() {
     vk::Format depth_format = find_depth_format();
 
@@ -567,31 +548,31 @@ void renderer::create_depth_resources() {
         vk::ImageTiling::eOptimal,
         vk::ImageUsageFlagBits::eDepthStencilAttachment,
         vk::MemoryPropertyFlagBits::eDeviceLocal,
-        msaa_samples_
+        vk::SampleCountFlagBits::e1
     );
     depth_image_view_ = create_image_view(depth_image_, depth_format, vk::ImageAspectFlagBits::eDepth);
 }
 
 void renderer::create_render_pass() {
-    // Attachment 0: MSAA color (render target)
+    // Attachment 0: swapchain image, drawn into directly
     vk::AttachmentDescription color_attachment{};
     color_attachment.format         = swapchain_image_format_;
-    color_attachment.samples        = msaa_samples_;
+    color_attachment.samples        = vk::SampleCountFlagBits::e1;
     color_attachment.loadOp         = vk::AttachmentLoadOp::eClear;
-    color_attachment.storeOp        = vk::AttachmentStoreOp::eDontCare;
+    color_attachment.storeOp        = vk::AttachmentStoreOp::eStore;
     color_attachment.stencilLoadOp  = vk::AttachmentLoadOp::eDontCare;
     color_attachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
     color_attachment.initialLayout  = vk::ImageLayout::eUndefined;
-    color_attachment.finalLayout    = vk::ImageLayout::eColorAttachmentOptimal;
+    color_attachment.finalLayout    = vk::ImageLayout::ePresentSrcKHR;
 
     vk::AttachmentReference color_attachment_ref{};
     color_attachment_ref.attachment = 0;
     color_attachment_ref.layout     = vk::ImageLayout::eColorAttachmentOptimal;
 
-    // Attachment 1: MSAA depth
+    // Attachment 1: depth
     vk::AttachmentDescription depth_attachment{};
     depth_attachment.format         = find_depth_format();
-    depth_attachment.samples        = msaa_samples_;
+    depth_attachment.samples        = vk::SampleCountFlagBits::e1;
     depth_attachment.loadOp         = vk::AttachmentLoadOp::eClear;
     depth_attachment.storeOp        = vk::AttachmentStoreOp::eDontCare;
     depth_attachment.stencilLoadOp  = vk::AttachmentLoadOp::eDontCare;
@@ -602,21 +583,6 @@ void renderer::create_render_pass() {
     vk::AttachmentReference depth_attachment_ref{};
     depth_attachment_ref.attachment = 1;
     depth_attachment_ref.layout     = vk::ImageLayout::eDepthStencilAttachmentOptimal;
-
-    // Attachment 2: resolve target (swapchain image, 1x)
-    vk::AttachmentDescription color_resolve_attachment{};
-    color_resolve_attachment.format         = swapchain_image_format_;
-    color_resolve_attachment.samples        = vk::SampleCountFlagBits::e1;
-    color_resolve_attachment.loadOp         = vk::AttachmentLoadOp::eDontCare;
-    color_resolve_attachment.storeOp        = vk::AttachmentStoreOp::eStore;
-    color_resolve_attachment.stencilLoadOp  = vk::AttachmentLoadOp::eDontCare;
-    color_resolve_attachment.stencilStoreOp = vk::AttachmentStoreOp::eDontCare;
-    color_resolve_attachment.initialLayout  = vk::ImageLayout::eUndefined;
-    color_resolve_attachment.finalLayout    = vk::ImageLayout::ePresentSrcKHR;
-
-    vk::AttachmentReference color_resolve_ref{};
-    color_resolve_ref.attachment = 2;
-    color_resolve_ref.layout     = vk::ImageLayout::eColorAttachmentOptimal;
 
     vk::SubpassDescription subpass_3d    = {};
     subpass_3d.pipelineBindPoint       = vk::PipelineBindPoint::eGraphics;
@@ -637,7 +603,7 @@ void renderer::create_render_pass() {
     subpass_imgui.colorAttachmentCount    = 1;
     subpass_imgui.pColorAttachments       = &color_attachment_ref;
     subpass_imgui.pDepthStencilAttachment = nullptr;
-    subpass_imgui.pResolveAttachments     = &color_resolve_ref;
+    subpass_imgui.pResolveAttachments     = nullptr;
 
     vk::SubpassDescription subpasses[] = {subpass_3d, subpass_debug, subpass_imgui};
 
@@ -668,12 +634,10 @@ void renderer::create_render_pass() {
 
     vk::SubpassDependency dependencies[] = {dependency_3d, dependency_debug, dependency_imgui};
 
-    vk::AttachmentDescription attachments[] = {
-        color_attachment, depth_attachment, color_resolve_attachment
-    };
+    vk::AttachmentDescription attachments[] = {color_attachment, depth_attachment};
 
     vk::RenderPassCreateInfo render_pass_info{};
-    render_pass_info.attachmentCount = 3;
+    render_pass_info.attachmentCount = 2;
     render_pass_info.pAttachments    = attachments;
     render_pass_info.subpassCount    = 3;
     render_pass_info.pSubpasses      = subpasses;
@@ -787,7 +751,7 @@ void renderer::create_graphics_pipeline() {
     // Multisampling state
     vk::PipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sampleShadingEnable  = vk::False;
-    multisampling.rasterizationSamples = msaa_samples_;
+    multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
 
     // Color blend state
     vk::PipelineColorBlendAttachmentState color_blend_attachment{};
@@ -803,7 +767,7 @@ void renderer::create_graphics_pipeline() {
     vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
     depth_stencil.depthTestEnable  = vk::True;
     depth_stencil.depthWriteEnable = vk::True;
-    depth_stencil.depthCompareOp   = vk::CompareOp::eLess;
+    depth_stencil.depthCompareOp   = vk::CompareOp::eGreater;
     depth_stencil.depthBoundsTestEnable = vk::False;
     depth_stencil.stencilTestEnable     = vk::False;
 
@@ -892,7 +856,7 @@ void renderer::create_wireframe_pipeline() {
 
     vk::PipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sampleShadingEnable  = vk::False;
-    multisampling.rasterizationSamples = msaa_samples_;
+    multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
 
     vk::PipelineColorBlendAttachmentState color_blend_attachment{};
     color_blend_attachment.colorWriteMask = vk::ColorComponentFlagBits::eR | vk::ColorComponentFlagBits::eG |
@@ -907,7 +871,7 @@ void renderer::create_wireframe_pipeline() {
     vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
     depth_stencil.depthTestEnable  = vk::True;
     depth_stencil.depthWriteEnable = vk::True;
-    depth_stencil.depthCompareOp   = vk::CompareOp::eLess;
+    depth_stencil.depthCompareOp   = vk::CompareOp::eGreater;
     depth_stencil.depthBoundsTestEnable = vk::False;
     depth_stencil.stencilTestEnable     = vk::False;
 
@@ -984,7 +948,7 @@ void renderer::create_debug_pipeline() {
     // Multisampling state
     vk::PipelineMultisampleStateCreateInfo multisampling{};
     multisampling.sampleShadingEnable  = vk::False;
-    multisampling.rasterizationSamples = msaa_samples_;
+    multisampling.rasterizationSamples = vk::SampleCountFlagBits::e1;
 
     // Color blend state
     vk::PipelineColorBlendAttachmentState color_blend_attachment{};
@@ -1000,7 +964,7 @@ void renderer::create_debug_pipeline() {
     vk::PipelineDepthStencilStateCreateInfo depth_stencil{};
     depth_stencil.depthTestEnable  = vk::True;
     depth_stencil.depthWriteEnable = vk::False;
-    depth_stencil.depthCompareOp   = vk::CompareOp::eLess;
+    depth_stencil.depthCompareOp   = vk::CompareOp::eGreater;
     depth_stencil.depthBoundsTestEnable = vk::False;
     depth_stencil.stencilTestEnable     = vk::False;
 
@@ -1044,14 +1008,13 @@ void renderer::create_framebuffers() {
 
     for (size_t i = 0; i < swapchain_image_views_.size(); i++) {
         vk::ImageView attachments[] = {
-            color_image_view_,
-            depth_image_view_,
             swapchain_image_views_[i],
+            depth_image_view_,
         };
 
         vk::FramebufferCreateInfo framebuffer_info{};
         framebuffer_info.renderPass      = render_pass_;
-        framebuffer_info.attachmentCount = 3;
+        framebuffer_info.attachmentCount = 2;
         framebuffer_info.pAttachments    = attachments;
         framebuffer_info.width           = swapchain_extent_.width;
         framebuffer_info.height          = swapchain_extent_.height;
@@ -1194,7 +1157,7 @@ void renderer::init_imgui() {
 
     init_info.PipelineInfoMain.RenderPass  = render_pass_;
     init_info.PipelineInfoMain.Subpass     = 2;
-    init_info.PipelineInfoMain.MSAASamples = static_cast<VkSampleCountFlagBits>(msaa_samples_);
+    init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
 
     if (!ImGui_ImplVulkan_Init(&init_info)) {
         throw std::runtime_error("failed to initialize imgui");
@@ -1332,21 +1295,6 @@ void renderer::cleanup_swapchain() {
     }
 }
 
-void renderer::cleanup_color_resources() {
-    if (color_image_view_ != nullptr) {
-        context_->get_device().destroyImageView(color_image_view_);
-        color_image_view_ = nullptr;
-    }
-    if (color_image_ != nullptr) {
-        context_->get_device().destroyImage(color_image_);
-        color_image_ = nullptr;
-    }
-    if (color_image_memory_ != nullptr) {
-        context_->get_device().freeMemory(color_image_memory_);
-        color_image_memory_ = nullptr;
-    }
-}
-
 void renderer::cleanup_depth_resources() {
     if (depth_image_view_ != nullptr) {
         context_->get_device().destroyImageView(depth_image_view_);
@@ -1376,12 +1324,10 @@ void renderer::recreate_swapchain() {
     wait_idle();
 
     cleanup_swapchain();
-    cleanup_color_resources();
     cleanup_depth_resources();
 
     create_swapchain();
     create_image_views();
-    create_color_resources();
     create_depth_resources();
     create_framebuffers();
     create_sync_objects();
@@ -1401,11 +1347,11 @@ void renderer::render_world_pass(
     render_pass_info.renderArea.offset = {0, 0};
     render_pass_info.renderArea.extent = swapchain_extent_;
 
-    vk::ClearValue clear_values[3]{};
+    vk::ClearValue clear_values[2]{};
     memcpy(&clear_values[0].color, &clear_color_, sizeof(vec4f));
-    clear_values[1].depthStencil = {1.0f, 0};
+    clear_values[1].depthStencil = {0.0f, 0};
 
-    render_pass_info.clearValueCount = 3;
+    render_pass_info.clearValueCount = 2;
     render_pass_info.pClearValues    = clear_values;
 
     command_buffers_[current_image_index_].beginRenderPass(render_pass_info, vk::SubpassContents::eInline);
@@ -1812,20 +1758,6 @@ vk::Extent2D renderer::choose_swap_extent(
     );
 
     return actual_extent;
-}
-
-auto renderer::get_max_usable_sample_count() const -> vk::SampleCountFlagBits {
-    const vk::PhysicalDeviceProperties props = context_->get_physical_device().getProperties();
-
-    const vk::SampleCountFlags counts =                //
-        props.limits.framebufferColorSampleCounts &  //
-        props.limits.framebufferDepthSampleCounts;
-
-    if (counts & vk::SampleCountFlagBits::e4)
-        return vk::SampleCountFlagBits::e4;
-    if (counts & vk::SampleCountFlagBits::e2)
-        return vk::SampleCountFlagBits::e2;
-    return vk::SampleCountFlagBits::e1;
 }
 
 }  // namespace vw::gfx

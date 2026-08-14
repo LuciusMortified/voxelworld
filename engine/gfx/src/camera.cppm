@@ -40,6 +40,10 @@ public:
     auto set_rotation(float pitch, float yaw) -> void;
     auto set_aspect_ratio(float aspect) -> void;
 
+    // View distance is a culling decision, not a cosmetic one: geometry past
+    // the far plane is dropped by the frustum test before it costs anything.
+    auto set_far(float far) -> void;
+
     [[nodiscard]] auto get_near() const -> float;
     [[nodiscard]] auto get_far() const -> float;
     [[nodiscard]] auto get_fov() const -> float;
