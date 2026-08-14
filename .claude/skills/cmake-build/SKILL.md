@@ -41,7 +41,8 @@ cmake -S . -B build/headless -G Ninja -DCMAKE_BUILD_TYPE=Release \
       -DVCPKG_TARGET_TRIPLET=x64-windows
 
 # Clang вместо MSVC: -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang
-# (драйвер clang++, не clang-cl — обоснование в docs/m0-toolchain-spike.md)
+# (драйвер clang++, не clang-cl: сканирование графа импортов CMake включает
+#  только для GNU-подобного фронтенда, с clang-cl конфигурация падает)
 ```
 
 ## Таргеты и опции
