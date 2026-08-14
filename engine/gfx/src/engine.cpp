@@ -71,6 +71,9 @@ engine::~engine() {
 
 void engine::shutdown() {
     running_ = false;
+    // Mesh generation reads model pages owned by world_, which is destroyed
+    // before renderer_; the threads have to be down before either goes away.
+    renderer_->get_mesh_pool().stop_gen_threads();
     renderer_->wait_idle();
 }
 
