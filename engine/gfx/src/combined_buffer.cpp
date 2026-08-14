@@ -123,14 +123,6 @@ void combined_buffer::allocate(
         expand_instance_buffers_();
     }
 
-    const draw_command cmd{
-        .index_count    = chunk_size_.index_count,
-        .instance_count = 1,
-        .first_index    = mesh_alloc.index_offset,
-        .vertex_offset  = static_cast<int32>(mesh_alloc.vertex_offset),
-        .first_instance = instance_index,
-    };
-
     const auto instance_staged = staging_->stage_struct(instance_index);
     staging_->copy_to(
         instance_index_buffer_->get_buffer(),
@@ -139,13 +131,7 @@ void combined_buffer::allocate(
         sizeof(uint32)
     );
 
-    const auto draw_cmd_staged = staging_->stage_struct(cmd);
-    staging_->copy_to(
-        indirect_draw_buffer_->get_buffer(),
-        instance_index * sizeof(draw_command),
-        draw_cmd_staged,
-        sizeof(draw_command)
-    );
+    write_draw_command_(instance_index, mesh_alloc);
 
     const auto model_staged = staging_->stage_struct(transform_matrix);
     staging_->copy_to(
@@ -188,6 +174,28 @@ void combined_buffer::allocate(
     mesh_alloc.ref_count++;
 }
 
+// The command draws the mesh, not the size class it landed in. Anything past
+// index_count is leftovers from whoever held the slot before, and never read.
+void combined_buffer::write_draw_command_(
+    uint32 instance_index, const mesh_allocation& mesh_alloc
+) {
+    const draw_command cmd{
+        .index_count    = mesh_alloc.index_count,
+        .instance_count = 1,
+        .first_index    = mesh_alloc.index_offset,
+        .vertex_offset  = static_cast<int32>(mesh_alloc.vertex_offset),
+        .first_instance = instance_index,
+    };
+
+    const auto staged = staging_->stage_struct(cmd);
+    staging_->copy_to(
+        indirect_draw_buffer_->get_buffer(),
+        instance_index * sizeof(draw_command),
+        staged,
+        sizeof(draw_command)
+    );
+}
+
 void combined_buffer::allocate_mesh(
     vw::asset::model_identity model_id, const mesh& mesh_data
 ) {
@@ -227,14 +235,6 @@ void combined_buffer::allocate_mesh(
         vertex_count * sizeof(vertex)
     );
 
-    const auto vertex_free_space_offset = (vertex_offset + vertex_count) * sizeof(vertex);
-    const auto vertex_free_space_size = (chunk_size_.vertex_count - vertex_count) * sizeof(vertex);
-    if (vertex_free_space_size > 0) {
-        staging_->zero_region(
-            vertex_buffer_->get_buffer(), vertex_free_space_offset, vertex_free_space_size
-        );
-    }
-
     const auto indices_staged = staging_->stage_vector(mesh_data.indices);
     staging_->copy_to(
         index_buffer_->get_buffer(),
@@ -242,14 +242,6 @@ void combined_buffer::allocate_mesh(
         indices_staged,
         index_count * sizeof(uint32)
     );
-
-    const auto index_free_space_offset = (index_offset + index_count) * sizeof(uint32);
-    const auto index_free_space_size = (chunk_size_.index_count - index_count) * sizeof(uint32);
-    if (index_free_space_size > 0) {
-        staging_->zero_region(
-            index_buffer_->get_buffer(), index_free_space_offset, index_free_space_size
-        );
-    }
 
     mesh_allocation new_mesh_alloc{};
     new_mesh_alloc.vertex_offset = vertex_offset;
@@ -288,15 +280,6 @@ void combined_buffer::write_mesh(
         vertex_count * sizeof(vertex)
     );
 
-    const auto vertex_free_space_offset =
-        (mesh_alloc.vertex_offset + vertex_count) * sizeof(vertex);
-    const auto vertex_free_space_size = (chunk_size_.vertex_count - vertex_count) * sizeof(vertex);
-    if (vertex_free_space_size > 0) {
-        staging_->zero_region(
-            vertex_buffer_->get_buffer(), vertex_free_space_offset, vertex_free_space_size
-        );
-    }
-
     const auto indices_staged = staging_->stage_vector(mesh_data.indices);
     staging_->copy_to(
         index_buffer_->get_buffer(),
@@ -305,17 +288,17 @@ void combined_buffer::write_mesh(
         index_count * sizeof(uint32)
     );
 
-    const auto index_free_space_offset = (mesh_alloc.index_offset + index_count) * sizeof(uint32);
-    const auto index_free_space_size   = (chunk_size_.index_count - index_count) * sizeof(uint32);
-    if (index_free_space_size > 0) {
-        staging_->zero_region(
-            index_buffer_->get_buffer(), index_free_space_offset, index_free_space_size
-        );
-    }
-
     mesh_alloc.vertex_count = vertex_count;
     mesh_alloc.index_count  = index_count;
     mesh_alloc.generation   = model_id.generation;
+
+    // A remesh changes how much of the slot is live, so every instance drawing
+    // this mesh needs its command rewritten.
+    for (const auto& [ent, ent_alloc] : entity_allocations_) {
+        if (ent_alloc.model_index == model_id.index) {
+            write_draw_command_(ent_alloc.instance_index, mesh_alloc);
+        }
+    }
 }
 
 void combined_buffer::write_transform(
@@ -398,21 +381,8 @@ auto combined_buffer::free(
         //     last_index, ent_alloc.instance_index
         // );
 
-        auto& last_mesh_alloc = mesh_allocations_[last_ent_alloc.model_index];
-        const draw_command new_cmd{
-            .index_count    = chunk_size_.index_count,
-            .instance_count = 1,
-            .first_index    = last_mesh_alloc.index_offset,
-            .vertex_offset  = static_cast<int32>(last_mesh_alloc.vertex_offset),
-            .first_instance = ent_alloc.instance_index,
-        };
-        auto draw_cmd_staged = staging_->stage_struct(new_cmd);
-        staging_->copy_to(
-            indirect_draw_buffer_->get_buffer(),
-            ent_alloc.instance_index * sizeof(draw_command),
-            draw_cmd_staged,
-            sizeof(draw_command)
-        );
+        const auto& last_mesh_alloc = mesh_allocations_[last_ent_alloc.model_index];
+        write_draw_command_(ent_alloc.instance_index, last_mesh_alloc);
 
         last_ent_alloc.instance_index = ent_alloc.instance_index;
         instance_indexes_[ent_alloc.instance_index] = last_ent;

@@ -373,7 +373,6 @@ public:
         vk::DeviceSize size
     );
 
-    void zero_region(vk::Buffer dst, vk::DeviceSize dst_offset, vk::DeviceSize size);
 
     [[nodiscard]] auto available() const -> vk::DeviceSize {
         return frame_end_offset_ - write_offset_;
@@ -883,6 +882,7 @@ public:
     }
 
 private:
+    void write_draw_command_(uint32 instance_index, const mesh_allocation& mesh_alloc);
     void expand_mesh_buffers_();
     void expand_instance_buffers_();
     void update_descriptor_set_();

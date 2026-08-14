@@ -230,10 +230,11 @@ void combined_buffer_pool::update_meshes_(
 
         buffer_chunk_size required_chunk_size = get_chunk_size_for_mesh(vertex_count, index_count);
 
-        const vk::DeviceSize mesh_staging_cost =
-            required_chunk_size.vertex_count * sizeof(vertex) +
-            required_chunk_size.index_count * sizeof(uint32) +
-            sizeof(uint32) + sizeof(draw_command) + sizeof(mat4f) * 2;
+        // Only the mesh itself travels through staging now: the rest of the
+        // size class is left as it was and never drawn.
+        const vk::DeviceSize mesh_staging_cost = (vertex_count * sizeof(vertex)) +
+            (index_count * sizeof(uint32)) + sizeof(uint32) + sizeof(draw_command) +
+            (sizeof(mat4f) * 2);
 
         const auto& transform_comp    = world.get<transform_component>(ent);
         const mat4f& transform_matrix = transform_comp.get_world_matrix();

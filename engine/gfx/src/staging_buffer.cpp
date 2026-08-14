@@ -111,16 +111,6 @@ void staging_buffer::copy_buffer(
     pending_copies_.push_back({src, dst, {src_offset, dst_offset, size}});
 }
 
-void staging_buffer::zero_region(
-    vk::Buffer dst, vk::DeviceSize dst_offset, vk::DeviceSize size
-) {
-    assert(write_offset_ + size <= frame_end_offset_);
-    auto offset = write_offset_;
-    std::memset(static_cast<std::byte*>(mapped_) + offset, 0, size);
-    write_offset_ += size;
-    copy_to(dst, dst_offset, offset, size);
-}
-
 void staging_buffer::replace_buffer(vk::Buffer old_buf, vk::Buffer new_buf) {
     for (auto& copy : pending_copies_) {
         if (copy.src == old_buf) copy.src = new_buf;

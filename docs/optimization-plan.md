@@ -284,7 +284,11 @@ reference-реализация. Туда же — микробенч време�
 
 ## 4. Фаза 1 — дешёвые правки
 
-### P1.1 Реальный `index_count` в indirect-командах
+### P1.1 Реальный `index_count` в indirect-командах — **сделано**
+
+Команда несёт длину меша, зануление хвоста убрано вместе с
+`staging_buffer::zero_region`. `gpu_world_pass` −8 % в `parked` и −15 % в
+`flythrough`; разбор, почему не больше, — в `docs/frame-time-baseline.md`.
 
 **Тип:** GPU, VRAM, пропускная способность staging.
 
