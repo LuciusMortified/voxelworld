@@ -297,6 +297,40 @@ public:
 
 }  // namespace vw::gfx
 
+namespace vw::gfx {
+
+// Owns GPU buffers that have been replaced while frames referencing them may
+// still be in flight, and destroys them once the owning frame is known
+// complete. Scoped RAII cannot express this: the point of release is a fence,
+// not a scope exit.
+class deletion_queue final {
+public:
+    deletion_queue()  = default;
+    ~deletion_queue() = default;
+
+    deletion_queue(const deletion_queue&)                    = delete;
+    auto operator=(const deletion_queue&) -> deletion_queue& = delete;
+    deletion_queue(deletion_queue&&)                         = delete;
+    auto operator=(deletion_queue&&) -> deletion_queue&      = delete;
+
+    auto set_frame(uint64 frame) -> void;
+    auto retire(std::unique_ptr<buffer> victim) -> void;
+    auto collect(uint64 completed_frame) -> void;
+
+    [[nodiscard]] auto pending_count() const -> uint32;
+
+private:
+    struct entry {
+        uint64 frame;
+        std::unique_ptr<buffer> victim;
+    };
+
+    std::vector<entry> entries_;
+    uint64 current_frame_ = 0;
+};
+
+}  // namespace vw::gfx
+
 // ---- from vw/gfx/resource/staging_buffer.h
 export namespace vw::gfx {
 
@@ -801,7 +835,8 @@ public:
         vk::DescriptorPool descriptor_pool,
         vk::DescriptorSetLayout descriptor_set_layout,
         vk::DescriptorSetLayout compute_descriptor_set_layout,
-        staging_buffer& staging
+        staging_buffer& staging,
+        deletion_queue& deletion
     );
     ~combined_buffer();
 
@@ -851,6 +886,7 @@ private:
 
     vulkan_context* context_;
     staging_buffer* staging_;
+    deletion_queue* deletion_;
     buffer_chunk_size chunk_size_;
 
     uint32 mesh_capacity_{default_mesh_capacity_};
@@ -923,6 +959,7 @@ public:
 
     explicit combined_buffer_pool(
         vulkan_context& context,
+        deletion_queue& deletion,
         vk::DescriptorPool descriptor_pool,
         vk::DescriptorSetLayout descriptor_set_layout,
         vk::DescriptorSetLayout compute_descriptor_set_layout = nullptr
@@ -957,6 +994,7 @@ private:
     void update_transforms_(world_type& world);
 
     vulkan_context* context_;
+    deletion_queue* deletion_;
     staging_buffer staging_;
     std::vector<std::unique_ptr<combined_buffer>> buffers_;
     std::unordered_map<entity, entity_buffer_info> entity_buffer_infos_;

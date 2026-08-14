@@ -28,10 +28,12 @@ combined_buffer::combined_buffer(
     vk::DescriptorPool descriptor_pool,
     vk::DescriptorSetLayout descriptor_set_layout,
     vk::DescriptorSetLayout compute_descriptor_set_layout,
-    staging_buffer& staging
+    staging_buffer& staging,
+    deletion_queue& deletion
 )
     : context_(&context)
     , staging_(&staging)
+    , deletion_(&deletion)
     , chunk_size_(chunk_size)
     , descriptor_pool_(descriptor_pool)
     , descriptor_set_layout_(descriptor_set_layout)
@@ -452,8 +454,8 @@ void combined_buffer::expand_mesh_buffers_() {
     staging_->replace_buffer(vertex_buffer_->get_buffer(), new_vertex_buffer->get_buffer());
     staging_->replace_buffer(index_buffer_->get_buffer(), new_index_buffer->get_buffer());
 
-    vertex_buffer_ = std::move(new_vertex_buffer);
-    index_buffer_  = std::move(new_index_buffer);
+    deletion_->retire(std::exchange(vertex_buffer_, std::move(new_vertex_buffer)));
+    deletion_->retire(std::exchange(index_buffer_, std::move(new_index_buffer)));
 }
 
 void combined_buffer::expand_instance_buffers_() {
@@ -513,22 +515,28 @@ void combined_buffer::expand_instance_buffers_() {
         aabb_buffer_->get_buffer(), new_aabb_buffer->get_buffer()
     );
 
-    model_matrix_buffer_   = std::move(new_model_matrix_buffer);
-    normal_matrix_buffer_  = std::move(new_normal_matrix_buffer);
-    indirect_draw_buffer_  = std::move(new_indirect_draw_buffer);
-    instance_index_buffer_ = std::move(new_instance_index_buffer);
-    aabb_buffer_           = std::move(new_aabb_buffer);
+    deletion_->retire(std::exchange(model_matrix_buffer_, std::move(new_model_matrix_buffer)));
+    deletion_->retire(std::exchange(normal_matrix_buffer_, std::move(new_normal_matrix_buffer)));
+    deletion_->retire(std::exchange(indirect_draw_buffer_, std::move(new_indirect_draw_buffer)));
+    deletion_->retire(std::exchange(instance_index_buffer_, std::move(new_instance_index_buffer)));
+    deletion_->retire(std::exchange(aabb_buffer_, std::move(new_aabb_buffer)));
 
-    culled_indirect_buffer_ = std::make_unique<device_storage_buffer>(
-        *context_,
-        instance_capacity_ * cull_pass_count * sizeof(draw_command),
-        vk::BufferUsageFlagBits::eIndirectBuffer
-    );
-    count_buffer_ = std::make_unique<device_storage_buffer>(
-        *context_,
-        cull_pass_count * sizeof(uint32),
-        vk::BufferUsageFlagBits::eIndirectBuffer | vk::BufferUsageFlagBits::eTransferDst
-    );
+    deletion_->retire(std::exchange(
+        culled_indirect_buffer_,
+        std::make_unique<device_storage_buffer>(
+            *context_,
+            instance_capacity_ * cull_pass_count * sizeof(draw_command),
+            vk::BufferUsageFlagBits::eIndirectBuffer
+        )
+    ));
+    deletion_->retire(std::exchange(
+        count_buffer_,
+        std::make_unique<device_storage_buffer>(
+            *context_,
+            cull_pass_count * sizeof(uint32),
+            vk::BufferUsageFlagBits::eIndirectBuffer | vk::BufferUsageFlagBits::eTransferDst
+        )
+    ));
 
     update_descriptor_set_();
     if (compute_descriptor_set_ != nullptr) {

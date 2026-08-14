@@ -330,6 +330,7 @@ private:
 
     // Состояние рендеринга
     uint32 current_frame_       = 0;
+    uint64 frame_counter_       = 0;
     uint32 current_image_index_ = 0;
     bool framebuffer_resized_     = false;
     vec4f clear_color_            = {0.1f, 0.1f, 0.1f, 1.0f};
@@ -351,6 +352,9 @@ private:
     // Mesh pool для генерации мешей
     mesh_pool mesh_pool_;
     std::unordered_set<entity> pending_mesh_entities_;
+
+    // Declared before the pool so that it outlives every buffer it may hold
+    deletion_queue deletion_queue_;
 
     // Combined buffer pool для indirect drawing
     std::unique_ptr<combined_buffer_pool_type> combined_buffer_pool_;

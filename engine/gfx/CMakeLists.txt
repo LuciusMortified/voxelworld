@@ -22,6 +22,7 @@ target_sources(vw_gfx
         src/shader.cpp
         src/buffer.cpp
         src/staging_buffer.cpp
+        src/deletion_queue.cpp
         src/mesh.cpp
         src/mesh_pool.cpp
         src/palette_buffer.cpp

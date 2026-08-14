@@ -44,11 +44,13 @@ void sorted_merge_range(
 
 combined_buffer_pool::combined_buffer_pool(
     vulkan_context& context,
+    deletion_queue& deletion,
     vk::DescriptorPool descriptor_pool,
     vk::DescriptorSetLayout descriptor_set_layout,
     vk::DescriptorSetLayout compute_descriptor_set_layout
 )
     : context_(&context)
+    , deletion_(&deletion)
     , staging_(context, 32 * 1024 * 1024)
     , descriptor_pool_(descriptor_pool)
     , descriptor_set_layout_(descriptor_set_layout)
@@ -133,7 +135,7 @@ combined_buffer* combined_buffer_pool::get_or_create_buffer(
     buffers_.push_back(
         std::make_unique<combined_buffer>(
             *context_, chunk_size, descriptor_pool_, descriptor_set_layout_,
-            compute_descriptor_set_layout_, staging_
+            compute_descriptor_set_layout_, staging_, *deletion_
         )
     );
     chunk_size_to_buffer_index_[chunk_size] = buffer_index;

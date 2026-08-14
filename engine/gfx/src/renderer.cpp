@@ -74,6 +74,7 @@ renderer::renderer(
 
     combined_buffer_pool_ = std::make_unique<combined_buffer_pool_type>(
         *context_,
+        deletion_queue_,
         descriptor_pool_,
         storage_descriptor_set_layout_,
         cull_pipeline_->get_buffer_descriptor_set_layout()
@@ -123,6 +124,13 @@ void renderer::begin_frame() {
 
     // Сбрасываем fence для рендеринга перед использованием
     vk_must(device.resetFences(in_flight_fences_[current_frame_]), "reset frame fence");
+
+    // The fence just waited on was signalled by frame_counter_ - MAX_FRAMES_IN_FLIGHT,
+    // so anything retired on that frame or earlier is no longer read by the GPU.
+    if (frame_counter_ >= MAX_FRAMES_IN_FLIGHT) {
+        deletion_queue_.collect(frame_counter_ - MAX_FRAMES_IN_FLIGHT);
+    }
+    deletion_queue_.set_frame(frame_counter_);
 
     // Получаем следующий image из swapchain (используем семафор)
     uint32 image_index = 0;
@@ -205,6 +213,7 @@ void renderer::end_frame() {
     draw_call_count_       = 0;
 
     current_frame_ = (current_frame_ + 1) % MAX_FRAMES_IN_FLIGHT;
+    ++frame_counter_;
 }
 
 auto renderer::get_present_mode_name() const -> std::string_view {
