@@ -83,6 +83,7 @@ struct push_constant_data {
 };
 
 struct render_timing_stats {
+    gpu_timing_stats gpu{};
     float32 shadow_map_update_ms    = 0.0f;
     float32 buffer_pool_update_ms   = 0.0f;
     float32 compute_cull_ms         = 0.0f;
@@ -371,6 +372,9 @@ private:
 
     // Shadow map для directional light
     std::unique_ptr<shadow_map> shadow_map_;
+
+    // GPU-время проходов кадра
+    std::unique_ptr<gpu_timer> gpu_timer_;
 
     // Настройки directional light
     directional_light_settings directional_light_settings_;

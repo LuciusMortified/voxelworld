@@ -296,6 +296,16 @@ void debug_window::render_render_detail() {
         ImGui::Unindent();
         row("end_frame", eng.end_frame_ms);
 
+        ImGui::Separator();
+        if (t.gpu.supported) {
+            ImGui::TextUnformatted("gpu (execution)");
+            for (uint32 stage = 0; stage < gpu_stage_count; ++stage) {
+                row(gpu_stage_names[stage].data(), t.gpu.ms[stage]);
+            }
+        } else {
+            ImGui::TextUnformatted("gpu timestamps unsupported");
+        }
+
         ImGui::Spacing();
         if (ImGui::Button("reset##render")) {
             metric_max_.clear();

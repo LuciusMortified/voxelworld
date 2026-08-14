@@ -13,7 +13,17 @@ struct stage_desc {
     auto (*get)(const frame_sample&) -> float32;
 };
 
-constexpr std::array stages{
+template <gpu_stage Stage>
+constexpr auto gpu_stage_desc() -> stage_desc {
+    return {
+        gpu_stage_names[static_cast<uint32>(Stage)],
+        [](const frame_sample& s) -> float32 {
+            return s.render.gpu.ms[static_cast<uint32>(Stage)];
+        },
+    };
+}
+
+constexpr std::array cpu_stages{
     stage_desc{"frame", [](const frame_sample& s) -> float32 { return s.engine.frame_ms; }},
     stage_desc{"world_update", [](const frame_sample& s) -> float32 { return s.engine.world_update_ms; }},
     stage_desc{"world_render", [](const frame_sample& s) -> float32 { return s.engine.world_render_ms; }},
@@ -30,6 +40,17 @@ constexpr std::array stages{
     stage_desc{"world_pass_geometry", [](const frame_sample& s) -> float32 { return s.render.world_pass_geometry_ms; }},
     stage_desc{"world_pass_debug", [](const frame_sample& s) -> float32 { return s.render.world_pass_debug_ms; }},
     stage_desc{"world_pass_imgui", [](const frame_sample& s) -> float32 { return s.render.world_pass_imgui_ms; }},
+};
+
+constexpr std::array gpu_stages{
+    gpu_stage_desc<gpu_stage::frame>(),
+    gpu_stage_desc<gpu_stage::buffer_upload>(),
+    gpu_stage_desc<gpu_stage::compute_cull>(),
+    gpu_stage_desc<gpu_stage::shadow_pass>(),
+    gpu_stage_desc<gpu_stage::world_pass>(),
+    gpu_stage_desc<gpu_stage::world_geometry>(),
+    gpu_stage_desc<gpu_stage::world_debug>(),
+    gpu_stage_desc<gpu_stage::world_imgui>(),
 };
 
 }  // namespace
@@ -76,16 +97,12 @@ auto frame_recorder::report() const -> std::string {
 
     std::format_to(sink, "samples: {}\n", samples_.size());
 
-    const auto frame_p50 = percentile_of(stages.front().get, 0.50f);
+    const auto frame_p50 = percentile_of(cpu_stages.front().get, 0.50f);
     if (frame_p50 > 0.0f) {
         std::format_to(sink, "fps at median frame: {:.1f}\n", 1000.0f / frame_p50);
     }
 
-    std::format_to(
-        sink, "\n{:<21}{:>9}{:>9}{:>9}{:>9}\n", "stage (ms)", "p50", "p95", "p99", "max"
-    );
-
-    for (const auto& stage : stages) {
+    const auto write_row = [&](const stage_desc& stage) -> void {
         std::format_to(
             sink,
             "{:<21}{:9.3f}{:9.3f}{:9.3f}{:9.3f}\n",
@@ -95,6 +112,26 @@ auto frame_recorder::report() const -> std::string {
             percentile_of(stage.get, 0.99f),
             percentile_of(stage.get, 1.00f)
         );
+    };
+
+    std::format_to(
+        sink, "\n{:<21}{:>9}{:>9}{:>9}{:>9}\n", "stage (ms)", "p50", "p95", "p99", "max"
+    );
+
+    for (const auto& stage : cpu_stages) {
+        write_row(stage);
+    }
+
+    // CPU stages measure command recording; these measure execution. They are
+    // reported apart because the two are not summable and not comparable.
+    if (!samples_.front().render.gpu.supported) {
+        std::format_to(sink, "\ngpu timestamps: unsupported on this device\n");
+        return out;
+    }
+
+    std::format_to(sink, "\n");
+    for (const auto& stage : gpu_stages) {
+        write_row(stage);
     }
 
     return out;

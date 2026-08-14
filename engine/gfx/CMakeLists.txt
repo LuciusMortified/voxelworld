@@ -31,6 +31,7 @@ target_sources(vw_gfx
         src/combined_buffer_pool.cpp
         src/debug_primitive.cpp
         src/vulkan_context.cpp
+        src/gpu_timer.cpp
         src/shadow_map.cpp
         src/cull_pipeline.cpp
         src/renderer.cpp

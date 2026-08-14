@@ -70,6 +70,8 @@ renderer::renderer(
     create_imgui_descriptor_pool();
     init_imgui();
 
+    gpu_timer_ = std::make_unique<gpu_timer>(*context_, get_frames_in_flight());
+
     cull_pipeline_ = std::make_unique<cull_pipeline>(*context_, descriptor_pool_);
 
     combined_buffer_pool_ = std::make_unique<combined_buffer_pool_type>(
@@ -95,6 +97,7 @@ renderer::~renderer() {
 
     combined_buffer_pool_.reset();
     cull_pipeline_.reset();
+    gpu_timer_.reset();
     palette_buffer_.reset();
     light_buffer_.reset();
     shadow_map_.reset();
@@ -131,6 +134,11 @@ void renderer::begin_frame() {
         deletion_queue_.collect(frame_counter_ - MAX_FRAMES_IN_FLIGHT);
     }
     deletion_queue_.set_frame(frame_counter_);
+
+    // The same fence covers this slot's timestamps: they are readable now, and
+    // the queries are reset again only when this frame starts recording.
+    gpu_timer_->resolve(current_frame_);
+    stats_.timing.gpu = gpu_timer_->get_stats();
 
     // Получаем следующий image из swapchain (используем семафор)
     uint32 image_index = 0;
@@ -327,6 +335,10 @@ void renderer::render(
 
     vk_must(command_buffers_[current_image_index_].begin(begin_info), "begin recording command buffer");
 
+    auto cmd = command_buffers_[current_image_index_];
+    gpu_timer_->reset(cmd, current_frame_);
+    gpu_timer_->begin(cmd, gpu_stage::frame);
+
     sync_meshes_(world);
 
     stats_.timing.shadow_map_update_ms =
@@ -335,11 +347,14 @@ void renderer::render(
     const auto& cascade_frustums = shadow_map_->get_cascade_frustums();
 
     stats_.timing.buffer_pool_update_ms = measure_ms([&] {
+        gpu_timer_->begin(cmd, gpu_stage::buffer_upload);
         combined_buffer_pool_->update(
             world, camera, command_buffers_[current_image_index_], mesh_pool_);
+        gpu_timer_->end(cmd, gpu_stage::buffer_upload);
     });
 
     stats_.timing.compute_cull_ms = measure_ms([&] {
+        gpu_timer_->begin(cmd, gpu_stage::compute_cull);
         {
             vk::MemoryBarrier barrier{};
             barrier.srcAccessMask = vk::AccessFlagBits::eTransferWrite;
@@ -387,11 +402,23 @@ void renderer::render(
                 nullptr
             );
         }
+
+        gpu_timer_->end(cmd, gpu_stage::compute_cull);
     });
 
-    stats_.timing.shadow_pass_ms = measure_ms([&] { render_shadow_pass(world, camera); });
+    stats_.timing.shadow_pass_ms = measure_ms([&] {
+        gpu_timer_->begin(cmd, gpu_stage::shadow_pass);
+        render_shadow_pass(world, camera);
+        gpu_timer_->end(cmd, gpu_stage::shadow_pass);
+    });
 
-    stats_.timing.world_pass_ms = measure_ms([&] { render_world_pass(world, camera); });
+    stats_.timing.world_pass_ms = measure_ms([&] {
+        gpu_timer_->begin(cmd, gpu_stage::world_pass);
+        render_world_pass(world, camera);
+        gpu_timer_->end(cmd, gpu_stage::world_pass);
+    });
+
+    gpu_timer_->end(cmd, gpu_stage::frame);
 
     vk_must(command_buffers_[current_image_index_].end(), "record command buffer");
 }
@@ -1393,15 +1420,29 @@ void renderer::render_world_pass(
 
     command_buffers_[current_image_index_].setScissor(0, scissor);
 
-    stats_.timing.world_pass_geometry_ms = measure_ms([&] { render_world(world, camera); });
+    auto cmd = command_buffers_[current_image_index_];
+
+    stats_.timing.world_pass_geometry_ms = measure_ms([&] {
+        gpu_timer_->begin(cmd, gpu_stage::world_geometry);
+        render_world(world, camera);
+        gpu_timer_->end(cmd, gpu_stage::world_geometry);
+    });
 
     command_buffers_[current_image_index_].nextSubpass(vk::SubpassContents::eInline);
 
-    stats_.timing.world_pass_debug_ms = measure_ms([&] { render_debug_primitives(); });
+    stats_.timing.world_pass_debug_ms = measure_ms([&] {
+        gpu_timer_->begin(cmd, gpu_stage::world_debug);
+        render_debug_primitives();
+        gpu_timer_->end(cmd, gpu_stage::world_debug);
+    });
 
     command_buffers_[current_image_index_].nextSubpass(vk::SubpassContents::eInline);
 
-    stats_.timing.world_pass_imgui_ms = measure_ms([&] { render_imgui(); });
+    stats_.timing.world_pass_imgui_ms = measure_ms([&] {
+        gpu_timer_->begin(cmd, gpu_stage::world_imgui);
+        render_imgui();
+        gpu_timer_->end(cmd, gpu_stage::world_imgui);
+    });
 
     command_buffers_[current_image_index_].endRenderPass();
 }

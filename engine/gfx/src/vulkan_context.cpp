@@ -251,6 +251,19 @@ auto vulkan_context::create_logical_device_() -> void {
     present_queue_  = device_.getQueue(queue_families_.present_family.value(), 0);
 }
 
+auto vulkan_context::get_timestamp_period() const -> float32 {
+    return physical_device_.getProperties().limits.timestampPeriod;
+}
+
+auto vulkan_context::get_timestamp_valid_bits() const -> uint32 {
+    const auto families = physical_device_.getQueueFamilyProperties();
+    const uint32 graphics = queue_families_.graphics_family.value();
+    if (graphics >= families.size()) {
+        return 0;
+    }
+    return families[graphics].timestampValidBits;
+}
+
 auto vulkan_context::create_command_pool_() -> void {
     command_pool_ = vk_must(
         device_.createCommandPool({
