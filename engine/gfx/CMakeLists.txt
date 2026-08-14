@@ -34,6 +34,7 @@ target_sources(vw_gfx
         src/cull_pipeline.cpp
         src/renderer.cpp
         src/debug_window.cpp
+        src/frame_recorder.cpp
         src/engine.cpp
 )
 

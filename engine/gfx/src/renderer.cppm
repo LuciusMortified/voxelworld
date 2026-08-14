@@ -132,6 +132,11 @@ public:
 
     [[nodiscard]] auto get_stats() const -> const renderer_stats&;
 
+    [[nodiscard]] auto get_present_mode_name() const -> std::string_view;
+    [[nodiscard]] static constexpr auto get_frames_in_flight() -> uint32 {
+        return static_cast<uint32>(MAX_FRAMES_IN_FLIGHT);
+    }
+
     [[nodiscard]] auto get_descriptor_pool() const -> vk::DescriptorPool {
         return descriptor_pool_;
     }
@@ -273,6 +278,7 @@ private:
     std::vector<vk::Image> swapchain_images_;
     vk::Format swapchain_image_format_ = vk::Format::eUndefined;
     vk::Extent2D swapchain_extent_{};
+    vk::PresentModeKHR present_mode_   = vk::PresentModeKHR::eFifo;
     std::vector<vk::ImageView> swapchain_image_views_;
 
     // MSAA

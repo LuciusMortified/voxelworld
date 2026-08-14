@@ -39,6 +39,12 @@ public:
         [[maybe_unused]] float delta_time
     ) {}
 
+    // A benchmark run holds off warmup until the scene reports itself settled,
+    // so streaming that has not finished cannot leak into the samples.
+    [[nodiscard]] virtual auto is_bench_ready() const -> bool {
+        return true;
+    }
+
 protected:
     [[nodiscard]] auto get_engine() const -> engine_type& {
         return *engine_;
@@ -122,6 +128,56 @@ struct engine_stats {
     uint64 vram_usage_bytes = 0;
 };
 
+// Turns the engine into an offline benchmark: run a fixed number of frames,
+// write a timing report, exit. Measurement is off unless measure_frames is set.
+struct bench_config {
+    uint32 warmup_frames  = 0;
+    uint32 measure_frames = 0;
+    std::string report_path;
+
+    // Feeds the world a fixed step instead of the measured one, so simulation
+    // work does not drift with the frame rate it is meant to measure.
+    float32 fixed_delta_seconds = 0.0f;
+
+    [[nodiscard]] auto enabled() const -> bool {
+        return measure_frames > 0;
+    }
+};
+
+}  // namespace vw::gfx
+
+namespace vw::gfx {
+
+struct frame_sample {
+    engine_stats engine{};
+    render_timing_stats render{};
+};
+
+// Accumulates whole frame samples over a benchmark run and reduces them to
+// percentiles. Samples are kept intact on purpose: a spike in the total frame
+// time only means something next to the stage that produced it.
+class frame_recorder final {
+public:
+    explicit frame_recorder(uint32 capacity);
+
+    auto record(const frame_sample& sample) -> void;
+
+    [[nodiscard]] auto sample_count() const -> uint32;
+    [[nodiscard]] auto report() const -> std::string;
+
+private:
+    using stage_getter = auto (*)(const frame_sample&) -> float32;
+
+    [[nodiscard]] auto percentile_of(stage_getter get, float32 quantile) const -> float32;
+
+    std::vector<frame_sample> samples_;
+    mutable std::vector<float32> scratch_;
+};
+
+}  // namespace vw::gfx
+
+export namespace vw::gfx {
+
 class engine final {
 public:
     using renderer_type     = renderer;
@@ -129,7 +185,7 @@ public:
     using debug_window_type = debug_window;
     using app_type          = app;
 
-    engine(int width, int height, std::string_view title);
+    engine(int32 width, int32 height, std::string_view title, bench_config bench = {});
     ~engine();
 
     engine(const engine&)                    = delete;
@@ -157,6 +213,9 @@ private:
 
     void render(float delta_time);
 
+    auto bench_tick_() -> void;
+    auto write_bench_report_() const -> void;
+
     std::unique_ptr<window> window_;
     std::unique_ptr<vulkan_context> vulkan_context_;
     std::unique_ptr<renderer_type> renderer_;
@@ -173,6 +232,11 @@ private:
     mutable engine_stats stats_;
     std::chrono::high_resolution_clock::time_point frame_start_time_;
     std::chrono::high_resolution_clock::time_point last_memory_update_time_;
+
+    bench_config bench_;
+    std::unique_ptr<frame_recorder> recorder_;
+    uint64 frame_index_       = 0;
+    uint64 bench_start_frame_ = 0;
 
     static constexpr float MEMORY_UPDATE_INTERVAL_SEC = 1.0f;
 

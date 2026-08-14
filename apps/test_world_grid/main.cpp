@@ -10,12 +10,18 @@ import vw.gfx;
 
 using namespace vw;
 
+enum class bench_scene {
+    off,
+    parked,
+    flythrough,
+};
+
 class world_grid_app final : public gfx::app {
 public:
     explicit world_grid_app(
-        gfx::engine& eng
+        gfx::engine& eng, bench_scene scene = bench_scene::off
     )
-        : app{eng} {
+        : app{eng}, bench_scene_{scene} {
         auto& window = get_engine().get_window();
         auto& camera = get_engine().get_camera();
 
@@ -50,10 +56,31 @@ public:
         }
     }
 
+    // Readiness latches: it gates the initial load only. Once the flythrough
+    // starts, streaming never settles again, and the streaming cost is exactly
+    // what that scene is there to measure.
+    [[nodiscard]] auto is_bench_ready() const -> bool override {
+        if (bench_ready_) {
+            return true;
+        }
+        if (!camera_placed_) {
+            return false;
+        }
+
+        const auto& wgs = get_engine().get_world().system<ecs::world_grid_system>();
+        bench_ready_    = wgs.get_stats().pending_count == 0 &&
+            get_engine().get_renderer().get_mesh_pool().get_pending_count() == 0;
+        return bench_ready_;
+    }
+
     void render(
         float delta_time
     ) override {
-        camera_controller_->update(delta_time);
+        if (bench_scene_ == bench_scene::off) {
+            camera_controller_->update(delta_time);
+        } else {
+            drive_bench_camera();
+        }
         try_place_camera();
 
         const auto& camera = get_engine().get_camera();
@@ -72,6 +99,38 @@ public:
     }
 
 private:
+    // Camera path is a function of the frame index, never of elapsed time:
+    // a benchmark that steers by wall clock measures a different flight on
+    // every machine.
+    auto drive_bench_camera() -> void {
+        if (!camera_placed_) {
+            return;
+        }
+
+        auto& camera = get_engine().get_camera();
+
+        if (bench_scene_ == bench_scene::parked) {
+            camera.set_position({0.0f, bench_altitude_, 0.0f});
+            camera.set_rotation(-10.0f, 0.0f);
+            return;
+        }
+
+        if (!bench_ready_) {
+            return;
+        }
+
+        const auto frame    = static_cast<float32>(bench_frame_++);
+        const float32 angle = frame * bench_degrees_per_frame_;
+        const float32 rad   = math::radians(angle);
+
+        camera.set_position({
+            std::sin(rad) * bench_radius_,
+            bench_altitude_,
+            std::cos(rad) * bench_radius_,
+        });
+        camera.set_rotation(-10.0f, angle + 90.0f);
+    }
+
     void try_place_camera() {
         if (camera_placed_) {
             return;
@@ -85,7 +144,8 @@ private:
         auto scale = static_cast<float32>(generator_params_.voxel_scale);
         float32 cam_y = (static_cast<float32>(*surface) + 3.0f) * scale;
         get_engine().get_camera().set_position({0.0f, cam_y, 0.0f});
-        camera_placed_ = true;
+        bench_altitude_ = cam_y;
+        camera_placed_  = true;
     }
 
     void setup_world_grid() {
@@ -180,13 +240,65 @@ private:
     ecs::perlin_terrain_generator* generator_ = nullptr;
     ecs::perlin_terrain_generator::params generator_params_;
     bool camera_placed_ = false;
+
+    bench_scene bench_scene_  = bench_scene::off;
+    float32 bench_altitude_   = 0.0f;
+    mutable bool bench_ready_ = false;
+    uint64 bench_frame_       = 0;
+
+    static constexpr float32 bench_radius_            = 1500.0f;
+    static constexpr float32 bench_degrees_per_frame_ = 0.25f;
 };
 
-auto main() -> int {
+namespace {
+
+auto option_value(std::string_view arg, std::string_view name) -> std::optional<std::string_view> {
+    if (!arg.starts_with(name) || arg.size() <= name.size() || arg[name.size()] != '=') {
+        return std::nullopt;
+    }
+    return arg.substr(name.size() + 1);
+}
+
+auto parse_uint(std::string_view text, uint32 fallback) -> uint32 {
+    uint32 value = 0;
+    const auto* end = text.data() + text.size();
+    if (std::from_chars(text.data(), end, value).ec != std::errc{}) {
+        return fallback;
+    }
+    return value;
+}
+
+}  // namespace
+
+auto main(int argc, char** argv) -> int {
+    gfx::bench_config bench;
+    auto scene = bench_scene::off;
+
+    for (int32 i = 1; i < argc; ++i) {
+        if (const auto value = option_value(std::string_view{argv[i]}, "--bench")) {
+            scene = (*value == "parked") ? bench_scene::parked : bench_scene::flythrough;
+            bench.measure_frames      = 2000;
+            bench.warmup_frames       = 200;
+            bench.fixed_delta_seconds = 1.0f / 60.0f;
+        }
+    }
+
+    for (int32 i = 1; i < argc; ++i) {
+        const std::string_view arg{argv[i]};
+
+        if (const auto value = option_value(arg, "--bench-frames")) {
+            bench.measure_frames = parse_uint(*value, 2000);
+        } else if (const auto value = option_value(arg, "--bench-warmup")) {
+            bench.warmup_frames = parse_uint(*value, 200);
+        } else if (const auto value = option_value(arg, "--bench-out")) {
+            bench.report_path = std::string{*value};
+        }
+    }
+
     try {
         log::add_file_sink("test_world_grid.log");
-        std::make_unique<gfx::engine>(1280, 720, "Voxel World - World Grid Test")
-            ->run<world_grid_app>();
+        std::make_unique<gfx::engine>(1280, 720, "Voxel World - World Grid Test", std::move(bench))
+            ->run<world_grid_app>(scene);
     } catch (const std::exception& e) {
         log::error("Error: {}", e.what());
         return 1;

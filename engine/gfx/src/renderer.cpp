@@ -207,6 +207,16 @@ void renderer::end_frame() {
     current_frame_ = (current_frame_ + 1) % MAX_FRAMES_IN_FLIGHT;
 }
 
+auto renderer::get_present_mode_name() const -> std::string_view {
+    switch (present_mode_) {
+        case vk::PresentModeKHR::eImmediate: return "immediate";
+        case vk::PresentModeKHR::eMailbox: return "mailbox";
+        case vk::PresentModeKHR::eFifo: return "fifo";
+        case vk::PresentModeKHR::eFifoRelaxed: return "fifo_relaxed";
+        default: return "other";
+    }
+}
+
 const renderer_stats& renderer::get_stats() const {
     stats_.combined_buffers = combined_buffer_pool_->get_stats();
     return stats_;
@@ -423,8 +433,9 @@ void renderer::create_swapchain() {
     auto swapchain_support = context_->query_swapchain_support_();
 
     vk::SurfaceFormatKHR surface_format = choose_swap_surface_format(swapchain_support.formats);
-    vk::PresentModeKHR present_mode     = choose_swap_present_mode(swapchain_support.present_modes);
     vk::Extent2D extent                 = choose_swap_extent(swapchain_support.capabilities);
+
+    present_mode_ = choose_swap_present_mode(swapchain_support.present_modes);
 
     uint32 image_count = swapchain_support.capabilities.minImageCount + 1;
     if (swapchain_support.capabilities.maxImageCount > 0 &&
@@ -443,7 +454,7 @@ void renderer::create_swapchain() {
     create_info.imageSharingMode = vk::SharingMode::eExclusive;
     create_info.preTransform     = swapchain_support.capabilities.currentTransform;
     create_info.compositeAlpha   = vk::CompositeAlphaFlagBitsKHR::eOpaque;
-    create_info.presentMode      = present_mode;
+    create_info.presentMode      = present_mode_;
     create_info.clipped          = vk::True;
     create_info.oldSwapchain     = nullptr;
 

@@ -16,6 +16,7 @@ import vw.ecs;
 import vw.world;
 import vw.platform;
 import :vk;
+import :engine;
 
 #ifdef _WIN32
 #ifndef NOMINMAX
@@ -27,9 +28,25 @@ import :vk;
 
 namespace vw::gfx {
 
+namespace {
+constexpr log::log_category lc_bench_{"bench"};
+
+constexpr std::string_view build_config =
+#ifdef NDEBUG
+    "Release";
+#else
+    "Debug";
+#endif
+}  // namespace
+
 engine::engine(
-    int width, int height, std::string_view title
-) {
+    int32 width, int32 height, std::string_view title, bench_config bench
+)
+    : bench_(std::move(bench)) {
+    if (bench_.enabled()) {
+        recorder_ = std::make_unique<frame_recorder>(bench_.measure_frames);
+    }
+
     window_         = std::make_unique<window>(width, height, title);
     vulkan_context_ = std::make_unique<vulkan_context>(*window_);
     renderer_       = std::make_unique<renderer_type>(*vulkan_context_, *window_, block_registry_);
@@ -116,13 +133,67 @@ void engine::main_loop() {
         auto delta_time   = std::chrono::duration<float>(current_time - last_frame_time_).count();
         delta_time        = std::min(delta_time, 0.1f);
 
+        if (bench_.fixed_delta_seconds > 0.0f) {
+            delta_time = bench_.fixed_delta_seconds;
+        }
+
         window_->poll_events();
 
         render(delta_time);
 
         update_stats();
         last_frame_time_ = current_time;
+        ++frame_index_;
+
+        if (bench_.enabled()) {
+            bench_tick_();
+        }
     }
+}
+
+auto engine::bench_tick_() -> void {
+    if (!app_->is_bench_ready()) {
+        bench_start_frame_ = frame_index_;
+        return;
+    }
+
+    if (frame_index_ - bench_start_frame_ <= bench_.warmup_frames) {
+        return;
+    }
+
+    recorder_->record({.engine = stats_, .render = renderer_->get_stats().timing});
+
+    if (recorder_->sample_count() >= bench_.measure_frames) {
+        write_bench_report_();
+        shutdown();
+    }
+}
+
+auto engine::write_bench_report_() const -> void {
+    const auto props = vulkan_context_->get_physical_device().getProperties();
+
+    std::string report = std::format(
+        "gpu: {}\nbuild: {}\npresent mode: {}\nframes in flight: {}\nwarmup frames: {}\n{}",
+        static_cast<const char*>(props.deviceName),
+        build_config,
+        renderer_->get_present_mode_name(),
+        renderer_type::get_frames_in_flight(),
+        bench_.warmup_frames,
+        recorder_->report()
+    );
+
+    log::info(lc_bench_, "benchmark report\n{}", report);
+
+    if (bench_.report_path.empty()) {
+        return;
+    }
+
+    std::ofstream out{bench_.report_path};
+    if (!out) {
+        log::error(lc_bench_, "cannot write bench report to {}", bench_.report_path);
+        return;
+    }
+    out << report;
 }
 
 void engine::render(
