@@ -95,45 +95,6 @@ auto buffer::copy_to(
     std::memcpy(data, static_cast<char*>(mapped) + offset, size);
 }
 
-auto buffer::copy_to_buffer(
-    buffer& dst,
-    vk::DeviceSize size,
-    vk::DeviceSize src_offset,
-    vk::DeviceSize dst_offset
-) -> void {
-    const vk::Device device = context_->get_device();
-
-    const auto command_buffers = vk_must(
-        device.allocateCommandBuffers({
-            .commandPool        = context_->get_command_pool(),
-            .level              = vk::CommandBufferLevel::ePrimary,
-            .commandBufferCount = 1,
-        }),
-        "allocate copy command buffer"
-    );
-    const vk::CommandBuffer command_buffer = command_buffers.front();
-
-    vk_must(
-        command_buffer.begin({.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit}),
-        "begin copy command buffer"
-    );
-    command_buffer.copyBuffer(
-        buffer_,
-        dst.buffer_,
-        vk::BufferCopy{.srcOffset = src_offset, .dstOffset = dst_offset, .size = size}
-    );
-    vk_must(command_buffer.end(), "end copy command buffer");
-
-    const vk::Queue queue = context_->get_graphics_queue();
-    vk_must(
-        queue.submit(vk::SubmitInfo{.commandBufferCount = 1, .pCommandBuffers = &command_buffer}),
-        "submit buffer copy"
-    );
-    vk_must(queue.waitIdle(), "wait for buffer copy");
-
-    device.freeCommandBuffers(context_->get_command_pool(), command_buffer);
-}
-
 auto buffer::find_memory_type(uint32 type_filter, vk::MemoryPropertyFlags properties) const
     -> uint32 {
     const vk::PhysicalDeviceMemoryProperties mem_properties =

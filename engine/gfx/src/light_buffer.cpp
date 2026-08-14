@@ -14,10 +14,12 @@ using namespace ::vw::ecs;
 
 light_buffer::light_buffer(
     vulkan_context& context,
+    deletion_queue& deletion,
     vk::DescriptorPool descriptor_pool,
     vk::DescriptorSetLayout descriptor_set_layout
 )
     : context_(&context)
+    , deletion_(&deletion)
     , capacity_(default_capacity_)
     , descriptor_pool_(descriptor_pool)
     , descriptor_set_layout_(descriptor_set_layout)
@@ -98,17 +100,12 @@ void light_buffer::expand_buffer_if_needed(uint32 required_count) {
         capacity_ *= 2;
     }
 
+    // No copy: update() rewrites the whole buffer right after this returns.
     auto new_lights_buffer = std::make_unique<storage_buffer>(
         *context_, capacity_ * sizeof(point_light_data)
     );
 
-    if (lights_count_ > 0) {
-        lights_buffer_->copy_to_buffer(
-            *new_lights_buffer, lights_count_ * sizeof(point_light_data)
-        );
-    }
-
-    lights_buffer_ = std::move(new_lights_buffer);
+    deletion_->retire(std::exchange(lights_buffer_, std::move(new_lights_buffer)));
     update_descriptor_set();
 }
 

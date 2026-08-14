@@ -81,7 +81,7 @@ renderer::renderer(
     );
 
     light_buffer_ = std::make_unique<light_buffer_type>(
-        *context_, descriptor_pool_, point_lights_descriptor_set_layout_
+        *context_, deletion_queue_, descriptor_pool_, point_lights_descriptor_set_layout_
     );
 
     palette_buffer_ = std::make_unique<palette_buffer>(

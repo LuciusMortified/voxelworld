@@ -100,6 +100,17 @@ void staging_buffer::copy_to(
     pending_copies_.push_back({buffer_, dst, {staging_offset, dst_offset, size}});
 }
 
+void staging_buffer::copy_buffer(
+    vk::Buffer src, vk::DeviceSize src_offset,
+    vk::Buffer dst, vk::DeviceSize dst_offset,
+    vk::DeviceSize size
+) {
+    if (size == 0) {
+        return;
+    }
+    pending_copies_.push_back({src, dst, {src_offset, dst_offset, size}});
+}
+
 void staging_buffer::zero_region(
     vk::Buffer dst, vk::DeviceSize dst_offset, vk::DeviceSize size
 ) {
@@ -134,10 +145,35 @@ void staging_buffer::flush(
         }
     );
 
+    bool saw_device_copy = false;
+    bool barrier_emitted = false;
+
     for (auto it = pending_copies_.begin(); it != pending_copies_.end();) {
         auto batch_end = std::find_if(it + 1, pending_copies_.end(), [&](const pending_copy& c) {
             return c.src != it->src || c.dst != it->dst;
         });
+
+        // Growth copies run first and may target the same regions this frame's
+        // staging writes are about to touch, so the two groups need ordering.
+        if (it->src == buffer_) {
+            if (saw_device_copy && !barrier_emitted) {
+                const vk::MemoryBarrier barrier{
+                    .srcAccessMask = vk::AccessFlagBits::eTransferWrite,
+                    .dstAccessMask = vk::AccessFlagBits::eTransferWrite,
+                };
+                cmd.pipelineBarrier(
+                    vk::PipelineStageFlagBits::eTransfer,
+                    vk::PipelineStageFlagBits::eTransfer,
+                    {},
+                    barrier,
+                    {},
+                    {}
+                );
+                barrier_emitted = true;
+            }
+        } else {
+            saw_device_copy = true;
+        }
 
         flush_regions_.clear();
         for (auto r = it; r != batch_end; ++r) {

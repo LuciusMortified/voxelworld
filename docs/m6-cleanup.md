@@ -131,5 +131,5 @@ Sculptor пересобирала всех, кто включал её заго�
 
 - **CI не прогонялся** — см. выше.
 - `docs/ENGINE.md` описывает структуру каталогов до миграции.
-- Хвосты M5: план — `docs/m5-tails-plan.md`. Измерение кадрового времени
-  сделано (`docs/frame-time-baseline.md`), `deletion_queue` (D4) — нет.
+- Хвосты M5 закрыты: `docs/m5-tails-plan.md`, числа — в
+  `docs/frame-time-baseline.md`.

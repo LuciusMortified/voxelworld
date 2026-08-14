@@ -444,15 +444,20 @@ void combined_buffer::expand_mesh_buffers_() {
     auto new_vertex_buffer = std::make_unique<device_vertex_buffer>(
         *context_, mesh_capacity_ * chunk_size_.vertex_count * sizeof(vertex)
     );
-    vertex_buffer_->copy_to_buffer(*new_vertex_buffer, old_vertex_bytes);
-
     auto new_index_buffer = std::make_unique<device_index_buffer>(
         *context_, mesh_capacity_ * chunk_size_.index_count * sizeof(uint32)
     );
-    index_buffer_->copy_to_buffer(*new_index_buffer, old_index_bytes);
 
     staging_->replace_buffer(vertex_buffer_->get_buffer(), new_vertex_buffer->get_buffer());
     staging_->replace_buffer(index_buffer_->get_buffer(), new_index_buffer->get_buffer());
+
+    // After replace_buffer, or it would retarget these onto themselves
+    staging_->copy_buffer(
+        vertex_buffer_->get_buffer(), 0, new_vertex_buffer->get_buffer(), 0, old_vertex_bytes
+    );
+    staging_->copy_buffer(
+        index_buffer_->get_buffer(), 0, new_index_buffer->get_buffer(), 0, old_index_bytes
+    );
 
     deletion_->retire(std::exchange(vertex_buffer_, std::move(new_vertex_buffer)));
     deletion_->retire(std::exchange(index_buffer_, std::move(new_index_buffer)));
@@ -483,22 +488,6 @@ void combined_buffer::expand_instance_buffers_() {
         *context_, instance_capacity_ * 2 * sizeof(vec4f)
     );
 
-    model_matrix_buffer_->copy_to_buffer(
-        *new_model_matrix_buffer, instance_count * sizeof(mat4f)
-    );
-    normal_matrix_buffer_->copy_to_buffer(
-        *new_normal_matrix_buffer, instance_count * sizeof(mat4f)
-    );
-    indirect_draw_buffer_->copy_to_buffer(
-        *new_indirect_draw_buffer, instance_count * sizeof(draw_command)
-    );
-    instance_index_buffer_->copy_to_buffer(
-        *new_instance_index_buffer, instance_count * sizeof(uint32)
-    );
-    aabb_buffer_->copy_to_buffer(
-        *new_aabb_buffer, instance_count * 2 * sizeof(vec4f)
-    );
-
     staging_->replace_buffer(
         model_matrix_buffer_->get_buffer(), new_model_matrix_buffer->get_buffer()
     );
@@ -513,6 +502,33 @@ void combined_buffer::expand_instance_buffers_() {
     );
     staging_->replace_buffer(
         aabb_buffer_->get_buffer(), new_aabb_buffer->get_buffer()
+    );
+
+    // After replace_buffer, or it would retarget these onto themselves
+    staging_->copy_buffer(
+        model_matrix_buffer_->get_buffer(), 0,
+        new_model_matrix_buffer->get_buffer(), 0,
+        instance_count * sizeof(mat4f)
+    );
+    staging_->copy_buffer(
+        normal_matrix_buffer_->get_buffer(), 0,
+        new_normal_matrix_buffer->get_buffer(), 0,
+        instance_count * sizeof(mat4f)
+    );
+    staging_->copy_buffer(
+        indirect_draw_buffer_->get_buffer(), 0,
+        new_indirect_draw_buffer->get_buffer(), 0,
+        instance_count * sizeof(draw_command)
+    );
+    staging_->copy_buffer(
+        instance_index_buffer_->get_buffer(), 0,
+        new_instance_index_buffer->get_buffer(), 0,
+        instance_count * sizeof(uint32)
+    );
+    staging_->copy_buffer(
+        aabb_buffer_->get_buffer(), 0,
+        new_aabb_buffer->get_buffer(), 0,
+        instance_count * 2 * sizeof(vec4f)
     );
 
     deletion_->retire(std::exchange(model_matrix_buffer_, std::move(new_model_matrix_buffer)));

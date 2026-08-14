@@ -117,10 +117,6 @@ public:
         copy_to(&dst, sizeof(T), offset);
     }
 
-    void copy_to_buffer(
-        buffer& dst, vk::DeviceSize size, vk::DeviceSize src_offset = 0, vk::DeviceSize dst_offset = 0
-    );
-
 protected:
     vk::DeviceSize size_;
 
@@ -366,6 +362,15 @@ public:
 
     void copy_to(
         vk::Buffer dst, vk::DeviceSize dst_offset, vk::DeviceSize staging_offset, vk::DeviceSize size
+    );
+
+    // Device-to-device copy recorded into the same frame command buffer. Flush
+    // orders these ahead of the staging writes, which is what buffer growth
+    // needs: carry the old contents over first, then apply this frame's writes.
+    void copy_buffer(
+        vk::Buffer src, vk::DeviceSize src_offset,
+        vk::Buffer dst, vk::DeviceSize dst_offset,
+        vk::DeviceSize size
     );
 
     void zero_region(vk::Buffer dst, vk::DeviceSize dst_offset, vk::DeviceSize size);
@@ -726,6 +731,7 @@ public:
 
     explicit light_buffer(
         vulkan_context& context,
+        deletion_queue& deletion,
         vk::DescriptorPool descriptor_pool,
         vk::DescriptorSetLayout descriptor_set_layout
     );
@@ -744,6 +750,7 @@ private:
     static constexpr uint32 default_capacity_ = 64;
 
     vulkan_context* context_;
+    deletion_queue* deletion_;
     uint32 capacity_;
     std::unique_ptr<storage_buffer> lights_buffer_;
 
