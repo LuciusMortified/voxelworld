@@ -14,14 +14,15 @@ enum class bench_scene {
     off,
     parked,
     flythrough,
+    crowd,
 };
 
 class world_grid_app final : public gfx::app {
 public:
     explicit world_grid_app(
-        gfx::engine& eng, bench_scene scene = bench_scene::off
+        gfx::engine& eng, bench_scene scene = bench_scene::off, uint32 crowd_size = 0
     )
-        : app{eng}, bench_scene_{scene} {
+        : app{eng}, bench_scene_{scene}, crowd_size_{crowd_size} {
         auto& window = get_engine().get_window();
         auto& camera = get_engine().get_camera();
 
@@ -72,8 +73,18 @@ public:
         }
 
         const auto& wgs = get_engine().get_world().system<ecs::world_grid_system>();
-        bench_ready_    = wgs.get_stats().pending_count == 0 &&
+        const bool streamed = wgs.get_stats().pending_count == 0 &&
             get_engine().get_renderer().get_mesh_pool().get_pending_count() == 0;
+
+        // The crowd is spawned in the air and has to land before it is worth
+        // measuring: bodies caught mid-fall put a different amount of work in
+        // every run, and the spread swamps what the scene is there to measure.
+        if (crowd_size_ > 0) {
+            bench_ready_ = streamed && crowd_settle_frames_ >= crowd_settle_target_;
+            return bench_ready_;
+        }
+
+        bench_ready_ = streamed;
         return bench_ready_;
     }
 
@@ -86,6 +97,7 @@ public:
             drive_bench_camera();
         }
         try_place_camera();
+        tick_crowd_settle_();
 
         const auto& camera = get_engine().get_camera();
         const auto cam_pos = camera.get_position();
@@ -116,6 +128,12 @@ private:
         if (bench_scene_ == bench_scene::parked) {
             camera.set_position({0.0f, bench_altitude_, 0.0f});
             camera.set_rotation(-10.0f, 0.0f);
+            return;
+        }
+
+        if (bench_scene_ == bench_scene::crowd) {
+            camera.set_position({0.0f, bench_altitude_ + 60.0f, 260.0f});
+            camera.set_rotation(-15.0f, 180.0f);
             return;
         }
 
@@ -150,6 +168,136 @@ private:
         get_engine().get_camera().set_position({0.0f, cam_y, 0.0f});
         bench_altitude_ = cam_y;
         camera_placed_  = true;
+
+        if (crowd_size_ > 0) {
+            spawn_crowd(cam_y);
+        }
+    }
+
+    auto tick_crowd_settle_() -> void {
+        if (crowd_size_ == 0 || crowd_.empty()) {
+            return;
+        }
+        if (crowd_settle_frames_ < crowd_settle_target_) {
+            ++crowd_settle_frames_;
+        }
+    }
+
+    // A crowd of animated, physical bodies: the scene the PRD actually cares
+    // about, and the only one where per-entity CPU work is visible at all.
+    void spawn_crowd(
+        float32 ground_y
+    ) {
+        auto& world    = get_engine().get_world();
+        auto& registry = world.resource<asset::model_registry>();
+
+        auto body = registry.create("crowd_body", 6, 12, 4);
+        body->fill(voxel{blocks::blue_3});
+        auto head = registry.create("crowd_head", 6, 6, 6);
+        head->fill(voxel{blocks::brown_2});
+        auto hand = registry.create("crowd_hand", 3, 8, 3);
+        hand->fill(voxel{blocks::green_4});
+
+        const std::array<std::pair<std::shared_ptr<asset::model>, vec3f>, 4> parts{{
+            {body, vec3f{0.0f, 8.0f, 0.0f}},
+            {head, vec3f{0.0f, 20.0f, 0.0f}},
+            {hand, vec3f{-5.0f, 8.0f, 0.0f}},
+            {hand, vec3f{5.0f, 8.0f, 0.0f}},
+        }};
+
+        const auto clip = make_crowd_clip(world);
+
+        const auto side = static_cast<int32>(std::ceil(std::sqrt(static_cast<float32>(crowd_size_))));
+        constexpr float32 spacing = 40.0f;
+        const float32 origin = -0.5f * static_cast<float32>(side - 1) * spacing;
+
+        auto& transform_sys = world.system<ecs::transform_system>();
+        auto& hierarchy_sys = world.system<ecs::hierarchy_system>();
+        auto& physics_sys   = world.system<ecs::physics_system>();
+        auto& model_sys     = world.system<ecs::model_system>();
+        auto& anim_sys      = world.system<ecs::animation_system>();
+
+        for (uint32 i = 0; i < crowd_size_; ++i) {
+            const auto col = static_cast<int32>(i) % side;
+            const auto row = static_cast<int32>(i) / side;
+
+            const auto root = world.create()
+                .with<ecs::hierarchy_component>()
+                .with<ecs::transform_component>()
+                .with<ecs::spatial_component>()
+                .with<ecs::rigid_body_component>()
+                .with<ecs::box_collider_component>()
+                .with<ecs::animation_player_component>()
+                .get_entity();
+
+            // Dropped from just above the ground and given time to land before
+            // the run starts: settling them by hand onto uneven terrain leaves
+            // bodies part-buried, and the push-out is worse than the fall.
+            transform_sys.modify(root).set_position({
+                origin + (static_cast<float32>(col) * spacing),
+                ground_y + 40.0f,
+                origin + (static_cast<float32>(row) * spacing),
+            });
+            physics_sys.modify_collider(root).set_extents({12.0f, 24.0f, 12.0f});
+            world.system<ecs::spatial_system>().modify(root).set_layer(
+                ecs::spatial_layer::character
+            );
+
+            for (size_t part = 0; part < parts.size(); ++part) {
+                const auto ent = world.create()
+                    .with<ecs::hierarchy_component>()
+                    .with<ecs::transform_component>()
+                    .with<ecs::spatial_component>()
+                    .with<ecs::model_component>()
+                    .with<ecs::animation_target_component>()
+                    .get_entity();
+
+                hierarchy_sys.modify(ent).set_parent(root);
+
+                transform rest;
+                rest.set_position(parts[part].second);
+                transform_sys.modify(ent).set_transform(rest);
+                model_sys.modify(ent).set_model(parts[part].first);
+
+                const auto target = anim_sys.modify_target(ent);
+                target.set_target_name(std::string{crowd_target_names_[part]});
+                target.set_rest_transform(rest);
+
+                crowd_.push_back(ent);
+            }
+
+            auto player = anim_sys.modify_player(root);
+            player.add_layer(0);
+            player.layer(0).blend_to(clip);
+            player.layer(0).set_loop_mode(asset::animation_loop_mode::loop);
+            player.layer(0).play();
+
+            crowd_.push_back(root);
+        }
+
+        log::info("crowd: {} bodies, {} entities", crowd_size_, crowd_.size());
+    }
+
+    [[nodiscard]] static auto make_crowd_clip(
+        ecs::world& world
+    ) -> std::shared_ptr<asset::animation_clip> {
+        auto& clips = world.resource<asset::animation_clip_registry>();
+        auto clip   = clips.create("crowd_wave");
+
+        for (size_t part = 0; part < crowd_target_names_.size(); ++part) {
+            asset::animation_track track{std::string{crowd_target_names_[part]}, 60.0f};
+
+            asset::animation_channel<vec3f> channel{asset::animation_property::position};
+            const float32 phase = static_cast<float32>(part) * 0.25f;
+            channel.add(asset::keyframe_vec3f{0.0f, vec3f{0.0f, phase, 0.0f}});
+            channel.add(asset::keyframe_vec3f{0.5f, vec3f{0.0f, phase + 2.0f, 0.0f}});
+            channel.add(asset::keyframe_vec3f{1.0f, vec3f{0.0f, phase, 0.0f}});
+            track.add<asset::animation_property::position>(std::move(channel));
+
+            clip->add_track(std::move(track));
+        }
+
+        return clip;
     }
 
     void setup_world_grid() {
@@ -245,6 +393,15 @@ private:
     ecs::perlin_terrain_generator::params generator_params_;
     bool camera_placed_ = false;
 
+    static constexpr std::array<std::string_view, 4> crowd_target_names_{
+        "body", "head", "hand_left", "hand_right"
+    };
+
+    std::vector<ecs::entity> crowd_;
+    uint32 crowd_size_ = 0;
+    uint32 crowd_settle_frames_ = 0;
+    static constexpr uint32 crowd_settle_target_ = 400;
+
     bench_scene bench_scene_  = bench_scene::off;
     float32 bench_altitude_   = 0.0f;
     mutable bool bench_ready_ = false;
@@ -276,11 +433,21 @@ auto parse_uint(std::string_view text, uint32 fallback) -> uint32 {
 
 auto main(int argc, char** argv) -> int {
     gfx::bench_config bench;
-    auto scene = bench_scene::off;
+    auto scene       = bench_scene::off;
+    uint32 crowd_size = 0;
 
     for (int32 i = 1; i < argc; ++i) {
         if (const auto value = option_value(std::string_view{argv[i]}, "--bench")) {
-            scene = (*value == "parked") ? bench_scene::parked : bench_scene::flythrough;
+            if (*value == "crowd" && crowd_size == 0) {
+                crowd_size = 50;
+            }
+            if (*value == "parked") {
+                scene = bench_scene::parked;
+            } else if (*value == "crowd") {
+                scene = bench_scene::crowd;
+            } else {
+                scene = bench_scene::flythrough;
+            }
             bench.measure_frames      = 2000;
             bench.warmup_frames       = 200;
             bench.fixed_delta_seconds = 1.0f / 60.0f;
@@ -296,13 +463,15 @@ auto main(int argc, char** argv) -> int {
             bench.warmup_frames = parse_uint(*value, 200);
         } else if (const auto value = option_value(arg, "--bench-out")) {
             bench.report_path = std::string{*value};
+        } else if (const auto value = option_value(arg, "--bench-crowd")) {
+            crowd_size = parse_uint(*value, 50);
         }
     }
 
     try {
         log::add_file_sink("test_world_grid.log");
         std::make_unique<gfx::engine>(1280, 720, "Voxel World - World Grid Test", std::move(bench))
-            ->run<world_grid_app>(scene);
+            ->run<world_grid_app>(scene, crowd_size);
     } catch (const std::exception& e) {
         log::error("Error: {}", e.what());
         return 1;
