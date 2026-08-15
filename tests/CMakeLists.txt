@@ -66,6 +66,25 @@ vw_use_std_module(world_tests)
 
 catch_discover_tests(world_tests)
 
+# The mesher is CPU-only but lives in vw.gfx, so its tests link the graphics
+# library and are skipped in a headless configuration. They never open a device.
+if(VW_BUILD_GFX)
+    add_executable(gfx_tests gfx/mesher.test.cpp)
+
+    target_link_libraries(gfx_tests PRIVATE
+        vw_core
+        vw_ecs
+        vw_world
+        vw_gfx
+        Catch2::Catch2WithMain
+    )
+
+    target_compile_features(gfx_tests PRIVATE cxx_std_23)
+    vw_use_std_module(gfx_tests)
+
+    catch_discover_tests(gfx_tests)
+endif()
+
 add_executable(view_bench ecs/view_bench.cpp)
 target_link_libraries(view_bench PRIVATE vw_core vw_ecs)
 target_compile_features(view_bench PRIVATE cxx_std_23)

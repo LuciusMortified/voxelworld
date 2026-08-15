@@ -212,144 +212,83 @@ void model::set_voxel_raw(int32 x, int32 y, int32 z, const voxel& v) {
             pool_ptr_->get(entry.pool_index())[li] = v;
             break;
     }
-    increment_generation_();
 }
 
 void model::compute_own_boundaries() {
     constexpr int32 ps = page_size;
 
-    auto fill_yz = [&](detail::boundary_slice& slice, int32 nx) {
-        slice.solid.assign(static_cast<std::size_t>(height_) * depth_, false);
-        slice.valid     = true;
-        const int32 px  = nx / ps;
-        const int32 lx  = nx % ps;
-        for (int32 py = 0; py < pages_y_; ++py) {
-            for (int32 pz = 0; pz < pages_z_; ++pz) {
-                const auto m  = get_page_mode(px, py, pz);
-                const int32 y0 = py * ps;
-                const int32 z0 = pz * ps;
-                if (m == page_mode::empty) {
+    own_faces_valid_ = 0;
+
+    // The bit planes are a fixed 64x64, which is exactly a world chunk. Larger
+    // models (Sculptor's, mostly) have no neighbours to hand them to anyway.
+    if (width_ > face_occupancy::side || height_ > face_occupancy::side ||
+        depth_ > face_occupancy::side) {
+        return;
+    }
+
+    for (auto& face : own_faces_) {
+        face.clear();
+    }
+
+    const auto solid_at = [this](int32 x, int32 y, int32 z) -> bool {
+        return !is_empty(x, y, z);
+    };
+
+    // Page modes still short-circuit the scan: an empty page contributes
+    // nothing, a uniform one contributes everything.
+    const auto scan_face = [&](face_occupancy& face, int32 axis, int32 layer) {
+        for (int32 b = 0; b < face_occupancy::side; ++b) {
+            for (int32 a = 0; a < face_occupancy::side; ++a) {
+                int32 x = 0;
+                int32 y = 0;
+                int32 z = 0;
+                switch (axis) {
+                    case 0: x = layer; y = a; z = b; break;
+                    case 1: x = a; y = layer; z = b; break;
+                    default: x = a; y = b; z = layer; break;
+                }
+
+                if (x >= width_ || y >= height_ || z >= depth_) {
                     continue;
                 }
-                if (m == page_mode::uniform) {
-                    for (int32 ly = 0; ly < ps && y0 + ly < height_; ++ly) {
-                        for (int32 lz = 0; lz < ps && z0 + lz < depth_; ++lz) {
-                            slice.solid[(y0 + ly) * depth_ + (z0 + lz)] = true;
-                        }
-                    }
-                    continue;
-                }
-                const auto* page = get_page(px, py, pz);
-                for (int32 ly = 0; ly < ps && y0 + ly < height_; ++ly) {
-                    for (int32 lz = 0; lz < ps && z0 + lz < depth_; ++lz) {
-                        if (!(*page)[lx + ly * ps + lz * ps * ps].is_empty()) {
-                            slice.solid[(y0 + ly) * depth_ + (z0 + lz)] = true;
-                        }
-                    }
+                if (solid_at(x, y, z)) {
+                    face.set(a, b);
                 }
             }
         }
     };
 
-    auto fill_xz = [&](detail::boundary_slice& slice, int32 ny) {
-        slice.solid.assign(static_cast<std::size_t>(width_) * depth_, false);
-        slice.valid    = true;
-        const int32 py = ny / ps;
-        const int32 ly = ny % ps;
-        for (int32 px = 0; px < pages_x_; ++px) {
-            for (int32 pz = 0; pz < pages_z_; ++pz) {
-                const auto m   = get_page_mode(px, py, pz);
-                const int32 x0 = px * ps;
-                const int32 z0 = pz * ps;
-                if (m == page_mode::empty) {
-                    continue;
-                }
-                if (m == page_mode::uniform) {
-                    for (int32 lx = 0; lx < ps && x0 + lx < width_; ++lx) {
-                        for (int32 lz = 0; lz < ps && z0 + lz < depth_; ++lz) {
-                            slice.solid[(x0 + lx) * depth_ + (z0 + lz)] = true;
-                        }
-                    }
-                    continue;
-                }
-                const auto* page = get_page(px, py, pz);
-                for (int32 lx = 0; lx < ps && x0 + lx < width_; ++lx) {
-                    for (int32 lz = 0; lz < ps && z0 + lz < depth_; ++lz) {
-                        if (!(*page)[lx + ly * ps + lz * ps * ps].is_empty()) {
-                            slice.solid[(x0 + lx) * depth_ + (z0 + lz)] = true;
-                        }
-                    }
-                }
-            }
-        }
-    };
+    scan_face(own_faces_[0], 0, 0);
+    scan_face(own_faces_[1], 0, width_ - 1);
+    scan_face(own_faces_[2], 1, 0);
+    scan_face(own_faces_[3], 1, height_ - 1);
+    scan_face(own_faces_[4], 2, 0);
+    scan_face(own_faces_[5], 2, depth_ - 1);
 
-    auto fill_xy = [&](detail::boundary_slice& slice, int32 nz) {
-        slice.solid.assign(static_cast<std::size_t>(width_) * height_, false);
-        slice.valid    = true;
-        const int32 pz = nz / ps;
-        const int32 lz = nz % ps;
-        for (int32 px = 0; px < pages_x_; ++px) {
-            for (int32 py = 0; py < pages_y_; ++py) {
-                const auto m   = get_page_mode(px, py, pz);
-                const int32 x0 = px * ps;
-                const int32 y0 = py * ps;
-                if (m == page_mode::empty) {
-                    continue;
-                }
-                if (m == page_mode::uniform) {
-                    for (int32 lx = 0; lx < ps && x0 + lx < width_; ++lx) {
-                        for (int32 ly = 0; ly < ps && y0 + ly < height_; ++ly) {
-                            slice.solid[(x0 + lx) * height_ + (y0 + ly)] = true;
-                        }
-                    }
-                    continue;
-                }
-                const auto* page = get_page(px, py, pz);
-                for (int32 lx = 0; lx < ps && x0 + lx < width_; ++lx) {
-                    for (int32 ly = 0; ly < ps && y0 + ly < height_; ++ly) {
-                        if (!(*page)[lx + ly * ps + lz * ps * ps].is_empty()) {
-                            slice.solid[(x0 + lx) * height_ + (y0 + ly)] = true;
-                        }
-                    }
-                }
-            }
-        }
-    };
+    own_faces_valid_ = 0x3F;
 
-    fill_yz(own_boundaries_[0], 0);
-    fill_yz(own_boundaries_[1], width_ - 1);
-    fill_xz(own_boundaries_[2], 0);
-    fill_xz(own_boundaries_[3], height_ - 1);
-    fill_xy(own_boundaries_[4], 0);
-    fill_xy(own_boundaries_[5], depth_ - 1);
+    static_cast<void>(ps);
 }
 
 void model::set_boundary_slice(int32 face_direction, const model& neighbor) {
-    const auto& src = neighbor.own_boundaries_[face_direction];
-    if (!src.valid) {
+    if ((neighbor.own_faces_valid_ & (1U << face_direction)) == 0) {
         return;
     }
-    auto& dst = boundary_slices_[face_direction];
-    dst.solid = src.solid;
-    dst.valid = true;
+
+    neighbor_faces_[face_direction] = neighbor.own_faces_[face_direction];
+    neighbor_faces_valid_ |= static_cast<uint8>(1U << face_direction);
 }
 
 auto model::is_boundary_solid(int32 face_direction, int32 x, int32 y, int32 z) const -> bool {
-    const auto& slice = boundary_slices_[face_direction];
-    int32 idx = 0;
+    const auto& face = neighbor_faces_[face_direction];
     switch (face_direction / 2) {
         case 0:
-            idx = y * depth_ + z;
-            break;
+            return face.test(y, z);
         case 1:
-            idx = x * depth_ + z;
-            break;
+            return face.test(x, z);
         default:
-            idx = x * height_ + y;
-            break;
+            return face.test(x, y);
     }
-    return slice.solid[idx];
 }
 
 void model::invalidate() {

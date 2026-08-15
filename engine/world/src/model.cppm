@@ -120,14 +120,29 @@ struct page_entry {
 
 }  // namespace vw::asset
 
-namespace vw::asset::detail {
-struct boundary_slice {
-    std::vector<bool> solid;
-    bool valid = false;
-};
-}  // namespace vw::asset::detail
-
 export namespace vw::asset {
+
+// One face of a chunk as occupancy bits: 64x64 in 64 words. Handing it to a
+// neighbour is a copy of 512 bytes with no allocation, and the mesher can take
+// a whole row of neighbour bits in one read instead of asking per voxel.
+struct face_occupancy {
+    static constexpr int32 side = 64;
+
+    std::array<uint64, side> rows{};
+
+    [[nodiscard]] auto test(int32 a, int32 b) const -> bool {
+        return ((rows[b] >> a) & 1U) != 0;
+    }
+
+    auto set(int32 a, int32 b) -> void {
+        rows[b] |= uint64{1} << a;
+    }
+
+    auto clear() -> void {
+        rows.fill(0);
+    }
+};
+
 
 // Paged voxel volume. Pages are empty, uniform or sparse, so a mostly solid or
 // mostly empty model costs one entry per page instead of a voxel array.
@@ -223,7 +238,7 @@ public:
     void set_boundary_slice(int32 face_direction, const model& neighbor);
 
     [[nodiscard]] auto has_boundary_slice(int32 face_direction) const -> bool {
-        return boundary_slices_[face_direction].valid;
+        return (neighbor_faces_valid_ & (1U << face_direction)) != 0;
     }
 
     [[nodiscard]] auto is_boundary_solid(int32 face_direction, int32 x, int32 y, int32 z) const
@@ -287,8 +302,10 @@ private:
     std::vector<page_entry> pages_;
     std::vector<uint32> owned_pages_;
     model_identity identity_;
-    std::array<detail::boundary_slice, 6> boundary_slices_;
-    std::array<detail::boundary_slice, 6> own_boundaries_;
+    std::array<face_occupancy, 6> neighbor_faces_{};
+    std::array<face_occupancy, 6> own_faces_{};
+    uint8 neighbor_faces_valid_ = 0;
+    uint8 own_faces_valid_      = 0;
 };
 
 // Owns the named models of a world together with the pools their pages and
