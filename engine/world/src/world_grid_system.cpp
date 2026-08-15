@@ -53,6 +53,10 @@ auto world_grid_system::has_loader() const -> bool {
     return loader_ != nullptr;
 }
 
+auto world_grid_system::get_loader_stats() const -> column_gen_stats {
+    return loader_ ? loader_->get_gen_stats() : column_gen_stats{};
+}
+
 auto world_grid_system::get_stats() const -> const world_grid_system_stats& {
     return stats_;
 }

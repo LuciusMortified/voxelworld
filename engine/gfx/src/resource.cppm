@@ -540,9 +540,11 @@ void add_quad(
     uint8 corner_bright
 );
 
+// Takes the mask cell rather than just the block id: the mask already holds the
+// ambient occlusion for this quad, and every cell merged into it has the same
+// one -- that is what the merge compares on.
 void emit_rect(
     mesh_generation_storage& storage,
-    const vw::asset::model& mdl,
     const face_axis_mapping& axes,
     int face_direction,
     int layer,
@@ -550,9 +552,7 @@ void emit_rect(
     int v_start,
     int w,
     int h,
-    uint8 voxel_id,
-    const block_registry& registry,
-    mesh_options opts
+    const face_mask_cell& cell
 );
 }  // namespace detail
 
@@ -637,6 +637,35 @@ struct mesh_generation_task {
         : identity(identity), model_ref(std::move(model_ref)), opts(opts) {}
 };
 
+// Meshing is off the frame thread, so frame percentiles say nothing about it.
+// Counters are per worker and merged under the queue lock the worker already
+// takes, which keeps the hot path free of both atomics and false sharing.
+struct mesh_gen_worker_stats {
+    uint64 chunks = 0;
+    uint64 nanos  = 0;
+    uint64 quads  = 0;
+    std::vector<uint32> micros;
+
+    auto record(uint64 elapsed_ns, size_t vertex_count) -> void {
+        ++chunks;
+        nanos += elapsed_ns;
+        quads += vertex_count / 4;
+        micros.push_back(static_cast<uint32>(elapsed_ns / 1000));
+    }
+};
+
+struct mesh_gen_stats {
+    uint64 chunks       = 0;
+    uint64 quads        = 0;
+    float32 total_ms    = 0.0f;
+    float32 mean_us     = 0.0f;
+    float32 p50_us      = 0.0f;
+    float32 p99_us      = 0.0f;
+    float32 max_us      = 0.0f;
+    uint32 queue_depth  = 0;
+    uint32 queue_peak   = 0;
+};
+
 class mesh_pool final {
 public:
     explicit mesh_pool(vulkan_context& context, const block_registry& registry);
@@ -656,10 +685,12 @@ public:
     void evict(const vw::asset::model_identity& identity);
     void process_completed();
     [[nodiscard]] auto get_pending_count() const -> uint32;
+    [[nodiscard]] auto get_gen_stats() const -> mesh_gen_stats;
 
 private:
     void gen_thread_function();
     void sweep_orphaned_();
+    void merge_worker_stats_(mesh_gen_worker_stats& worker);
 
     vulkan_context* context_;
     const block_registry* registry_;
@@ -670,12 +701,14 @@ private:
 
     std::vector<std::thread> gen_threads_;
     std::queue<std::unique_ptr<mesh_generation_task>> gen_queue_;
-    std::mutex gen_mutex_;
+    mutable std::mutex gen_mutex_;
     std::condition_variable gen_cv_;
     bool gen_running_ = true;
     uint32 sweep_counter_ = 0;
     static constexpr uint32 sweep_interval_ = 60;
 
+    mesh_gen_worker_stats gen_totals_;
+    uint32 gen_queue_peak_ = 0;
 };
 
 }  // namespace vw::gfx
@@ -1023,6 +1056,7 @@ private:
     std::vector<entity> transform_pending_entities_;
     std::vector<entity> merge_buffer_;
     std::vector<vw::spatial::aabb> touched_bounds_;
+    std::vector<std::pair<float32, entity>> sort_keys_;
 
     mutable combined_buffer_pool_stats stats_;
 };

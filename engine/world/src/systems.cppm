@@ -126,7 +126,7 @@ private:
     void update_entity_world_matrix(entity ent, const transform_component& transform_comp);
 
     world* world_;
-    std::vector<entity> sorted_entities_;
+    std::vector<std::pair<std::size_t, entity>> sorted_entities_;
 };
 
 class model_system {
@@ -563,6 +563,7 @@ public:
     void shutdown();
 
     [[nodiscard]] auto get_stats() const -> const world_grid_system_stats&;
+    [[nodiscard]] auto get_loader_stats() const -> column_gen_stats;
 
     class view_modifier {
     public:

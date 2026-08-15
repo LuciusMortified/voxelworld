@@ -151,6 +151,7 @@ namespace vw::gfx {
 struct frame_sample {
     engine_stats engine{};
     render_timing_stats render{};
+    world_grid_system_stats grid{};
 };
 
 // Accumulates whole frame samples over a benchmark run and reduces them to

@@ -151,21 +151,26 @@ void combined_buffer_pool::update_meshes_(
     auto& model_changed = world.changed<model_component>();
     sorted_merge_range(mesh_pending_entities_, model_changed.begin(), model_changed.end());
 
-    entities_to_process_.assign(
-        mesh_pending_entities_.begin(), mesh_pending_entities_.end());
+    // Distance is two component lookups, so it is resolved once per entity
+    // rather than twice per comparison.
+    sort_keys_.clear();
+    sort_keys_.reserve(mesh_pending_entities_.size());
+    for (entity ent : mesh_pending_entities_) {
+        float32 dist_sq = 0.0f;
+        if (world.has<spatial_component>(ent)) {
+            const auto diff = world.get<spatial_component>(ent).get_bounds().center() - camera_pos;
+            dist_sq = (diff.x * diff.x) + (diff.y * diff.y) + (diff.z * diff.z);
+        }
+        sort_keys_.emplace_back(dist_sq, ent);
+    }
 
-    std::sort(entities_to_process_.begin(), entities_to_process_.end(),
-        [&](entity a, entity b) {
-            auto get_dist_sq = [&](entity e) -> float32 {
-                if (!world.has<spatial_component>(e)) {
-                    return 0.0f;
-                }
-                auto& sc = world.get<spatial_component>(e);
-                auto diff = sc.get_bounds().center() - camera_pos;
-                return diff.x * diff.x + diff.y * diff.y + diff.z * diff.z;
-            };
-            return get_dist_sq(a) < get_dist_sq(b);
-        });
+    std::ranges::sort(sort_keys_, {}, &std::pair<float32, entity>::first);
+
+    entities_to_process_.clear();
+    entities_to_process_.reserve(sort_keys_.size());
+    for (const auto& [dist_sq, ent] : sort_keys_) {
+        entities_to_process_.push_back(ent);
+    }
 
     constexpr uint32 estimated_avg_mesh_cost = 32 * 1024;
     const uint32 max_mesh_writes = std::clamp(

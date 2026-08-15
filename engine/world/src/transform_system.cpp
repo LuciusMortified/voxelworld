@@ -238,14 +238,19 @@ void transform_system::update(float32 /*dt*/) {
         return;
     }
 
-    sorted_entities_.assign(requested.begin(), requested.end());
+    // Depth is walked up the parent chain with a component lookup per level,
+    // so it is resolved once per entity rather than twice per comparison.
+    auto& hierarchy = world_->system<hierarchy_system>();
 
-    std::ranges::sort(sorted_entities_, [this](entity lhs, entity rhs) {
-        return world_->system<hierarchy_system>().get_hierarchy_depth(lhs) <
-               world_->system<hierarchy_system>().get_hierarchy_depth(rhs);
-    });
+    sorted_entities_.clear();
+    sorted_entities_.reserve(requested.size());
+    for (entity ent : requested) {
+        sorted_entities_.emplace_back(hierarchy.get_hierarchy_depth(ent), ent);
+    }
 
-    for (entity ent : sorted_entities_) {
+    std::ranges::sort(sorted_entities_, {}, &std::pair<std::size_t, entity>::first);
+
+    for (const auto& [depth, ent] : sorted_entities_) {
         if (!reg.has<transform_component>(ent)) {
             continue;
         }

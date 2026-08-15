@@ -161,7 +161,11 @@ auto engine::bench_tick_() -> void {
         return;
     }
 
-    recorder_->record({.engine = stats_, .render = renderer_->get_stats().timing});
+    recorder_->record({
+        .engine = stats_,
+        .render = renderer_->get_stats().timing,
+        .grid   = world_->system<ecs::world_grid_system>().get_stats(),
+    });
 
     if (recorder_->sample_count() >= bench_.measure_frames) {
         write_bench_report_();
@@ -180,6 +184,42 @@ auto engine::write_bench_report_() const -> void {
         renderer_type::get_frames_in_flight(),
         bench_.warmup_frames,
         recorder_->report()
+    );
+
+    // Meshing runs off the frame thread, so it is summarised per chunk: frame
+    // percentiles would hide it entirely.
+    const auto meshing = renderer_->get_mesh_pool().get_gen_stats();
+    std::format_to(
+        std::back_inserter(report),
+        "\nmeshing: {} chunks, {} quads, {:.1f} ms total\n"
+        "  per chunk (us): mean {:.0f}  p50 {:.0f}  p99 {:.0f}  max {:.0f}\n"
+        "  queue: {} left, {} peak\n",
+        meshing.chunks,
+        meshing.quads,
+        meshing.total_ms,
+        meshing.mean_us,
+        meshing.p50_us,
+        meshing.p99_us,
+        meshing.max_us,
+        meshing.queue_depth,
+        meshing.queue_peak
+    );
+
+    const auto columns = world_->system<ecs::world_grid_system>().get_loader_stats();
+    std::format_to(
+        std::back_inserter(report),
+        "\nterrain: {} columns, {} chunks, {:.1f} ms total\n"
+        "  per column (us): mean {:.0f}  p50 {:.0f}  p99 {:.0f}  max {:.0f}\n"
+        "  queue: {} left, {} peak\n",
+        columns.columns,
+        columns.chunks,
+        columns.total_ms,
+        columns.mean_us,
+        columns.p50_us,
+        columns.p99_us,
+        columns.max_us,
+        columns.queue_depth,
+        columns.queue_peak
     );
 
     log::info(lc_bench_, "benchmark report\n{}", report);

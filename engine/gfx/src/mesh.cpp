@@ -451,7 +451,6 @@ void add_quad(
 
 void emit_rect(
     mesh_generation_storage& storage,
-    const vw::asset::model& mdl,
     const face_axis_mapping& axes,
     int face_direction,
     int layer,
@@ -459,16 +458,9 @@ void emit_rect(
     int v_start,
     int w,
     int h,
-    block_id bid,
-    const block_registry& registry,
-    mesh_options opts
+    const face_mask_cell& cell
 ) {
     auto [min_pos, max_pos] = axes.to_local_min_max(u_start, v_start, w, h, layer);
-    auto [cx, cy, cz]       = axes.to_model_coords(u_start, v_start, layer);
-    uint8 corner_dark       = compute_corner_darkness(mdl, cx, cy, cz, face_direction);
-    uint8 corner_bright     = (opts.enable_top_brightness && face_direction == 2)
-        ? compute_corner_brightness(mdl, cx, cy, cz, face_direction)
-        : uint8{0};
 
     add_quad(
         storage.vertices,
@@ -476,9 +468,9 @@ void emit_rect(
         face_direction,
         min_pos,
         max_pos,
-        bid,
-        corner_dark,
-        corner_bright
+        block_id{cell.voxel_id},
+        cell.corner_dark,
+        cell.corner_bright
     );
 }
 
@@ -589,7 +581,10 @@ auto strip_mesh_generator::generate_mesh_data(
         generate_face_quads(storage, mdl, face_direction, registry, opts);
     }
 
-    return mesh{storage.vertices, storage.indices};
+    // Moved, not copied: the storage exists to be reused, and copying it back
+    // out was two allocations and a memcpy of the whole mesh per chunk. The
+    // reserve at the top of the next call restores the capacity.
+    return mesh{std::move(storage.vertices), std::move(storage.indices)};
 }
 
 void strip_mesh_generator::merge_and_emit_strips(
@@ -621,20 +616,7 @@ void strip_mesh_generator::merge_and_emit_strips(
             }
             int w = u - strip_start;
 
-            detail::emit_rect(
-                storage,
-                mdl,
-                axes,
-                face_direction,
-                layer,
-                strip_start,
-                v,
-                w,
-                1,
-                cell.voxel_id,
-                registry,
-                opts
-            );
+            detail::emit_rect(storage, axes, face_direction, layer, strip_start, v, w, 1, cell);
         }
     }
 }
@@ -712,7 +694,10 @@ auto greedy_mesh_generator::generate_mesh_data(
         generate_face_quads(storage, mdl, face_direction, registry, opts);
     }
 
-    return mesh{storage.vertices, storage.indices};
+    // Moved, not copied: the storage exists to be reused, and copying it back
+    // out was two allocations and a memcpy of the whole mesh per chunk. The
+    // reserve at the top of the next call restores the capacity.
+    return mesh{std::move(storage.vertices), std::move(storage.indices)};
 }
 
 void greedy_mesh_generator::merge_and_emit_rects(
@@ -761,10 +746,7 @@ void greedy_mesh_generator::merge_and_emit_rects(
                 }
             }
 
-            detail::emit_rect(
-                storage, mdl, axes, face_direction, layer, u, v, w, h, cell.voxel_id, registry,
-                opts
-            );
+            detail::emit_rect(storage, axes, face_direction, layer, u, v, w, h, cell);
         }
     }
 }

@@ -149,6 +149,13 @@ public:
 
     void set_voxel(int32 x, int32 y, int32 z, const voxel& v);
 
+    // The same write without bumping the generation. set_voxel takes the
+    // identity pool mutex on every call, which is fine for an edit and ruinous
+    // for generation: a chunk is tens of thousands of writes across four
+    // workers. Filling a fresh model needs no invalidation at all -- nobody has
+    // meshed it yet; changing a live one calls invalidate() once at the end.
+    void set_voxel_raw(int32 x, int32 y, int32 z, const voxel& v);
+
     void set_voxel(vec3i pos, const voxel& v) {
         set_voxel(pos.x, pos.y, pos.z, v);
     }

@@ -184,6 +184,11 @@ auto model::operator=(model&& other) noexcept -> model& {
 }
 
 void model::set_voxel(int32 x, int32 y, int32 z, const voxel& v) {
+    set_voxel_raw(x, y, z, v);
+    increment_generation_();
+}
+
+void model::set_voxel_raw(int32 x, int32 y, int32 z, const voxel& v) {
     const int32 px = x / page_size;
     const int32 py = y / page_size;
     const int32 pz = z / page_size;

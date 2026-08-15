@@ -80,6 +80,28 @@ private:
 
 // Generates columns on worker threads and hands the finished ones back to the
 // main thread through a queue.
+// Column generation runs on its own workers, so it never shows up in a frame
+// percentile. Counters live per worker and merge under the queue lock the
+// worker already holds.
+struct column_gen_worker_stats {
+    uint64 columns = 0;
+    uint64 chunks  = 0;
+    uint64 nanos   = 0;
+    std::vector<uint32> micros;
+};
+
+struct column_gen_stats {
+    uint64 columns     = 0;
+    uint64 chunks      = 0;
+    float32 total_ms   = 0.0F;
+    float32 mean_us    = 0.0F;
+    float32 p50_us     = 0.0F;
+    float32 p99_us     = 0.0F;
+    float32 max_us     = 0.0F;
+    uint32 queue_depth = 0;
+    uint32 queue_peak  = 0;
+};
+
 class chunk_loader {
 public:
     explicit chunk_loader(std::unique_ptr<terrain_generator> generator);
@@ -95,9 +117,11 @@ public:
     [[nodiscard]] auto try_pop_completed() -> std::unique_ptr<gen_column>;
     [[nodiscard]] auto is_pending(vec2i coord) const -> bool;
     [[nodiscard]] auto pending_count() const -> uint32;
+    [[nodiscard]] auto get_gen_stats() const -> column_gen_stats;
 
 private:
     void gen_thread_function_();
+    void merge_worker_stats_(column_gen_worker_stats& worker);
 
     struct gen_task {
         vec2i coord;
@@ -107,11 +131,14 @@ private:
     std::vector<std::thread> gen_threads_;
     std::queue<gen_task> gen_queue_;
     std::queue<std::unique_ptr<gen_column>> completed_queue_;
-    std::mutex gen_mutex_;
+    mutable std::mutex gen_mutex_;
     mutable std::mutex completed_mutex_;
     std::condition_variable gen_cv_;
     bool gen_running_ = true;
     std::unordered_set<vec2i> pending_columns_;
+
+    column_gen_worker_stats gen_totals_;
+    uint32 gen_queue_peak_ = 0;
 };
 
 class perlin_terrain_generator final : public terrain_generator {
@@ -155,7 +182,22 @@ private:
     [[nodiscard]] auto height_at(int32 wx, int32 wz) const -> int32;
     [[nodiscard]] auto block_at(int32 y, int32 surface_y, float64 continent) const -> block_id;
 
-    void generate_chunk(terrain_context& ctx, int32 chunk_y);
+    // height_at is about twenty noise2d calls, and the same (x, z) used to be
+    // re-evaluated once per chunk in the column. Sampled once here instead.
+    // The exact extremes also replace the five-sample estimate that decided the
+    // column's vertical range, which could clip terrain between its samples.
+    struct column_profile {
+        static constexpr int32 size = 64;
+
+        std::array<int32, size * size> surface{};
+        std::array<float64, size * size> continent{};
+        int32 min_surface = 0;
+        int32 max_surface = 0;
+    };
+
+    [[nodiscard]] auto sample_column_(int32 cx, int32 cz) const -> column_profile;
+
+    void generate_chunk(terrain_context& ctx, int32 chunk_y, const column_profile& profile);
 
     static auto fade(float64 t) -> float64;
     static auto lerp(float64 t, float64 a, float64 b) -> float64;

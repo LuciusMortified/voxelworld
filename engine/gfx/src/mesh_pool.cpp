@@ -89,6 +89,7 @@ void mesh_pool::request_mesh(
         std::scoped_lock lock(gen_mutex_);
         pending_meshes_[identity] = std::move(future);
         gen_queue_.push(std::move(task));
+        gen_queue_peak_ = std::max(gen_queue_peak_, static_cast<uint32>(gen_queue_.size()));
     }
     gen_cv_.notify_one();
 }
@@ -168,14 +169,74 @@ auto mesh_pool::get_pending_count() const -> uint32 {
     return static_cast<uint32>(pending_meshes_.size());
 }
 
+void mesh_pool::merge_worker_stats_(
+    mesh_gen_worker_stats& worker
+) {
+    if (worker.chunks == 0) {
+        return;
+    }
+
+    gen_totals_.chunks += worker.chunks;
+    gen_totals_.nanos += worker.nanos;
+    gen_totals_.quads += worker.quads;
+    gen_totals_.micros.insert(
+        gen_totals_.micros.end(), worker.micros.begin(), worker.micros.end()
+    );
+
+    worker.chunks = 0;
+    worker.nanos  = 0;
+    worker.quads  = 0;
+    worker.micros.clear();
+}
+
+auto mesh_pool::get_gen_stats() const -> mesh_gen_stats {
+    std::scoped_lock lock(gen_mutex_);
+
+    mesh_gen_stats out{};
+    out.chunks      = gen_totals_.chunks;
+    out.quads       = gen_totals_.quads;
+    out.total_ms    = static_cast<float32>(static_cast<float64>(gen_totals_.nanos) / 1.0e6);
+    out.queue_depth = static_cast<uint32>(gen_queue_.size());
+    out.queue_peak  = gen_queue_peak_;
+
+    if (gen_totals_.micros.empty()) {
+        return out;
+    }
+
+    auto samples = gen_totals_.micros;
+    std::ranges::sort(samples);
+
+    const auto at = [&samples](float32 quantile) -> float32 {
+        const auto count = static_cast<float32>(samples.size());
+        const auto rank  = static_cast<uint64>(std::ceil(quantile * count));
+        const auto index = std::clamp<uint64>(rank, 1, samples.size()) - 1;
+        return static_cast<float32>(samples[index]);
+    };
+
+    out.mean_us = static_cast<float32>(
+        static_cast<float64>(gen_totals_.nanos) / 1000.0 / static_cast<float64>(gen_totals_.chunks)
+    );
+    out.p50_us = at(0.50f);
+    out.p99_us = at(0.99f);
+    out.max_us = at(1.00f);
+
+    return out;
+}
+
 void mesh_pool::gen_thread_function() {
     mesh_generation_storage storage;
+    mesh_gen_worker_stats local;
 
     while (true) {
         std::unique_ptr<mesh_generation_task> task;
 
         {
             std::unique_lock lock(gen_mutex_);
+
+            // The worker is already holding the queue lock here, so folding its
+            // counters in costs nothing extra.
+            merge_worker_stats_(local);
+
             gen_cv_.wait(lock, [this] -> bool { return !gen_queue_.empty() || !gen_running_; });
 
             if (!gen_running_ && gen_queue_.empty()) {
@@ -196,9 +257,15 @@ void mesh_pool::gen_thread_function() {
             }
 
             try {
+                const auto started = std::chrono::steady_clock::now();
                 mesh data = greedy_mesh_generator::generate_mesh_data(
                     storage, *model_ptr, *registry_, task->opts
                 );
+                const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                    std::chrono::steady_clock::now() - started
+                );
+                local.record(static_cast<uint64>(elapsed.count()), data.vertices.size());
+
                 task->promise.set_value(std::move(data));
             } catch (const std::exception& e) {
                 task->promise.set_exception(std::current_exception());

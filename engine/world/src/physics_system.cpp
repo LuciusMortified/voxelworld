@@ -151,6 +151,12 @@ auto physics_system::resolve_box_voxel(
     auto vs_i = grid->voxel_scale();
     bool grounded = false;
 
+    // A body spans a handful of voxels and they nearly all live in one chunk,
+    // but world_grid::get_voxel hashes the chunk coordinate on every single
+    // one. The lookup is kept across cells and across iterations.
+    vec3i cached_coord{std::numeric_limits<int32>::min(), 0, 0};
+    chunk* cached_chunk = nullptr;
+
     for (int32 iter = 0; iter < max_collision_iterations; ++iter) {
         auto entity_min = center - half_extents;
         auto entity_max = center + half_extents;
@@ -170,7 +176,17 @@ auto physics_system::resolve_box_voxel(
             for (int32 vy = min_vy; vy <= max_vy; ++vy) {
                 for (int32 vz = min_vz; vz <= max_vz; ++vz) {
                     auto world_pos = vec3i{vx * vs_i, vy * vs_i, vz * vs_i};
-                    auto v = grid->get_voxel(world_pos);
+
+                    const auto chunk_coord = grid->world_to_chunk_coord(world_pos);
+                    if (chunk_coord != cached_coord) {
+                        cached_coord = chunk_coord;
+                        cached_chunk = grid->get_chunk(chunk_coord);
+                    }
+                    if (cached_chunk == nullptr) {
+                        continue;
+                    }
+
+                    auto v = cached_chunk->get_voxel(grid->world_to_local_coord(world_pos) / vs_i);
                     if (v.is_empty()) {
                         continue;
                     }
