@@ -152,17 +152,37 @@ public:
         // of and put almost every column inside a single chunk.
         int32 depth_below_surface = 128;
 
-        // Caves are the intersection of two ridged 3D fields: each one alone is
-        // a sheet, the pair of them is a tunnel. Higher threshold, thinner
-        // tunnels.
-        float32 cave_frequency  = 0.035F;
-        float32 cave_threshold  = 0.86F;
-        int32 cave_octaves      = 2;
+        // Caves are tunnels along the edges of a coarse lattice: one node per
+        // cell, pushed off centre, joined to its neighbours. Connectivity is
+        // then a property of the graph and holds by construction.
+        //
+        // Noise fields were tried first and do not give a network. Thresholding
+        // the field carves sponge; intersecting two isosurfaces carves passages
+        // of an even calibre, but they come out as closed loops that meet only
+        // where three fields vanish at once, which is rare -- measured over a
+        // 192-voxel region it left 17 to 30 disconnected pieces.
+        //
+        // Few wide passages, not many narrow ones. Surface area -- what the
+        // mesher pays for -- grows with the length of the network times the
+        // radius, while the hollow volume grows with the radius squared, so at
+        // an equal amount of hollow the sparse lattice costs half the geometry
+        // and is the easier one to walk. A spacing of 32 with a radius of 3.5
+        // measured 44 faces per thousand voxels against 20 for this, and ran
+        // the graphics device out of memory.
+        int32 cave_node_spacing_xz = 64;
+        int32 cave_node_spacing_y  = 64;
 
-        // Blobs of open space on top of the tunnels, so the underground is not
-        // all corridors of the same width.
-        float32 cavern_frequency = 0.018F;
-        float32 cavern_threshold = 0.62F;
+        // How far a node may sit from the centre of its cell. Without it every
+        // passage runs along a grid line.
+        int32 cave_node_jitter = 21;
+
+        // Passages run mostly sideways: a character walks along them, and
+        // vertical shafts are the exception that links the levels.
+        float32 cave_edge_chance_xz = 0.85F;
+        float32 cave_edge_chance_y  = 0.425F;
+
+        // Radius of the passage, in voxels. A body is 2 x 4 x 2.
+        float32 cave_radius = 5.0F;
 
         // No carving right under the surface (it would open holes in the
         // ground) and none in the bottom few layers.
@@ -196,33 +216,13 @@ public:
 
 private:
     [[nodiscard]] auto noise2d(float64 x, float64 y) const -> float64;
-    [[nodiscard]] auto noise3d(float64 x, float64 y, float64 z) const -> float64;
-    [[nodiscard]] auto ridged_noise3d(float64 x, float64 y, float64 z, int32 octaves) const
-        -> float64;
-    // Cave noise is smooth over a few voxels, so it is sampled on a lattice and
-    // interpolated: 17^3 samples per field instead of 64^3. It also costs about
-    // the same to generate as sampling per voxel but produces half the geometry
-    // -- the interpolation smooths away detail the mesher would otherwise have
-    // to turn into quads.
-    struct cave_field {
-        static constexpr int32 step = 4;
-        static constexpr int32 dim  = (64 / step) + 1;
 
-        std::array<float32, dim * dim * dim> tunnel_a{};
-        std::array<float32, dim * dim * dim> tunnel_b{};
-        std::array<float32, dim * dim * dim> cavern{};
-
-        [[nodiscard]] static auto index(int32 i, int32 j, int32 k) -> int32 {
-            return (((j * dim) + k) * dim) + i;
-        }
-    };
-
-    void sample_cave_field_(int32 wx0, int32 wy0, int32 wz0, cave_field& out) const;
-
-    [[nodiscard]] static auto trilinear(
-        const std::array<float32, cave_field::dim * cave_field::dim * cave_field::dim>& field,
-        int32 lx, int32 ly, int32 lz
-    ) -> float32;
+    // The lattice is never stored: a node's position and whether an edge exists
+    // are both hashes of the cell coordinate, so any chunk can work out the
+    // tunnels crossing it without knowing about its neighbours.
+    [[nodiscard]] static auto hash_cell(int32 i, int32 j, int32 k, uint32 salt) -> uint32;
+    [[nodiscard]] auto cave_node(int32 i, int32 j, int32 k) const -> vec3i;
+    [[nodiscard]] auto cave_edge_open(int32 i, int32 j, int32 k, int32 axis) const -> bool;
 
     [[nodiscard]] auto octave_noise(float64 x, float64 y) const -> float64;
     [[nodiscard]] auto ridged_noise(float64 x, float64 y) const -> float64;
@@ -245,13 +245,14 @@ private:
 
     [[nodiscard]] auto sample_column_(int32 cx, int32 cz) const -> column_profile;
 
-    void generate_chunk(terrain_context& ctx, int32 chunk_y, const column_profile& profile,
-                        cave_field& field);
+    void carve_tunnels_(asset::model& mdl, terrain_context& ctx, int32 chunk_y,
+                        const column_profile& profile) const;
+
+    void generate_chunk(terrain_context& ctx, int32 chunk_y, const column_profile& profile);
 
     static auto fade(float64 t) -> float64;
     static auto lerp(float64 t, float64 a, float64 b) -> float64;
     static auto grad(int32 hash, float64 x, float64 y) -> float64;
-    static auto grad3(int32 hash, float64 x, float64 y, float64 z) -> float64;
 
     asset::model_identity_pool* identity_pool_;
     asset::page_pool* page_pool_;

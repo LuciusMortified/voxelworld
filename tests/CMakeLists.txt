@@ -52,7 +52,7 @@ vw_use_std_module(ecs_tests)
 
 catch_discover_tests(ecs_tests)
 
-add_executable(world_tests world/headless.test.cpp)
+add_executable(world_tests world/headless.test.cpp world/caves.test.cpp)
 
 target_link_libraries(world_tests PRIVATE
     vw_core
