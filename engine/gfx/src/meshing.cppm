@@ -148,15 +148,27 @@ void add_quad(
 // Takes the mask cell rather than just the block id: the mask already holds the
 // ambient occlusion for this quad, and every cell merged into it has the same
 // one -- that is what the merge compares on.
-// Visible faces of one layer, one word per row of 64 cells. Returns false when
-// the layer has none, which replaces the linear scan over the whole mask.
-[[nodiscard]] auto build_visible_rows(
+// One layer reduced to bit rows: what is visible, what sits in front of the
+// face (the plane ambient occlusion samples) and the layer itself (which is
+// what top brightness samples). Empty says the layer holds no faces at all,
+// which replaces the linear scan over the whole mask.
+struct layer_rows {
+    std::array<uint64, 64> visible{};
+    std::array<uint64, 64> front{};
+    std::array<uint64, 64> own{};
+
+    // The plane in front lies outside the chunk, so every occlusion sample
+    // around it leaves the chunk on two axes and reads as empty.
+    bool front_outside = false;
+};
+
+[[nodiscard]] auto build_layer_rows(
     const vw::asset::model& mdl,
     const vw::asset::chunk_occupancy& occupancy,
     const face_axis_mapping& axes,
     int face_direction,
     int layer,
-    std::array<uint64, 64>& out
+    layer_rows& out
 ) -> bool;
 
 void emit_rect(

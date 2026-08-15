@@ -311,3 +311,27 @@ TEST_CASE("greedy meshing output is stable", "[mesh]") {
     REQUIRE(mesh.vertices.size() / 4 == 5452);
     REQUIRE(digest == 16201069180391058227ULL);
 }
+
+// The 32-cube above never reaches the bit path, so ambient occlusion out of
+// occupancy bits needs its own anchor: this digest covers the packed corner
+// values, which the greedy-against-simple comparison does not look at.
+TEST_CASE("full-size greedy meshing output is stable", "[mesh]") {
+    model_fixture fixture{64};
+
+    uint32 state = 20250815;
+    for (int32 x = 0; x < fixture.size(); ++x) {
+        for (int32 z = 0; z < fixture.size(); ++z) {
+            state = (state * 1664525U) + 1013904223U;
+            const int32 height = 6 + static_cast<int32>((state >> 26) % 20);
+            for (int32 y = 0; y < height; ++y) {
+                fixture.get()->set_voxel(x, y, z, voxel{blocks::green_3});
+            }
+        }
+    }
+
+    const auto mesh = fixture.greedy();
+    const auto digest = hash_mesh(mesh);
+    INFO("full-size digest: " << digest << ", quads: " << mesh.vertices.size() / 4);
+    REQUIRE(mesh.vertices.size() / 4 == 29218);
+    REQUIRE(digest == 419103052605503707ULL);
+}

@@ -475,54 +475,94 @@ auto boundary_row(
     return face.rows[v];
 }
 
-auto build_visible_rows(
+auto build_layer_rows(
     const vw::asset::model& mdl,
     const vw::asset::chunk_occupancy& occupancy,
     const face_axis_mapping& axes,
     int face_direction,
     int layer,
-    std::array<uint64, 64>& out
+    layer_rows& out
 ) -> bool {
     const int d    = (face_direction % 2 == 0) ? layer : axes.depth - 1 - layer;
     const int step = (face_direction % 2 == 0) ? 1 : -1;
     const int nd   = d + step;
     const bool inside = nd >= 0 && nd < 64;
 
+    out.front_outside = !inside;
+
     uint64 any = 0;
 
-    switch (face_direction / 2) {
-        case 0:  // +-X: rows of z at (y = v, x = d)
-            for (int v = 0; v < 64; ++v) {
-                const uint64 cur  = occupancy.zrow(v, d);
-                const uint64 next = inside ? occupancy.zrow(v, nd)
-                                           : boundary_row(mdl, face_direction, v);
-                out[v] = cur & ~next;
-                any |= out[v];
-            }
-            break;
+    for (int v = 0; v < 64; ++v) {
+        uint64 own  = 0;
+        uint64 front = 0;
 
-        case 1:  // +-Y: rows of x at (y = d, z = v)
-            for (int v = 0; v < 64; ++v) {
-                const uint64 cur  = occupancy.row(d, v);
-                const uint64 next = inside ? occupancy.row(nd, v)
-                                           : boundary_row(mdl, face_direction, v);
-                out[v] = cur & ~next;
-                any |= out[v];
-            }
-            break;
+        switch (face_direction / 2) {
+            case 0:  // +-X: rows of z at (y = v, x = layer plane)
+                own   = occupancy.zrow(v, d);
+                front = inside ? occupancy.zrow(v, nd) : boundary_row(mdl, face_direction, v);
+                break;
+            case 1:  // +-Y: rows of x at (y = layer plane, z = v)
+                own   = occupancy.row(d, v);
+                front = inside ? occupancy.row(nd, v) : boundary_row(mdl, face_direction, v);
+                break;
+            default:  // +-Z: rows of x at (y = v, z = layer plane)
+                own   = occupancy.row(v, d);
+                front = inside ? occupancy.row(v, nd) : boundary_row(mdl, face_direction, v);
+                break;
+        }
 
-        default:  // +-Z: rows of x at (y = v, z = d)
-            for (int v = 0; v < 64; ++v) {
-                const uint64 cur  = occupancy.row(v, d);
-                const uint64 next = inside ? occupancy.row(v, nd)
-                                           : boundary_row(mdl, face_direction, v);
-                out[v] = cur & ~next;
-                any |= out[v];
-            }
-            break;
+        out.own[v]     = own;
+        out.front[v]   = front;
+        out.visible[v] = own & ~front;
+        any |= out.visible[v];
     }
 
     return any != 0;
+}
+
+// Ambient occlusion for one cell, read out of three neighbouring bit rows
+// instead of eight lookups into the paged volume. Rows are pre-shifted so the
+// eight samples around a cell are all bit u of some mask.
+struct corner_samples {
+    uint64 edge_mu = 0;
+    uint64 edge_pu = 0;
+    uint64 edge_mv = 0;
+    uint64 edge_pv = 0;
+    uint64 diag_c0 = 0;
+    uint64 diag_c1 = 0;
+    uint64 diag_c2 = 0;
+    uint64 diag_c3 = 0;
+};
+
+auto samples_from_rows(uint64 row_mv, uint64 row, uint64 row_pv) -> corner_samples {
+    return {
+        .edge_mu = row << 1,
+        .edge_pu = row >> 1,
+        .edge_mv = row_mv,
+        .edge_pv = row_pv,
+        .diag_c0 = row_mv << 1,
+        .diag_c1 = row_mv >> 1,
+        .diag_c2 = row_pv >> 1,
+        .diag_c3 = row_pv << 1,
+    };
+}
+
+auto pack_corners(const corner_samples& s, int u) -> uint8 {
+    const auto bit = [u](uint64 mask) -> bool { return ((mask >> u) & 1U) != 0; };
+
+    auto corner = [](bool s1, bool s2, bool diag) -> uint8 {
+        if (s1 && s2) {
+            return 3;
+        }
+        return static_cast<uint8>(s1) + static_cast<uint8>(s2) + static_cast<uint8>(diag);
+    };
+
+    const uint8 c0 = corner(bit(s.edge_mu), bit(s.edge_mv), bit(s.diag_c0));
+    const uint8 c1 = corner(bit(s.edge_pu), bit(s.edge_mv), bit(s.diag_c1));
+    const uint8 c2 = corner(bit(s.edge_pu), bit(s.edge_pv), bit(s.diag_c2));
+    const uint8 c3 = corner(bit(s.edge_mu), bit(s.edge_pv), bit(s.diag_c3));
+
+    return static_cast<uint8>(c0 | (c1 << 2) | (c2 << 4) | (c3 << 6));
 }
 
 void emit_rect(
@@ -868,7 +908,7 @@ void greedy_mesh_generator::generate_face_quads(
         return static_cast<size_t>(u) * static_cast<size_t>(axes.height) + static_cast<size_t>(v);
     };
 
-    std::array<uint64, 64> visible{};
+    detail::layer_rows rows;
 
     for (int layer = 0; layer < axes.depth; layer++) {
         if (!storage.depth_has_pages[layer / ps]) {
@@ -880,29 +920,62 @@ void greedy_mesh_generator::generate_face_quads(
             // Visibility for a whole row of 64 cells is one and-not, and an
             // empty layer is known without touching the mask at all. Only the
             // cells that actually carry a face are written.
-            if (!detail::build_visible_rows(
-                    mdl, *storage.occupancy, axes, face_direction, layer, visible
+            if (!detail::build_layer_rows(
+                    mdl, *storage.occupancy, axes, face_direction, layer, rows
                 )) {
                 continue;
             }
 
+            const bool want_bright = opts.enable_top_brightness && face_direction == 2;
+
             for (int v = 0; v < axes.height; v++) {
-                uint64 bits = visible[v];
+                uint64 bits = rows.visible[v];
+                if (bits == 0) {
+                    continue;
+                }
+
+                // Occlusion samples sit one cell away in u and v, so a cell on
+                // the edge of the layer reaches into the neighbouring chunk and
+                // keeps the scalar path, which knows how to ask for it. Same
+                // when the sampled plane is outside the chunk entirely.
+                const bool interior_v = v > 0 && v + 1 < axes.height;
+                const bool bit_ao     = interior_v && !rows.front_outside;
+
+                const auto dark = detail::samples_from_rows(
+                    interior_v ? rows.front[v - 1] : 0,
+                    rows.front[v],
+                    interior_v ? rows.front[v + 1] : 0
+                );
+                const auto bright = detail::samples_from_rows(
+                    interior_v ? ~rows.own[v - 1] : 0,
+                    ~rows.own[v],
+                    interior_v ? ~rows.own[v + 1] : 0
+                );
+
                 while (bits != 0) {
                     const int u = std::countr_zero(bits);
                     bits &= bits - 1;
 
                     auto [mx, my, mz] = axes.to_model_coords(u, v, layer);
 
+                    const bool interior = bit_ao && u > 0 && u + 1 < axes.width;
+
                     face_mask_cell cell{};
-                    cell.voxel_id    = mdl.get_voxel(mx, my, mz).id;
-                    cell.corner_dark = detail::compute_corner_darkness(
-                        mdl, mx, my, mz, face_direction
-                    );
-                    cell.corner_bright =
-                        (opts.enable_top_brightness && face_direction == 2)
-                            ? detail::compute_corner_brightness(mdl, mx, my, mz, face_direction)
-                            : uint8{0};
+                    cell.voxel_id = mdl.get_voxel(mx, my, mz).id;
+
+                    if (interior) {
+                        cell.corner_dark   = detail::pack_corners(dark, u);
+                        cell.corner_bright = want_bright ? detail::pack_corners(bright, u)
+                                                         : uint8{0};
+                    } else {
+                        cell.corner_dark = detail::compute_corner_darkness(
+                            mdl, mx, my, mz, face_direction
+                        );
+                        cell.corner_bright =
+                            want_bright
+                                ? detail::compute_corner_brightness(mdl, mx, my, mz, face_direction)
+                                : uint8{0};
+                    }
 
                     storage.mask[idx(u, v)] = cell;
                 }
