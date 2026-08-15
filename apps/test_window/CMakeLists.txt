@@ -10,5 +10,6 @@ target_link_libraries(${PROJECT_NAME} vwengine)
 
 # Компиляционные флаги - C++23
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
+vw_use_std_module(${PROJECT_NAME})
 
 # Копирование шейдеров не требуется для test_window
