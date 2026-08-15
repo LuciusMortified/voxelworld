@@ -225,6 +225,17 @@ public:
     ) -> mesh;
 
 private:
+    // Runs off the visibility bits instead of scanning the mask: a run starts
+    // at countr_zero, a rectangle is cleared with one and-not per row, and the
+    // mask is only consulted to compare keys of cells already known to be set.
+    static void merge_and_emit_rects_bits(
+        mesh_generation_storage& storage,
+        const detail::face_axis_mapping& axes,
+        int face_direction,
+        int layer,
+        detail::layer_rows& rows
+    );
+
     static void merge_and_emit_rects(
         mesh_generation_storage& storage,
         const vw::asset::model& mdl,

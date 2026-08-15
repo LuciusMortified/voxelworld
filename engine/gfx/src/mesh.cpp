@@ -823,6 +823,59 @@ auto greedy_mesh_generator::generate_mesh_data(
     return mesh{std::move(storage.vertices), std::move(storage.indices)};
 }
 
+void greedy_mesh_generator::merge_and_emit_rects_bits(
+    mesh_generation_storage& storage,
+    const detail::face_axis_mapping& axes,
+    int face_direction,
+    int layer,
+    detail::layer_rows& rows
+) {
+    // Row-major over u, so widening a run walks contiguous memory.
+    auto idx = [&](int u, int v) -> size_t {
+        return (static_cast<size_t>(v) * static_cast<size_t>(axes.width)) +
+               static_cast<size_t>(u);
+    };
+
+    const auto keys_match = [&](int v, int u, int w, const face_mask_cell& key) -> bool {
+        for (int du = 0; du < w; ++du) {
+            if (storage.mask[idx(u + du, v)] != key) {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    for (int v = 0; v < axes.height; ++v) {
+        uint64 row = rows.visible[v];
+
+        while (row != 0) {
+            const int u = std::countr_zero(row);
+            const face_mask_cell key = storage.mask[idx(u, v)];
+
+            int w = 1;
+            while (u + w < axes.width && ((row >> (u + w)) & 1U) != 0 &&
+                   storage.mask[idx(u + w, v)] == key) {
+                ++w;
+            }
+
+            const uint64 span =
+                (w == 64) ? ~uint64{0} : (((uint64{1} << w) - 1) << u);
+
+            int h = 1;
+            while (v + h < axes.height && (rows.visible[v + h] & span) == span &&
+                   keys_match(v + h, u, w, key)) {
+                rows.visible[v + h] &= ~span;
+                ++h;
+            }
+
+            row &= ~span;
+            detail::emit_rect(storage, axes, face_direction, layer, u, v, w, h, key);
+        }
+
+        rows.visible[v] = 0;
+    }
+}
+
 void greedy_mesh_generator::merge_and_emit_rects(
     mesh_generation_storage& storage,
     const vw::asset::model& mdl,
@@ -905,7 +958,8 @@ void greedy_mesh_generator::generate_face_quads(
     }
 
     auto idx = [&](int u, int v) -> size_t {
-        return static_cast<size_t>(u) * static_cast<size_t>(axes.height) + static_cast<size_t>(v);
+        return (static_cast<size_t>(v) * static_cast<size_t>(axes.width)) +
+               static_cast<size_t>(u);
     };
 
     detail::layer_rows rows;
@@ -981,7 +1035,7 @@ void greedy_mesh_generator::generate_face_quads(
                 }
             }
 
-            merge_and_emit_rects(storage, mdl, axes, face_direction, layer, registry, opts);
+            merge_and_emit_rects_bits(storage, axes, face_direction, layer, rows);
             continue;
         }
 
