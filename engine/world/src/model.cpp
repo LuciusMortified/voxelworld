@@ -238,10 +238,12 @@ auto model::build_occupancy(chunk_occupancy& out) const -> bool {
                 const int32 z0 = pz * ps;
 
                 if (mode == page_mode::uniform) {
-                    const uint64 span = uint64{0xFF} << x0;
+                    const uint64 xspan = uint64{0xFF} << x0;
+                    const uint64 zspan = uint64{0xFF} << z0;
                     for (int32 ly = 0; ly < ps; ++ly) {
-                        for (int32 lz = 0; lz < ps; ++lz) {
-                            out.set_row(y0 + ly, z0 + lz, span);
+                        for (int32 l = 0; l < ps; ++l) {
+                            out.set_row(y0 + ly, z0 + l, xspan);
+                            out.set_zrow(y0 + ly, x0 + l, zspan);
                         }
                     }
                     continue;
@@ -256,8 +258,15 @@ auto model::build_occupancy(chunk_occupancy& out) const -> bool {
                                 bits |= uint64{1} << lx;
                             }
                         }
-                        if (bits != 0) {
-                            out.set_row(y0 + ly, z0 + lz, bits << x0);
+                        if (bits == 0) {
+                            continue;
+                        }
+
+                        out.set_row(y0 + ly, z0 + lz, bits << x0);
+                        for (int32 lx = 0; lx < ps; ++lx) {
+                            if (((bits >> lx) & 1U) != 0) {
+                                out.set_zrow(y0 + ly, x0 + lx, uint64{1} << (z0 + lz));
+                            }
                         }
                     }
                 }

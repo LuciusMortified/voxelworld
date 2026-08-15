@@ -95,6 +95,11 @@ struct mesh_generation_storage {
     std::vector<face_mask_cell> mask;
     std::vector<bool> depth_has_pages;
 
+    // 64 KB of bit volume, reused by the worker across chunks and built once
+    // per mesh. Heap rather than a member so the worker stack stays small.
+    std::unique_ptr<vw::asset::chunk_occupancy> occupancy;
+    bool occupancy_valid = false;
+
     void clear() {
         vertices.clear();
         indices.clear();
@@ -143,6 +148,17 @@ void add_quad(
 // Takes the mask cell rather than just the block id: the mask already holds the
 // ambient occlusion for this quad, and every cell merged into it has the same
 // one -- that is what the merge compares on.
+// Visible faces of one layer, one word per row of 64 cells. Returns false when
+// the layer has none, which replaces the linear scan over the whole mask.
+[[nodiscard]] auto build_visible_rows(
+    const vw::asset::model& mdl,
+    const vw::asset::chunk_occupancy& occupancy,
+    const face_axis_mapping& axes,
+    int face_direction,
+    int layer,
+    std::array<uint64, 64>& out
+) -> bool;
+
 void emit_rect(
     mesh_generation_storage& storage,
     const face_axis_mapping& axes,

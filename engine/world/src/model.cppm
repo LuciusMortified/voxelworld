@@ -150,14 +150,23 @@ struct face_occupancy {
 struct chunk_occupancy {
     static constexpr int32 side = 64;
 
-    std::array<uint64, side * side> rows{};
+    // Two orientations of the same volume. Rows along X serve the +-Y and +-Z
+    // faces; rows along Z serve +-X. Both are filled in one pass, which is
+    // cheaper than transposing 64x64 bit planes afterwards.
+    std::array<uint64, side * side> rows{};   // rows[y * side + z], bit x
+    std::array<uint64, side * side> zrows{};  // zrows[y * side + x], bit z
 
     auto clear() -> void {
         rows.fill(0);
+        zrows.fill(0);
     }
 
     [[nodiscard]] auto row(int32 y, int32 z) const -> uint64 {
         return rows[(y * side) + z];
+    }
+
+    [[nodiscard]] auto zrow(int32 y, int32 x) const -> uint64 {
+        return zrows[(y * side) + x];
     }
 
     [[nodiscard]] auto test(int32 x, int32 y, int32 z) const -> bool {
@@ -166,6 +175,10 @@ struct chunk_occupancy {
 
     auto set_row(int32 y, int32 z, uint64 bits) -> void {
         rows[(y * side) + z] |= bits;
+    }
+
+    auto set_zrow(int32 y, int32 x, uint64 bits) -> void {
+        zrows[(y * side) + x] |= bits;
     }
 };
 
@@ -266,6 +279,10 @@ public:
     // per row at once. False when the model is not a 64-cube.
     [[nodiscard]] auto build_occupancy(chunk_occupancy& out) const -> bool;
     void set_boundary_slice(int32 face_direction, const model& neighbor);
+
+    [[nodiscard]] auto get_boundary_face(int32 face_direction) const -> const face_occupancy& {
+        return neighbor_faces_[face_direction];
+    }
 
     [[nodiscard]] auto has_boundary_slice(int32 face_direction) const -> bool {
         return (neighbor_faces_valid_ & (1U << face_direction)) != 0;

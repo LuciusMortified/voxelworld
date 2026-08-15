@@ -185,6 +185,50 @@ TEST_CASE("greedy meshing agrees with per-voxel meshing", "[mesh]") {
         REQUIRE(to_face_cells(fixture.greedy()) == to_face_cells(fixture.simple()));
     }
 
+    // A 64-cube is the only size that takes the bit-occupancy path, so the
+    // cases below are the ones that actually exercise it.
+    SECTION("full-size chunk, terrain-like") {
+        model_fixture fixture{64};
+        uint32 state = 777;
+        for (int32 x = 0; x < fixture.size(); ++x) {
+            for (int32 z = 0; z < fixture.size(); ++z) {
+                state = (state * 1664525U) + 1013904223U;
+                const int32 height = 8 + static_cast<int32>((state >> 26) % 24);
+                for (int32 y = 0; y < height; ++y) {
+                    fixture.get()->set_voxel(x, y, z, voxel{blocks::brown_3});
+                }
+            }
+        }
+        REQUIRE(to_face_cells(fixture.greedy()) == to_face_cells(fixture.simple()));
+    }
+
+    SECTION("full-size chunk, sparse noise") {
+        model_fixture fixture{64};
+        uint32 state = 31337;
+        for (int32 x = 0; x < fixture.size(); ++x) {
+            for (int32 y = 0; y < fixture.size(); ++y) {
+                for (int32 z = 0; z < fixture.size(); ++z) {
+                    state = (state * 1664525U) + 1013904223U;
+                    if ((state >> 29) == 0) {
+                        fixture.get()->set_voxel(
+                            x, y, z, voxel{block_id{static_cast<uint8>(1 + (state % 40))}}
+                        );
+                    }
+                }
+            }
+        }
+        REQUIRE(to_face_cells(fixture.greedy()) == to_face_cells(fixture.simple()));
+    }
+
+    SECTION("full-size chunk, solid") {
+        model_fixture fixture{64};
+        fixture.get()->fill(voxel{blocks::gray_6});
+
+        const auto greedy = fixture.greedy();
+        REQUIRE(greedy.vertices.size() == 24);
+        REQUIRE(to_face_cells(greedy) == to_face_cells(fixture.simple()));
+    }
+
     SECTION("pseudo-random fill") {
         model_fixture fixture{32};
         uint32 state = 12345;
@@ -207,7 +251,9 @@ TEST_CASE("boundary faces close the seam between chunks", "[mesh]") {
     asset::page_pool pages;
     block_registry registry;
 
-    constexpr int32 size = 16;
+    // 64 so the bit path is the one under test: the +-X faces gather the
+    // neighbour plane bit by bit, which the other four directions never do.
+    constexpr int32 size = 64;
     auto left  = std::make_shared<asset::model>(identity_pool, pages, size, size, size);
     auto right = std::make_shared<asset::model>(identity_pool, pages, size, size, size);
 

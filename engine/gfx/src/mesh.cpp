@@ -449,6 +449,82 @@ void add_quad(
     indices.push_back(base_vertex + 0);
 }
 
+
+// The neighbour plane in the orientation this face needs. For +-Y and +-Z the
+// stored plane is already rows of u; +-X keeps y-major rows, so that one is
+// gathered bit by bit -- it happens on one layer out of sixty-four.
+auto boundary_row(
+    const vw::asset::model& mdl, int face_direction, int v
+) -> uint64 {
+    if (!mdl.has_boundary_slice(face_direction)) {
+        return 0;  // no neighbour: the far side is open, every face is visible
+    }
+
+    const auto& face = mdl.get_boundary_face(face_direction);
+
+    if (face_direction / 2 == 0) {
+        uint64 bits = 0;
+        for (int z = 0; z < 64; ++z) {
+            if (face.test(v, z)) {
+                bits |= uint64{1} << z;
+            }
+        }
+        return bits;
+    }
+
+    return face.rows[v];
+}
+
+auto build_visible_rows(
+    const vw::asset::model& mdl,
+    const vw::asset::chunk_occupancy& occupancy,
+    const face_axis_mapping& axes,
+    int face_direction,
+    int layer,
+    std::array<uint64, 64>& out
+) -> bool {
+    const int d    = (face_direction % 2 == 0) ? layer : axes.depth - 1 - layer;
+    const int step = (face_direction % 2 == 0) ? 1 : -1;
+    const int nd   = d + step;
+    const bool inside = nd >= 0 && nd < 64;
+
+    uint64 any = 0;
+
+    switch (face_direction / 2) {
+        case 0:  // +-X: rows of z at (y = v, x = d)
+            for (int v = 0; v < 64; ++v) {
+                const uint64 cur  = occupancy.zrow(v, d);
+                const uint64 next = inside ? occupancy.zrow(v, nd)
+                                           : boundary_row(mdl, face_direction, v);
+                out[v] = cur & ~next;
+                any |= out[v];
+            }
+            break;
+
+        case 1:  // +-Y: rows of x at (y = d, z = v)
+            for (int v = 0; v < 64; ++v) {
+                const uint64 cur  = occupancy.row(d, v);
+                const uint64 next = inside ? occupancy.row(nd, v)
+                                           : boundary_row(mdl, face_direction, v);
+                out[v] = cur & ~next;
+                any |= out[v];
+            }
+            break;
+
+        default:  // +-Z: rows of x at (y = v, z = d)
+            for (int v = 0; v < 64; ++v) {
+                const uint64 cur  = occupancy.row(v, d);
+                const uint64 next = inside ? occupancy.row(v, nd)
+                                           : boundary_row(mdl, face_direction, v);
+                out[v] = cur & ~next;
+                any |= out[v];
+            }
+            break;
+    }
+
+    return any != 0;
+}
+
 void emit_rect(
     mesh_generation_storage& storage,
     const face_axis_mapping& axes,
@@ -690,6 +766,13 @@ auto greedy_mesh_generator::generate_mesh_data(
         storage.indices.reserve(estimate);
     }
 
+    // Built once for the whole mesh and read by all six directions. Models that
+    // are not 64-cubes (Sculptor's) fall back to the per-cell path.
+    if (!storage.occupancy) {
+        storage.occupancy = std::make_unique<vw::asset::chunk_occupancy>();
+    }
+    storage.occupancy_valid = mdl.build_occupancy(*storage.occupancy);
+
     for (int face_direction = 0; face_direction < 6; face_direction++) {
         generate_face_quads(storage, mdl, face_direction, registry, opts);
     }
@@ -781,9 +864,51 @@ void greedy_mesh_generator::generate_face_quads(
         }
     }
 
+    auto idx = [&](int u, int v) -> size_t {
+        return static_cast<size_t>(u) * static_cast<size_t>(axes.height) + static_cast<size_t>(v);
+    };
+
+    std::array<uint64, 64> visible{};
+
     for (int layer = 0; layer < axes.depth; layer++) {
         if (!storage.depth_has_pages[layer / ps]) {
             layer = ((layer / ps) + 1) * ps - 1;
+            continue;
+        }
+
+        if (storage.occupancy_valid) {
+            // Visibility for a whole row of 64 cells is one and-not, and an
+            // empty layer is known without touching the mask at all. Only the
+            // cells that actually carry a face are written.
+            if (!detail::build_visible_rows(
+                    mdl, *storage.occupancy, axes, face_direction, layer, visible
+                )) {
+                continue;
+            }
+
+            for (int v = 0; v < axes.height; v++) {
+                uint64 bits = visible[v];
+                while (bits != 0) {
+                    const int u = std::countr_zero(bits);
+                    bits &= bits - 1;
+
+                    auto [mx, my, mz] = axes.to_model_coords(u, v, layer);
+
+                    face_mask_cell cell{};
+                    cell.voxel_id    = mdl.get_voxel(mx, my, mz).id;
+                    cell.corner_dark = detail::compute_corner_darkness(
+                        mdl, mx, my, mz, face_direction
+                    );
+                    cell.corner_bright =
+                        (opts.enable_top_brightness && face_direction == 2)
+                            ? detail::compute_corner_brightness(mdl, mx, my, mz, face_direction)
+                            : uint8{0};
+
+                    storage.mask[idx(u, v)] = cell;
+                }
+            }
+
+            merge_and_emit_rects(storage, mdl, axes, face_direction, layer, registry, opts);
             continue;
         }
 
