@@ -272,6 +272,12 @@ public:
         return voxel_scale_;
     }
 
+    // A page stays sparse once written, even when every voxel in it ends up
+    // the same block -- so solid rock costs 512 bytes a page instead of
+    // nothing. Folding those back into uniform is what makes a deep world
+    // affordable; call it once the volume is filled.
+    auto compact_pages() -> uint32;
+
     void compute_own_boundaries();
 
     // Fills the bit volume from the page table rather than voxel by voxel: an

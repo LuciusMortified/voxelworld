@@ -44,8 +44,8 @@ public:
 
         auto& fog = get_engine().get_renderer().get_fog_settings();
         fog.color = {0.4f, 0.6f, 0.9f};
-        fog.near_distance = 6 * 64 * 8;
-        fog.far_distance = 9 * 64 * 8;
+        fog.near_distance = 16 * 64 * 8;
+        fog.far_distance = 19 * 64 * 8;
 
         // Anything past the fog is solid fog colour, so drawing it is pure
         // waste; the far plane is what makes the frustum test drop it.
@@ -324,6 +324,8 @@ private:
             .with<ecs::transform_component>()
             .with<ecs::world_view_component>()
             .get_entity();
+
+        gs.modify_view(viewer_).set_view_distance(20);
     }
 
     void render_ui() const {
@@ -394,7 +396,7 @@ private:
     bool camera_placed_ = false;
 
     static constexpr std::array<std::string_view, 4> crowd_target_names_{
-        "body", "head", "hand_left", "hand_right"
+        "body", "head", "hand_left", "hand_right",
     };
 
     std::vector<ecs::entity> crowd_;

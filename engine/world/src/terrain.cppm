@@ -147,7 +147,27 @@ public:
         uint32 seed       = 42;
         int32 voxel_scale = 8;
 
-        int32 shell_depth = 8;
+        // How far down solid rock goes below the surface. The old world was a
+        // shell 8 voxels thick, which left nothing for caves to be carved out
+        // of and put almost every column inside a single chunk.
+        int32 depth_below_surface = 128;
+
+        // Caves are the intersection of two ridged 3D fields: each one alone is
+        // a sheet, the pair of them is a tunnel. Higher threshold, thinner
+        // tunnels.
+        float32 cave_frequency  = 0.035F;
+        float32 cave_threshold  = 0.86F;
+        int32 cave_octaves      = 2;
+
+        // Blobs of open space on top of the tunnels, so the underground is not
+        // all corridors of the same width.
+        float32 cavern_frequency = 0.018F;
+        float32 cavern_threshold = 0.62F;
+
+        // No carving right under the surface (it would open holes in the
+        // ground) and none in the bottom few layers.
+        int32 cave_surface_margin = 6;
+        int32 bedrock_thickness   = 3;
 
         float32 continent_frequency = 0.003F;
         float32 terrain_frequency   = 0.02F;
@@ -176,6 +196,34 @@ public:
 
 private:
     [[nodiscard]] auto noise2d(float64 x, float64 y) const -> float64;
+    [[nodiscard]] auto noise3d(float64 x, float64 y, float64 z) const -> float64;
+    [[nodiscard]] auto ridged_noise3d(float64 x, float64 y, float64 z, int32 octaves) const
+        -> float64;
+    // Cave noise is smooth over a few voxels, so it is sampled on a lattice and
+    // interpolated: 17^3 samples per field instead of 64^3. It also costs about
+    // the same to generate as sampling per voxel but produces half the geometry
+    // -- the interpolation smooths away detail the mesher would otherwise have
+    // to turn into quads.
+    struct cave_field {
+        static constexpr int32 step = 4;
+        static constexpr int32 dim  = (64 / step) + 1;
+
+        std::array<float32, dim * dim * dim> tunnel_a{};
+        std::array<float32, dim * dim * dim> tunnel_b{};
+        std::array<float32, dim * dim * dim> cavern{};
+
+        [[nodiscard]] static auto index(int32 i, int32 j, int32 k) -> int32 {
+            return (((j * dim) + k) * dim) + i;
+        }
+    };
+
+    void sample_cave_field_(int32 wx0, int32 wy0, int32 wz0, cave_field& out) const;
+
+    [[nodiscard]] static auto trilinear(
+        const std::array<float32, cave_field::dim * cave_field::dim * cave_field::dim>& field,
+        int32 lx, int32 ly, int32 lz
+    ) -> float32;
+
     [[nodiscard]] auto octave_noise(float64 x, float64 y) const -> float64;
     [[nodiscard]] auto ridged_noise(float64 x, float64 y) const -> float64;
     [[nodiscard]] auto continent_at(float64 nx, float64 nz) const -> float64;
@@ -197,11 +245,13 @@ private:
 
     [[nodiscard]] auto sample_column_(int32 cx, int32 cz) const -> column_profile;
 
-    void generate_chunk(terrain_context& ctx, int32 chunk_y, const column_profile& profile);
+    void generate_chunk(terrain_context& ctx, int32 chunk_y, const column_profile& profile,
+                        cave_field& field);
 
     static auto fade(float64 t) -> float64;
     static auto lerp(float64 t, float64 a, float64 b) -> float64;
     static auto grad(int32 hash, float64 x, float64 y) -> float64;
+    static auto grad3(int32 hash, float64 x, float64 y, float64 z) -> float64;
 
     asset::model_identity_pool* identity_pool_;
     asset::page_pool* page_pool_;

@@ -262,6 +262,129 @@ auto perlin_terrain_generator::noise2d(
     return lerp(v, x1, x2);
 }
 
+auto perlin_terrain_generator::grad3(
+    int32 hash, float64 x, float64 y, float64 z
+) -> float64 {
+    const int32 h = hash & 15;
+    const float64 u = h < 8 ? x : y;
+    const float64 v = h < 4 ? y : ((h == 12 || h == 14) ? x : z);
+    return (((h & 1) != 0) ? -u : u) + (((h & 2) != 0) ? -v : v);
+}
+
+auto perlin_terrain_generator::noise3d(
+    float64 x, float64 y, float64 z
+) const -> float64 {
+    const int32 xi = static_cast<int32>(std::floor(x)) & 255;
+    const int32 yi = static_cast<int32>(std::floor(y)) & 255;
+    const int32 zi = static_cast<int32>(std::floor(z)) & 255;
+
+    const float64 xf = x - std::floor(x);
+    const float64 yf = y - std::floor(y);
+    const float64 zf = z - std::floor(z);
+
+    const float64 u = fade(xf);
+    const float64 v = fade(yf);
+    const float64 w = fade(zf);
+
+    const int32 a  = perm_[xi] + yi;
+    const int32 aa = perm_[a & 255] + zi;
+    const int32 ab = perm_[(a + 1) & 255] + zi;
+    const int32 b  = perm_[(xi + 1) & 255] + yi;
+    const int32 ba = perm_[b & 255] + zi;
+    const int32 bb = perm_[(b + 1) & 255] + zi;
+
+    const float64 x1 = lerp(u, grad3(perm_[aa & 255], xf, yf, zf),
+                               grad3(perm_[ba & 255], xf - 1.0, yf, zf));
+    const float64 x2 = lerp(u, grad3(perm_[ab & 255], xf, yf - 1.0, zf),
+                               grad3(perm_[bb & 255], xf - 1.0, yf - 1.0, zf));
+    const float64 y1 = lerp(v, x1, x2);
+
+    const float64 x3 = lerp(u, grad3(perm_[(aa + 1) & 255], xf, yf, zf - 1.0),
+                               grad3(perm_[(ba + 1) & 255], xf - 1.0, yf, zf - 1.0));
+    const float64 x4 = lerp(u, grad3(perm_[(ab + 1) & 255], xf, yf - 1.0, zf - 1.0),
+                               grad3(perm_[(bb + 1) & 255], xf - 1.0, yf - 1.0, zf - 1.0));
+    const float64 y2 = lerp(v, x3, x4);
+
+    return lerp(w, y1, y2);
+}
+
+auto perlin_terrain_generator::ridged_noise3d(
+    float64 x, float64 y, float64 z, int32 octaves
+) const -> float64 {
+    float64 total   = 0.0;
+    float64 freq    = 1.0;
+    float64 amp     = 1.0;
+    float64 max_amp = 0.0;
+
+    for (int32 i = 0; i < octaves; ++i) {
+        float64 n = 1.0 - std::abs(noise3d(x * freq, y * freq, z * freq));
+        n *= n;
+        total += n * amp;
+        max_amp += amp;
+        freq *= params_.lacunarity;
+        amp *= params_.persistence;
+    }
+
+    return total / max_amp;
+}
+
+void perlin_terrain_generator::sample_cave_field_(
+    int32 wx0, int32 wy0, int32 wz0, cave_field& out
+) const {
+    constexpr int32 step = cave_field::step;
+    constexpr int32 dim  = cave_field::dim;
+
+    const float64 f  = params_.cave_frequency;
+    const float64 cf = params_.cavern_frequency;
+
+    for (int32 j = 0; j < dim; ++j) {
+        const auto y = static_cast<float64>(wy0 + (j * step));
+
+        for (int32 k = 0; k < dim; ++k) {
+            const auto z = static_cast<float64>(wz0 + (k * step));
+
+            for (int32 i = 0; i < dim; ++i) {
+                const auto x   = static_cast<float64>(wx0 + (i * step));
+                const int32 at = cave_field::index(i, j, k);
+
+                out.tunnel_a[at] = static_cast<float32>(
+                    ridged_noise3d(x * f, y * f * 1.6, z * f, params_.cave_octaves)
+                );
+                out.tunnel_b[at] = static_cast<float32>(ridged_noise3d(
+                    (x + 137.0) * f, (y - 71.0) * f * 1.6, (z + 251.0) * f, params_.cave_octaves
+                ));
+                out.cavern[at] = static_cast<float32>(noise3d(x * cf, y * cf * 2.0, z * cf));
+            }
+        }
+    }
+}
+
+auto perlin_terrain_generator::trilinear(
+    const std::array<float32, cave_field::dim * cave_field::dim * cave_field::dim>& field,
+    int32 lx, int32 ly, int32 lz
+) -> float32 {
+    constexpr int32 step = cave_field::step;
+
+    const int32 i = lx / step;
+    const int32 j = ly / step;
+    const int32 k = lz / step;
+
+    const auto fx = static_cast<float32>(lx % step) / static_cast<float32>(step);
+    const auto fy = static_cast<float32>(ly % step) / static_cast<float32>(step);
+    const auto fz = static_cast<float32>(lz % step) / static_cast<float32>(step);
+
+    const auto at = [&field](int32 a, int32 b, int32 c) -> float32 {
+        return field[cave_field::index(a, b, c)];
+    };
+
+    const float32 c00 = std::lerp(at(i, j, k), at(i + 1, j, k), fx);
+    const float32 c01 = std::lerp(at(i, j, k + 1), at(i + 1, j, k + 1), fx);
+    const float32 c10 = std::lerp(at(i, j + 1, k), at(i + 1, j + 1, k), fx);
+    const float32 c11 = std::lerp(at(i, j + 1, k + 1), at(i + 1, j + 1, k + 1), fx);
+
+    return std::lerp(std::lerp(c00, c01, fz), std::lerp(c10, c11, fz), fy);
+}
+
 auto perlin_terrain_generator::octave_noise(
     float64 x, float64 y
 ) const -> float64 {
@@ -397,15 +520,19 @@ void perlin_terrain_generator::generate(
 
     const auto profile = sample_column_(ctx.cx, ctx.cz);
 
-    const int32 bottom = profile.min_surface - params_.shell_depth;
+    const int32 bottom = profile.min_surface - params_.depth_below_surface;
 
     auto floor_div = [](int32 a, int32 b) -> int32 { return a >= 0 ? a / b : (a - b + 1) / b; };
 
     int32 min_cy = floor_div(bottom, s);
     int32 max_cy = floor_div(profile.max_surface, s);
 
+    // One scratch field for the whole column: 59 KB, and allocating it per
+    // chunk showed up in the measurement.
+    const auto field = std::make_unique<cave_field>();
+
     for (int32 cy = min_cy; cy <= max_cy; ++cy) {
-        generate_chunk(ctx, cy, profile);
+        generate_chunk(ctx, cy, profile, *field);
     }
 }
 
@@ -438,11 +565,14 @@ auto perlin_terrain_generator::sample_column_(
 }
 
 void perlin_terrain_generator::generate_chunk(
-    terrain_context& ctx, int32 chunk_y, const column_profile& profile
+    terrain_context& ctx, int32 chunk_y, const column_profile& profile, cave_field& field
 ) {
     constexpr int32 s = 64;
 
     auto mdl = std::make_shared<vw::asset::model>(*identity_pool_, *page_pool_, s, s, s, params_.voxel_scale);
+
+    sample_cave_field_(ctx.cx * s, chunk_y * s, ctx.cz * s, field);
+
 
     for (int32 x = 0; x < s; ++x) {
         for (int32 z = 0; z < s; ++z) {
@@ -450,17 +580,47 @@ void perlin_terrain_generator::generate_chunk(
             const int32 surface = profile.surface[index];
             const float64 continent = profile.continent[index];
 
-            int32 top    = std::min(surface, chunk_y * s + s - 1);
-            int32 bottom_y = std::max(chunk_y * s, surface - params_.shell_depth);
+            const int32 world_bottom = surface - params_.depth_below_surface;
+            const int32 top      = std::min(surface, (chunk_y * s) + s - 1);
+            const int32 bottom_y = std::max(chunk_y * s, world_bottom);
+
+            const int32 wx = (ctx.cx * s) + x;
+            const int32 wz = (ctx.cz * s) + z;
 
             for (int32 wy = bottom_y; wy <= top; ++wy) {
-                int32 y = wy - chunk_y * s;
-                if (y < 0 || y >= s)
+                const int32 y = wy - (chunk_y * s);
+                if (y < 0 || y >= s) {
                     continue;
+                }
+
+                // Bedrock is never carved, so the world always has a floor,
+                // and the layers right under the surface stay closed.
+                const bool solid_floor = (wy - world_bottom) < params_.bedrock_thickness;
+                const bool near_surface = (surface - wy) < params_.cave_surface_margin;
+
+                if (!solid_floor && !near_surface) {
+                    // Cheapest test first: the cavern field decides most
+                    // voxels, and the second tunnel field is only reached when
+                    // the first one says this might be a tunnel.
+                    bool carved = trilinear(field.cavern, x, y, z) > params_.cavern_threshold;
+
+                    if (!carved && trilinear(field.tunnel_a, x, y, z) > params_.cave_threshold) {
+                        carved = trilinear(field.tunnel_b, x, y, z) > params_.cave_threshold;
+                    }
+
+                    if (carved) {
+                        continue;
+                    }
+                }
+
                 mdl->set_voxel_raw(x, y, z, voxel{block_at(wy, surface, continent)});
             }
         }
     }
+
+    // Solid rock and hollowed-out caverns both collapse back to a single page
+    // entry here; without this a deep world runs the page pool dry.
+    mdl->compact_pages();
 
     ctx.create_chunk(chunk_y) = {vec3i{ctx.cx, chunk_y, ctx.cz}, std::move(mdl)};
 }

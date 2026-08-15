@@ -3,6 +3,9 @@ module vw.world;
 import std;
 
 namespace vw::asset {
+namespace {
+constexpr log::log_category lc_pool_{"page_pool"};
+}
 
 model_identity_pool::model_identity_pool(std::size_t capacity) {
     generations_.reserve(capacity);
@@ -109,6 +112,19 @@ auto page_pool::free_count() const -> uint32 {
 }
 
 void page_pool::ensure_capacity_(uint32 index) {
+    // page_entry stores the index in 20 bits, so running past the pool does not
+    // fail on its own -- it silently aliases another model's pages. Better to
+    // say so than to corrupt the world and crash somewhere else.
+    if (index >= block_size * max_blocks) {
+        log::critical(
+            lc_pool_,
+            "page pool exhausted: {} pages requested, {} is the addressable limit",
+            index + 1,
+            block_size * max_blocks
+        );
+        std::terminate();
+    }
+
     const uint32 block_idx = index / block_size;
     while (blocks_.size() <= block_idx) {
         blocks_.push_back(std::make_unique<std::array<page_type, block_size>>());
@@ -275,6 +291,42 @@ auto model::build_occupancy(chunk_occupancy& out) const -> bool {
     }
 
     return true;
+}
+
+auto model::compact_pages() -> uint32 {
+    std::vector<uint32> released;
+
+    for (auto& entry : pages_) {
+        if (entry.mode() != page_mode::sparse) {
+            continue;
+        }
+
+        const uint32 idx  = entry.pool_index();
+        const auto& page  = pool_ptr_->get(idx);
+        const block_id id = page[0].id;
+
+        const bool uniform = std::ranges::all_of(page, [id](const voxel& v) -> bool {
+            return v.id == id;
+        });
+        if (!uniform) {
+            continue;
+        }
+
+        entry = (id == blocks::air) ? page_entry::make_empty() : page_entry::make_uniform(id);
+        released.push_back(idx);
+    }
+
+    if (released.empty()) {
+        return 0;
+    }
+
+    std::ranges::sort(released);
+    std::erase_if(owned_pages_, [&released](uint32 owned) -> bool {
+        return std::ranges::binary_search(released, owned);
+    });
+    pool_ptr_->free_batch(released);
+
+    return static_cast<uint32>(released.size());
 }
 
 void model::compute_own_boundaries() {
