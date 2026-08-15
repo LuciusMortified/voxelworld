@@ -214,6 +214,60 @@ void model::set_voxel_raw(int32 x, int32 y, int32 z, const voxel& v) {
     }
 }
 
+auto model::build_occupancy(chunk_occupancy& out) const -> bool {
+    constexpr int32 ps   = page_size;
+    constexpr int32 side = chunk_occupancy::side;
+
+    if (width_ != side || height_ != side || depth_ != side) {
+        return false;
+    }
+
+    out.clear();
+
+    for (int32 px = 0; px < pages_x_; ++px) {
+        const int32 x0 = px * ps;
+
+        for (int32 py = 0; py < pages_y_; ++py) {
+            for (int32 pz = 0; pz < pages_z_; ++pz) {
+                const auto mode = get_page_mode(px, py, pz);
+                if (mode == page_mode::empty) {
+                    continue;
+                }
+
+                const int32 y0 = py * ps;
+                const int32 z0 = pz * ps;
+
+                if (mode == page_mode::uniform) {
+                    const uint64 span = uint64{0xFF} << x0;
+                    for (int32 ly = 0; ly < ps; ++ly) {
+                        for (int32 lz = 0; lz < ps; ++lz) {
+                            out.set_row(y0 + ly, z0 + lz, span);
+                        }
+                    }
+                    continue;
+                }
+
+                const auto* page = get_page(px, py, pz);
+                for (int32 ly = 0; ly < ps; ++ly) {
+                    for (int32 lz = 0; lz < ps; ++lz) {
+                        uint64 bits = 0;
+                        for (int32 lx = 0; lx < ps; ++lx) {
+                            if (!(*page)[local_index(lx, ly, lz)].is_empty()) {
+                                bits |= uint64{1} << lx;
+                            }
+                        }
+                        if (bits != 0) {
+                            out.set_row(y0 + ly, z0 + lz, bits << x0);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
 void model::compute_own_boundaries() {
     constexpr int32 ps = page_size;
 

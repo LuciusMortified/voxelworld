@@ -144,6 +144,31 @@ struct face_occupancy {
 };
 
 
+// A whole chunk as occupancy bits: one word per row along X, indexed by
+// (y, z). 32 KB, built once per mesh and read a row at a time -- the scans the
+// mesher does per cell are single instructions against this.
+struct chunk_occupancy {
+    static constexpr int32 side = 64;
+
+    std::array<uint64, side * side> rows{};
+
+    auto clear() -> void {
+        rows.fill(0);
+    }
+
+    [[nodiscard]] auto row(int32 y, int32 z) const -> uint64 {
+        return rows[(y * side) + z];
+    }
+
+    [[nodiscard]] auto test(int32 x, int32 y, int32 z) const -> bool {
+        return ((row(y, z) >> x) & 1U) != 0;
+    }
+
+    auto set_row(int32 y, int32 z, uint64 bits) -> void {
+        rows[(y * side) + z] |= bits;
+    }
+};
+
 // Paged voxel volume. Pages are empty, uniform or sparse, so a mostly solid or
 // mostly empty model costs one entry per page instead of a voxel array.
 class model {
@@ -235,6 +260,11 @@ public:
     }
 
     void compute_own_boundaries();
+
+    // Fills the bit volume from the page table rather than voxel by voxel: an
+    // empty page contributes nothing, a uniform one contributes eight set bits
+    // per row at once. False when the model is not a 64-cube.
+    [[nodiscard]] auto build_occupancy(chunk_occupancy& out) const -> bool;
     void set_boundary_slice(int32 face_direction, const model& neighbor);
 
     [[nodiscard]] auto has_boundary_slice(int32 face_direction) const -> bool {

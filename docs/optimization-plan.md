@@ -871,7 +871,7 @@ uint8 neighbor_valid_ = 0;
 - пик RSS и число аллокаций (P0.4) вниз на `flythrough`;
 - дифф-тест (P0.7) — бит-в-бит.
 
-### P4.2 `chunk_occupancy` из страниц
+### P4.2 `chunk_occupancy` из страниц — **сделано**
 
 **Тип:** CPU.
 
