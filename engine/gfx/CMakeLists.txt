@@ -12,6 +12,10 @@ target_sources(vw_gfx
             src/gfx.cppm
             src/vk.cppm
             src/camera.cppm
+            src/meshing.cppm
+            src/mesh_pool.cppm
+            src/gpu_buffers.cppm
+            src/geometry.cppm
             src/resource.cppm
             src/render.cppm
             src/renderer.cppm

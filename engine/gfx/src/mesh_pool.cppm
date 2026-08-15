@@ -1,0 +1,104 @@
+export module vw.gfx:mesh_pool;
+
+import std;
+
+import vw.core;
+import vw.world;
+import :meshing;
+import vulkan;
+
+// ---- from vw/gfx/resource/mesh_pool.h
+export namespace vw::gfx {
+
+
+class vulkan_context;
+
+struct mesh_generation_task {
+    vw::asset::model_identity identity;
+    std::weak_ptr<vw::asset::model> model_ref;
+    std::promise<mesh> promise;
+    mesh_options opts;
+
+    mesh_generation_task(
+        vw::asset::model_identity identity,
+        std::weak_ptr<vw::asset::model> model_ref,
+        mesh_options opts
+    )
+        : identity(identity), model_ref(std::move(model_ref)), opts(opts) {}
+};
+
+// Meshing is off the frame thread, so frame percentiles say nothing about it.
+// Counters are per worker and merged under the queue lock the worker already
+// takes, which keeps the hot path free of both atomics and false sharing.
+struct mesh_gen_worker_stats {
+    uint64 chunks = 0;
+    uint64 nanos  = 0;
+    uint64 quads  = 0;
+    std::vector<uint32> micros;
+
+    auto record(uint64 elapsed_ns, size_t vertex_count) -> void {
+        ++chunks;
+        nanos += elapsed_ns;
+        quads += vertex_count / 4;
+        micros.push_back(static_cast<uint32>(elapsed_ns / 1000));
+    }
+};
+
+struct mesh_gen_stats {
+    uint64 chunks       = 0;
+    uint64 quads        = 0;
+    float32 total_ms    = 0.0f;
+    float32 mean_us     = 0.0f;
+    float32 p50_us      = 0.0f;
+    float32 p99_us      = 0.0f;
+    float32 max_us      = 0.0f;
+    uint32 queue_depth  = 0;
+    uint32 queue_peak   = 0;
+};
+
+class mesh_pool final {
+public:
+    explicit mesh_pool(vulkan_context& context, const block_registry& registry);
+    ~mesh_pool();
+
+    mesh_pool(const mesh_pool&)                    = delete;
+    auto operator=(const mesh_pool&) -> mesh_pool& = delete;
+    mesh_pool(mesh_pool&&)                         = delete;
+    auto operator=(mesh_pool&&) -> mesh_pool&      = delete;
+
+    void stop_gen_threads();
+    [[nodiscard]] auto has(const vw::asset::model_identity& identity) const -> bool;
+    [[nodiscard]] auto is_pending(const vw::asset::model_identity& identity) const -> bool;
+    void request_mesh(const std::shared_ptr<vw::asset::model>& model_ptr, mesh_options opts = {});
+    [[nodiscard]] auto get(const vw::asset::model_identity& identity) const -> std::shared_ptr<mesh>;
+    void remove(const vw::asset::model_identity& identity);
+    void evict(const vw::asset::model_identity& identity);
+    void process_completed();
+    [[nodiscard]] auto get_pending_count() const -> uint32;
+    [[nodiscard]] auto get_gen_stats() const -> mesh_gen_stats;
+
+private:
+    void gen_thread_function();
+    void sweep_orphaned_();
+    void merge_worker_stats_(mesh_gen_worker_stats& worker);
+
+    vulkan_context* context_;
+    const block_registry* registry_;
+    std::unordered_map<vw::asset::model_identity, std::shared_ptr<mesh>> meshes_;
+    std::unordered_map<vw::asset::model_identity, std::weak_ptr<vw::asset::model>> model_refs_;
+    std::unordered_map<vw::asset::model_identity, std::future<mesh>> pending_meshes_;
+    std::unordered_set<uint32> pending_indices_;
+
+    std::vector<std::thread> gen_threads_;
+    std::queue<std::unique_ptr<mesh_generation_task>> gen_queue_;
+    mutable std::mutex gen_mutex_;
+    std::condition_variable gen_cv_;
+    bool gen_running_ = true;
+    uint32 sweep_counter_ = 0;
+    static constexpr uint32 sweep_interval_ = 60;
+
+    mesh_gen_worker_stats gen_totals_;
+    uint32 gen_queue_peak_ = 0;
+};
+
+}  // namespace vw::gfx
