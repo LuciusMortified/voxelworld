@@ -38,11 +38,15 @@ combined_buffer::combined_buffer(
     , descriptor_pool_(descriptor_pool)
     , descriptor_set_layout_(descriptor_set_layout)
     , compute_descriptor_set_layout_(compute_descriptor_set_layout) {
-    vertex_buffer_ = std::make_unique<device_vertex_buffer>(
-        *context_, mesh_capacity_ * chunk_size_.vertex_count * sizeof(vertex)
-    );
-    index_buffer_ = std::make_unique<device_index_buffer>(
-        *context_, mesh_capacity_ * chunk_size_.index_count * sizeof(uint32)
+    // A fixed slot count starts the largest classes off holding megabytes for a
+    // handful of meshes -- one class was measured holding 4.6 MB for five. The
+    // floor is a byte budget instead, and growth takes it from there.
+    constexpr uint32 initial_bytes = 256 * 1024;
+    const auto slot_bytes = chunk_size_.quad_count * static_cast<uint32>(sizeof(quad));
+    mesh_capacity_ = std::clamp(initial_bytes / std::max(slot_bytes, 1u), 4u, default_mesh_capacity_);
+
+    quad_buffer_ = std::make_unique<device_storage_buffer>(
+        *context_, mesh_capacity_ * chunk_size_.quad_count * sizeof(quad)
     );
     instance_index_buffer_ = std::make_unique<device_storage_buffer>(
         *context_,
@@ -57,7 +61,7 @@ combined_buffer::combined_buffer(
     );
     indirect_draw_buffer_ = std::make_unique<device_storage_buffer>(
         *context_,
-        instance_capacity_ * sizeof(draw_command),
+        instance_capacity_ * faces_per_mesh * sizeof(draw_command),
         vk::BufferUsageFlagBits::eIndirectBuffer
     );
     aabb_buffer_ = std::make_unique<device_storage_buffer>(
@@ -65,13 +69,16 @@ combined_buffer::combined_buffer(
     );
     culled_indirect_buffer_ = std::make_unique<device_storage_buffer>(
         *context_,
-        instance_capacity_ * cull_pass_count * sizeof(draw_command),
+        instance_capacity_ * faces_per_mesh * cull_pass_count * sizeof(draw_command),
         vk::BufferUsageFlagBits::eIndirectBuffer
     );
     count_buffer_ = std::make_unique<device_storage_buffer>(
         *context_,
         cull_pass_count * sizeof(uint32),
         vk::BufferUsageFlagBits::eIndirectBuffer | vk::BufferUsageFlagBits::eTransferDst
+    );
+    visibility_buffer_ = std::make_unique<device_storage_buffer>(
+        *context_, instance_capacity_ * sizeof(uint32)
     );
 
     descriptor_set_ = vk_must(
@@ -175,24 +182,34 @@ void combined_buffer::allocate(
 }
 
 // The command draws the mesh, not the size class it landed in. Anything past
-// index_count is leftovers from whoever held the slot before, and never read.
+// quad_count is leftovers from whoever held the slot before, and never read.
 void combined_buffer::write_draw_command_(
     uint32 instance_index, const mesh_allocation& mesh_alloc
 ) {
-    const draw_command cmd{
-        .index_count    = mesh_alloc.index_count,
-        .instance_count = 1,
-        .first_index    = mesh_alloc.index_offset,
-        .vertex_offset  = static_cast<int32>(mesh_alloc.vertex_offset),
-        .first_instance = instance_index,
-    };
+    // One command per face direction. Every mesh indexes the same shared
+    // pattern from the start; vertex_offset is what puts gl_VertexIndex on this
+    // direction's run of quads.
+    std::array<draw_command, faces_per_mesh> commands{};
+    uint32 offset = mesh_alloc.quad_offset;
 
-    const auto staged = staging_->stage_struct(cmd);
+    for (uint32 face = 0; face < faces_per_mesh; ++face) {
+        const auto count = mesh_alloc.face_counts[face];
+        commands[face]   = draw_command{
+              .index_count    = count * 6,
+              .instance_count = 1,
+              .first_index    = 0,
+              .vertex_offset  = static_cast<int32>(offset * 4),
+              .first_instance = instance_index,
+        };
+        offset += count;
+    }
+
+    const auto staged = staging_->stage_struct(commands);
     staging_->copy_to(
         indirect_draw_buffer_->get_buffer(),
-        instance_index * sizeof(draw_command),
+        instance_index * faces_per_mesh * sizeof(draw_command),
         staged,
-        sizeof(draw_command)
+        sizeof(commands)
     );
 }
 
@@ -206,50 +223,34 @@ void combined_buffer::allocate_mesh(
     //     mesh_data.vertices.size(), mesh_data.indices.size()
     // );
 
-    const auto vertex_count = mesh_data.vertices.size();
-    const auto index_count  = mesh_data.indices.size();
-    uint32 vertex_offset  = vertex_used_;
-    uint32 index_offset   = index_used_;
+    const auto quad_count = mesh_data.quads.size();
+    uint32 quad_offset    = quad_used_;
 
     if (!free_slots_.empty()) {
-        const auto& slot = free_slots_.back();
-        vertex_offset    = slot.vertex_offset;
-        index_offset     = slot.index_offset;
+        quad_offset = free_slots_.back().quad_offset;
         free_slots_.pop_back();
     } else {
-        vertex_used_ += chunk_size_.vertex_count;
-        index_used_ += chunk_size_.index_count;
+        quad_used_ += chunk_size_.quad_count;
     }
 
-    const bool vertex_out_of_bounds = vertex_used_ > mesh_capacity_ * chunk_size_.vertex_count;
-    const bool index_out_of_bounds  = index_used_ > mesh_capacity_ * chunk_size_.index_count;
-    if (vertex_out_of_bounds || index_out_of_bounds) {
+    if (quad_used_ > mesh_capacity_ * chunk_size_.quad_count) {
         expand_mesh_buffers_();
     }
 
-    auto vertices_staged = staging_->stage_vector(mesh_data.vertices);
+    const auto quads_staged = staging_->stage_vector(mesh_data.quads);
     staging_->copy_to(
-        vertex_buffer_->get_buffer(),
-        vertex_offset * sizeof(vertex),
-        vertices_staged,
-        vertex_count * sizeof(vertex)
-    );
-
-    const auto indices_staged = staging_->stage_vector(mesh_data.indices);
-    staging_->copy_to(
-        index_buffer_->get_buffer(),
-        index_offset * sizeof(uint32),
-        indices_staged,
-        index_count * sizeof(uint32)
+        quad_buffer_->get_buffer(),
+        quad_offset * sizeof(quad),
+        quads_staged,
+        quad_count * sizeof(quad)
     );
 
     mesh_allocation new_mesh_alloc{};
-    new_mesh_alloc.vertex_offset = vertex_offset;
-    new_mesh_alloc.index_offset  = index_offset;
-    new_mesh_alloc.vertex_count  = vertex_count;
-    new_mesh_alloc.index_count   = index_count;
-    new_mesh_alloc.generation    = model_id.generation;
-    new_mesh_alloc.ref_count     = 0;
+    new_mesh_alloc.quad_offset = quad_offset;
+    new_mesh_alloc.quad_count  = quad_count;
+    new_mesh_alloc.generation  = model_id.generation;
+    new_mesh_alloc.ref_count   = 0;
+    new_mesh_alloc.face_counts = mesh_data.face_counts;
 
     mesh_allocations_[model_id.index] = new_mesh_alloc;
 }
@@ -269,28 +270,19 @@ void combined_buffer::write_mesh(
     //     mesh_data.vertices.size(), mesh_data.indices.size()
     // );
 
-    const auto vertex_count = mesh_data.vertices.size();
-    const auto index_count  = mesh_data.indices.size();
+    const auto quad_count = mesh_data.quads.size();
 
-    const auto vertices_staged = staging_->stage_vector(mesh_data.vertices);
+    const auto quads_staged = staging_->stage_vector(mesh_data.quads);
     staging_->copy_to(
-        vertex_buffer_->get_buffer(),
-        mesh_alloc.vertex_offset * sizeof(vertex),
-        vertices_staged,
-        vertex_count * sizeof(vertex)
+        quad_buffer_->get_buffer(),
+        mesh_alloc.quad_offset * sizeof(quad),
+        quads_staged,
+        quad_count * sizeof(quad)
     );
 
-    const auto indices_staged = staging_->stage_vector(mesh_data.indices);
-    staging_->copy_to(
-        index_buffer_->get_buffer(),
-        mesh_alloc.index_offset * sizeof(uint32),
-        indices_staged,
-        index_count * sizeof(uint32)
-    );
-
-    mesh_alloc.vertex_count = vertex_count;
-    mesh_alloc.index_count  = index_count;
-    mesh_alloc.generation   = model_id.generation;
+    mesh_alloc.quad_count  = quad_count;
+    mesh_alloc.generation  = model_id.generation;
+    mesh_alloc.face_counts = mesh_data.face_counts;
 
     // A remesh changes how much of the slot is live, so every instance drawing
     // this mesh needs its command rewritten.
@@ -336,6 +328,18 @@ void combined_buffer::write_transform(
     );
 }
 
+void combined_buffer::write_visibility(
+    std::span<const uint32> flags
+) {
+    if (flags.empty()) {
+        return;
+    }
+
+    const auto bytes = flags.size() * sizeof(uint32);
+    const auto staged = staging_->stage(flags.data(), bytes);
+    staging_->copy_to(visibility_buffer_->get_buffer(), 0, staged, bytes);
+}
+
 auto combined_buffer::free(
     entity ent
 ) -> std::optional<entity> {
@@ -358,10 +362,7 @@ auto combined_buffer::free(
         //     ent_alloc.model_index,
         //     mesh_alloc.vertex_offset, mesh_alloc.index_offset
         // );
-        free_slots_.push_back({
-            .vertex_offset = mesh_alloc.vertex_offset,
-            .index_offset  = mesh_alloc.index_offset,
-        });
+        free_slots_.push_back({.quad_offset = mesh_alloc.quad_offset});
         mesh_allocations_.erase(ent_alloc.model_index);
     }
 
@@ -399,38 +400,36 @@ auto combined_buffer::get_entity_allocation(
     return entity_allocations_[ent];
 }
 
-vk::Buffer combined_buffer::get_vertex_buffer() const {
-    return vertex_buffer_->get_buffer();
+auto combined_buffer::get_quad_buffer() const -> vk::Buffer {
+    return quad_buffer_->get_buffer();
 }
 
 void combined_buffer::expand_mesh_buffers_() {
-    const auto old_vertex_bytes =
-        (mesh_capacity_ * chunk_size_.vertex_count) * sizeof(vertex);
-    const auto old_index_bytes =
-        (mesh_capacity_ * chunk_size_.index_count) * sizeof(uint32);
+    const auto old_bytes = (mesh_capacity_ * chunk_size_.quad_count) * sizeof(quad);
 
-    mesh_capacity_ *= 2;
+    // Half again rather than double. A buffer sits wherever the last growth
+    // left it, so doubling leaves anywhere from nothing to half of it empty --
+    // measured at 47 % empty on the class that holds most of the world. The
+    // price is more copies while a scene streams in, and those are off the
+    // frame path.
+    mesh_capacity_ += (mesh_capacity_ + 1) / 2;
 
-    auto new_vertex_buffer = std::make_unique<device_vertex_buffer>(
-        *context_, mesh_capacity_ * chunk_size_.vertex_count * sizeof(vertex)
+    auto new_quad_buffer = std::make_unique<device_storage_buffer>(
+        *context_, mesh_capacity_ * chunk_size_.quad_count * sizeof(quad)
     );
-    auto new_index_buffer = std::make_unique<device_index_buffer>(
-        *context_, mesh_capacity_ * chunk_size_.index_count * sizeof(uint32)
-    );
 
-    staging_->replace_buffer(vertex_buffer_->get_buffer(), new_vertex_buffer->get_buffer());
-    staging_->replace_buffer(index_buffer_->get_buffer(), new_index_buffer->get_buffer());
+    staging_->replace_buffer(quad_buffer_->get_buffer(), new_quad_buffer->get_buffer());
 
-    // After replace_buffer, or it would retarget these onto themselves
+    // After replace_buffer, or it would retarget this onto itself
     staging_->copy_buffer(
-        vertex_buffer_->get_buffer(), 0, new_vertex_buffer->get_buffer(), 0, old_vertex_bytes
-    );
-    staging_->copy_buffer(
-        index_buffer_->get_buffer(), 0, new_index_buffer->get_buffer(), 0, old_index_bytes
+        quad_buffer_->get_buffer(), 0, new_quad_buffer->get_buffer(), 0, old_bytes
     );
 
-    deletion_->retire(std::exchange(vertex_buffer_, std::move(new_vertex_buffer)));
-    deletion_->retire(std::exchange(index_buffer_, std::move(new_index_buffer)));
+    deletion_->retire(std::exchange(quad_buffer_, std::move(new_quad_buffer)));
+
+    // The geometry is read through the descriptor set now rather than bound as
+    // a vertex buffer per draw, so the set has to hear about the new one.
+    update_descriptor_set_();
 }
 
 void combined_buffer::expand_instance_buffers_() {
@@ -446,7 +445,7 @@ void combined_buffer::expand_instance_buffers_() {
     );
     auto new_indirect_draw_buffer = std::make_unique<device_storage_buffer>(
         *context_,
-        instance_capacity_ * sizeof(draw_command),
+        instance_capacity_ * faces_per_mesh * sizeof(draw_command),
         vk::BufferUsageFlagBits::eIndirectBuffer
     );
     auto new_instance_index_buffer = std::make_unique<device_storage_buffer>(
@@ -488,7 +487,7 @@ void combined_buffer::expand_instance_buffers_() {
     staging_->copy_buffer(
         indirect_draw_buffer_->get_buffer(), 0,
         new_indirect_draw_buffer->get_buffer(), 0,
-        instance_count * sizeof(draw_command)
+        instance_count * faces_per_mesh * sizeof(draw_command)
     );
     staging_->copy_buffer(
         instance_index_buffer_->get_buffer(), 0,
@@ -511,7 +510,7 @@ void combined_buffer::expand_instance_buffers_() {
         culled_indirect_buffer_,
         std::make_unique<device_storage_buffer>(
             *context_,
-            instance_capacity_ * cull_pass_count * sizeof(draw_command),
+            instance_capacity_ * faces_per_mesh * cull_pass_count * sizeof(draw_command),
             vk::BufferUsageFlagBits::eIndirectBuffer
         )
     ));
@@ -521,6 +520,14 @@ void combined_buffer::expand_instance_buffers_() {
             *context_,
             cull_pass_count * sizeof(uint32),
             vk::BufferUsageFlagBits::eIndirectBuffer | vk::BufferUsageFlagBits::eTransferDst
+        )
+    ));
+
+    // Nothing to carry over: visibility is rewritten in full every frame.
+    deletion_->retire(std::exchange(
+        visibility_buffer_,
+        std::make_unique<device_storage_buffer>(
+            *context_, instance_capacity_ * sizeof(uint32)
         )
     ));
 
@@ -543,6 +550,12 @@ void combined_buffer::update_descriptor_set_() {
         .range  = vk::WholeSize,
     };
 
+    const vk::DescriptorBufferInfo quad_buffer_info{
+        .buffer = quad_buffer_->get_buffer(),
+        .offset = 0,
+        .range  = vk::WholeSize,
+    };
+
     const std::array descriptor_writes{
         vk::WriteDescriptorSet{
             .dstSet          = descriptor_set_,
@@ -559,6 +572,14 @@ void combined_buffer::update_descriptor_set_() {
             .descriptorCount = 1,
             .descriptorType  = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo     = &normal_buffer_info,
+        },
+        vk::WriteDescriptorSet{
+            .dstSet          = descriptor_set_,
+            .dstBinding      = 2,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType  = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo     = &quad_buffer_info,
         },
     };
 
@@ -586,6 +607,12 @@ void combined_buffer::update_compute_descriptor_set_() {
 
     const vk::DescriptorBufferInfo count_info{
         .buffer = count_buffer_->get_buffer(),
+        .offset = 0,
+        .range  = vk::WholeSize,
+    };
+
+    const vk::DescriptorBufferInfo visibility_info{
+        .buffer = visibility_buffer_->get_buffer(),
         .offset = 0,
         .range  = vk::WholeSize,
     };
@@ -623,17 +650,25 @@ void combined_buffer::update_compute_descriptor_set_() {
             .descriptorType  = vk::DescriptorType::eStorageBuffer,
             .pBufferInfo     = &count_info,
         },
+        vk::WriteDescriptorSet{
+            .dstSet          = compute_descriptor_set_,
+            .dstBinding      = 4,
+            .dstArrayElement = 0,
+            .descriptorCount = 1,
+            .descriptorType  = vk::DescriptorType::eStorageBuffer,
+            .pBufferInfo     = &visibility_info,
+        },
     };
 
     context_->get_device().updateDescriptorSets(writes, nullptr);
 }
 
-uint32 combined_buffer::get_draw_command_count() const {
-    return entity_allocations_.size();
+uint32 combined_buffer::get_instance_count() const {
+    return static_cast<uint32>(entity_allocations_.size());
 }
 
-vk::Buffer combined_buffer::get_index_buffer() const {
-    return index_buffer_->get_buffer();
+uint32 combined_buffer::get_draw_command_count() const {
+    return static_cast<uint32>(entity_allocations_.size()) * faces_per_mesh;
 }
 
 vk::Buffer combined_buffer::get_instance_index_buffer() const {
@@ -674,50 +709,32 @@ const combined_buffer_stats& combined_buffer::get_stats() const {
     stats_.mesh_count        = static_cast<uint32>(mesh_allocations_.size());
     stats_.instance_capacity = instance_capacity_;
     stats_.instance_count    = static_cast<uint32>(entity_allocations_.size());
-    stats_.vertex_load_min   = 0.f;
-    stats_.vertex_load_max   = 0.f;
-    stats_.vertex_load_avg   = 0.f;
-    stats_.index_load_min    = 0.f;
-    stats_.index_load_max    = 0.f;
-    stats_.index_load_avg    = 0.f;
+    stats_.quad_load_min     = 0.f;
+    stats_.quad_load_max     = 0.f;
+    stats_.quad_load_avg     = 0.f;
 
     if (mesh_allocations_.empty()) {
         return stats_;
     }
 
-    float32 vertex_load_avg_sum = 0.0f;
-    float32 index_load_avg_sum  = 0.0f;
+    float32 load_avg_sum = 0.0f;
 
     for (const auto& mesh_alloc : mesh_allocations_ | std::views::values) {
-        float32 vertex_load = 0.0f;
-        if (chunk_size_.vertex_count > 0) {
-            vertex_load = static_cast<float32>(mesh_alloc.vertex_count) /
-                static_cast<float32>(chunk_size_.vertex_count);
+        float32 load = 0.0f;
+        if (chunk_size_.quad_count > 0) {
+            load = static_cast<float32>(mesh_alloc.quad_count) /
+                static_cast<float32>(chunk_size_.quad_count);
         }
-        if (vertex_load < stats_.vertex_load_min || stats_.vertex_load_min == 0.0f) {
-            stats_.vertex_load_min = vertex_load;
+        if (load < stats_.quad_load_min || stats_.quad_load_min == 0.0f) {
+            stats_.quad_load_min = load;
         }
-        if (vertex_load > stats_.vertex_load_max) {
-            stats_.vertex_load_max = vertex_load;
+        if (load > stats_.quad_load_max) {
+            stats_.quad_load_max = load;
         }
-        vertex_load_avg_sum += vertex_load;
-
-        float32 index_load = 0.0f;
-        if (chunk_size_.index_count > 0) {
-            index_load = static_cast<float32>(mesh_alloc.index_count) /
-                static_cast<float32>(chunk_size_.index_count);
-        }
-        if (index_load < stats_.index_load_min || stats_.index_load_min == 0.0f) {
-            stats_.index_load_min = index_load;
-        }
-        if (index_load > stats_.index_load_max) {
-            stats_.index_load_max = index_load;
-        }
-        index_load_avg_sum += index_load;
+        load_avg_sum += load;
     }
 
-    stats_.vertex_load_avg = vertex_load_avg_sum / static_cast<float32>(mesh_allocations_.size());
-    stats_.index_load_avg  = index_load_avg_sum / static_cast<float32>(mesh_allocations_.size());
+    stats_.quad_load_avg = load_avg_sum / static_cast<float32>(mesh_allocations_.size());
 
     return stats_;
 }

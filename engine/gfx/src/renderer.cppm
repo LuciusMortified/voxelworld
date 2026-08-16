@@ -84,6 +84,11 @@ struct push_constant_data {
 
 struct render_timing_stats {
     gpu_timing_stats gpu{};
+
+    // Collecting finished meshes and requesting new ones. Was inside the
+    // renderer total and nowhere else, which is how a 46 ms spike managed to
+    // hide behind stages that all reported single digits.
+    float32 mesh_sync_ms            = 0.0f;
     float32 shadow_map_update_ms    = 0.0f;
     float32 buffer_pool_update_ms   = 0.0f;
     float32 compute_cull_ms         = 0.0f;
@@ -108,7 +113,8 @@ public:
     using combined_buffer_pool_type = combined_buffer_pool;
     using light_buffer_type         = light_buffer;
 
-    renderer(vulkan_context& context, window& window, const block_registry& registry);
+    renderer(vulkan_context& context, window& window, const block_registry& registry,
+             uint32 mesh_workers = 0);
     ~renderer();
 
     renderer(const renderer&)            = delete;
@@ -167,6 +173,13 @@ public:
 
     [[nodiscard]] auto get_mesh_pool() -> mesh_pool& { return mesh_pool_; }
     [[nodiscard]] auto get_mesh_pool() const -> const mesh_pool& { return mesh_pool_; }
+
+    // Drops chunks no open path reaches from the viewer. Off, the walk still
+    // runs and reports what it would have hidden, so the two can be compared
+    // in one build.
+    void set_chunk_cull_enabled(bool enabled) {
+        combined_buffer_pool_->set_chunk_cull_enabled(enabled);
+    }
 
     void draw_colliders(world_type& w, color col = colors::green);
 

@@ -17,12 +17,12 @@ import :vk;
 namespace vw::gfx {
 
 renderer::renderer(
-    vulkan_context& context, window& window, const block_registry& registry
+    vulkan_context& context, window& window, const block_registry& registry, uint32 mesh_workers
 )
     : context_(&context)
     , window_(&window)
     , block_registry_(&registry)
-    , mesh_pool_(context, registry) {
+    , mesh_pool_(context, registry, mesh_workers) {
     vertex_shader_ =
         std::make_unique<shader>(*context_, "shaders/voxel.vert.spv", shader_type::VERTEX);
     fragment_shader_ =
@@ -315,7 +315,13 @@ void renderer::sync_meshes_(world_type& world) {
         auto identity = comp.get_identity();
         if (!mesh_pool_.has(identity) && !mesh_pool_.is_pending(identity)) {
             mesh_pool_.request_mesh(
-                comp.get_model(), mesh_options{.enable_top_brightness = comp.top_brightness()}
+                comp.get_model(),
+                mesh_options{
+                    .enable_top_brightness = comp.top_brightness(),
+                    // Meshes built before the walk was switched on keep their
+                    // wide-open links, which hides nothing rather than too much.
+                    .build_links = combined_buffer_pool_->is_chunk_cull_enabled(),
+                }
             );
             pending_mesh_entities_.insert(ent);
         }
@@ -335,7 +341,7 @@ void renderer::render(
     gpu_timer_->reset(cmd, current_frame_);
     gpu_timer_->begin(cmd, gpu_stage::frame);
 
-    sync_meshes_(world);
+    stats_.timing.mesh_sync_ms = measure_ms([&] { sync_meshes_(world); });
 
     stats_.timing.buffer_pool_update_ms = measure_ms([&] {
         gpu_timer_->begin(cmd, gpu_stage::buffer_upload);
@@ -381,15 +387,14 @@ void renderer::render(
         }
 
         const vw::spatial::frustum& view_frustum = camera.get_frustum();
-        cull_pipeline_->update_frustums(current_frame_, view_frustum, cascade_frustums);
+        cull_pipeline_->update_frustums(
+            current_frame_, view_frustum, cascade_frustums, camera.get_position());
 
-        for (const auto& buffer : combined_buffer_pool_->get_buffers()) {
-            if (!buffer->is_empty()) {
-                cull_pipeline_->dispatch(
-                    command_buffers_[current_image_index_], *buffer, current_frame_
-                );
-            }
-        }
+        cull_pipeline_->dispatch(
+            command_buffers_[current_image_index_],
+            combined_buffer_pool_->get_buffers(),
+            current_frame_
+        );
 
         {
             vk::MemoryBarrier compute_barrier{};
@@ -663,8 +668,8 @@ void renderer::create_descriptor_set_layouts() {
     uniform_descriptor_set_layout_ = vk_must(context_->get_device().createDescriptorSetLayout(ubo_layout_info), "failed to create uniform descriptor set layout");
 
     // Storage buffer descriptor set layout (set 1: binding 0 = vw::asset::model matrices, binding 1 = normal
-    // matrices)
-    std::array<vk::DescriptorSetLayoutBinding, 2> storage_layout_bindings{};
+    // matrices, binding 2 = quads)
+    std::array<vk::DescriptorSetLayoutBinding, 3> storage_layout_bindings{};
     storage_layout_bindings[0].binding            = 0;
     storage_layout_bindings[0].descriptorType     = vk::DescriptorType::eStorageBuffer;
     storage_layout_bindings[0].descriptorCount    = 1;
@@ -676,6 +681,12 @@ void renderer::create_descriptor_set_layouts() {
     storage_layout_bindings[1].descriptorCount    = 1;
     storage_layout_bindings[1].stageFlags         = vk::ShaderStageFlagBits::eVertex;
     storage_layout_bindings[1].pImmutableSamplers = nullptr;
+
+    storage_layout_bindings[2].binding            = 2;
+    storage_layout_bindings[2].descriptorType     = vk::DescriptorType::eStorageBuffer;
+    storage_layout_bindings[2].descriptorCount    = 1;
+    storage_layout_bindings[2].stageFlags         = vk::ShaderStageFlagBits::eVertex;
+    storage_layout_bindings[2].pImmutableSamplers = nullptr;
 
     vk::DescriptorSetLayoutCreateInfo storage_layout_info{};
     storage_layout_info.bindingCount = storage_layout_bindings.size();
@@ -705,8 +716,8 @@ void renderer::create_graphics_pipeline() {
     };
 
     // Vertex input state
-    auto binding_description    = vertex::get_binding_descriptions();
-    auto attribute_descriptions = vertex::get_attribute_descriptions();
+    auto binding_description    = quad::get_binding_descriptions();
+    auto attribute_descriptions = quad::get_attribute_descriptions();
 
     vk::PipelineVertexInputStateCreateInfo vertex_input_info{};
     vertex_input_info.vertexBindingDescriptionCount =
@@ -813,8 +824,8 @@ void renderer::create_wireframe_pipeline() {
         vertex_shader_->get_stage_info(), fragment_shader_->get_stage_info()
     };
 
-    auto binding_description    = vertex::get_binding_descriptions();
-    auto attribute_descriptions = vertex::get_attribute_descriptions();
+    auto binding_description    = quad::get_binding_descriptions();
+    auto attribute_descriptions = quad::get_attribute_descriptions();
 
     vk::PipelineVertexInputStateCreateInfo vertex_input_info{};
     vertex_input_info.vertexBindingDescriptionCount =
@@ -1453,9 +1464,7 @@ void renderer::render_world(
             continue;
         }
 
-        vk::Buffer vertex_buffer         = buffer->get_vertex_buffer();
         vk::Buffer instance_index_buffer = buffer->get_instance_index_buffer();
-        vk::Buffer index_buffer          = buffer->get_index_buffer();
 
         // Биндим storage buffer descriptor set из буфера (set 1)
         vk::DescriptorSet buffer_descriptor_set = buffer->get_descriptor_set();
@@ -1467,15 +1476,14 @@ void renderer::render_world(
             0,
             nullptr);
 
-        // Биндим vertex и index буферы
-        constexpr vk::DeviceSize vertex_offset   = 0;
+        // Geometry comes out of the storage buffer in set 1; the only thing
+        // left in vertex input is the per-instance index. The index buffer
+        // holds one quad pattern shared by every mesh in the pool.
         constexpr vk::DeviceSize instance_offset = 0;
-
-        std::array vertex_buffers = {vertex_buffer, instance_index_buffer};
-        std::array vertex_offsets = {vertex_offset, instance_offset};
-
-        command_buffers_[current_image_index_].bindVertexBuffers(0, vertex_buffers, vertex_offsets);
-        command_buffers_[current_image_index_].bindIndexBuffer(index_buffer, 0, vk::IndexType::eUint32);
+        command_buffers_[current_image_index_].bindVertexBuffers(
+            0, instance_index_buffer, instance_offset);
+        command_buffers_[current_image_index_].bindIndexBuffer(
+            combined_buffer_pool_->get_index_buffer(), 0, vk::IndexType::eUint32);
 
         const uint32 max_draws = buffer->get_draw_command_count();
         if (max_draws > 0) {
@@ -1890,8 +1898,8 @@ void renderer::create_shadow_pipeline() {
     };
 
     // Vertex input state (только позиция)
-    auto binding_description    = vertex::get_binding_descriptions();
-    auto attribute_descriptions = vertex::get_attribute_descriptions();
+    auto binding_description    = quad::get_binding_descriptions();
+    auto attribute_descriptions = quad::get_attribute_descriptions();
 
     vk::PipelineVertexInputStateCreateInfo vertex_input_info{};
     vertex_input_info.vertexBindingDescriptionCount =
@@ -2085,9 +2093,7 @@ void renderer::render_shadow_pass(
                 continue;
             }
 
-            vk::Buffer vertex_buffer         = buffer->get_vertex_buffer();
             vk::Buffer instance_index_buffer = buffer->get_instance_index_buffer();
-            vk::Buffer index_buffer          = buffer->get_index_buffer();
 
             // Биндим storage buffer descriptor set из буфера (set 1)
             vk::DescriptorSet buffer_descriptor_set = buffer->get_descriptor_set();
@@ -2099,18 +2105,11 @@ void renderer::render_shadow_pass(
                 0,
                 nullptr);
 
-            // Биндим vertex и index буферы
-            constexpr vk::DeviceSize vertex_offset   = 0;
             constexpr vk::DeviceSize instance_offset = 0;
-
-            std::array vertex_buffers = {vertex_buffer, instance_index_buffer};
-            std::array vertex_offsets = {vertex_offset, instance_offset};
-
-            command_buffers_[current_image_index_].bindVertexBuffers(0,
-                vertex_buffers.size(),
-                vertex_buffers.data(),
-                vertex_offsets.data());
-            command_buffers_[current_image_index_].bindIndexBuffer(index_buffer, 0, vk::IndexType::eUint32);
+            command_buffers_[current_image_index_].bindVertexBuffers(
+                0, instance_index_buffer, instance_offset);
+            command_buffers_[current_image_index_].bindIndexBuffer(
+                combined_buffer_pool_->get_index_buffer(), 0, vk::IndexType::eUint32);
 
             const uint32 max_draws  = buffer->get_draw_command_count();
             const uint32 pass_index = cascade_index + 1;

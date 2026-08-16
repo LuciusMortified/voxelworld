@@ -1,7 +1,5 @@
 #version 460 core
 
-layout(location = 0) in uint inData0;
-layout(location = 1) in uint inData1;
 layout(location = 2) in uint inInstanceIndex;
 
 struct DirectionalLightData {
@@ -27,6 +25,17 @@ layout(set = 1, binding = 0, std430) readonly buffer ModelMatrices {
 layout(set = 1, binding = 1, std430) readonly buffer NormalMatrices {
     mat4 normals[];
 } normalMatrices;
+
+// One record per greedy rectangle; six vertices are unrolled out of each.
+// Packing mirrors gfx::quad::pack.
+struct Quad {
+    uint data0;
+    uint data1;
+};
+
+layout(set = 1, binding = 2, std430) readonly buffer Quads {
+    Quad quads[];
+};
 
 layout(set = 4, binding = 0, std430) readonly buffer PaletteBuffer {
     uint palette[];
@@ -55,20 +64,35 @@ vec3 unpackPaletteColor(uint packedColor) {
     return vec3(r, g, b);
 }
 
-void main() {
-    uint px = inData0 & 0x7Fu;
-    uint py = (inData0 >> 7) & 0x7Fu;
-    uint pz = (inData0 >> 14) & 0x7Fu;
-    uint normal_id = (inData0 >> 21) & 0x7u;
-    uint palette_idx = inData1 & 0xFFu;
+// Which corner of the rectangle each of the six vertices takes, and which end
+// of the box each corner takes its components from. Both tables are the ones
+// detail::add_quad used to bake into the vertex buffer.
+const uvec3 FACE_VERTS[6][4] = uvec3[6][4](
+    uvec3[4](uvec3(1, 0, 0), uvec3(1, 0, 1), uvec3(1, 1, 1), uvec3(1, 1, 0)),  // +X
+    uvec3[4](uvec3(0, 0, 0), uvec3(0, 1, 0), uvec3(0, 1, 1), uvec3(0, 0, 1)),  // -X
+    uvec3[4](uvec3(0, 1, 0), uvec3(1, 1, 0), uvec3(1, 1, 1), uvec3(0, 1, 1)),  // +Y
+    uvec3[4](uvec3(0, 0, 0), uvec3(0, 0, 1), uvec3(1, 0, 1), uvec3(1, 0, 0)),  // -Y
+    uvec3[4](uvec3(0, 0, 1), uvec3(0, 1, 1), uvec3(1, 1, 1), uvec3(1, 0, 1)),  // +Z
+    uvec3[4](uvec3(1, 0, 0), uvec3(1, 1, 0), uvec3(0, 1, 0), uvec3(0, 0, 0))   // -Z
+);
 
-    uint corners_dark   = (inData1 >> 8)  & 0xFu;
-    uint corners_bright = (inData1 >> 12) & 0xFu;
-    uint corner_id      = (inData1 >> 16) & 0x3u;
+void main() {
+    Quad q = quads[uint(gl_VertexIndex) / 4u];
+    uint corner_id = uint(gl_VertexIndex) % 4u;
+
+    uvec3 mn = uvec3(q.data0 & 0x7Fu, (q.data0 >> 7) & 0x7Fu, (q.data0 >> 14) & 0x7Fu);
+    uvec3 mx = uvec3(q.data1 & 0x7Fu, (q.data1 >> 7) & 0x7Fu, (q.data1 >> 14) & 0x7Fu);
+
+    uint normal_id      = (q.data0 >> 21) & 0x7u;
+    uint corners_dark   = (q.data0 >> 24) & 0xFu;
+    uint corners_bright = (q.data0 >> 28) & 0xFu;
+    uint palette_idx    = (q.data1 >> 21) & 0xFFu;
+
+    uvec3 pick = FACE_VERTS[normal_id][corner_id];
 
     mat4 model = modelMatrices.models[inInstanceIndex];
 
-    vec3 localPos = vec3(float(px), float(py), float(pz));
+    vec3 localPos = vec3(mix(mn, mx, bvec3(pick)));
     vec4 worldPos = model * vec4(localPos, 1.0);
     fragPos = worldPos.xyz;
 

@@ -96,16 +96,10 @@ void debug_window::render_fps_window() {
 
         const auto& cb_stats = rend_stats.combined_buffers;
         ImGui::Text(
-            "vertex load avg %.2f min %.2f max %.2f",
-            cb_stats.vertex_load_avg,
-            cb_stats.vertex_load_min,
-            cb_stats.vertex_load_max
-        );
-        ImGui::Text(
-            "index load  avg %.2f min %.2f max %.2f",
-            cb_stats.index_load_avg,
-            cb_stats.index_load_min,
-            cb_stats.index_load_max
+            "quad load avg %.2f min %.2f max %.2f",
+            cb_stats.quad_load_avg,
+            cb_stats.quad_load_min,
+            cb_stats.quad_load_max
         );
         ImGui::Text(
             "mesh %u/%u instance %u/%u",
@@ -211,22 +205,12 @@ void debug_window::render_combined_buffers_detail() {
             const auto& buffer = buffers[i];
             ImGui::Text("Buffer %zu:", i);
             ImGui::Indent();
+            ImGui::Text("chunk_size: %u quads", buffer.chunk_size.quad_count);
             ImGui::Text(
-                "chunk_size: vertex=%u index=%u",
-                buffer.chunk_size.vertex_count,
-                buffer.chunk_size.index_count
-            );
-            ImGui::Text(
-                "vertex load: avg %.2f min %.2f max %.2f",
-                buffer.vertex_load_avg,
-                buffer.vertex_load_min,
-                buffer.vertex_load_max
-            );
-            ImGui::Text(
-                "index load: avg %.2f min %.2f max %.2f",
-                buffer.index_load_avg,
-                buffer.index_load_min,
-                buffer.index_load_max
+                "quad load: avg %.2f min %.2f max %.2f",
+                buffer.quad_load_avg,
+                buffer.quad_load_min,
+                buffer.quad_load_max
             );
             ImGui::Text(
                 "mesh %u/%u instance %u/%u",
@@ -274,6 +258,7 @@ void debug_window::render_render_detail() {
 
         row("begin_frame", eng.begin_frame_ms);
         row("app_render", eng.app_render_ms);
+        row("mesh_sync", t.mesh_sync_ms);
         row("shadow_update", t.shadow_map_update_ms);
         row("buffer_pool", t.buffer_pool_update_ms);
 

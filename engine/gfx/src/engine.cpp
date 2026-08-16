@@ -49,7 +49,8 @@ engine::engine(
 
     window_         = std::make_unique<window>(width, height, title);
     vulkan_context_ = std::make_unique<vulkan_context>(*window_);
-    renderer_       = std::make_unique<renderer_type>(*vulkan_context_, *window_, block_registry_);
+    renderer_       = std::make_unique<renderer_type>(
+        *vulkan_context_, *window_, block_registry_, bench_.mesh_workers);
     camera_ =
         std::make_unique<camera>(45.0f, static_cast<float>(width) / static_cast<float>(height));
     world_      = std::make_unique<world_type>();
@@ -157,6 +158,14 @@ auto engine::bench_tick_() -> void {
         return;
     }
 
+    if (!ready_recorded_) {
+        ready_recorded_ = true;
+        ready_frames_   = frame_index_;
+        ready_ms_       = std::chrono::duration<float32, std::milli>(
+                        std::chrono::high_resolution_clock::now() - start_time_
+                    ).count();
+    }
+
     if (frame_index_ - bench_start_frame_ <= bench_.warmup_frames) {
         return;
     }
@@ -222,6 +231,111 @@ auto engine::write_bench_report_() const -> void {
         columns.queue_peak
     );
 
+    std::format_to(
+        std::back_inserter(report),
+        "\nscene ready after {} frames, {:.0f} ms\n",
+        ready_frames_,
+        ready_ms_
+    );
+
+    const auto grid = world_->system<ecs::world_grid_system>().get_stats();
+    std::format_to(
+        std::back_inserter(report),
+        "\ngrid: {} chunks loaded, {} drawn, {} buried in rock or open air\n",
+        grid.loaded_count,
+        grid.drawn_count,
+        grid.loaded_count - grid.drawn_count
+    );
+
+    // The page pool is a ceiling rather than a budget: page_entry holds the
+    // index in twenty bits, and past that a page silently aliases another
+    // model's. A deep world is the first thing that can get near it.
+    const auto& pool  = world_->resource<asset::model_registry>().get_page_pool();
+    const auto in_use = pool.allocated_count();
+    constexpr auto addressable = asset::page_pool::block_size * asset::page_pool::max_blocks;
+
+    constexpr auto to_mb = 1.0F / (1024.0F * 1024.0F);
+
+    std::format_to(
+        std::back_inserter(report),
+        "\npages: {} of {} in use ({:.1f}% of the addressable limit), {} free, {:.0f} MB\n"
+        "memory: ram {:.0f} MB now, {:.0f} MB peak; commit {:.0f} MB now, {:.0f} MB peak; "
+        "vram {:.0f} MB now, {:.0f} MB peak\n",
+        in_use,
+        addressable,
+        100.0F * static_cast<float32>(in_use) / static_cast<float32>(addressable),
+        pool.free_count(),
+        static_cast<float32>(in_use + pool.free_count()) *
+            static_cast<float32>(sizeof(asset::page_pool::page_type)) * to_mb,
+        static_cast<float32>(stats_.ram_usage_bytes) * to_mb,
+        static_cast<float32>(stats_.ram_peak_bytes) * to_mb,
+        static_cast<float32>(stats_.commit_bytes) * to_mb,
+        static_cast<float32>(stats_.commit_peak_bytes) * to_mb,
+        static_cast<float32>(stats_.vram_usage_bytes) * to_mb,
+        static_cast<float32>(stats_.vram_peak_bytes) * to_mb
+    );
+
+    // Geometry lands in a power-of-two size class and holds the whole slot,
+    // whatever it uses of it. Both halves of the waste are worth seeing: the
+    // slots handed out but not filled (capacity over count) and the space
+    // inside a slot the mesh does not reach (the load figures).
+    const auto& buffers = renderer_->get_stats().combined_buffers;
+
+    float32 slot_mb = 0.0F;
+    float32 used_mb = 0.0F;
+
+    report += "\nbuffers by size class (quads): slots, load, MB\n";
+
+    for (const auto& b : buffers.buffers) {
+        const auto slot_bytes = static_cast<float32>(b.chunk_size.quad_count) * sizeof(quad);
+
+        const auto held = static_cast<float32>(b.mesh_capacity) * slot_bytes * to_mb;
+        const auto full = static_cast<float32>(b.mesh_count) * slot_bytes * to_mb;
+
+        slot_mb += held;
+        used_mb += full * b.quad_load_avg;
+
+        std::format_to(
+            std::back_inserter(report),
+            "  {:>8}  {:>5} of {:<6}  load {:.2f}  {:.1f} MB\n",
+            b.chunk_size.quad_count,
+            b.mesh_count,
+            b.mesh_capacity,
+            b.quad_load_avg,
+            held
+        );
+    }
+
+    std::format_to(
+        std::back_inserter(report),
+        "  total {:.0f} MB of slots, about {:.0f} MB of it geometry\n",
+        slot_mb,
+        used_mb
+    );
+
+    // The state at the last frame, not an average: the walk answers a question
+    // about where the camera is standing now.
+    const auto& cull = renderer_->get_stats().combined_buffers.chunk_cull;
+    std::format_to(
+        std::back_inserter(report),
+        "\nchunk cull: {} of {} chunks visible ({:.1f}% hidden), walk {:.3f} ms\n"
+        "  walked {} cells, {} of them empty; {} chunks with links, {} sealed, "
+        "{} merged, {} pockets at most\n",
+        cull.visible,
+        cull.chunks,
+        cull.chunks > 0
+            ? 100.0F * static_cast<float32>(cull.chunks - cull.visible) /
+                  static_cast<float32>(cull.chunks)
+            : 0.0F,
+        cull.walk_ms,
+        cull.visited,
+        cull.visited_empty,
+        cull.known_links,
+        cull.sealed,
+        cull.merged,
+        cull.max_pockets
+    );
+
     log::info(lc_bench_, "benchmark report\n{}", report);
 
     if (bench_.report_path.empty()) {
@@ -272,7 +386,11 @@ void engine::update_stats() {
         std::chrono::duration<float32>(current_time - last_memory_update_time_).count();
     if (time_since_last_memory_update >= MEMORY_UPDATE_INTERVAL_SEC) {
         stats_.ram_usage_bytes   = calculate_ram_usage();
+        stats_.commit_bytes      = calculate_commit_usage();
         stats_.vram_usage_bytes  = calculate_vram_usage();
+        stats_.ram_peak_bytes    = std::max(stats_.ram_peak_bytes, stats_.ram_usage_bytes);
+        stats_.commit_peak_bytes = std::max(stats_.commit_peak_bytes, stats_.commit_bytes);
+        stats_.vram_peak_bytes   = std::max(stats_.vram_peak_bytes, stats_.vram_usage_bytes);
         last_memory_update_time_ = current_time;
     }
 }
@@ -284,6 +402,18 @@ auto engine::calculate_ram_usage() -> uint64 {
             GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&pmc), sizeof(pmc)
         )) {
         return pmc.WorkingSetSize;
+    }
+#endif
+    return 0;
+}
+
+auto engine::calculate_commit_usage() -> uint64 {
+#ifdef _WIN32
+    PROCESS_MEMORY_COUNTERS_EX pmc{};
+    if (GetProcessMemoryInfo(
+            GetCurrentProcess(), reinterpret_cast<PROCESS_MEMORY_COUNTERS*>(&pmc), sizeof(pmc)
+        )) {
+        return pmc.PrivateUsage;
     }
 #endif
     return 0;

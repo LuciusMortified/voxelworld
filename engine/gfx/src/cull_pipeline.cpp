@@ -50,7 +50,9 @@ void cull_pipeline::create_descriptor_set_layouts_() {
         "create frustum descriptor set layout"
     );
 
-    std::array<vk::DescriptorSetLayoutBinding, 4> buffer_bindings{};
+    // Commands, bounds, culled output, counts, and the per-instance visibility
+    // the connectivity walk writes.
+    std::array<vk::DescriptorSetLayoutBinding, 5> buffer_bindings{};
     for (uint32 i = 0; i < buffer_bindings.size(); i++) {
         buffer_bindings[i] = {
             .binding         = i,
@@ -147,10 +149,12 @@ void cull_pipeline::create_frustum_ubos_() {
 void cull_pipeline::update_frustums(
     uint32 frame_index,
     const vw::spatial::frustum& view_frustum,
-    std::span<const vw::spatial::frustum> shadow_frustums
+    std::span<const vw::spatial::frustum> shadow_frustums,
+    const vec3f& eye
 ) {
     cull_frustum_ubo ubo{};
     ubo.pass_count = 1 + static_cast<uint32>(shadow_frustums.size());
+    ubo.eye        = vec4f{eye.x, eye.y, eye.z, 1.0f};
 
     for (uint32 i = 0; i < 6; i++) {
         const auto& p = view_frustum.planes[i];
@@ -170,15 +174,24 @@ void cull_pipeline::update_frustums(
 
 void cull_pipeline::dispatch(
     vk::CommandBuffer cmd,
-    combined_buffer& buffer,
+    const std::vector<std::unique_ptr<combined_buffer>>& buffers,
     uint32 frame_index
 ) {
-    const uint32 instance_count = buffer.get_draw_command_count();
-    if (instance_count == 0) return;
+    bool any = false;
 
-    cmd.fillBuffer(
-        buffer.get_count_buffer(), 0, combined_buffer::cull_pass_count * sizeof(uint32), 0
-    );
+    for (const auto& buffer : buffers) {
+        if (buffer->get_instance_count() == 0) {
+            continue;
+        }
+        any = true;
+        cmd.fillBuffer(
+            buffer->get_count_buffer(), 0, combined_buffer::cull_pass_count * sizeof(uint32), 0
+        );
+    }
+
+    if (!any) {
+        return;
+    }
 
     cmd.pipelineBarrier(
         vk::PipelineStageFlagBits::eTransfer,
@@ -199,17 +212,23 @@ void cull_pipeline::dispatch(
         frustum_descriptor_sets_[frame_index], nullptr
     );
 
-    cmd.bindDescriptorSets(
-        vk::PipelineBindPoint::eCompute, compute_pipeline_layout_, 1,
-        buffer.get_compute_descriptor_set(), nullptr
-    );
+    for (const auto& buffer : buffers) {
+        const uint32 instance_count = buffer->get_instance_count();
+        if (instance_count == 0) {
+            continue;
+        }
 
-    cmd.pushConstants<uint32>(
-        compute_pipeline_layout_, vk::ShaderStageFlagBits::eCompute, 0, instance_count
-    );
+        cmd.bindDescriptorSets(
+            vk::PipelineBindPoint::eCompute, compute_pipeline_layout_, 1,
+            buffer->get_compute_descriptor_set(), nullptr
+        );
 
-    const uint32 group_count = (instance_count + 63) / 64;
-    cmd.dispatch(group_count, 1, 1);
+        cmd.pushConstants<uint32>(
+            compute_pipeline_layout_, vk::ShaderStageFlagBits::eCompute, 0, instance_count
+        );
+
+        cmd.dispatch((instance_count + 63) / 64, 1, 1);
+    }
 }
 
 }  // namespace vw::gfx

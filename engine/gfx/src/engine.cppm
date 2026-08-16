@@ -126,6 +126,17 @@ struct engine_stats {
     float32 end_frame_ms    = 0.0f;
     uint64 ram_usage_bytes  = 0;
     uint64 vram_usage_bytes = 0;
+
+    // Streaming makes memory a curve, not a number: what matters is the high
+    // water mark over a flight, not what is held at the moment the run ends.
+    uint64 ram_peak_bytes  = 0;
+    uint64 vram_peak_bytes = 0;
+
+    // The working set is what is resident; the commit charge is what the
+    // process has actually asked for. When the two diverge, the allocator is
+    // sitting on memory it has already been given back.
+    uint64 commit_bytes      = 0;
+    uint64 commit_peak_bytes = 0;
 };
 
 // Turns the engine into an offline benchmark: run a fixed number of frames,
@@ -134,6 +145,11 @@ struct bench_config {
     uint32 warmup_frames  = 0;
     uint32 measure_frames = 0;
     std::string report_path;
+
+    // Zero leaves each queue on its own default. They are here so the curve can
+    // be swept without a rebuild -- see P11.6 in docs/optimization-plan.md.
+    uint32 mesh_workers    = 0;
+    uint32 terrain_workers = 0;
 
     // Feeds the world a fixed step instead of the measured one, so simulation
     // work does not drift with the frame rate it is meant to measure.
@@ -207,6 +223,11 @@ public:
     [[nodiscard]] auto get_world() const -> world_type&;
     [[nodiscard]] auto get_block_registry() const -> const block_registry&;
     [[nodiscard]] auto get_debug_tool() const -> debug_window_type&;
+
+    // Zero means the loader picks its own default.
+    [[nodiscard]] auto get_terrain_workers() const -> uint32 {
+        return bench_.terrain_workers;
+    }
     [[nodiscard]] const engine_stats& get_stats() const;
 
 private:
@@ -228,6 +249,8 @@ private:
     std::unique_ptr<app_type> app_;
 
     bool running_ = false;
+    std::chrono::high_resolution_clock::time_point start_time_ =
+        std::chrono::high_resolution_clock::now();
     std::chrono::high_resolution_clock::time_point last_frame_time_;
 
     mutable engine_stats stats_;
@@ -239,10 +262,17 @@ private:
     uint64 frame_index_       = 0;
     uint64 bench_start_frame_ = 0;
 
+    // How long the scene took to stream in: everything generated, meshed and
+    // uploaded. The one number the worker counts move.
+    float32 ready_ms_        = 0.0f;
+    uint64 ready_frames_     = 0;
+    bool ready_recorded_     = false;
+
     static constexpr float MEMORY_UPDATE_INTERVAL_SEC = 1.0f;
 
     void update_stats();
     [[nodiscard]] static uint64 calculate_ram_usage();
+    [[nodiscard]] static uint64 calculate_commit_usage();
     [[nodiscard]] uint64 calculate_vram_usage() const;
 
     event_sub<window_resize_event> window_resize_sub_;

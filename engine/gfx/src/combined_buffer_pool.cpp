@@ -77,6 +77,10 @@ void combined_buffer_pool::update(
         update_transforms_(world);
     });
 
+    stats_.chunk_cull.walk_ms = measure_ms([&] {
+        update_chunk_visibility_(world, camera.get_position());
+    });
+
     stats_.timing.staging_flush_ms = measure_ms([&] {
         staging_.flush(cmd);
     });
@@ -104,30 +108,81 @@ void combined_buffer_pool::process_destroyed_(world_type& world) {
             }
             entity_buffer_infos_.erase(ent);
         }
+        chunk_links_.erase(ent);
         sorted_erase(mesh_pending_entities_, ent);
         sorted_erase(transform_pending_entities_, ent);
     }
 }
 
+// Half again per step rather than double. A mesh holds its whole class whatever
+// it uses of it, so doubling leaves a quarter of every slot empty on average and
+// measured 43 % on the class that carries the biggest chunks. Nothing here needs
+// the sizes to be powers of two -- the geometry is a storage buffer read by
+// index, not a vertex binding.
 buffer_chunk_size combined_buffer_pool::get_chunk_size_for_mesh(
-    uint32 vertex_count, uint32 index_count
+    uint32 quad_count
 ) {
-    uint32 vertex_chunk = 256;
-    while (vertex_chunk < vertex_count) {
-        vertex_chunk *= 2;
+    uint32 chunk = 64;
+    while (chunk < quad_count) {
+        chunk += (chunk + 1) / 2;
     }
 
-    uint32 index_chunk = 512;
-    while (index_chunk < index_count) {
-        index_chunk *= 2;
+    return buffer_chunk_size{chunk};
+}
+
+auto combined_buffer_pool::get_index_buffer() const -> vk::Buffer {
+    return index_buffer_ ? index_buffer_->get_buffer() : nullptr;
+}
+
+// One pattern for every mesh in every buffer: quad i is 4i+0, 4i+1, 4i+2, 4i+2,
+// 4i+3, 4i+0, and the draw command shifts it onto the right quads. It only has
+// to be as long as the largest size class, because no mesh is longer than the
+// slot it sits in.
+void combined_buffer_pool::ensure_index_pattern_(uint32 quads) {
+    if (index_buffer_ && quads <= index_quads_) {
+        return;
     }
 
-    return buffer_chunk_size{vertex_chunk, index_chunk};
+    index_quads_ = quads;
+
+    std::vector<uint32> pattern;
+    pattern.reserve(static_cast<std::size_t>(quads) * 6);
+    for (uint32 i = 0; i < quads; ++i) {
+        const uint32 base = i * 4;
+        pattern.insert(pattern.end(), {base, base + 1, base + 2, base + 2, base + 3, base});
+    }
+
+    const auto bytes = pattern.size() * sizeof(uint32);
+
+    // Not through the frame staging ring. That ring is budgeted per frame and
+    // its bounds check is an assert, so in a release build a megabyte of
+    // indices went straight past the window and over the next frame's staged
+    // data -- corrupt draw commands, and a world pass of thirty-five
+    // milliseconds. Its own host-visible buffer instead, copied device-side.
+    // Retired rather than dropped: the copy is still only recorded, and several
+    // size classes can turn up in one frame. Freeing the source under a pending
+    // copy is a dangling handle in vkCmdCopyBuffer.
+    if (index_upload_) {
+        deletion_->retire(std::move(index_upload_));
+    }
+
+    index_upload_ = std::make_unique<index_buffer>(*context_, bytes);
+    index_upload_->copy_from_vector(pattern);
+
+    auto buffer = std::make_unique<device_index_buffer>(*context_, bytes);
+    staging_.copy_buffer(index_upload_->get_buffer(), 0, buffer->get_buffer(), 0, bytes);
+
+    if (index_buffer_) {
+        deletion_->retire(std::move(index_buffer_));
+    }
+    index_buffer_ = std::move(buffer);
 }
 
 combined_buffer* combined_buffer_pool::get_or_create_buffer(
     const buffer_chunk_size& chunk_size
 ) {
+    ensure_index_pattern_(chunk_size.quad_count);
+
     if (chunk_size_to_buffer_index_.contains(chunk_size)) {
         auto buffer_index = chunk_size_to_buffer_index_[chunk_size];
         return buffers_[buffer_index].get();
@@ -226,20 +281,22 @@ void combined_buffer_pool::update_meshes_(
             continue;
         }
 
-        auto vertex_count = mesh_ptr->vertices.size();
-        auto index_count  = mesh_ptr->indices.size();
+        // Before the empty-mesh check below: a chunk of solid rock has no
+        // geometry and still blocks sight.
+        chunk_links_[ent] = mesh_ptr->links;
 
-        if (vertex_count == 0 || index_count == 0) {
+        auto quad_count = mesh_ptr->quads.size();
+
+        if (quad_count == 0) {
             continue;
         }
 
-        buffer_chunk_size required_chunk_size = get_chunk_size_for_mesh(vertex_count, index_count);
+        buffer_chunk_size required_chunk_size = get_chunk_size_for_mesh(quad_count);
 
         // Only the mesh itself travels through staging now: the rest of the
         // size class is left as it was and never drawn.
-        const vk::DeviceSize mesh_staging_cost = (vertex_count * sizeof(vertex)) +
-            (index_count * sizeof(uint32)) + sizeof(uint32) + sizeof(draw_command) +
-            (sizeof(mat4f) * 2);
+        const vk::DeviceSize mesh_staging_cost = (quad_count * sizeof(quad)) + sizeof(uint32) +
+            sizeof(draw_command) + (sizeof(mat4f) * 2);
 
         const auto& transform_comp    = world.get<transform_component>(ent);
         const mat4f& transform_matrix = transform_comp.get_world_matrix();
@@ -308,6 +365,199 @@ void combined_buffer_pool::update_meshes_(
     mesh_pending_entities_.swap(merge_buffer_);
 }
 
+void combined_buffer_pool::update_chunk_visibility_(
+    world_type& world, const vec3f& camera_pos
+) {
+    // Everything starts visible. Only chunks are ever hidden -- a character or
+    // a prop has no connectivity and no place in the walk.
+    visibility_flags_.resize(buffers_.size());
+    for (std::size_t i = 0; i < buffers_.size(); ++i) {
+        visibility_flags_[i].assign(buffers_[i]->get_stats().instance_capacity, 1U);
+    }
+
+    stats_.chunk_cull = chunk_cull_stats{};
+
+    auto* grid = world.system<ecs::world_grid_system>().grid();
+    if (!chunk_cull_enabled_ || grid == nullptr) {
+        for (std::size_t i = 0; i < buffers_.size(); ++i) {
+            buffers_[i]->write_visibility(visibility_flags_[i]);
+        }
+        return;
+    }
+
+    const auto slot_of = [&](entity ent) -> std::optional<std::pair<std::size_t, uint32>> {
+        if (!ent.is_valid()) {
+            return std::nullopt;
+        }
+        const auto it = entity_buffer_infos_.find(ent);
+        if (it == entity_buffer_infos_.end()) {
+            return std::nullopt;
+        }
+        const auto index = buffers_[it->second.buffer_index]->get_entity_allocation(ent).instance_index;
+        return std::pair{it->second.buffer_index, index};
+    };
+
+    // Hide every chunk, then let the walk put back the ones sight reaches.
+    // The same pass collects the vertical extent of the world: above and below
+    // it there are no chunks at all, and the walk would spread through that
+    // emptiness and come down everywhere.
+    vec3i lo{std::numeric_limits<int32>::max(), std::numeric_limits<int32>::max(),
+             std::numeric_limits<int32>::max()};
+    vec3i hi{std::numeric_limits<int32>::lowest(), std::numeric_limits<int32>::lowest(),
+             std::numeric_limits<int32>::lowest()};
+
+    column_top_.clear();
+
+    grid->for_each_chunk([&](vec3i coord, const ecs::chunk& c) {
+        const auto ent = c.get_entity();
+
+        const vec2i column{coord.x, coord.z};
+        if (const auto it = column_top_.find(column);
+            it == column_top_.end() || it->second < coord.y) {
+            column_top_[column] = coord.y;
+        }
+
+        lo = vec3i{std::min(lo.x, coord.x), std::min(lo.y, coord.y), std::min(lo.z, coord.z)};
+        hi = vec3i{std::max(hi.x, coord.x), std::max(hi.y, coord.y), std::max(hi.z, coord.z)};
+
+        if (const auto it = chunk_links_.find(ent); it != chunk_links_.end()) {
+            ++stats_.chunk_cull.known_links;
+            if (it->second.is_sealed()) {
+                ++stats_.chunk_cull.sealed;
+            }
+            for (const auto& cell : it->second.cells) {
+                if (cell.merged) {
+                    ++stats_.chunk_cull.merged;
+                }
+                stats_.chunk_cull.max_pockets = std::max(
+                    stats_.chunk_cull.max_pockets, static_cast<uint32>(cell.pockets.size())
+                );
+            }
+        }
+
+        if (const auto slot = slot_of(ent)) {
+            ++stats_.chunk_cull.chunks;
+            visibility_flags_[slot->first][slot->second] = 0U;
+        }
+    });
+
+    if (stats_.chunk_cull.chunks == 0) {
+        for (std::size_t i = 0; i < buffers_.size(); ++i) {
+            buffers_[i]->write_visibility(visibility_flags_[i]);
+        }
+        return;
+    }
+
+    const vec3i camera_voxel{
+        static_cast<int32>(std::floor(camera_pos.x)),
+        static_cast<int32>(std::floor(camera_pos.y)),
+        static_cast<int32>(std::floor(camera_pos.z)),
+    };
+    const vec3i camera_chunk = grid->world_to_chunk_coord(camera_voxel);
+
+    // Open sky above the world is real and the camera stands in it. Below the
+    // world there is nothing at all, and since unloaded chunks count as open,
+    // letting the walk into that empty layer lets it run under everything and
+    // come back up on the far side -- which is how this first measured 0%
+    // hidden. The floor of the walk is the floor of the loaded world.
+    lo.y = std::min(lo.y, camera_chunk.y);
+    hi.y = std::max(hi.y + 1, camera_chunk.y);
+
+    // From here on the walk works in connectivity cells, several to a chunk.
+    constexpr int32 per_side = vw::asset::chunk_links::cells_per_side;
+    constexpr int32 cell_voxels =
+        vw::asset::chunk_links::cell_size * 1;  // in voxels, before voxel_scale
+
+    const auto to_chunk = [](int32 cell) -> int32 {
+        return cell >= 0 ? cell / per_side : (cell - per_side + 1) / per_side;
+    };
+    const auto to_sub = [&to_chunk](int32 cell) -> int32 {
+        return cell - (to_chunk(cell) * per_side);
+    };
+
+    const vec3i cell_lo{lo.x * per_side, lo.y * per_side, lo.z * per_side};
+    const vec3i cell_hi{
+        ((hi.x + 1) * per_side) - 1, ((hi.y + 1) * per_side) - 1,
+        ((hi.z + 1) * per_side) - 1};
+
+    // The cell the camera stands in, inside its chunk.
+    const int32 scaled_cell = cell_voxels * grid->voxel_scale();
+    const auto cell_of      = [scaled_cell](int32 world) -> int32 {
+        return world >= 0 ? world / scaled_cell : (world - scaled_cell + 1) / scaled_cell;
+    };
+    const vec3i origin{
+        cell_of(camera_voxel.x), cell_of(camera_voxel.y), cell_of(camera_voxel.z)};
+
+    ecs::walk_visible_chunks(
+        origin, cell_lo, cell_hi,
+        [&](vec3i cell) -> const vw::asset::cell_links* {
+            // Solid rock is never meshed and so has no links of its own, but it
+            // is the one thing the walk must not treat as unknown: unknown reads
+            // as wide open, and sight would run straight through the bedrock.
+            static const vw::asset::cell_links sealed{};
+
+            auto* c = grid->get_chunk(
+                vec3i{to_chunk(cell.x), to_chunk(cell.y), to_chunk(cell.z)});
+            if (c == nullptr) {
+                return nullptr;  // not loaded
+            }
+            if (c->is_solid()) {
+                return &sealed;
+            }
+            const auto it = chunk_links_.find(c->get_entity());
+            if (it == chunk_links_.end()) {
+                return nullptr;  // not meshed yet, so nothing is known
+            }
+            return &it->second.cells[vw::asset::chunk_links::cell_index(
+                to_sub(cell.x), to_sub(cell.y), to_sub(cell.z))];
+        },
+        [&, world_top = cell_hi.y](vec3i cell) -> bool {
+            // Sky is anything above the top of that column of the world. The
+            // loaded area is a disc inside a square bounding box, so columns in
+            // the corners are missing entirely -- and calling those sky at
+            // every height let the walk drop down the corners and spread back
+            // under the world. Above everything is the only safe answer there.
+            const auto it = column_top_.find(vec2i{to_chunk(cell.x), to_chunk(cell.z)});
+            if (it == column_top_.end()) {
+                return cell.y >= world_top;
+            }
+            return to_chunk(cell.y) > it->second;
+        },
+        [&](const vw::asset::chunk_pocket& pocket) -> bool {
+            // Which pocket of its own cell the camera is standing in.
+            const int32 voxels = grid->voxel_scale();
+            const auto local   = [&](int32 world, int32 cell) -> int32 {
+                return (world / voxels) - (cell * vw::asset::chunk_links::cell_size);
+            };
+            return pocket.holds(
+                local(camera_voxel.x, origin.x), local(camera_voxel.y, origin.y),
+                local(camera_voxel.z, origin.z),
+                vw::asset::chunk_links::cell_size / vw::asset::chunk_pocket::volume_span
+            );
+        },
+        [&](vec3i cell) {
+            ++stats_.chunk_cull.visited;
+
+            auto* c = grid->get_chunk(
+                vec3i{to_chunk(cell.x), to_chunk(cell.y), to_chunk(cell.z)});
+            if (c == nullptr) {
+                ++stats_.chunk_cull.visited_empty;
+                return;
+            }
+            if (const auto slot = slot_of(c->get_entity())) {
+                if (visibility_flags_[slot->first][slot->second] == 0U) {
+                    ++stats_.chunk_cull.visible;
+                    visibility_flags_[slot->first][slot->second] = 1U;
+                }
+            }
+        }
+    );
+
+    for (std::size_t i = 0; i < buffers_.size(); ++i) {
+        buffers_[i]->write_visibility(visibility_flags_[i]);
+    }
+}
+
 void combined_buffer_pool::update_transforms_(
     world_type& world
 ) {
@@ -360,12 +610,9 @@ void combined_buffer_pool::update_transforms_(
 }
 
 const combined_buffer_pool_stats& combined_buffer_pool::get_stats() const {
-    stats_.vertex_load_min   = 0.0f;
-    stats_.vertex_load_max   = 0.0f;
-    stats_.vertex_load_avg   = 0.0f;
-    stats_.index_load_min    = 0.0f;
-    stats_.index_load_max    = 0.0f;
-    stats_.index_load_avg    = 0.0f;
+    stats_.quad_load_min     = 0.0f;
+    stats_.quad_load_max     = 0.0f;
+    stats_.quad_load_avg     = 0.0f;
     stats_.mesh_capacity     = 0;
     stats_.mesh_count        = 0;
     stats_.instance_capacity = 0;
@@ -376,30 +623,21 @@ const combined_buffer_pool_stats& combined_buffer_pool::get_stats() const {
         return stats_;
     }
 
-    float32 vertex_load_avg_sum = 0.0f;
-    float32 index_load_avg_sum  = 0.0f;
+    float32 load_avg_sum = 0.0f;
 
     for (const auto& buffer : buffers_) {
         const auto& buffer_stats = buffer->get_stats();
 
         stats_.buffers.push_back(buffer_stats);
 
-        if (buffer_stats.vertex_load_min < stats_.vertex_load_min ||
-            stats_.vertex_load_min == 0.0f) {
-            stats_.vertex_load_min = buffer_stats.vertex_load_min;
+        if (buffer_stats.quad_load_min < stats_.quad_load_min || stats_.quad_load_min == 0.0f) {
+            stats_.quad_load_min = buffer_stats.quad_load_min;
         }
-        if (buffer_stats.vertex_load_max > stats_.vertex_load_max) {
-            stats_.vertex_load_max = buffer_stats.vertex_load_max;
-        }
-        if (buffer_stats.index_load_min < stats_.index_load_min || stats_.index_load_min == 0.0f) {
-            stats_.index_load_min = buffer_stats.index_load_min;
-        }
-        if (buffer_stats.index_load_max > stats_.index_load_max) {
-            stats_.index_load_max = buffer_stats.index_load_max;
+        if (buffer_stats.quad_load_max > stats_.quad_load_max) {
+            stats_.quad_load_max = buffer_stats.quad_load_max;
         }
 
-        vertex_load_avg_sum += buffer_stats.vertex_load_avg;
-        index_load_avg_sum += buffer_stats.index_load_avg;
+        load_avg_sum += buffer_stats.quad_load_avg;
 
         stats_.mesh_capacity += buffer_stats.mesh_capacity;
         stats_.mesh_count += buffer_stats.mesh_count;
@@ -407,8 +645,7 @@ const combined_buffer_pool_stats& combined_buffer_pool::get_stats() const {
         stats_.instance_count += buffer_stats.instance_count;
     }
 
-    stats_.vertex_load_avg = vertex_load_avg_sum / buffers_.size();
-    stats_.index_load_avg  = index_load_avg_sum / buffers_.size();
+    stats_.quad_load_avg = load_avg_sum / buffers_.size();
 
     return stats_;
 }

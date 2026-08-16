@@ -17,6 +17,7 @@ struct AABB {
 
 layout(set = 0, binding = 0) uniform CullFrustumData {
     vec4 planes[30];
+    vec4 eye;
     uint pass_count;
 } frustum_data;
 
@@ -36,6 +37,12 @@ layout(set = 1, binding = 3, std430) buffer Counts {
     uint counts[];
 } count_buffer;
 
+// Written on the CPU by the chunk connectivity walk: zero means no open path
+// from the viewer's chunk to this one, so nothing in it can be on screen.
+layout(set = 1, binding = 4, std430) readonly buffer Visibility {
+    uint flags[];
+} visibility;
+
 layout(push_constant) uniform PC {
     uint instance_count;
 };
@@ -50,20 +57,52 @@ bool frustum_test(uint pass, vec3 bmin, vec3 bmax) {
     return true;
 }
 
+// Every face of a mesh is axis aligned, so a whole direction is back-facing
+// when the viewer is on the wrong side of the whole box. Conservative on
+// purpose: a chunk the eye is inside keeps both sides of that axis.
+//
+// Only the camera pass uses it. A shadow cascade would have to test against the
+// light instead, and a caster the camera cannot see still casts.
+bool faces_away(uint dir, vec3 bmin, vec3 bmax) {
+    vec3 eye = frustum_data.eye.xyz;
+    switch (dir) {
+        case 0u: return eye.x <= bmin.x;   // +X
+        case 1u: return eye.x >= bmax.x;   // -X
+        case 2u: return eye.y <= bmin.y;   // +Y
+        case 3u: return eye.y >= bmax.y;   // -Y
+        case 4u: return eye.z <= bmin.z;   // +Z
+        default: return eye.z >= bmax.z;   // -Z
+    }
+}
+
 void main() {
     uint idx = gl_GlobalInvocationID.x;
     if (idx >= instance_count) return;
 
-    DrawCommand cmd = input_commands.commands[idx];
-    if (cmd.instance_count == 0) return;
+    if (visibility.flags[idx] == 0) return;
 
     vec3 bmin = input_aabbs.aabbs[idx].min_point.xyz;
     vec3 bmax = input_aabbs.aabbs[idx].max_point.xyz;
 
+    const uint faces = 6u;
+    uint stride = instance_count * faces;
+
     for (uint pass = 0; pass < frustum_data.pass_count; pass++) {
-        if (frustum_test(pass, bmin, bmax)) {
+        if (!frustum_test(pass, bmin, bmax)) {
+            continue;
+        }
+
+        for (uint dir = 0u; dir < faces; dir++) {
+            DrawCommand cmd = input_commands.commands[idx * faces + dir];
+            if (cmd.index_count == 0 || cmd.instance_count == 0) {
+                continue;
+            }
+            if (pass == 0u && faces_away(dir, bmin, bmax)) {
+                continue;
+            }
+
             uint slot = atomicAdd(count_buffer.counts[pass], 1);
-            output_commands.commands[pass * instance_count + slot] = cmd;
+            output_commands.commands[pass * stride + slot] = cmd;
         }
     }
 }

@@ -168,7 +168,10 @@ model::model(model&& other) noexcept
     , pages_z_(other.pages_z_)
     , pages_(std::move(other.pages_))
     , owned_pages_(std::move(other.owned_pages_))
-    , identity_(other.identity_) {
+    , identity_(other.identity_)
+    , boundary_(std::move(other.boundary_))
+    , fill_(other.fill_)
+    , fill_known_(other.fill_known_) {
     other.identity_pool_ = nullptr;
     other.pool_ptr_      = nullptr;
 }
@@ -193,6 +196,9 @@ auto model::operator=(model&& other) noexcept -> model& {
         pages_               = std::move(other.pages_);
         owned_pages_         = std::move(other.owned_pages_);
         identity_            = other.identity_;
+        boundary_            = std::move(other.boundary_);
+        fill_                = other.fill_;
+        fill_known_          = other.fill_known_;
         other.identity_pool_ = nullptr;
         other.pool_ptr_      = nullptr;
     }
@@ -205,6 +211,7 @@ void model::set_voxel(int32 x, int32 y, int32 z, const voxel& v) {
 }
 
 void model::set_voxel_raw(int32 x, int32 y, int32 z, const voxel& v) {
+    fill_known_    = false;
     const int32 px = x / page_size;
     const int32 py = y / page_size;
     const int32 pz = z / page_size;
@@ -293,7 +300,219 @@ auto model::build_occupancy(chunk_occupancy& out) const -> bool {
     return true;
 }
 
+namespace {
+
+// Pockets of one cell: the cube of `size` voxels starting at `origin` inside
+// the chunk. Faces are indexed the same way from both sides of a shared face,
+// so two neighbouring cells can be asked whether their openings line up.
+auto build_cell_links(
+    const chunk_occupancy& occupancy, vec3i origin, int32 size, chunk_link_scratch& scratch
+) -> cell_links {
+    const int32 rows       = size * size;
+    const int32 face_span  = chunk_pocket::face_span;
+    const int32 face_block = std::max(1, size / face_span);
+
+    auto& masks     = scratch.masks;
+    auto& row_begin = scratch.row_begin;
+    auto& seen      = scratch.seen;
+    auto& stack     = scratch.stack;
+
+    masks.clear();
+    row_begin.assign(rows + 1, 0);
+
+    const uint64 span_mask = (size == 64) ? ~uint64{0} : ((uint64{1} << size) - 1);
+
+    for (int32 y = 0; y < size; ++y) {
+        for (int32 z = 0; z < size; ++z) {
+            const int32 row = (y * size) + z;
+            row_begin[row]  = static_cast<int32>(masks.size());
+
+            uint64 free_bits =
+                (~occupancy.row(origin.y + y, origin.z + z) >> origin.x) & span_mask;
+
+            while (free_bits != 0) {
+                const int32 start = std::countr_zero(free_bits);
+                const uint64 tail = free_bits >> start;
+                const int32 len   = std::countr_one(tail);
+
+                const uint64 run = (len == 64)
+                    ? ~uint64{0}
+                    : (((uint64{1} << len) - 1) << start);
+
+                masks.push_back(run);
+                free_bits &= ~run;
+            }
+        }
+    }
+    row_begin[rows] = static_cast<int32>(masks.size());
+
+    seen.assign(masks.size(), 0);
+    stack.clear();
+
+    cell_links links;
+
+    const int32 volume_block = std::max(1, size / chunk_pocket::volume_span);
+
+    const auto add_volume = [&](chunk_pocket& pocket, int32 y, int32 z, uint64 run) {
+        uint64 bits = run;
+        while (bits != 0) {
+            const int32 x = std::countr_zero(bits);
+            pocket.volume |= chunk_pocket::volume_bit(x, y, z, volume_block);
+
+            // Skip the rest of this block: one bit per block is all that is
+            // recorded.
+            const int32 next = ((x / volume_block) + 1) * volume_block;
+            if (next >= 64) {
+                break;
+            }
+            bits &= ~((uint64{1} << next) - 1);
+        }
+    };
+
+    const auto add_faces = [&](chunk_pocket& pocket, int32 y, int32 z, uint64 run) {
+        const auto block_bit = [face_block, face_span](int32 a, int32 b) -> uint64 {
+            return uint64{1} << (((b / face_block) * face_span) + (a / face_block));
+        };
+
+        if ((run & 1U) != 0) {
+            pocket.faces[0] |= block_bit(y, z);
+        }
+        if (((run >> (size - 1)) & 1U) != 0) {
+            pocket.faces[1] |= block_bit(y, z);
+        }
+
+        const bool on_y = (y == 0) || (y == size - 1);
+        const bool on_z = (z == 0) || (z == size - 1);
+        if (!on_y && !on_z) {
+            return;
+        }
+
+        for (int32 i = 0; i < face_span; ++i) {
+            const uint64 chunk_of_run = (run >> (i * face_block)) &
+                ((uint64{1} << face_block) - 1);
+            if (chunk_of_run == 0) {
+                continue;
+            }
+            if (y == 0) {
+                pocket.faces[2] |= uint64{1} << (((z / face_block) * face_span) + i);
+            }
+            if (y == size - 1) {
+                pocket.faces[3] |= uint64{1} << (((z / face_block) * face_span) + i);
+            }
+            if (z == 0) {
+                pocket.faces[4] |= uint64{1} << (((y / face_block) * face_span) + i);
+            }
+            if (z == size - 1) {
+                pocket.faces[5] |= uint64{1} << (((y / face_block) * face_span) + i);
+            }
+        }
+    };
+
+    for (int32 row = 0; row < rows; ++row) {
+        const int32 y = row / size;
+        const int32 z = row % size;
+
+        for (int32 r = row_begin[row]; r < row_begin[row + 1]; ++r) {
+            if (seen[r] != 0) {
+                continue;
+            }
+
+            chunk_pocket pocket;
+            seen[r] = 1;
+            stack.push_back(r);
+            stack.push_back(row);
+
+            while (!stack.empty()) {
+                const int32 at_row = stack.back();
+                stack.pop_back();
+                const int32 at = stack.back();
+                stack.pop_back();
+
+                const int32 ay   = at_row / size;
+                const int32 az   = at_row % size;
+                const uint64 run = masks[at];
+
+                add_faces(pocket, ay, az, run);
+                add_volume(pocket, ay, az, run);
+
+                const auto visit = [&](int32 ny, int32 nz) {
+                    if (ny < 0 || nz < 0 || ny >= size || nz >= size) {
+                        return;
+                    }
+                    const int32 neighbour_row = (ny * size) + nz;
+                    for (int32 n = row_begin[neighbour_row]; n < row_begin[neighbour_row + 1];
+                         ++n) {
+                        if (seen[n] != 0 || (masks[n] & run) == 0) {
+                            continue;
+                        }
+                        seen[n] = 1;
+                        stack.push_back(n);
+                        stack.push_back(neighbour_row);
+                    }
+                };
+
+                visit(ay - 1, az);
+                visit(ay + 1, az);
+                visit(ay, az - 1);
+                visit(ay, az + 1);
+            }
+
+            const bool reaches_a_face = std::ranges::any_of(
+                pocket.faces, [](uint64 blocks) -> bool { return blocks != 0; }
+            );
+            if (reaches_a_face) {
+                links.pockets.push_back(pocket);
+            }
+        }
+    }
+
+    if (links.pockets.size() > cell_links::max_pockets) {
+        links.merged = true;
+        chunk_pocket merged;
+        for (const auto& pocket : links.pockets) {
+            merged.volume |= pocket.volume;
+            for (int32 face = 0; face < chunk_pocket::face_count; ++face) {
+                merged.faces[face] |= pocket.faces[face];
+            }
+        }
+        links.pockets.assign(1, merged);
+    }
+
+    return links;
+}
+
+}  // namespace
+
+auto build_chunk_links(
+    const chunk_occupancy& occupancy, chunk_link_scratch& scratch
+) -> chunk_links {
+    constexpr int32 size = chunk_links::cell_size;
+    constexpr int32 per  = chunk_links::cells_per_side;
+
+    chunk_links links;
+
+    for (int32 x = 0; x < per; ++x) {
+        for (int32 y = 0; y < per; ++y) {
+            for (int32 z = 0; z < per; ++z) {
+                links.cells[chunk_links::cell_index(x, y, z)] = build_cell_links(
+                    occupancy, vec3i{x * size, y * size, z * size}, size, scratch
+                );
+            }
+        }
+    }
+
+    return links;
+}
+
+auto build_chunk_links(
+    const chunk_occupancy& occupancy
+) -> chunk_links {
+    chunk_link_scratch scratch;
+    return build_chunk_links(occupancy, scratch);
+}
+
 auto model::compact_pages() -> uint32 {
+    fill_known_ = false;
     std::vector<uint32> released;
 
     for (auto& entry : pages_) {
@@ -329,73 +548,169 @@ auto model::compact_pages() -> uint32 {
     return static_cast<uint32>(released.size());
 }
 
-void model::compute_own_boundaries() {
-    constexpr int32 ps = page_size;
-
-    own_faces_valid_ = 0;
-
-    // The bit planes are a fixed 64x64, which is exactly a world chunk. Larger
-    // models (Sculptor's, mostly) have no neighbours to hand them to anyway.
-    if (width_ > face_occupancy::side || height_ > face_occupancy::side ||
-        depth_ > face_occupancy::side) {
-        return;
+auto model::scan_fill() const -> model_fill {
+    if (fill_known_) {
+        return fill_;
     }
 
-    for (auto& face : own_faces_) {
-        face.clear();
+    bool any_empty = false;
+    bool any_solid = false;
+    fill_          = model_fill::mixed;
+    fill_known_    = true;
+
+    for (const auto& entry : pages_) {
+        switch (entry.mode()) {
+            case page_mode::empty:
+                any_empty = true;
+                break;
+            case page_mode::uniform:
+                any_solid = true;
+                break;
+            case page_mode::sparse:
+                return fill_;
+        }
+
+        if (any_empty && any_solid) {
+            return fill_;
+        }
     }
 
-    const auto solid_at = [this](int32 x, int32 y, int32 z) -> bool {
-        return !is_empty(x, y, z);
-    };
+    fill_ = any_solid ? model_fill::solid : model_fill::air;
+    return fill_;
+}
 
-    // Page modes still short-circuit the scan: an empty page contributes
-    // nothing, a uniform one contributes everything.
-    const auto scan_face = [&](face_occupancy& face, int32 axis, int32 layer) {
-        for (int32 b = 0; b < face_occupancy::side; ++b) {
-            for (int32 a = 0; a < face_occupancy::side; ++a) {
-                int32 x = 0;
-                int32 y = 0;
-                int32 z = 0;
-                switch (axis) {
-                    case 0: x = layer; y = a; z = b; break;
-                    case 1: x = a; y = layer; z = b; break;
-                    default: x = a; y = b; z = layer; break;
-                }
+auto model::boundaries_are_solid() const -> bool {
+    if (boundary_ == nullptr || boundary_->valid != 0x3F) {
+        return false;
+    }
 
-                if (x >= width_ || y >= height_ || z >= depth_) {
-                    continue;
-                }
-                if (solid_at(x, y, z)) {
-                    face.set(a, b);
-                }
-            }
+    // The planes are a fixed 64x64. Anything else has no neighbours to be
+    // pressed against, and the spare bits would read as air.
+    if (width_ != face_occupancy::side || height_ != face_occupancy::side ||
+        depth_ != face_occupancy::side) {
+        return false;
+    }
+
+    return std::ranges::all_of(boundary_->faces, [](const face_occupancy& face) -> bool {
+        return std::ranges::all_of(face.rows, [](uint64 row) -> bool {
+            return row == ~uint64{0};
+        });
+    });
+}
+
+auto model::extract_face(int32 face_direction, face_occupancy& out) const -> bool {
+    constexpr int32 side  = face_occupancy::side;
+    constexpr int32 ps    = page_size;
+    constexpr int32 pages = side / ps;
+
+    if (width_ != side || height_ != side || depth_ != side) {
+        return false;
+    }
+
+    out.clear();
+
+    // Face order: +X, -X, +Y, -Y, +Z, -Z. An even direction is the far side of
+    // its axis. The plane is addressed (a, b), skipping the axis itself: (y, z)
+    // for +-X, (x, z) for +-Y, (x, y) for +-Z -- the same order
+    // is_boundary_solid reads it back in.
+    const int32 axis  = face_direction / 2;
+    const int32 layer = (face_direction % 2 == 0) ? side - 1 : 0;
+    const int32 pl    = layer / ps;
+
+    const auto page_at = [axis, pl](int32 pa, int32 pb) -> vec3i {
+        switch (axis) {
+            case 0: return {pl, pa, pb};
+            case 1: return {pa, pl, pb};
+            default: return {pa, pb, pl};
         }
     };
 
-    scan_face(own_faces_[0], 0, 0);
-    scan_face(own_faces_[1], 0, width_ - 1);
-    scan_face(own_faces_[2], 1, 0);
-    scan_face(own_faces_[3], 1, height_ - 1);
-    scan_face(own_faces_[4], 2, 0);
-    scan_face(own_faces_[5], 2, depth_ - 1);
+    // Inside the page, the layer is the same cell every time.
+    const int32 ll = layer % ps;
 
-    own_faces_valid_ = 0x3F;
+    const auto cell_index = [axis, ll](int32 a, int32 b) -> int32 {
+        switch (axis) {
+            case 0: return local_index(ll, a, b);
+            case 1: return local_index(a, ll, b);
+            default: return local_index(a, b, ll);
+        }
+    };
 
-    static_cast<void>(ps);
+    for (int32 pb = 0; pb < pages; ++pb) {
+        for (int32 pa = 0; pa < pages; ++pa) {
+            const auto page = page_at(pa, pb);
+            const auto mode = get_page_mode(page.x, page.y, page.z);
+
+            if (mode == page_mode::empty) {
+                continue;
+            }
+
+            if (mode == page_mode::uniform) {
+                const uint64 bits = uint64{0xFF} << (pa * ps);
+                for (int32 b = 0; b < ps; ++b) {
+                    out.rows[(pb * ps) + b] |= bits;
+                }
+                continue;
+            }
+
+            // Resolved once for the whole page rather than per voxel: is_empty
+            // would walk the table and the pool again on every cell.
+            const auto* data = get_page(page.x, page.y, page.z);
+
+            for (int32 b = 0; b < ps; ++b) {
+                uint64 bits = 0;
+                for (int32 a = 0; a < ps; ++a) {
+                    if (!(*data)[cell_index(a, b)].is_empty()) {
+                        bits |= uint64{1} << a;
+                    }
+                }
+                out.rows[(pb * ps) + b] |= bits << (pa * ps);
+            }
+        }
+    }
+
+    return true;
 }
 
 void model::set_boundary_slice(int32 face_direction, const model& neighbor) {
-    if ((neighbor.own_faces_valid_ & (1U << face_direction)) == 0) {
+    constexpr int32 side = face_occupancy::side;
+
+    if (neighbor.width_ != side || neighbor.height_ != side || neighbor.depth_ != side) {
         return;
     }
 
-    neighbor_faces_[face_direction] = neighbor.own_faces_[face_direction];
-    neighbor_faces_valid_ |= static_cast<uint8>(1U << face_direction);
+    if (boundary_ == nullptr) {
+        boundary_ = std::make_unique<model_boundary>();
+    }
+
+    auto& face = boundary_->faces[face_direction];
+
+    // Most seams in a deep world are rock against rock, and a volume that is
+    // uniform all the way through has the same plane on all six sides. Reading
+    // the page table twice to find that out costs more than saying it.
+    switch (neighbor.scan_fill()) {
+        case model_fill::solid:
+            face.rows.fill(~uint64{0});
+            break;
+        case model_fill::air:
+            face.clear();
+            break;
+        case model_fill::mixed:
+            // The neighbour lies in `face_direction` from here, so the side of
+            // it that faces this model is the opposite one.
+            neighbor.extract_face(face_direction ^ 1, face);
+            break;
+    }
+
+    boundary_->valid |= static_cast<uint8>(1U << face_direction);
+}
+
+void model::release_boundary() {
+    boundary_.reset();
 }
 
 auto model::is_boundary_solid(int32 face_direction, int32 x, int32 y, int32 z) const -> bool {
-    const auto& face = neighbor_faces_[face_direction];
+    const auto& face = boundary_->faces[face_direction];
     switch (face_direction / 2) {
         case 0:
             return face.test(y, z);
@@ -418,13 +733,28 @@ void model::fill(const voxel& v) {
 
     if (v.is_empty()) {
         std::ranges::fill(pages_, page_entry::make_empty());
+        fill_ = model_fill::air;
     } else {
         std::ranges::fill(pages_, page_entry::make_uniform(v.id));
+        fill_ = model_fill::solid;
     }
+    fill_known_ = true;
     increment_generation_();
 }
 
+void model::fill_page_raw(int32 px, int32 py, int32 pz, const voxel& v) {
+    fill_known_ = false;
+    auto& entry = pages_[page_index(px, py, pz)];
+
+    if (entry.mode() == page_mode::sparse) {
+        free_sparse_page(entry.pool_index());
+    }
+
+    entry = v.is_empty() ? page_entry::make_empty() : page_entry::make_uniform(v.id);
+}
+
 void model::clone_pages_from(const model& source) {
+    fill_known_ = false;
     if (!owned_pages_.empty()) {
         pool_ptr_->free_batch(owned_pages_);
         owned_pages_.clear();

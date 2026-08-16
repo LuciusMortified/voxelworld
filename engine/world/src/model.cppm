@@ -90,6 +90,11 @@ private:
 
 enum class page_mode : uint8 { empty = 0, uniform = 1, sparse = 2 };
 
+// What the page table alone says about a whole volume. Both extremes matter:
+// solid rock and open air are the two things a chunk can be made of that carry
+// no faces of their own.
+enum class model_fill : uint8 { mixed = 0, air = 1, solid = 2 };
+
 struct page_entry {
     uint32 data = 0;
 
@@ -143,6 +148,15 @@ struct face_occupancy {
     }
 };
 
+// The six neighbour planes a model needs to close its own outside where another
+// model is pressed against it -- world chunks, and anything else assembled out
+// of several models. Three kilobytes, wanted from the moment the neighbours are
+// known until the mesher is done and not one frame longer, which is why the
+// model keeps them behind a pointer rather than for as long as it lives.
+struct model_boundary {
+    std::array<face_occupancy, 6> faces{};
+    uint8 valid = 0;
+};
 
 // A whole chunk as occupancy bits: one word per row along X, indexed by
 // (y, z). 32 KB, built once per mesh and read a row at a time -- the scans the
@@ -181,6 +195,121 @@ struct chunk_occupancy {
         zrows[(y * side) + x] |= bits;
     }
 };
+
+// Where a chunk lets sight through, as the pockets of air inside it.
+//
+// A pocket is one connected volume of empty voxels, described by the blocks it
+// reaches on each of the six faces: a face coarsened to 8x8 blocks, one bit per
+// block. Sight enters through a pocket and leaves through the same pocket,
+// nowhere else.
+//
+// Two things here were arrived at by measurement, and both matter.
+//
+// Pockets rather than pairs of faces: above a hillside the sky and the tunnels
+// under it both touch the side of the chunk, in different places and as
+// different pockets. Pairs of faces make that one opening, and a walk built on
+// them hid nothing at all of a cave system a voxel flood fill showed was
+// completely sealed.
+//
+// Cells of 32 voxels rather than whole chunks: the cave network is connected
+// almost everywhere, so a single false opening anywhere floods the lot. At
+// 64-voxel cells that left 0% hidden; at 32 it hides 66%, and 16 gains nothing
+// further.
+struct chunk_pocket {
+    static constexpr int32 face_count = 6;
+    static constexpr int32 face_span  = 8;
+
+    // Face order: -X, +X, -Y, +Y, -Z, +Z. The opposite of a face is face ^ 1.
+    std::array<uint64, face_count> faces{};
+
+    // The cell's volume as 4x4x4 blocks, one bit per block, set where the
+    // pocket has any voxel. Only used to work out which pocket a viewer is
+    // standing in: starting from all of them would hand a camera in open air
+    // the tunnels under its feet, and from there the whole connected network.
+    static constexpr int32 volume_span = 4;
+    uint64 volume = 0;
+
+    [[nodiscard]] static constexpr auto volume_bit(int32 x, int32 y, int32 z, int32 block)
+        -> uint64 {
+        return uint64{1}
+            << ((((y / block) * volume_span) + (z / block)) * volume_span + (x / block));
+    }
+
+    [[nodiscard]] auto holds(int32 x, int32 y, int32 z, int32 block) const -> bool {
+        return (volume & volume_bit(x, y, z, block)) != 0;
+    }
+
+    [[nodiscard]] auto touches(int32 face) const -> bool {
+        return faces[face] != 0;
+    }
+
+    // The two cells share a face, and this pocket meets that one only where
+    // both are open in the same block.
+    [[nodiscard]] auto meets(const chunk_pocket& other, int32 face) const -> bool {
+        return (faces[face] & other.faces[face ^ 1]) != 0;
+    }
+
+    [[nodiscard]] static auto wide_open() -> chunk_pocket {
+        chunk_pocket pocket;
+        pocket.faces.fill(~uint64{0});
+        return pocket;
+    }
+};
+
+// One cell of the connectivity grid: a 32-voxel cube, an eighth of a chunk.
+struct cell_links {
+    // A cell cut by a dense network of tunnels can have a great many small
+    // pockets. Past this they are merged into one, which can only make the walk
+    // report more than it should -- never less. The walk tracks visited pockets
+    // in a 64-bit mask and keeps one bit for itself, so this is the ceiling.
+    static constexpr std::size_t max_pockets = 63;
+
+    std::vector<chunk_pocket> pockets;
+    bool merged = false;
+
+    [[nodiscard]] auto is_sealed() const -> bool {
+        return pockets.empty();
+    }
+};
+
+struct chunk_links {
+    static constexpr int32 cell_size      = 32;
+    static constexpr int32 cells_per_side = chunk_occupancy::side / cell_size;
+    static constexpr int32 cell_count = cells_per_side * cells_per_side * cells_per_side;
+
+    std::array<cell_links, cell_count> cells;
+
+    [[nodiscard]] static constexpr auto cell_index(int32 x, int32 y, int32 z) -> int32 {
+        return (((y * cells_per_side) + z) * cells_per_side) + x;
+    }
+
+    [[nodiscard]] auto is_sealed() const -> bool {
+        return std::ranges::all_of(cells, [](const cell_links& c) -> bool {
+            return c.is_sealed();
+        });
+    }
+};
+
+// Working memory for build_chunk_links. Held by the caller so meshing a chunk
+// does not allocate.
+struct chunk_link_scratch {
+    std::vector<uint64> masks;
+    std::vector<int32> row_begin;
+    std::vector<uint8> seen;
+    std::vector<int32> stack;
+};
+
+// Flood fill over the empty voxels, run by run rather than voxel by voxel: a
+// row of the cell is part of a single word, and its empty stretches are a
+// handful of spans. Filling per voxel costs more than meshing the chunk does.
+//
+// Only pockets touching a face are kept -- a sealed bubble in the middle
+// connects nothing and cannot be seen into.
+[[nodiscard]] auto build_chunk_links(
+    const chunk_occupancy& occupancy, chunk_link_scratch& scratch
+) -> chunk_links;
+
+[[nodiscard]] auto build_chunk_links(const chunk_occupancy& occupancy) -> chunk_links;
 
 // Paged voxel volume. Pages are empty, uniform or sparse, so a mostly solid or
 // mostly empty model costs one entry per page instead of a voxel array.
@@ -278,7 +407,26 @@ public:
     // affordable; call it once the volume is filled.
     auto compact_pages() -> uint32;
 
-    void compute_own_boundaries();
+    // This model's own plane on the side facing `face_direction`, straight out
+    // of the page table: a uniform page is eight rows of eight set bits and
+    // never touches a voxel. False for anything that is not a 64-cube -- only
+    // world chunks have neighbours to hand a plane to.
+    [[nodiscard]] auto extract_face(int32 face_direction, face_occupancy& out) const -> bool;
+
+    // Walks the page entries, not the voxels: a chunk of solid rock is 512
+    // uniform entries and the answer comes out of the first two that differ.
+    // Call it after compact_pages -- a sparse page that happens to hold one
+    // block reads as mixed.
+    //
+    // Cached, because the caller that matters is a neighbour asking across a
+    // seam, and by then the page table is cold: two kilobytes of cache misses
+    // to learn one byte. Worth warming on the thread that generated the chunk.
+    [[nodiscard]] auto scan_fill() const -> model_fill;
+
+    // Every neighbour plane known and every bit of it set, so nothing on the
+    // outside of this model can be seen. A missing slice is open sky and counts
+    // as not solid.
+    [[nodiscard]] auto boundaries_are_solid() const -> bool;
 
     // Fills the bit volume from the page table rather than voxel by voxel: an
     // empty page contributes nothing, a uniform one contributes eight set bits
@@ -286,13 +434,19 @@ public:
     [[nodiscard]] auto build_occupancy(chunk_occupancy& out) const -> bool;
     void set_boundary_slice(int32 face_direction, const model& neighbor);
 
+    // Only valid while has_boundary_slice says so.
     [[nodiscard]] auto get_boundary_face(int32 face_direction) const -> const face_occupancy& {
-        return neighbor_faces_[face_direction];
+        return boundary_->faces[face_direction];
     }
 
     [[nodiscard]] auto has_boundary_slice(int32 face_direction) const -> bool {
-        return (neighbor_faces_valid_ & (1U << face_direction)) != 0;
+        return boundary_ != nullptr && (boundary_->valid & (1U << face_direction)) != 0;
     }
+
+    // Called once the mesh is built. Everything the planes were there for has
+    // happened by then, and holding them costs three kilobytes a chunk for as
+    // long as the chunk is loaded.
+    void release_boundary();
 
     [[nodiscard]] auto is_boundary_solid(int32 face_direction, int32 x, int32 y, int32 z) const
         -> bool;
@@ -300,6 +454,11 @@ public:
     void invalidate();
 
     void fill(const voxel& v);
+
+    // A whole page in one entry. Terrain below the surface is the same block
+    // for hundreds of voxels at a time, and writing it voxel by voxel costs
+    // both the loop and a sparse page the pool then has to fold back.
+    void fill_page_raw(int32 px, int32 py, int32 pz, const voxel& v);
 
     [[nodiscard]] auto get_identity() const -> model_identity {
         return identity_;
@@ -355,10 +514,9 @@ private:
     std::vector<page_entry> pages_;
     std::vector<uint32> owned_pages_;
     model_identity identity_;
-    std::array<face_occupancy, 6> neighbor_faces_{};
-    std::array<face_occupancy, 6> own_faces_{};
-    uint8 neighbor_faces_valid_ = 0;
-    uint8 own_faces_valid_      = 0;
+    std::unique_ptr<model_boundary> boundary_;
+    mutable model_fill fill_  = model_fill::mixed;
+    mutable bool fill_known_  = false;
 };
 
 // Owns the named models of a world together with the pools their pages and

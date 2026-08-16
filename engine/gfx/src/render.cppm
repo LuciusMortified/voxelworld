@@ -284,6 +284,11 @@ class vulkan_context;
 
 struct cull_frustum_ubo {
     vec4f planes[30];
+
+    // Where the camera stands, for dropping the face directions that point away
+    // from it. Only the camera pass uses it.
+    vec4f eye;
+
     uint32 pass_count;
     uint32 pad[3];
 };
@@ -306,12 +311,16 @@ public:
     void update_frustums(
         uint32 frame_index,
         const vw::spatial::frustum& view_frustum,
-        std::span<const vw::spatial::frustum> shadow_frustums
+        std::span<const vw::spatial::frustum> shadow_frustums,
+        const vec3f& eye
     );
 
+    // All the buffers at once. One barrier covers every count buffer instead
+    // of one apiece: the barrier is a pipeline stall, and the pool grew from
+    // nine buffers to fifteen when the size classes got finer.
     void dispatch(
         vk::CommandBuffer cmd,
-        combined_buffer& buffer,
+        const std::vector<std::unique_ptr<combined_buffer>>& buffers,
         uint32 frame_index
     );
 

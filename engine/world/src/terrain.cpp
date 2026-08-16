@@ -7,10 +7,10 @@ import std;
 namespace vw::ecs {
 
 chunk_loader::chunk_loader(
-    std::unique_ptr<terrain_generator> generator
+    std::unique_ptr<terrain_generator> generator, uint32 workers
 )
     : generator_(std::move(generator)) {
-    auto count = std::min(std::thread::hardware_concurrency(), 4u);
+    auto count = workers != 0 ? workers : std::min(std::thread::hardware_concurrency(), 4u);
     if (count == 0) {
         count = 1;
     }
@@ -166,8 +166,12 @@ void chunk_loader::gen_thread_function_() {
         generator_->generate(ctx);
         col->set_phase(column_phase::terrain);
 
+        // Whether a chunk is rock, air or a mix is asked six times over by its
+        // neighbours when the column is placed, and by then the page table is
+        // two kilobytes of cache misses away. Here it is still in the cache of
+        // the thread that just wrote it.
         for (auto& [y, cd] : col->get_all_chunk_data()) {
-            cd.chunk_model->compute_own_boundaries();
+            static_cast<void>(cd.chunk_model->scan_fill());
         }
 
         const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -262,177 +266,283 @@ auto perlin_terrain_generator::noise2d(
     return lerp(v, x1, x2);
 }
 
-auto perlin_terrain_generator::hash_cell(
-    int32 i, int32 j, int32 k, uint32 salt
-) -> uint32 {
-    uint32 h = 0x9E3779B9u ^ salt;
-    h        = (h ^ static_cast<uint32>(i)) * 0x85EBCA6Bu;
-    h ^= h >> 13;
-    h = (h ^ static_cast<uint32>(j)) * 0xC2B2AE35u;
-    h ^= h >> 16;
-    h = (h ^ static_cast<uint32>(k)) * 0x27D4EB2Fu;
-    h ^= h >> 15;
-    return h;
-}
+auto perlin_terrain_generator::noise3d(
+    float64 x, float64 y, float64 z
+) const -> float64 {
+    const int32 xi = static_cast<int32>(std::floor(x)) & 255;
+    const int32 yi = static_cast<int32>(std::floor(y)) & 255;
+    const int32 zi = static_cast<int32>(std::floor(z)) & 255;
 
-auto perlin_terrain_generator::cave_node(
-    int32 i, int32 j, int32 k
-) const -> vec3i {
-    const int32 sxz = params_.cave_node_spacing_xz;
-    const int32 sy  = params_.cave_node_spacing_y;
-    const int32 jit = params_.cave_node_jitter;
+    const float64 xf = x - std::floor(x);
+    const float64 yf = y - std::floor(y);
+    const float64 zf = z - std::floor(z);
 
-    const uint32 h = hash_cell(i, j, k, params_.seed);
+    const float64 u = fade(xf);
+    const float64 v = fade(yf);
+    const float64 w = fade(zf);
 
-    const auto offset = [jit](uint32 bits) -> int32 {
-        const auto span = static_cast<uint32>((jit * 2) + 1);
-        return static_cast<int32>(bits % span) - jit;
+    const int32 a  = perm_[xi] + yi;
+    const int32 aa = perm_[a] + zi;
+    const int32 ab = perm_[a + 1] + zi;
+    const int32 b  = perm_[xi + 1] + yi;
+    const int32 ba = perm_[b] + zi;
+    const int32 bb = perm_[b + 1] + zi;
+
+    const auto g = [](int32 hash, float64 px, float64 py, float64 pz) -> float64 {
+        const int32 h    = hash & 15;
+        const float64 gu = h < 8 ? px : py;
+        const float64 gv = h < 4 ? py : (h == 12 || h == 14 ? px : pz);
+        return ((h & 1) != 0 ? -gu : gu) + ((h & 2) != 0 ? -gv : gv);
     };
 
-    return vec3i{
-        (i * sxz) + (sxz / 2) + offset(h & 0x3FFu),
-        (j * sy) + (sy / 2) + offset((h >> 10) & 0x3FFu),
-        (k * sxz) + (sxz / 2) + offset((h >> 20) & 0x3FFu),
-    };
+    const float64 x1 = lerp(u, g(perm_[aa], xf, yf, zf), g(perm_[ba], xf - 1.0, yf, zf));
+    const float64 x2 = lerp(u, g(perm_[ab], xf, yf - 1.0, zf), g(perm_[bb], xf - 1.0, yf - 1.0, zf));
+    const float64 x3 =
+        lerp(u, g(perm_[aa + 1], xf, yf, zf - 1.0), g(perm_[ba + 1], xf - 1.0, yf, zf - 1.0));
+    const float64 x4 = lerp(
+        u, g(perm_[ab + 1], xf, yf - 1.0, zf - 1.0), g(perm_[bb + 1], xf - 1.0, yf - 1.0, zf - 1.0)
+    );
+
+    return lerp(w, lerp(v, x1, x2), lerp(v, x3, x4));
 }
 
-auto perlin_terrain_generator::cave_edge_open(
-    int32 i, int32 j, int32 k, int32 axis
-) const -> bool {
-    const uint32 h = hash_cell(i, j, k, params_.seed + 0x51ED2701u + static_cast<uint32>(axis));
+auto perlin_terrain_generator::cave_field_at(
+    int32 wx, int32 wy, int32 wz, int32 depth
+) const -> float32 {
+    const auto f = params_.cave_field_frequency;
+    const auto n = static_cast<float32>(noise3d(
+        (static_cast<float64>(wx) * f) + 517.3,
+        static_cast<float64>(wy) * f * params_.cave_field_squash,
+        (static_cast<float64>(wz) * f) + 241.9
+    ));
 
-    const float32 chance =
-        (axis == 1) ? params_.cave_edge_chance_y : params_.cave_edge_chance_xz;
+    // Below the threshold there is no cave at all; above it the field comes up
+    // over the falloff. The edge of a field is therefore a place where passages
+    // narrow and stop, not a wall sliced through a chamber.
+    const float32 near_surface = depth < params_.cave_field_surface_reach
+        ? 1.0F - (static_cast<float32>(std::max(0, depth)) /
+                  static_cast<float32>(std::max(1, params_.cave_field_surface_reach)))
+        : 0.0F;
 
-    constexpr float32 scale = 1.0F / 65536.0F;
-    return static_cast<float32>(h & 0xFFFFu) * scale < chance;
+    const float32 t = ((n + (near_surface * params_.cave_field_surface_bias)) -
+                       params_.cave_field_threshold) /
+        params_.cave_field_falloff;
+    const float32 c = std::clamp(t, 0.0F, 1.0F);
+    return c * c * (3.0F - (2.0F * c));
 }
 
-void perlin_terrain_generator::carve_tunnels_(
+auto perlin_terrain_generator::cave_entrance_leak_at(
+    int32 wx, int32 wz
+) const -> float32 {
+    const auto fe = params_.cave_entrance_frequency;
+    const auto n  = static_cast<float32>(noise2d(
+        (static_cast<float64>(wx) * fe) - 88.1, (static_cast<float64>(wz) * fe) + 44.6
+    ));
+
+    return std::clamp(
+        (n - params_.cave_entrance_threshold) / std::max(0.05F, params_.cave_entrance_falloff),
+        0.0F, 1.0F
+    );
+}
+
+auto perlin_terrain_generator::cave_openness_at(
+    int32 wx, int32 wy, int32 wz, float32 field, int32 surface, float32 leak
+) const -> float32 {
+    const auto x = static_cast<float64>(wx);
+    const auto y = static_cast<float64>(wy);
+    const auto z = static_cast<float64>(wz);
+
+    // Caverns come in storeys: the band widens the cheese term at fixed heights
+    // so a field reads as levels rather than one blob of holes.
+    const auto spacing = static_cast<float32>(std::max(1, params_.cave_level_spacing));
+    const auto phase   = static_cast<float32>(wy) * 6.2831853F / spacing;
+    const float32 band =
+        1.0F - (params_.cave_level_contrast * (0.5F - (0.5F * std::cos(phase))));
+
+    const auto fc = params_.cave_cheese_frequency;
+    const auto cheese = static_cast<float32>(
+        noise3d(x * fc, y * fc * params_.cave_cheese_squash, z * fc)
+    );
+    const float32 cheese_open =
+        (params_.cave_cheese_width * field * band) - std::abs(cheese);
+
+    // Two fields crossing: their common zero is a curve through the rock, and a
+    // curve is a passage. One field alone would give a sheet.
+    const auto ft = params_.cave_tunnel_frequency;
+    const auto ta = static_cast<float32>(noise3d((x * ft) + 71.5, (y * ft) + 13.7, (z * ft) + 39.1));
+    const auto tb = static_cast<float32>(noise3d((x * ft) - 128.3, (y * ft) + 96.2, (z * ft) - 57.4));
+    const float32 tunnel_open =
+        (params_.cave_tunnel_width * field) - std::sqrt((ta * ta) + (tb * tb));
+
+    float32 open = std::max(cheese_open, tunnel_open);
+
+    // The roof. A cave fades out as it comes up to the surface, in proportion
+    // to how solid the ground is above it.
+    const int32 depth = surface - wy;
+    const int32 reach = params_.cave_surface_margin + params_.cave_surface_fade;
+
+    if (depth < reach) {
+        const auto over = static_cast<float32>(reach - depth);
+        const float32 fade = over / static_cast<float32>(std::max(1, params_.cave_surface_fade));
+
+        open -= fade * 2.0F * (1.0F - leak);
+        open += leak * params_.cave_entrance_lift;
+    }
+
+    // The floor of the world is never opened.
+    const int32 above_bottom = wy - params_.world_bottom_y;
+    if (above_bottom < (params_.bedrock_thickness + 4)) {
+        open -= 1.0F;
+    }
+
+    return open;
+}
+
+void perlin_terrain_generator::carve_caves_(
     vw::asset::model& mdl, terrain_context& ctx, int32 chunk_y, const column_profile& profile
 ) const {
     constexpr int32 s = 64;
 
-    const float32 radius = params_.cave_radius;
-    const auto reach     = static_cast<int32>(std::ceil(radius)) + 1;
+    if (!params_.caves) {
+        return;
+    }
 
     const int32 x0 = ctx.cx * s;
     const int32 y0 = chunk_y * s;
     const int32 z0 = ctx.cz * s;
 
-    const int32 sxz = params_.cave_node_spacing_xz;
-    const int32 sy  = params_.cave_node_spacing_y;
+    if (y0 > profile.max_surface) {
+        return;
+    }
+    if ((y0 + s - 1) < (params_.world_bottom_y + params_.bedrock_thickness + 4)) {
+        return;
+    }
 
-    // A node sits anywhere in its cell and an edge reaches into the next one,
-    // so the cells that can touch this chunk extend a cell past it either way.
-    const auto floor_div = [](int32 a, int32 b) -> int32 {
-        return a >= 0 ? a / b : (a - b + 1) / b;
-    };
+    const int32 stride = std::max(1, params_.cave_sample_stride);
+    const int32 cells  = (s + stride - 1) / stride;
+    const int32 points = cells + 1;
+    const auto plane   = static_cast<std::size_t>(points) * points;
 
-    const int32 i0 = floor_div(x0 - reach, sxz) - 1;
-    const int32 i1 = floor_div(x0 + s + reach, sxz) + 1;
-    const int32 j0 = floor_div(y0 - reach, sy) - 1;
-    const int32 j1 = floor_div(y0 + s + reach, sy) + 1;
-    const int32 k0 = floor_div(z0 - reach, sxz) - 1;
-    const int32 k1 = floor_div(z0 + s + reach, sxz) + 1;
+    // One value per grid point, positive where the rock opens. Interpolating
+    // this rather than testing every voxel is what makes the noise affordable:
+    // at a stride of four it is one sample in sixty-four.
+    //
+    // The field is asked first and costs one sample; only where it answers does
+    // the point pay for the caverns and the passages.
+    std::vector<float32> open(plane * points, -1.0F);
 
-    const float32 radius2 = radius * radius;
+    bool any_open = false;
 
-    const auto carve_segment = [&](vec3i from, vec3i to) {
-        const int32 lo_x = std::max(std::min(from.x, to.x) - reach, x0) - x0;
-        const int32 hi_x = std::min(std::max(from.x, to.x) + reach, x0 + s - 1) - x0;
-        const int32 lo_y = std::max(std::min(from.y, to.y) - reach, y0) - y0;
-        const int32 hi_y = std::min(std::max(from.y, to.y) + reach, y0 + s - 1) - y0;
-        const int32 lo_z = std::max(std::min(from.z, to.z) - reach, z0) - z0;
-        const int32 hi_z = std::min(std::max(from.z, to.z) + reach, z0 + s - 1) - z0;
+    for (int32 gy = 0; gy < points; ++gy) {
+        const int32 ly = std::min(gy * stride, s - 1);
+        const int32 wy = y0 + ly;
 
-        if (lo_x > hi_x || lo_y > hi_y || lo_z > hi_z) {
-            return;
-        }
+        for (int32 gz = 0; gz < points; ++gz) {
+            const int32 lz = std::min(gz * stride, s - 1);
 
-        const auto ax = static_cast<float32>(from.x);
-        const auto ay = static_cast<float32>(from.y);
-        const auto az = static_cast<float32>(from.z);
-        const auto dx = static_cast<float32>(to.x - from.x);
-        const auto dy = static_cast<float32>(to.y - from.y);
-        const auto dz = static_cast<float32>(to.z - from.z);
+            for (int32 gx = 0; gx < points; ++gx) {
+                const int32 lx = std::min(gx * stride, s - 1);
 
-        const float32 length2 = (dx * dx) + (dy * dy) + (dz * dz);
-        if (length2 <= 0.0F) {
-            return;
-        }
-        const float32 inv_length2 = 1.0F / length2;
+                const int32 surface = profile.surface[(lx * s) + lz];
+                const int32 depth   = surface - wy;
 
-        for (int32 z = lo_z; z <= hi_z; ++z) {
-            for (int32 x = lo_x; x <= hi_x; ++x) {
-                const int32 index        = (x * s) + z;
-                const int32 surface      = profile.surface[index];
-                const int32 world_bottom = surface - params_.depth_below_surface;
+                // Near the surface a leaky patch is a field in its own right,
+                // so the way in exists whether or not a blob reached up here.
+                const float32 leak =
+                    depth < (params_.cave_surface_margin + params_.cave_surface_fade)
+                    ? cave_entrance_leak_at(x0 + lx, z0 + lz)
+                    : 0.0F;
 
-                for (int32 y = lo_y; y <= hi_y; ++y) {
-                    const int32 wy = y0 + y;
-
-                    // The world keeps a floor and a closed lid: no passage
-                    // breaks the surface open and none cuts into the bedrock.
-                    if ((surface - wy) < params_.cave_surface_margin ||
-                        (wy - world_bottom) < params_.bedrock_thickness) {
-                        continue;
-                    }
-
-                    const float32 px = static_cast<float32>(x0 + x) - ax;
-                    const float32 py = static_cast<float32>(wy) - ay;
-                    const float32 pz = static_cast<float32>(z0 + z) - az;
-
-                    const float32 t = std::clamp(
-                        ((px * dx) + (py * dy) + (pz * dz)) * inv_length2, 0.0F, 1.0F
-                    );
-
-                    const float32 ox = px - (t * dx);
-                    const float32 oy = py - (t * dy);
-                    const float32 oz = pz - (t * dz);
-
-                    if ((ox * ox) + (oy * oy) + (oz * oz) <= radius2) {
-                        mdl.set_voxel_raw(x, y, z, voxel{blocks::air});
-                    }
+                // The shaft keeps its own field down to where blobs live, so a
+                // way in leads somewhere instead of ending as a pit.
+                float32 shaft = 0.0F;
+                if (depth >= 0 && depth < params_.cave_entrance_depth) {
+                    const float32 taper = 1.0F -
+                        (static_cast<float32>(depth) /
+                         static_cast<float32>(std::max(1, params_.cave_entrance_depth)));
+                    shaft = cave_entrance_leak_at(x0 + lx, z0 + lz) * taper;
                 }
+
+                const float32 field = std::max(
+                    cave_field_at(x0 + lx, wy, z0 + lz, depth),
+                    std::max(leak, shaft) * params_.cave_entrance_field
+                );
+                if (field <= 0.0F) {
+                    continue;
+                }
+
+                const float32 value =
+                    cave_openness_at(x0 + lx, wy, z0 + lz, field, surface, leak);
+
+                open[(static_cast<std::size_t>(gy) * plane) + (static_cast<std::size_t>(gz) * points) + gx] =
+                    value;
+                any_open = any_open || value > 0.0F;
             }
         }
+    }
+
+    if (!any_open) {
+        return;
+    }
+
+    const auto sample = [&](int32 gx, int32 gy, int32 gz) -> float32 {
+        return open[(static_cast<std::size_t>(gy) * plane) +
+                    (static_cast<std::size_t>(gz) * points) + gx];
     };
 
-    const int32 bend = params_.cave_node_jitter;
+    const auto inv = 1.0F / static_cast<float32>(stride);
 
-    for (int32 j = j0; j <= j1; ++j) {
-        for (int32 k = k0; k <= k1; ++k) {
-            for (int32 i = i0; i <= i1; ++i) {
-                const vec3i from = cave_node(i, j, k);
+    // Cell by cell rather than voxel by voxel: a cell whose eight corners are
+    // all rock has no surface crossing it, and skipping it drops sixty-four
+    // voxels at a time. Most of a chunk is that.
+    for (int32 cy = 0; cy < cells; ++cy) {
+        for (int32 cz = 0; cz < cells; ++cz) {
+            for (int32 cx = 0; cx < cells; ++cx) {
+                const float32 c000 = sample(cx, cy, cz);
+                const float32 c100 = sample(cx + 1, cy, cz);
+                const float32 c010 = sample(cx, cy + 1, cz);
+                const float32 c110 = sample(cx + 1, cy + 1, cz);
+                const float32 c001 = sample(cx, cy, cz + 1);
+                const float32 c101 = sample(cx + 1, cy, cz + 1);
+                const float32 c011 = sample(cx, cy + 1, cz + 1);
+                const float32 c111 = sample(cx + 1, cy + 1, cz + 1);
 
-                for (int32 axis = 0; axis < 3; ++axis) {
-                    if (!cave_edge_open(i, j, k, axis)) {
+                const float32 hi = std::max(
+                    std::max(std::max(c000, c100), std::max(c010, c110)),
+                    std::max(std::max(c001, c101), std::max(c011, c111))
+                );
+                if (hi <= 0.0F) {
+                    continue;
+                }
+
+                const int32 x_end = std::min((cx + 1) * stride, s);
+                const int32 y_end = std::min((cy + 1) * stride, s);
+                const int32 z_end = std::min((cz + 1) * stride, s);
+
+                for (int32 y = cy * stride; y < y_end; ++y) {
+                    if ((y0 + y) < params_.world_bottom_y) {
                         continue;
                     }
+                    const float32 ty = static_cast<float32>(y - (cy * stride)) * inv;
 
-                    const vec3i to = cave_node(
-                        i + (axis == 0 ? 1 : 0), j + (axis == 1 ? 1 : 0), k + (axis == 2 ? 1 : 0)
-                    );
+                    for (int32 z = cz * stride; z < z_end; ++z) {
+                        const float32 tz = static_cast<float32>(z - (cz * stride)) * inv;
 
-                    // The midpoint is pushed aside so a passage bends instead of
-                    // running dead straight for the whole span between nodes.
-                    const uint32 h = hash_cell(i, j, k, params_.seed + 0x1B873593u +
-                                                            static_cast<uint32>(axis));
+                        const float32 y00 = std::lerp(c000, c010, ty);
+                        const float32 y10 = std::lerp(c100, c110, ty);
+                        const float32 y01 = std::lerp(c001, c011, ty);
+                        const float32 y11 = std::lerp(c101, c111, ty);
 
-                    const auto offset = [bend](uint32 bits) -> int32 {
-                        const auto span = static_cast<uint32>((bend * 2) + 1);
-                        return static_cast<int32>(bits % span) - bend;
-                    };
+                        const float32 z0v = std::lerp(y00, y01, tz);
+                        const float32 z1v = std::lerp(y10, y11, tz);
 
-                    const vec3i mid{
-                        ((from.x + to.x) / 2) + offset(h & 0x3FFu),
-                        ((from.y + to.y) / 2) + (offset((h >> 10) & 0x3FFu) / 2),
-                        ((from.z + to.z) / 2) + offset((h >> 20) & 0x3FFu),
-                    };
-
-                    carve_segment(from, mid);
-                    carve_segment(mid, to);
+                        for (int32 x = cx * stride; x < x_end; ++x) {
+                            const float32 tx = static_cast<float32>(x - (cx * stride)) * inv;
+                            if (std::lerp(z0v, z1v, tx) > 0.0F) {
+                                mdl.set_voxel_raw(x, y, z, voxel{blocks::air});
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -485,7 +595,7 @@ auto perlin_terrain_generator::continent_at(
     return (c + 1.0) * 0.5;
 }
 
-auto perlin_terrain_generator::height_at(
+auto perlin_terrain_generator::stone_height_at(
     int32 wx, int32 wz
 ) const -> int32 {
     auto nx = static_cast<float64>(wx);
@@ -535,36 +645,74 @@ auto perlin_terrain_generator::height_at(
     return base_h + static_cast<int32>(mixed * amplitude);
 }
 
-auto perlin_terrain_generator::block_at(
-    int32 y, int32 surface_y, float64 continent
-) const -> block_id {
-    int32 depth = surface_y - y;
+auto perlin_terrain_generator::soil_depth_at(
+    int32 wx, int32 wz, int32 stone, float32 slope
+) const -> int32 {
+    const float64 n = noise2d(
+        static_cast<float64>(wx) * params_.soil_frequency,
+        static_cast<float64>(wz) * params_.soil_frequency
+    );
 
-    if (continent >= 0.7) {
-        if (depth == 0) {
-            if (surface_y > params_.mountains_height + 20)
-                return blocks::gray_9;
-            return blocks::gray_5;
-        }
+    auto t = static_cast<float32>((n + 1.0) * 0.5);
+
+    // Soil slides off steep ground and thins out with altitude. Between the two
+    // a mountain ends up bare without anything in the code saying "mountain".
+    t *= std::clamp(1.0F - (slope / params_.soil_slope_limit), 0.0F, 1.0F);
+
+    if (stone > params_.soil_altitude_start) {
+        const auto start = static_cast<float32>(params_.soil_altitude_start);
+        const auto end   = static_cast<float32>(params_.soil_altitude_end);
+        t *= std::clamp((end - static_cast<float32>(stone)) / (end - start), 0.0F, 1.0F);
+    }
+
+    return static_cast<int32>((t * static_cast<float32>(params_.soil_depth_max)) + 0.5F);
+}
+
+auto perlin_terrain_generator::rock_block_at(
+    int32 wy
+) const -> block_id {
+    if (wy < (params_.world_bottom_y + params_.bedrock_thickness)) {
+        return blocks::gray_0;
+    }
+    if (wy < params_.rock_bottom_y) {
+        return blocks::gray_1;
+    }
+    if (wy < params_.rock_deep_y) {
+        return blocks::gray_2;
+    }
+    return blocks::gray_3;
+}
+
+auto perlin_terrain_generator::block_at(
+    int32 wy, int32 stone_top, int32 surface_top
+) const -> block_id {
+    if (wy > stone_top) {
+        return wy == surface_top ? blocks::green_2 : blocks::brown_0;
+    }
+
+    // Rock left in the open weathers, and high enough up it holds snow.
+    if (wy == stone_top && surface_top == stone_top) {
+        return wy > params_.snow_line ? blocks::gray_9 : blocks::gray_5;
+    }
+    if ((stone_top - wy) < params_.rock_skin) {
         return blocks::gray_4;
     }
 
-    if (depth == 0) {
-        if (surface_y > params_.mountains_height + 10)
-            return blocks::gray_9;
-        if (surface_y > params_.hills_height + 10)
-            return blocks::gray_4;
-        return blocks::green_2;
-    }
-    if (depth < 3)
-        return blocks::brown_0;
-    return blocks::gray_3;
+    return rock_block_at(wy);
 }
 
 auto perlin_terrain_generator::surface_height_at(
     int32 wx, int32 wz
 ) const -> int32 {
-    return height_at(wx, wz);
+    const int32 stone = stone_height_at(wx, wz);
+
+    const auto dx = stone_height_at(wx + 1, wz) - stone_height_at(wx - 1, wz);
+    const auto dz = stone_height_at(wx, wz + 1) - stone_height_at(wx, wz - 1);
+
+    const auto slope =
+        0.5F * static_cast<float32>(std::max(std::abs(dx), std::abs(dz)));
+
+    return stone + soil_depth_at(wx, wz, stone, slope);
 }
 
 void perlin_terrain_generator::generate(
@@ -574,14 +722,13 @@ void perlin_terrain_generator::generate(
 
     const auto profile = sample_column_(ctx.cx, ctx.cz);
 
-    const int32 bottom = profile.min_surface - params_.depth_below_surface;
-
     auto floor_div = [](int32 a, int32 b) -> int32 { return a >= 0 ? a / b : (a - b + 1) / b; };
 
-    int32 min_cy = floor_div(bottom, s);
+    int32 min_cy = floor_div(params_.world_bottom_y, s);
     int32 max_cy = floor_div(profile.max_surface, s);
 
-    for (int32 cy = min_cy; cy <= max_cy; ++cy) {
+    // Top down, like every other walk over a column.
+    for (int32 cy = max_cy; cy >= min_cy; --cy) {
         generate_chunk(ctx, cy, profile);
     }
 }
@@ -590,23 +737,44 @@ auto perlin_terrain_generator::sample_column_(
     int32 cx, int32 cz
 ) const -> column_profile {
     constexpr int32 s = column_profile::size;
+    constexpr int32 a = column_profile::apron;
+    constexpr int32 p = column_profile::page;
 
     column_profile profile{};
-    profile.min_surface = std::numeric_limits<int32>::max();
+    profile.min_stone   = std::numeric_limits<int32>::max();
     profile.max_surface = std::numeric_limits<int32>::lowest();
+
+    for (int32 i = 0; i < column_profile::stride; ++i) {
+        for (int32 j = 0; j < column_profile::stride; ++j) {
+            profile.stone[(i * column_profile::stride) + j] =
+                stone_height_at((cx * s) + i - a, (cz * s) + j - a);
+        }
+    }
+
+    profile.page_min_stone.fill(std::numeric_limits<int32>::max());
+    profile.page_max_surface.fill(std::numeric_limits<int32>::lowest());
 
     for (int32 x = 0; x < s; ++x) {
         for (int32 z = 0; z < s; ++z) {
-            const int32 wx = (cx * s) + x;
-            const int32 wz = (cz * s) + z;
-            const int32 surface = height_at(wx, wz);
+            const int32 stone = profile.stone[column_profile::stone_index(x, z)];
 
-            const auto index = (x * s) + z;
-            profile.surface[index] = surface;
-            profile.continent[index] =
-                continent_at(static_cast<float64>(wx), static_cast<float64>(wz));
+            const auto dx = profile.stone[column_profile::stone_index(x + 1, z)] -
+                profile.stone[column_profile::stone_index(x - 1, z)];
+            const auto dz = profile.stone[column_profile::stone_index(x, z + 1)] -
+                profile.stone[column_profile::stone_index(x, z - 1)];
 
-            profile.min_surface = std::min(profile.min_surface, surface);
+            const auto slope = 0.5F * static_cast<float32>(std::max(std::abs(dx), std::abs(dz)));
+
+            const int32 surface =
+                stone + soil_depth_at((cx * s) + x, (cz * s) + z, stone, slope);
+
+            profile.surface[(x * s) + z] = surface;
+
+            const int32 page = ((x / p) * column_profile::pages) + (z / p);
+            profile.page_min_stone[page]   = std::min(profile.page_min_stone[page], stone);
+            profile.page_max_surface[page] = std::max(profile.page_max_surface[page], surface);
+
+            profile.min_stone   = std::min(profile.min_stone, stone);
             profile.max_surface = std::max(profile.max_surface, surface);
         }
     }
@@ -621,28 +789,62 @@ void perlin_terrain_generator::generate_chunk(
 
     auto mdl = std::make_shared<vw::asset::model>(*identity_pool_, *page_pool_, s, s, s, params_.voxel_scale);
 
-    for (int32 x = 0; x < s; ++x) {
-        for (int32 z = 0; z < s; ++z) {
-            const auto index    = (x * s) + z;
-            const int32 surface = profile.surface[index];
-            const float64 continent = profile.continent[index];
+    constexpr int32 p  = column_profile::page;
+    constexpr int32 pn = column_profile::pages;
 
-            const int32 world_bottom = surface - params_.depth_below_surface;
-            const int32 top      = std::min(surface, (chunk_y * s) + s - 1);
-            const int32 bottom_y = std::max(chunk_y * s, world_bottom);
+    const int32 base_y = chunk_y * s;
 
-            for (int32 wy = bottom_y; wy <= top; ++wy) {
-                const int32 y = wy - (chunk_y * s);
-                if (y < 0 || y >= s) {
+    // Page by page, not voxel by voxel: a thousand voxels of rock under every
+    // column is one entry per page and no loop at all. Only the band where the
+    // ground actually changes is written out in full.
+    for (int32 py = 0; py < pn; ++py) {
+        const int32 y0 = base_y + (py * p);
+        const int32 y1 = y0 + p - 1;
+
+        if (y1 < params_.world_bottom_y) {
+            continue;
+        }
+
+        const bool one_rock = y0 >= params_.world_bottom_y &&
+            rock_block_at(y0) == rock_block_at(y1);
+
+        for (int32 px = 0; px < pn; ++px) {
+            for (int32 pz = 0; pz < pn; ++pz) {
+                const int32 page = (px * pn) + pz;
+
+                if (y0 > profile.page_max_surface[page]) {
                     continue;
                 }
 
-                mdl->set_voxel_raw(x, y, z, voxel{block_at(wy, surface, continent)});
+                if (one_rock && y1 < (profile.page_min_stone[page] - params_.rock_skin)) {
+                    mdl->fill_page_raw(px, py, pz, voxel{rock_block_at(y0)});
+                    continue;
+                }
+
+                for (int32 lx = 0; lx < p; ++lx) {
+                    const int32 x = (px * p) + lx;
+
+                    for (int32 lz = 0; lz < p; ++lz) {
+                        const int32 z = (pz * p) + lz;
+
+                        const int32 stone   = profile.stone[column_profile::stone_index(x, z)];
+                        const int32 surface = profile.surface[(x * s) + z];
+
+                        const int32 top    = std::min(surface, y1);
+                        const int32 bottom = std::max(y0, params_.world_bottom_y);
+
+                        for (int32 wy = bottom; wy <= top; ++wy) {
+                            mdl->set_voxel_raw(
+                                x, wy - base_y, z, voxel{block_at(wy, stone, surface)}
+                            );
+                        }
+                    }
+                }
             }
         }
     }
 
-    carve_tunnels_(*mdl, ctx, chunk_y, profile);
+    carve_caves_(*mdl, ctx, chunk_y, profile);
 
     // Solid rock and hollowed-out caverns both collapse back to a single page
     // entry here; without this a deep world runs the page pool dry.

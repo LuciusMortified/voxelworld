@@ -31,6 +31,7 @@ constexpr std::array cpu_stages{
     stage_desc{"app_render", [](const frame_sample& s) -> float32 { return s.engine.app_render_ms; }},
     stage_desc{"renderer", [](const frame_sample& s) -> float32 { return s.engine.renderer_ms; }},
     stage_desc{"end_frame", [](const frame_sample& s) -> float32 { return s.engine.end_frame_ms; }},
+    stage_desc{"mesh_sync", [](const frame_sample& s) -> float32 { return s.render.mesh_sync_ms; }},
     stage_desc{"shadow_map_update", [](const frame_sample& s) -> float32 { return s.render.shadow_map_update_ms; }},
     stage_desc{"buffer_pool_update", [](const frame_sample& s) -> float32 { return s.render.buffer_pool_update_ms; }},
     stage_desc{"compute_cull", [](const frame_sample& s) -> float32 { return s.render.compute_cull_ms; }},
@@ -41,13 +42,13 @@ constexpr std::array cpu_stages{
     stage_desc{"world_pass_debug", [](const frame_sample& s) -> float32 { return s.render.world_pass_debug_ms; }},
     stage_desc{"world_pass_imgui", [](const frame_sample& s) -> float32 { return s.render.world_pass_imgui_ms; }},
     stage_desc{"cascades drawn", [](const frame_sample& s) -> float32 { return s.render.shadow_cascades_drawn; }},
+    stage_desc{"grid_stage", [](const frame_sample& s) -> float32 { return s.grid.stage_ms; }},
     stage_desc{"grid_integrate", [](const frame_sample& s) -> float32 { return s.grid.integrate_ms; }},
     stage_desc{"grid_boundary_from", [](const frame_sample& s) -> float32 { return s.grid.boundary_from_ms; }},
     stage_desc{"grid_chunk_create", [](const frame_sample& s) -> float32 { return s.grid.chunk_create_ms; }},
-    stage_desc{"grid_boundary_to", [](const frame_sample& s) -> float32 { return s.grid.boundary_to_ms; }},
-    stage_desc{"grid_remesh", [](const frame_sample& s) -> float32 { return s.grid.deferred_remesh_ms; }},
     stage_desc{"grid_requests", [](const frame_sample& s) -> float32 { return s.grid.request_columns_ms; }},
     stage_desc{"grid_pending", [](const frame_sample& s) -> float32 { return static_cast<float32>(s.grid.pending_count); }},
+    stage_desc{"grid_staged", [](const frame_sample& s) -> float32 { return static_cast<float32>(s.grid.staged_count); }},
 };
 
 constexpr std::array gpu_stages{

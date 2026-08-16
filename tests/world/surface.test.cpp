@@ -1,0 +1,213 @@
+#include <catch2/catch_test_macros.hpp>
+
+import std;
+
+import vw.core;
+import vw.ecs;
+import vw.world;
+
+using namespace vw;
+using namespace vw::ecs;
+
+namespace {
+
+// One generated column, addressed by world height instead of by chunk. Caves
+// are switched off in every test here: what is under examination is the stack
+// of materials, and a chamber cut through it only adds noise.
+class sampled_column {
+public:
+    static constexpr int32 chunk = 64;
+
+    sampled_column(perlin_terrain_generator& gen, int32 cx, int32 cz) {
+        ecs::gen_column column{cx, cz};
+
+        terrain_context ctx{
+            .cx           = cx,
+            .cz           = cz,
+            .create_chunk = [&column](int32 y) -> chunk_data& {
+                return column.create_chunk(y, chunk_data{});
+            },
+        };
+        gen.generate(ctx);
+
+        for (auto& [cy, data] : column.get_all_chunk_data()) {
+            models_[cy] = data.chunk_model;
+            min_y_      = std::min(min_y_, cy * chunk);
+            max_y_      = std::max(max_y_, (cy * chunk) + chunk - 1);
+        }
+    }
+
+    [[nodiscard]] auto bottom() const -> int32 {
+        return min_y_;
+    }
+
+    [[nodiscard]] auto top() const -> int32 {
+        return max_y_;
+    }
+
+    [[nodiscard]] auto id_at(int32 x, int32 wy, int32 z) const -> block_id {
+        const int32 cy = wy >= 0 ? wy / chunk : ((wy - chunk) + 1) / chunk;
+
+        const auto it = models_.find(cy);
+        if (it == models_.end()) {
+            return blocks::air;
+        }
+        return it->second->get_voxel(x, wy - (cy * chunk), z).id;
+    }
+
+    // The highest voxel that is not air, or bottom() - 1 when the column is
+    // empty all the way down.
+    [[nodiscard]] auto surface_of(int32 x, int32 z) const -> int32 {
+        for (int32 wy = max_y_; wy >= min_y_; --wy) {
+            if (id_at(x, wy, z) != blocks::air) {
+                return wy;
+            }
+        }
+        return min_y_ - 1;
+    }
+
+private:
+    std::unordered_map<int32, std::shared_ptr<asset::model>> models_;
+    int32 min_y_ = std::numeric_limits<int32>::max();
+    int32 max_y_ = std::numeric_limits<int32>::lowest();
+};
+
+// Caves off: these tests are about the layers of the ground, and a cave through
+// them is a hole the assertions would read as a missing layer.
+auto settled_params() -> perlin_terrain_generator::params {
+    perlin_terrain_generator::params p{};
+    p.caves = false;
+    return p;
+}
+
+auto column_has_turf(const sampled_column& column, int32 x, int32 z) -> bool {
+    return column.id_at(x, column.surface_of(x, z), z) == blocks::green_2;
+}
+
+}  // namespace
+
+TEST_CASE("ground is layers, not paint", "[world][surface]") {
+    const auto p = settled_params();
+
+    asset::model_identity_pool identity_pool;
+    asset::page_pool pages;
+    perlin_terrain_generator gen{identity_pool, pages, p};
+
+    const sampled_column column{gen, 0, 0};
+
+    REQUIRE(column.bottom() == p.world_bottom_y);
+
+    int32 with_soil = 0;
+    int32 bare_rock = 0;
+
+    for (int32 x = 0; x < sampled_column::chunk; ++x) {
+        for (int32 z = 0; z < sampled_column::chunk; ++z) {
+            const int32 surface = column.surface_of(x, z);
+            INFO("column " << x << "," << z << " surface at " << surface);
+            REQUIRE(surface >= p.world_bottom_y);
+
+            // Nothing above the surface, and no holes under it: with caves off
+            // the rock is unbroken from the floor up.
+            REQUIRE(column.id_at(x, surface + 1, z) == blocks::air);
+
+            bool unbroken = true;
+            for (int32 wy = p.world_bottom_y; wy <= surface; ++wy) {
+                unbroken = unbroken && (column.id_at(x, wy, z) != blocks::air);
+            }
+            REQUIRE(unbroken);
+
+            const auto crown = column.id_at(x, surface, z);
+
+            if (crown == blocks::green_2) {
+                ++with_soil;
+
+                // Exactly one voxel of turf, and soil under it -- or, where the
+                // soil is a single voxel deep, weathered rock straight away.
+                REQUIRE(column.id_at(x, surface - 1, z) != blocks::green_2);
+                const auto under = column.id_at(x, surface - 1, z);
+                REQUIRE((under == blocks::brown_0 || under == blocks::gray_4));
+                continue;
+            }
+
+            // Rock in the open: soil slid off or the altitude is too high for
+            // it. Snow only above the line.
+            REQUIRE((crown == blocks::gray_5 || crown == blocks::gray_9));
+            if (crown == blocks::gray_9) {
+                REQUIRE(surface > p.snow_line);
+            }
+            ++bare_rock;
+
+            // No soil hiding under bare rock.
+            REQUIRE(column.id_at(x, surface - 1, z) != blocks::brown_0);
+        }
+    }
+
+    // The one column is not a special case either way: this patch of the map
+    // has both kinds of ground on it.
+    INFO("soil columns " << with_soil << ", bare rock " << bare_rock);
+    REQUIRE(with_soil > 0);
+    REQUIRE(bare_rock > 0);
+}
+
+TEST_CASE("rock changes with absolute depth", "[world][surface]") {
+    const auto p = settled_params();
+
+    asset::model_identity_pool identity_pool;
+    asset::page_pool pages;
+    perlin_terrain_generator gen{identity_pool, pages, p};
+
+    const sampled_column column{gen, 3, 5};
+
+    struct probe {
+        int32 wy;
+        block_id expected;
+    };
+
+    // Read at heights that cannot be anywhere near the surface, so only the
+    // depth rule decides.
+    for (const auto& [wy, expected] : {
+             probe{p.world_bottom_y, blocks::gray_0},
+             probe{p.world_bottom_y + p.bedrock_thickness - 1, blocks::gray_0},
+             probe{p.world_bottom_y + p.bedrock_thickness, blocks::gray_1},
+             probe{p.rock_bottom_y - 1, blocks::gray_1},
+             probe{p.rock_bottom_y, blocks::gray_2},
+             probe{p.rock_deep_y - 1, blocks::gray_2},
+             probe{p.rock_deep_y, blocks::gray_3},
+         }) {
+        INFO("at height " << wy);
+        REQUIRE(column.id_at(0, wy, 0) == expected);
+        REQUIRE(column.id_at(37, wy, 21) == expected);
+    }
+}
+
+TEST_CASE("soil settles by slope, not by a mountain rule", "[world][surface]") {
+    auto p = settled_params();
+
+    asset::model_identity_pool identity_pool;
+    asset::page_pool pages;
+
+    // With the slope limit wide open the same terrain keeps its soil, which is
+    // what says the bare ground above is the slope talking and not the height
+    // field having no room for soil in the first place.
+    p.soil_slope_limit  = 1.0e6F;
+    p.soil_altitude_end = 1000;
+
+    perlin_terrain_generator gentle{identity_pool, pages, p};
+    const sampled_column soft{gentle, 7, 2};
+
+    perlin_terrain_generator strict{identity_pool, pages, settled_params()};
+    const sampled_column hard{strict, 7, 2};
+
+    int32 soft_soil = 0;
+    int32 hard_soil = 0;
+
+    for (int32 x = 0; x < sampled_column::chunk; ++x) {
+        for (int32 z = 0; z < sampled_column::chunk; ++z) {
+            soft_soil += column_has_turf(soft, x, z) ? 1 : 0;
+            hard_soil += column_has_turf(hard, x, z) ? 1 : 0;
+        }
+    }
+
+    INFO("turf with the limit lifted " << soft_soil << ", with it in place " << hard_soil);
+    REQUIRE(soft_soil > hard_soil);
+}

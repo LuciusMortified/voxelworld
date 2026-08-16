@@ -16,10 +16,10 @@ namespace vw::gfx {
 
 
 mesh_pool::mesh_pool(
-    vulkan_context& context, const block_registry& registry
+    vulkan_context& context, const block_registry& registry, uint32 workers
 )
     : context_{&context}, registry_{&registry} {
-    auto count = std::min(std::thread::hardware_concurrency(), 4u);
+    auto count = workers != 0 ? workers : std::min(std::thread::hardware_concurrency(), 4u);
     if (count == 0) {
         count = 1;
     }
@@ -118,23 +118,50 @@ void mesh_pool::evict(
 }
 
 void mesh_pool::sweep_orphaned_() {
-    for (auto it = model_refs_.begin(); it != model_refs_.end();) {
-        if (it->second.expired()) {
-            meshes_.erase(it->first);
-            pending_meshes_.erase(it->first);
-            pending_indices_.erase(it->first.index);
-            it = model_refs_.erase(it);
-        } else {
+    const auto buckets = model_refs_.bucket_count();
+    if (buckets == 0) {
+        sweep_bucket_ = 0;
+        return;
+    }
+
+    // The cursor walks buckets rather than elements: an insert can rehash the
+    // table between frames, and a bucket index survives that where an iterator
+    // would not.
+    if (sweep_bucket_ >= buckets) {
+        sweep_bucket_ = 0;
+    }
+
+    const auto limit  = std::min(buckets, sweep_bucket_ + sweep_buckets_per_frame_);
+    std::size_t freed = 0;
+
+    while (sweep_bucket_ < limit) {
+        for (auto it = model_refs_.begin(sweep_bucket_);
+             it != model_refs_.end(sweep_bucket_) && freed < sweep_orphans_per_frame_;) {
+            if (!it->second.expired()) {
+                ++it;
+                continue;
+            }
+
+            const auto identity = it->first;
             ++it;
+
+            meshes_.erase(identity);
+            pending_meshes_.erase(identity);
+            pending_indices_.erase(identity.index);
+            model_refs_.erase(identity);
+            ++freed;
         }
+
+        // Out of budget mid-bucket: stay on it and pick it up next frame.
+        if (freed >= sweep_orphans_per_frame_) {
+            break;
+        }
+        ++sweep_bucket_;
     }
 }
 
 void mesh_pool::process_completed() {
-    if (++sweep_counter_ >= sweep_interval_) {
-        sweep_orphaned_();
-        sweep_counter_ = 0;
-    }
+    sweep_orphaned_();
 
     constexpr uint32 max_meshes_per_frame = 4;
     uint32 completed = 0;
@@ -151,11 +178,20 @@ void mesh_pool::process_completed() {
             //     "Completed mesh generation for vw::asset::model {}.{} vertices {} indices {}",
             //     identity.index,
             //     identity.generation,
-            //     data.vertices.size(),
-            //     data.indices.size()
+            //     data.quads.size()
             // );
 
             meshes_[identity] = std::make_shared<mesh>(std::move(data));
+
+            // The neighbour planes were only ever there to build this mesh, and
+            // the worker that read them is finished. Three kilobytes a chunk
+            // that would otherwise sit there for as long as the chunk is
+            // loaded.
+            if (const auto ref = model_refs_.find(identity); ref != model_refs_.end()) {
+                if (const auto model = ref->second.lock()) {
+                    model->release_boundary();
+                }
+            }
 
             iter = pending_meshes_.erase(iter);
             ++completed;
@@ -264,7 +300,7 @@ void mesh_pool::gen_thread_function() {
                 const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
                     std::chrono::steady_clock::now() - started
                 );
-                local.record(static_cast<uint64>(elapsed.count()), data.vertices.size());
+                local.record(static_cast<uint64>(elapsed.count()), data.quads.size());
 
                 task->promise.set_value(std::move(data));
             } catch (const std::exception& e) {

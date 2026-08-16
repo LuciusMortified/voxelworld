@@ -14,43 +14,38 @@ import :vk;
 
 namespace vw::gfx {
 
-// ==================== vertex ====================
+// ==================== quad ====================
 
-auto vertex::pack(
-    int x,
-    int y,
-    int z,
+auto quad::pack(
+    vec3i min_pos,
+    vec3i max_pos,
     uint8 normal_id,
     block_id block_id,
     uint8 corners_dark,
-    uint8 corners_bright,
-    uint8 corner_id
-) -> vertex {
-    vertex v;
-    v.data0 =                                       //
-        (static_cast<uint32>(x) & 0x7Fu) |          //
-        ((static_cast<uint32>(y) & 0x7Fu) << 7) |   //
-        ((static_cast<uint32>(z) & 0x7Fu) << 14) |  //
-        ((static_cast<uint32>(normal_id) & 0x7u) << 21);
+    uint8 corners_bright
+) -> quad {
+    quad q;
+    q.data0 =                                                //
+        (static_cast<uint32>(min_pos.x) & 0x7Fu) |           //
+        ((static_cast<uint32>(min_pos.y) & 0x7Fu) << 7) |    //
+        ((static_cast<uint32>(min_pos.z) & 0x7Fu) << 14) |   //
+        ((static_cast<uint32>(normal_id) & 0x7u) << 21) |    //
+        ((static_cast<uint32>(corners_dark) & 0xFu) << 24) |  //
+        ((static_cast<uint32>(corners_bright) & 0xFu) << 28);
 
-    v.data1 =                                                   //
-        static_cast<uint32>(block_id.value) |                   //
-        ((static_cast<uint32>(corners_dark) & 0xFu) << 8) |     //
-        ((static_cast<uint32>(corners_bright) & 0xFu) << 12) |  //
-        ((static_cast<uint32>(corner_id) & 0x3u) << 16);
+    q.data1 =                                               //
+        (static_cast<uint32>(max_pos.x) & 0x7Fu) |          //
+        ((static_cast<uint32>(max_pos.y) & 0x7Fu) << 7) |   //
+        ((static_cast<uint32>(max_pos.z) & 0x7Fu) << 14) |  //
+        (static_cast<uint32>(block_id.value) << 21);
 
-    return v;
+    return q;
 }
 
-auto vertex::get_binding_descriptions() -> std::vector<vk::VertexInputBindingDescription> {
+auto quad::get_binding_descriptions() -> std::vector<vk::VertexInputBindingDescription> {
     std::vector binding_descriptions = {
         vk::VertexInputBindingDescription{
             .binding   = 0,
-            .stride    = sizeof(vertex),
-            .inputRate = vk::VertexInputRate::eVertex,
-        },
-        vk::VertexInputBindingDescription{
-            .binding   = 1,
             .stride    = sizeof(uint32),
             .inputRate = vk::VertexInputRate::eInstance,
         },
@@ -58,23 +53,11 @@ auto vertex::get_binding_descriptions() -> std::vector<vk::VertexInputBindingDes
     return binding_descriptions;
 }
 
-auto vertex::get_attribute_descriptions() -> std::vector<vk::VertexInputAttributeDescription> {
+auto quad::get_attribute_descriptions() -> std::vector<vk::VertexInputAttributeDescription> {
     std::vector attribute_descriptions = {
         vk::VertexInputAttributeDescription{
-            .location = 0,
-            .binding  = 0,
-            .format   = vk::Format::eR32Uint,
-            .offset   = offsetof(vertex, data0),
-        },
-        vk::VertexInputAttributeDescription{
-            .location = 1,
-            .binding  = 0,
-            .format   = vk::Format::eR32Uint,
-            .offset   = offsetof(vertex, data1),
-        },
-        vk::VertexInputAttributeDescription{
             .location = 2,
-            .binding  = 1,
+            .binding  = 0,
             .format   = vk::Format::eR32Uint,
             .offset   = 0,
         },
@@ -373,8 +356,7 @@ void build_face_mask(
 }
 
 void add_quad(
-    std::vector<vertex>& vertices,
-    std::vector<uint32>& indices,
+    std::vector<quad>& quads,
     int face_direction,
     vec3i min_pos,
     vec3i max_pos,
@@ -382,15 +364,9 @@ void add_quad(
     uint8 corner_dark,
     uint8 corner_bright
 ) {
-    static constexpr int face_verts[6][4][3] = {
-        {{1, 0, 0}, {1, 0, 1}, {1, 1, 1}, {1, 1, 0}},  // +X
-        {{0, 0, 0}, {0, 1, 0}, {0, 1, 1}, {0, 0, 1}},  // -X
-        {{0, 1, 0}, {1, 1, 0}, {1, 1, 1}, {0, 1, 1}},  // +Y
-        {{0, 0, 0}, {0, 0, 1}, {1, 0, 1}, {1, 0, 0}},  // -Y
-        {{0, 0, 1}, {0, 1, 1}, {1, 1, 1}, {1, 0, 1}},  // +Z
-        {{1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 0}},  // -Z
-    };
-
+    // Which of the two corners each winding-order vertex takes its components
+    // from. The same table lives in voxel.vert and shadow.vert -- the shader is
+    // what unrolls the six vertices now, and the two have to agree.
     static constexpr uint8 winding_to_corner[6][4] = {
         {0, 1, 3, 2},  // +X
         {0, 2, 3, 1},  // -X
@@ -402,8 +378,7 @@ void add_quad(
 
     static constexpr uint8 corner_to_ao[4] = {0, 1, 3, 2};
 
-    const auto normal_id   = static_cast<uint8>(face_direction);
-    const auto base_vertex = static_cast<uint32>(vertices.size());
+    const auto normal_id = static_cast<uint8>(face_direction);
 
     const uint8 c_dark[4] = {
         static_cast<uint8>(corner_dark & 0x3u),
@@ -431,22 +406,9 @@ void add_quad(
         }
     }
 
-    for (int i = 0; i < 4; i++) {
-        const int x = face_verts[face_direction][i][0] ? max_pos.x : min_pos.x;
-        const int y = face_verts[face_direction][i][1] ? max_pos.y : min_pos.y;
-        const int z = face_verts[face_direction][i][2] ? max_pos.z : min_pos.z;
-        vertices.push_back(vertex::pack(
-            x, y, z, normal_id, block_id,
-            corners_dark_winding, corners_bright_winding, static_cast<uint8>(i)
-        ));
-    }
-
-    indices.push_back(base_vertex + 0);
-    indices.push_back(base_vertex + 1);
-    indices.push_back(base_vertex + 2);
-    indices.push_back(base_vertex + 2);
-    indices.push_back(base_vertex + 3);
-    indices.push_back(base_vertex + 0);
+    quads.push_back(quad::pack(
+        min_pos, max_pos, normal_id, block_id, corners_dark_winding, corners_bright_winding
+    ));
 }
 
 
@@ -579,8 +541,7 @@ void emit_rect(
     auto [min_pos, max_pos] = axes.to_local_min_max(u_start, v_start, w, h, layer);
 
     add_quad(
-        storage.vertices,
-        storage.indices,
+        storage.quads,
         face_direction,
         min_pos,
         max_pos,
@@ -601,31 +562,37 @@ auto simple_mesh_generator::generate_mesh_data(
         return mesh{};
     }
 
-    std::vector<vertex> vertices;
-    std::vector<uint32> indices;
+    std::vector<quad> quads;
+    std::array<uint32, 6> face_counts{};
 
-    for (int x = 0; x < mdl->width(); x++) {
-        for (int y = 0; y < mdl->height(); y++) {
-            for (int z = 0; z < mdl->depth(); z++) {
-                if (voxel voxel_obj = mdl->get_voxel(x, y, z); !voxel_obj.is_empty()) {
-                    for (int face = 0; face < 6; face++) {
+    // Face outermost, so the quads come out grouped by direction the way the
+    // greedy mesher already emits them. The comparison test looks at the set of
+    // faces, not the order, and the grouping is what the culling shader needs.
+    for (int face = 0; face < 6; face++) {
+        const auto before = quads.size();
+
+        for (int x = 0; x < mdl->width(); x++) {
+            for (int y = 0; y < mdl->height(); y++) {
+                for (int z = 0; z < mdl->depth(); z++) {
+                    if (voxel voxel_obj = mdl->get_voxel(x, y, z); !voxel_obj.is_empty()) {
                         if (is_face_visible(mdl, x, y, z, face)) {
                             add_cube_face(
-                                vertices, indices, mdl, x, y, z, face, voxel_obj.id, registry, opts
+                                quads, mdl, x, y, z, face, voxel_obj.id, registry, opts
                             );
                         }
                     }
                 }
             }
         }
+
+        face_counts[static_cast<std::size_t>(face)] = static_cast<uint32>(quads.size() - before);
     }
 
-    return mesh{.vertices = std::move(vertices), .indices = std::move(indices)};
+    return mesh{.quads = std::move(quads), .face_counts = face_counts};
 }
 
 void simple_mesh_generator::add_cube_face(
-    std::vector<vertex>& vertices,
-    std::vector<uint32>& indices,
+    std::vector<quad>& quads,
     const std::shared_ptr<vw::asset::model>& mdl,
     int x,
     int y,
@@ -640,8 +607,7 @@ void simple_mesh_generator::add_cube_face(
         ? detail::compute_corner_brightness(*mdl, x, y, z, face_direction)
         : uint8{0};
     detail::add_quad(
-        vertices,
-        indices,
+        quads,
         face_direction,
         {x, y, z},
         {x + 1, y + 1, z + 1},
@@ -686,21 +652,23 @@ auto strip_mesh_generator::generate_mesh_data(
     auto total    = mdl.width() * mdl.height() * mdl.depth();
     auto estimate = static_cast<size_t>(total / 4);
 
-    if (storage.vertices.capacity() < estimate) {
-        storage.vertices.reserve(estimate);
-    }
-    if (storage.indices.capacity() < estimate) {
-        storage.indices.reserve(estimate);
+    if (storage.quads.capacity() < estimate) {
+        storage.quads.reserve(estimate);
     }
 
+    std::array<uint32, 6> face_counts{};
+
     for (int face_direction = 0; face_direction < 6; face_direction++) {
+        const auto before = storage.quads.size();
         generate_face_quads(storage, mdl, face_direction, registry, opts);
+        face_counts[static_cast<std::size_t>(face_direction)] =
+            static_cast<uint32>(storage.quads.size() - before);
     }
 
     // Moved, not copied: the storage exists to be reused, and copying it back
-    // out was two allocations and a memcpy of the whole mesh per chunk. The
+    // out was an allocation and a memcpy of the whole mesh per chunk. The
     // reserve at the top of the next call restores the capacity.
-    return mesh{std::move(storage.vertices), std::move(storage.indices)};
+    return mesh{std::move(storage.quads), face_counts};
 }
 
 void strip_mesh_generator::merge_and_emit_strips(
@@ -796,14 +764,16 @@ auto greedy_mesh_generator::generate_mesh_data(
 ) -> mesh {
     storage.clear();
 
-    auto total    = mdl.width() * mdl.height() * mdl.depth();
-    auto estimate = static_cast<size_t>(total / 4);
+    // A quarter of the chunk volume used to be reserved here -- 768 KB per
+    // mesh, committed whether or not the chunk had any geometry, and carried
+    // into every finished mesh because the vector is moved out. Growing from
+    // a small figure costs a doubling or two and measures faster than that.
+    // Sizing the guess off the previous chunk was tried and is worse: one
+    // surface chunk sets a high mark that every empty chunk behind it inherits.
+    constexpr size_t estimate = 4096;
 
-    if (storage.vertices.capacity() < estimate) {
-        storage.vertices.reserve(estimate);
-    }
-    if (storage.indices.capacity() < estimate) {
-        storage.indices.reserve(estimate);
+    if (storage.quads.capacity() < estimate) {
+        storage.quads.reserve(estimate);
     }
 
     // Built once for the whole mesh and read by all six directions. Models that
@@ -813,14 +783,32 @@ auto greedy_mesh_generator::generate_mesh_data(
     }
     storage.occupancy_valid = mdl.build_occupancy(*storage.occupancy);
 
+    std::array<uint32, 6> face_counts{};
+
     for (int face_direction = 0; face_direction < 6; face_direction++) {
+        const auto before = storage.quads.size();
         generate_face_quads(storage, mdl, face_direction, registry, opts);
+        face_counts[static_cast<std::size_t>(face_direction)] =
+            static_cast<uint32>(storage.quads.size() - before);
+    }
+
+    // Models that are not 64-cubes have no occupancy and no chunk coordinate
+    // either, so they are never part of the connectivity walk. Left empty they
+    // would read as "sealed"; one pocket open on every face hides nothing. The
+    // same stands in when the walk is switched off and nobody asked for links.
+    vw::asset::chunk_links links;
+    if (opts.build_links && storage.occupancy_valid) {
+        links = vw::asset::build_chunk_links(*storage.occupancy, storage.link_scratch);
+    } else {
+        for (auto& cell : links.cells) {
+            cell.pockets.assign(1, vw::asset::chunk_pocket::wide_open());
+        }
     }
 
     // Moved, not copied: the storage exists to be reused, and copying it back
-    // out was two allocations and a memcpy of the whole mesh per chunk. The
+    // out was an allocation and a memcpy of the whole mesh per chunk. The
     // reserve at the top of the next call restores the capacity.
-    return mesh{std::move(storage.vertices), std::move(storage.indices)};
+    return mesh{std::move(storage.quads), face_counts, std::move(links)};
 }
 
 void greedy_mesh_generator::merge_and_emit_rects_bits(

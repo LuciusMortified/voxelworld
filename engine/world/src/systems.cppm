@@ -525,18 +525,23 @@ private:
 };
 
 struct world_grid_system_stats {
-    float32 integrate_ms         = 0.0F;
-    float32 boundary_from_ms     = 0.0F;
-    float32 chunk_create_ms      = 0.0F;
-    float32 boundary_to_ms       = 0.0F;
-    float32 deferred_remesh_ms   = 0.0F;
-    float32 request_columns_ms   = 0.0F;
-    float32 rebuild_active_ms    = 0.0F;
-    float32 unload_ms            = 0.0F;
-    uint32 active_count          = 0;
-    uint32 pending_count         = 0;
-    uint32 loaded_count          = 0;
-    uint32 deferred_remesh_count = 0;
+    float32 integrate_ms       = 0.0F;
+    float32 stage_ms           = 0.0F;
+    float32 boundary_from_ms   = 0.0F;
+    float32 chunk_create_ms    = 0.0F;
+    float32 request_columns_ms = 0.0F;
+    float32 rebuild_active_ms  = 0.0F;
+    float32 unload_ms          = 0.0F;
+    uint32 active_count        = 0;
+    uint32 pending_count       = 0;
+    uint32 loaded_count        = 0;
+
+    // Of the loaded ones, those with an entity behind them. Solid rock and open
+    // air have nothing to draw and get neither entity nor mesh.
+    uint32 drawn_count = 0;
+
+    // Generated, held back until its four neighbours are there too.
+    uint32 staged_count = 0;
 };
 
 class world_grid_system {
@@ -580,15 +585,25 @@ public:
     auto modify_view(entity ent) -> view_modifier;
 
 private:
-    struct deferred_remesh {
-        vec3i chunk_coord;
-        int32 face_direction;
-    };
+    // A column waits in staging until its four horizontal neighbours have been
+    // generated too. Only then are its chunks put in the grid, with every
+    // boundary already known -- so each chunk is meshed once instead of once
+    // per neighbour that turns up after it.
+    //
+    // The active set is therefore one column wider than the view distance: the
+    // outermost ring exists to complete the ring inside it and is never placed.
+    static constexpr int32 apron_columns = 1;
 
     auto process_dirty_entity_(entity ent) -> bool;
     auto process_dirty_entities_() -> bool;
+    void stage_completed_columns_();
     void integrate_completed_columns_();
-    void process_deferred_remeshes_();
+    [[nodiscard]] auto column_available_(vec2i coord) const -> bool;
+    [[nodiscard]] auto column_ready_(vec2i coord) const -> bool;
+    [[nodiscard]] auto within_draw_(vec2i coord) const -> bool;
+    [[nodiscard]] auto model_at_(vec3i chunk_coord) const -> asset::model*;
+    void queue_if_ready_(vec2i coord);
+    void demote_column_(vec2i coord);
     void dispatch_column_requests_();
     void update_grid_stats_();
     auto rebuild_active_set_() -> vec2i;
@@ -603,7 +618,15 @@ private:
     std::unordered_set<vec2i> active_columns_;
     std::unordered_set<vec2i> pending_active_columns_;
     std::vector<vec2i> pending_requests_;
-    std::queue<deferred_remesh> deferred_remeshes_;
+    std::unordered_map<vec2i, std::unique_ptr<gen_column>> staged_columns_;
+    std::vector<vec2i> ready_columns_;
+
+    // The apron is generated but never drawn, so it must not keep drawn columns
+    // alive behind the camera: staging reaches one column further than this,
+    // placed columns are let go at it.
+    vec2i camera_column_{};
+    int32 draw_distance_ = 0;
+
     world_grid_system_stats stats_;
 };
 

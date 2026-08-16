@@ -220,9 +220,13 @@ auto vulkan_context::create_logical_device_() -> void {
         });
     }
 
+    // Every indirect command carries its instance index in firstInstance, which
+    // is what feeds the per-instance vertex attribute. That has always been the
+    // case here and the feature was never asked for.
     constexpr vk::PhysicalDeviceFeatures device_features{
-        .multiDrawIndirect = vk::True,
-        .fillModeNonSolid  = vk::True,
+        .multiDrawIndirect             = vk::True,
+        .drawIndirectFirstInstance     = vk::True,
+        .fillModeNonSolid              = vk::True,
     };
 
     const vk::StructureChain<

@@ -1,0 +1,349 @@
+#include <catch2/catch_test_macros.hpp>
+
+import std;
+
+import vw.core;
+import vw.ecs;
+import vw.world;
+
+using namespace vw;
+using namespace vw::ecs;
+
+namespace {
+
+constexpr int32 view_distance = 2;
+
+// A shallow world: these tests are about when columns are placed, and four
+// chunks a column say that as well as nine. Not fewer, though -- the bottom
+// chunk of the world has its floor open to nothing and is drawn, so a column
+// needs one more below the surface to have anything buried in it at all.
+auto shallow_params() -> perlin_terrain_generator::params {
+    perlin_terrain_generator::params p{};
+    p.world_bottom_y = -192;
+    return p;
+}
+
+// Drives the grid system until the loader is idle and nothing more is being
+// placed, watching every chunk from the moment it first appears.
+class settled_grid {
+public:
+    explicit settled_grid(world& w) : world_{&w} {
+        auto& models = w.resource<asset::model_registry>();
+        auto& gs     = w.system<world_grid_system>();
+
+        gs.set_grid(std::make_unique<world_grid>(w, 8));
+        gs.set_loader(std::make_unique<chunk_loader>(std::make_unique<perlin_terrain_generator>(
+            models.get_identity_pool(), models.get_page_pool(), shallow_params()
+        )));
+
+        viewer_ = w.create().with<transform_component>().with<world_view_component>().get_entity();
+        gs.modify_view(viewer_).set_view_distance(view_distance);
+
+        // Quiet frames rather than one quiet frame: requests go out eight per
+        // frame and columns are placed one per frame, so the loader is idle for
+        // stretches long before the world is whole.
+        int32 quiet = 0;
+
+        for (int32 frame = 0; frame < max_frames && quiet < quiet_frames; ++frame) {
+            w.update(0.016F);
+            observe_();
+
+            const bool waiting = gs.get_stats().pending_count > 0;
+            quiet              = (waiting || placed_this_frame_ > 0) ? 0 : quiet + 1;
+
+            // An empty update takes microseconds and generation takes
+            // milliseconds, so a tight loop would run out of frames before the
+            // first column ever arrived.
+            if (waiting && placed_this_frame_ == 0) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+        }
+    }
+
+    [[nodiscard]] auto grid() const -> const world_grid& {
+        return *world_->system<world_grid_system>().grid();
+    }
+
+    // How many chunks changed identity after they were placed. Every such
+    // change is a chunk the mesher has to build a second time.
+    [[nodiscard]] auto reissued() const -> std::size_t {
+        std::size_t count = 0;
+
+        world_->system<world_grid_system>().grid()->for_each_chunk(
+            [&](vec3i coord, const chunk& c) {
+                const auto it = first_seen_.find(coord);
+                if (it != first_seen_.end() && !(it->second == c.get_model()->get_identity())) {
+                    ++count;
+                }
+            }
+        );
+
+        return count;
+    }
+
+    [[nodiscard]] auto seen_count() const -> std::size_t {
+        return first_seen_.size();
+    }
+
+private:
+    static constexpr int32 max_frames  = 4000;
+    static constexpr int32 quiet_frames = 120;
+
+    void observe_() {
+        placed_this_frame_ = 0;
+
+        world_->system<world_grid_system>().grid()->for_each_chunk(
+            [&](vec3i coord, const chunk& c) {
+                if (first_seen_.try_emplace(coord, c.get_model()->get_identity()).second) {
+                    ++placed_this_frame_;
+                }
+            }
+        );
+    }
+
+    world* world_;
+    entity viewer_;
+    std::unordered_map<vec3i, asset::model_identity> first_seen_;
+    int32 placed_this_frame_ = 0;
+};
+
+}  // namespace
+
+TEST_CASE("a placed chunk is never reissued", "[world][grid]") {
+    world w;
+    const settled_grid settled{w};
+
+    REQUIRE(settled.seen_count() > 0);
+
+    // Chunks used to be invalidated once per neighbour that turned up after
+    // them, which is what made the mesher run over each chunk three and a half
+    // times. Placement now waits for the neighbours instead.
+    REQUIRE(settled.reissued() == 0);
+}
+
+TEST_CASE("a placed chunk knows every neighbour it has", "[world][grid]") {
+    world w;
+    const settled_grid settled{w};
+
+    static constexpr vec3i offsets[6] = {
+        {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1},
+    };
+
+    auto& grid = *w.system<world_grid_system>().grid();
+
+    std::size_t checked = 0;
+    std::size_t missing = 0;
+
+    // The chunk is asked, not its model: the planes are dropped once nothing
+    // else will read them, and the chunk keeps the record of having had them.
+    grid.for_each_chunk([&](vec3i coord, const chunk& c) {
+        for (int32 fd = 0; fd < 6; ++fd) {
+            if (!grid.has_chunk(coord + offsets[fd])) {
+                continue;
+            }
+            ++checked;
+            if ((c.known_neighbors() & (1U << fd)) == 0) {
+                ++missing;
+            }
+        }
+    });
+
+    REQUIRE(checked > 0);
+    REQUIRE(missing == 0);
+}
+
+TEST_CASE("buried rock costs no entity", "[world][grid]") {
+    world w;
+    const settled_grid settled{w};
+
+    auto& grid = *w.system<world_grid_system>().grid();
+
+    // Face order as the grid exchanges boundaries: +X, -X, +Y, -Y, +Z, -Z. The
+    // plane of the neighbour that faces this chunk is the far side of that
+    // offset, which is why the layers below run the axis backwards.
+    static constexpr vec3i offsets[6] = {
+        {1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1},
+    };
+
+    constexpr int32 s = chunk::size;
+
+    // Read the seam out of the neighbour's voxels rather than the bit plane the
+    // grid handed it: the point is to check that cached answer, not repeat it.
+    const auto seam_is_solid = [&](const chunk& neighbor, int32 fd) -> bool {
+        for (int32 a = 0; a < s; ++a) {
+            for (int32 b = 0; b < s; ++b) {
+                const vec3i local = [&] -> vec3i {
+                    switch (fd) {
+                        case 0: return {0, a, b};
+                        case 1: return {s - 1, a, b};
+                        case 2: return {a, 0, b};
+                        case 3: return {a, s - 1, b};
+                        case 4: return {a, b, 0};
+                        default: return {a, b, s - 1};
+                    }
+                }();
+
+                if (neighbor.get_voxel(local).is_empty()) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    };
+
+    std::size_t skipped  = 0;
+    std::size_t verified = 0;
+
+    grid.for_each_chunk([&](vec3i coord, const chunk& c) {
+        if (c.is_drawn()) {
+            return;
+        }
+        ++skipped;
+
+        INFO("chunk " << coord.x << "," << coord.y << "," << coord.z);
+
+        // Air has no faces of its own whatever stands around it.
+        if (!c.is_solid()) {
+            bool all_air = true;
+            for (int32 x = 0; x < s && all_air; ++x) {
+                for (int32 y = 0; y < s && all_air; ++y) {
+                    for (int32 z = 0; z < s && all_air; ++z) {
+                        all_air = c.is_empty(x, y, z);
+                    }
+                }
+            }
+            REQUIRE(all_air);
+            return;
+        }
+
+        for (int32 fd = 0; fd < 6; ++fd) {
+            INFO("face " << fd);
+
+            // A chunk on the edge of the drawn area has neighbours in the
+            // apron: generated, boundaries handed over, never placed. Their
+            // voxels are out of reach here, so all this can say is that the
+            // face was answered by something rather than left open to the sky.
+            auto* neighbor = grid.get_chunk(coord + offsets[fd]);
+            if (neighbor == nullptr) {
+                REQUIRE((c.known_neighbors() & (1U << fd)) != 0);
+                continue;
+            }
+
+            REQUIRE(seam_is_solid(*neighbor, fd));
+            ++verified;
+        }
+    });
+
+    // Four chunks a column, one of them the floor of the world and one the
+    // surface: something in between has to be buried.
+    REQUIRE(skipped > 0);
+    REQUIRE(verified > 0);
+    REQUIRE(grid.drawn_chunk_count() == grid.chunk_count() - skipped);
+}
+
+TEST_CASE("a chunk with no entity still holds its voxels", "[world][grid]") {
+    world w;
+    const settled_grid settled{w};
+
+    auto& grid = *w.system<world_grid_system>().grid();
+
+    std::size_t checked = 0;
+
+    grid.for_each_chunk([&](vec3i coord, const chunk& c) {
+        if (c.is_drawn() || !c.is_solid()) {
+            return;
+        }
+        ++checked;
+
+        INFO("chunk " << coord.x << "," << coord.y << "," << coord.z);
+        REQUIRE_FALSE(c.is_empty(0, 0, 0));
+        REQUIRE_FALSE(c.is_empty(chunk::size - 1, chunk::size - 1, chunk::size - 1));
+    });
+
+    REQUIRE(checked > 0);
+}
+
+TEST_CASE("digging a seam tells both sides", "[world][grid]") {
+    world w;
+    const settled_grid settled{w};
+
+    auto& grid = *w.system<world_grid_system>().grid();
+
+    // A chunk buried in rock, so both it and the neighbour start with nothing
+    // to draw and no planes held.
+    std::optional<vec3i> target;
+    grid.for_each_chunk([&](vec3i coord, const chunk& c) {
+        if (target || c.is_drawn() || !c.is_solid()) {
+            return;
+        }
+        if (grid.has_chunk(coord + vec3i{1, 0, 0})) {
+            target = coord;
+        }
+    });
+
+    REQUIRE(target.has_value());
+
+    auto* digger = grid.get_chunk(*target);
+    auto* east   = grid.get_chunk(*target + vec3i{1, 0, 0});
+    REQUIRE(east != nullptr);
+    REQUIRE_FALSE(digger->is_drawn());
+
+    // The far skin of the chunk, which is half of the seam with the neighbour.
+    constexpr int32 last = chunk::size - 1;
+    const vec3i local{last, 20, 30};
+    const auto scale = grid.voxel_scale();
+    const auto world_pos =
+        grid.chunk_to_world_coord(*target) + (local * scale);
+
+    grid.set_voxel(world_pos, empty_voxel);
+
+    REQUIRE(grid.get_voxel(world_pos).is_empty());
+
+    // Both sides are back in the scene with their planes, and the neighbour's
+    // view of this chunk has the hole in it: face 1 is -X, and the plane it
+    // reads is addressed (y, z).
+    REQUIRE(digger->is_drawn());
+    REQUIRE(digger->known_neighbors() != 0);
+    REQUIRE(east->is_drawn());
+    REQUIRE(east->get_model()->has_boundary_slice(1));
+    REQUIRE_FALSE(east->get_model()->is_boundary_solid(1, 0, local.y, local.z));
+
+    // ...and the rock beside the hole is still rock.
+    REQUIRE(east->get_model()->is_boundary_solid(1, 0, local.y + 1, local.z));
+}
+
+TEST_CASE("the apron is generated but not placed", "[world][grid]") {
+    world w;
+    const settled_grid settled{w};
+
+    const auto& grid = settled.grid();
+
+    const auto& stats = w.system<world_grid_system>().get_stats();
+    INFO(
+        "columns " << grid.column_count() << ", chunks " << grid.chunk_count() << ", staged "
+                   << stats.staged_count << ", active " << stats.active_count << ", pending "
+                   << stats.pending_count
+    );
+
+    // Everything the viewer can see is there...
+    for (int32 x = -view_distance; x <= view_distance; ++x) {
+        for (int32 z = -view_distance; z <= view_distance; ++z) {
+            INFO("column " << x << "," << z);
+            REQUIRE(grid.has_column(vec2i{x, z}));
+        }
+    }
+
+    // ...and the ring that exists only to give it its boundaries is not.
+    std::size_t apron_placed = 0;
+    for (int32 x = -view_distance - 1; x <= view_distance + 1; ++x) {
+        for (int32 z = -view_distance - 1; z <= view_distance + 1; ++z) {
+            const bool on_ring =
+                std::abs(x) == view_distance + 1 || std::abs(z) == view_distance + 1;
+            if (on_ring && grid.has_column(vec2i{x, z})) {
+                ++apron_placed;
+            }
+        }
+    }
+
+    REQUIRE(apron_placed == 0);
+}

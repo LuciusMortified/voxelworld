@@ -11,9 +11,9 @@ using namespace vw;
 
 namespace {
 
-// A quad decoded back out of the packed vertices, so a greedy result can be
-// compared against a per-voxel one: the two agree on which faces exist, never
-// on how many quads they took to say it.
+// One unit face, so a greedy result can be compared against a per-voxel one:
+// the two agree on which faces exist, never on how many quads they took to say
+// it.
 struct face_cell {
     int32 x = 0;
     int32 y = 0;
@@ -24,20 +24,28 @@ struct face_cell {
     auto operator<=>(const face_cell&) const = default;
 };
 
-auto unpack_position(const gfx::vertex& v) -> vec3i {
+auto unpack_min(const gfx::quad& q) -> vec3i {
     return {
-        static_cast<int32>(v.data0 & 0x7FU),
-        static_cast<int32>((v.data0 >> 7) & 0x7FU),
-        static_cast<int32>((v.data0 >> 14) & 0x7FU),
+        static_cast<int32>(q.data0 & 0x7FU),
+        static_cast<int32>((q.data0 >> 7) & 0x7FU),
+        static_cast<int32>((q.data0 >> 14) & 0x7FU),
     };
 }
 
-auto unpack_normal(const gfx::vertex& v) -> uint8 {
-    return static_cast<uint8>((v.data0 >> 21) & 0x7U);
+auto unpack_max(const gfx::quad& q) -> vec3i {
+    return {
+        static_cast<int32>(q.data1 & 0x7FU),
+        static_cast<int32>((q.data1 >> 7) & 0x7FU),
+        static_cast<int32>((q.data1 >> 14) & 0x7FU),
+    };
 }
 
-auto unpack_block(const gfx::vertex& v) -> uint8 {
-    return static_cast<uint8>(v.data1 & 0xFFU);
+auto unpack_normal(const gfx::quad& q) -> uint8 {
+    return static_cast<uint8>((q.data0 >> 21) & 0x7U);
+}
+
+auto unpack_block(const gfx::quad& q) -> uint8 {
+    return static_cast<uint8>((q.data1 >> 21) & 0xFFU);
 }
 
 // Every quad covers a rectangle of unit faces on one plane. Splitting it back
@@ -45,17 +53,12 @@ auto unpack_block(const gfx::vertex& v) -> uint8 {
 auto to_face_cells(const gfx::mesh& m) -> std::set<face_cell> {
     std::set<face_cell> cells;
 
-    for (size_t base = 0; base + 3 < m.vertices.size(); base += 4) {
-        auto lo = unpack_position(m.vertices[base]);
-        auto hi = lo;
-        for (size_t i = base + 1; i < base + 4; ++i) {
-            const auto p = unpack_position(m.vertices[i]);
-            lo = {std::min(lo.x, p.x), std::min(lo.y, p.y), std::min(lo.z, p.z)};
-            hi = {std::max(hi.x, p.x), std::max(hi.y, p.y), std::max(hi.z, p.z)};
-        }
+    for (const auto& q : m.quads) {
+        const auto lo = unpack_min(q);
+        const auto hi = unpack_max(q);
 
-        const auto normal = unpack_normal(m.vertices[base]);
-        const auto block  = unpack_block(m.vertices[base]);
+        const auto normal = unpack_normal(q);
+        const auto block  = unpack_block(q);
 
         const int32 sx = std::max(1, hi.x - lo.x);
         const int32 sy = std::max(1, hi.y - lo.y);
@@ -84,12 +87,9 @@ auto hash_mesh(const gfx::mesh& m) -> uint64 {
         }
     };
 
-    for (const auto& v : m.vertices) {
-        mix(v.data0);
-        mix(v.data1);
-    }
-    for (const auto index : m.indices) {
-        mix(index);
+    for (const auto& q : m.quads) {
+        mix(q.data0);
+        mix(q.data1);
     }
 
     return hash;
@@ -131,7 +131,7 @@ private:
 TEST_CASE("greedy meshing agrees with per-voxel meshing", "[mesh]") {
     SECTION("empty model") {
         model_fixture fixture{16};
-        REQUIRE(fixture.greedy().vertices.empty());
+        REQUIRE(fixture.greedy().quads.empty());
     }
 
     SECTION("single voxel") {
@@ -139,7 +139,7 @@ TEST_CASE("greedy meshing agrees with per-voxel meshing", "[mesh]") {
         fixture.get()->set_voxel(4, 5, 6, voxel{blocks::red_3});
 
         const auto greedy = fixture.greedy();
-        REQUIRE(greedy.vertices.size() == 24);
+        REQUIRE(greedy.quads.size() == 6);
         REQUIRE(to_face_cells(greedy) == to_face_cells(fixture.simple()));
     }
 
@@ -154,7 +154,7 @@ TEST_CASE("greedy meshing agrees with per-voxel meshing", "[mesh]") {
         fixture.get()->fill(voxel{blocks::green_2});
 
         const auto greedy = fixture.greedy();
-        REQUIRE(greedy.vertices.size() == 24);
+        REQUIRE(greedy.quads.size() == 6);
         REQUIRE(to_face_cells(greedy) == to_face_cells(fixture.simple()));
     }
 
@@ -225,7 +225,7 @@ TEST_CASE("greedy meshing agrees with per-voxel meshing", "[mesh]") {
         fixture.get()->fill(voxel{blocks::gray_6});
 
         const auto greedy = fixture.greedy();
-        REQUIRE(greedy.vertices.size() == 24);
+        REQUIRE(greedy.quads.size() == 6);
         REQUIRE(to_face_cells(greedy) == to_face_cells(fixture.simple()));
     }
 
@@ -259,7 +259,6 @@ TEST_CASE("boundary faces close the seam between chunks", "[mesh]") {
 
     left->fill(voxel{blocks::gray_4});
     right->fill(voxel{blocks::gray_4});
-    right->compute_own_boundaries();
 
     const auto count_faces = [&registry](const asset::model& m, uint8 normal) {
         gfx::mesh_generation_storage storage;
@@ -303,13 +302,12 @@ TEST_CASE("greedy meshing output is stable", "[mesh]") {
     }
 
     const auto mesh = fixture.greedy();
-    REQUIRE(mesh.vertices.size() > 0);
-    REQUIRE(mesh.indices.size() == (mesh.vertices.size() / 4) * 6);
+    REQUIRE(mesh.quads.size() > 0);
 
     const auto digest = hash_mesh(mesh);
-    INFO("mesh digest: " << digest << ", quads: " << mesh.vertices.size() / 4);
-    REQUIRE(mesh.vertices.size() / 4 == 5452);
-    REQUIRE(digest == 16201069180391058227ULL);
+    INFO("mesh digest: " << digest << ", quads: " << mesh.quads.size());
+    REQUIRE(mesh.quads.size() == 5452);
+    REQUIRE(digest == 15251726191898468883ULL);
 }
 
 // The 32-cube above never reaches the bit path, so ambient occlusion out of
@@ -331,7 +329,7 @@ TEST_CASE("full-size greedy meshing output is stable", "[mesh]") {
 
     const auto mesh = fixture.greedy();
     const auto digest = hash_mesh(mesh);
-    INFO("full-size digest: " << digest << ", quads: " << mesh.vertices.size() / 4);
-    REQUIRE(mesh.vertices.size() / 4 == 29218);
-    REQUIRE(digest == 419103052605503707ULL);
+    INFO("full-size digest: " << digest << ", quads: " << mesh.quads.size());
+    REQUIRE(mesh.quads.size() == 29218);
+    REQUIRE(digest == 18429262697901979086ULL);
 }

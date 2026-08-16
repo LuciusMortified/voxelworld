@@ -36,10 +36,10 @@ struct mesh_gen_worker_stats {
     uint64 quads  = 0;
     std::vector<uint32> micros;
 
-    auto record(uint64 elapsed_ns, size_t vertex_count) -> void {
+    auto record(uint64 elapsed_ns, size_t quad_count) -> void {
         ++chunks;
         nanos += elapsed_ns;
-        quads += vertex_count / 4;
+        quads += quad_count;
         micros.push_back(static_cast<uint32>(elapsed_ns / 1000));
     }
 };
@@ -58,7 +58,8 @@ struct mesh_gen_stats {
 
 class mesh_pool final {
 public:
-    explicit mesh_pool(vulkan_context& context, const block_registry& registry);
+    explicit mesh_pool(vulkan_context& context, const block_registry& registry,
+                       uint32 workers = 0);
     ~mesh_pool();
 
     mesh_pool(const mesh_pool&)                    = delete;
@@ -94,8 +95,15 @@ private:
     mutable std::mutex gen_mutex_;
     std::condition_variable gen_cv_;
     bool gen_running_ = true;
-    uint32 sweep_counter_ = 0;
-    static constexpr uint32 sweep_interval_ = 60;
+    // Orphans are collected a slice of the table per frame. Sweeping it whole
+    // on every sixtieth frame did both halves badly: dead geometry sat in
+    // memory until the sweep came round, and the sweep itself was a spike of
+    // milliseconds when it did. The budget that matters is the second one --
+    // scanning a bucket is nothing, freeing a mesh is a pair of deallocations,
+    // and after a column scrolls out of view there are hundreds to free.
+    std::size_t sweep_bucket_ = 0;
+    static constexpr std::size_t sweep_buckets_per_frame_ = 512;
+    static constexpr std::size_t sweep_orphans_per_frame_ = 32;
 
     mesh_gen_worker_stats gen_totals_;
     uint32 gen_queue_peak_ = 0;

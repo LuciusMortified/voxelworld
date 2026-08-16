@@ -9,22 +9,32 @@ import vulkan;
 // ---- from vw/gfx/resource/mesh.h
 export namespace vw::gfx {
 
-struct vertex {
+// One greedy rectangle, eight bytes. There is no vertex buffer and no index
+// buffer: the draw asks for six vertices per quad and the vertex shader picks
+// the corner out of this record by gl_VertexIndex. Four vertices of eight bytes
+// plus six indices of four came to fifty-six.
+//
+// data0: min.x[6:0] | min.y[13:7] | min.z[20:14] | normal_id[23:21]
+//      | corners_dark[27:24] | corners_bright[31:28]
+// data1: max.x[6:0] | max.y[13:7] | max.z[20:14] | palette_index[28:21]
+//
+// The two corners are the box the rectangle spans; along the face axis they are
+// equal. Seven bits each, so a model is at most 128 voxels a side -- the same
+// ceiling the packed vertex had. corners_dark/bright: one bit per corner in
+// winding order.
+struct quad {
     uint32 data0 = 0;
     uint32 data1 = 0;
 
-    // data0: pos.x[6:0] | pos.y[13:7] | pos.z[20:14] | normal_id[23:21] | reserved[31:24]
-    // data1: palette_index[7:0] | corners_dark[11:8] | corners_bright[15:12] | corner_id[17:16] | reserved[31:18]
-    // corners_dark/bright: 4-bit binary mask, one bit per quad corner in winding order (same on all 4 verts of a quad)
-    // corner_id: which winding-order corner (0..3) this vertex represents — used to pick UV in vertex shader
-
-    vertex() = default;
+    quad() = default;
 
     [[nodiscard]] static auto pack(
-        int x, int y, int z, uint8 normal_id, block_id block_id,
-        uint8 corners_dark, uint8 corners_bright, uint8 corner_id
-    ) -> vertex;
+        vec3i min_pos, vec3i max_pos, uint8 normal_id, block_id block_id, uint8 corners_dark,
+        uint8 corners_bright
+    ) -> quad;
 
+    // Only the per-instance index is still fed through vertex input; the
+    // geometry comes out of a storage buffer.
     [[nodiscard]] static auto get_binding_descriptions()
         -> std::vector<vk::VertexInputBindingDescription>;
 
@@ -33,17 +43,30 @@ struct vertex {
 };
 
 struct mesh {
-    std::vector<vertex> vertices;
-    std::vector<uint32> indices;
+    std::vector<quad> quads;
+
+    // The quads are grouped by face direction, in the order +X, -X, +Y, -Y, +Z,
+    // -Z, because that is the order the mesher walks. Keeping the six run
+    // lengths costs nothing and lets the culling shader drop the three
+    // directions that face away from the viewer before they are ever shaded.
+    std::array<uint32, 6> face_counts{};
+
+    // Which faces of the chunk see through to which, taken off the same
+    // occupancy the mesher runs on. Survives release_data: the culling walk
+    // needs it long after the geometry has gone to the device.
+    vw::asset::chunk_links links;
 
     void release_data() {
-        vertices = {};
-        indices  = {};
+        quads = {};
     }
 };
 
 struct mesh_options {
     bool enable_top_brightness = false;
+
+    // Connectivity is only read by the culling walk, and the walk is off by
+    // default. Building it regardless cost a tenth of all meshing.
+    bool build_links = false;
 };
 
 class simple_mesh_generator {
@@ -57,8 +80,7 @@ public:
 
 private:
     static void add_cube_face(
-        std::vector<vertex>& vertices,
-        std::vector<uint32>& indices,
+        std::vector<quad>& quads,
         const std::shared_ptr<vw::asset::model>& mdl,
         int x,
         int y,
@@ -90,8 +112,7 @@ struct face_mask_cell {
 };
 
 struct mesh_generation_storage {
-    std::vector<vertex> vertices;
-    std::vector<uint32> indices;
+    std::vector<quad> quads;
     std::vector<face_mask_cell> mask;
     std::vector<bool> depth_has_pages;
 
@@ -100,9 +121,11 @@ struct mesh_generation_storage {
     std::unique_ptr<vw::asset::chunk_occupancy> occupancy;
     bool occupancy_valid = false;
 
+    // Reused across chunks so the connectivity fill allocates nothing.
+    vw::asset::chunk_link_scratch link_scratch;
+
     void clear() {
-        vertices.clear();
-        indices.clear();
+        quads.clear();
     }
 };
 
@@ -135,8 +158,7 @@ void build_face_mask(
 );
 
 void add_quad(
-    std::vector<vertex>& vertices,
-    std::vector<uint32>& indices,
+    std::vector<quad>& quads,
     int face_direction,
     vec3i min_pos,
     vec3i max_pos,

@@ -105,6 +105,16 @@ export namespace vw::gfx {
 
 class vulkan_context;
 
+// Indexed against one index buffer shared by the whole pool, whose contents are
+// the same pattern for every mesh: 0,1,2,2,3,0 per quad. vertex_offset is what
+// puts gl_VertexIndex on this mesh, so the shader finds its record at
+// gl_VertexIndex / 4 and the corner at gl_VertexIndex % 4.
+//
+// Six vertices unrolled from gl_VertexIndex with no index buffer was tried
+// first and is a third more vertex shading -- four invocations a quad become
+// six, with no post-transform reuse. It cost 38 % of the world pass. The shared
+// buffer is a megabyte and a half for the whole engine, against the 24 bytes a
+// quad the per-mesh index buffers used to cost.
 struct draw_command {
     uint32 index_count;
     uint32 instance_count;
@@ -114,28 +124,23 @@ struct draw_command {
 };
 
 struct buffer_chunk_size {
-    uint32 vertex_count;
-    uint32 index_count;
+    uint32 quad_count;
 
     bool operator==(
         const buffer_chunk_size& rhs
     ) const {
-        return vertex_count == rhs.vertex_count && index_count == rhs.index_count;
+        return quad_count == rhs.quad_count;
     }
 
     bool operator<(
         const buffer_chunk_size& rhs
     ) const {
-        if (vertex_count != rhs.vertex_count) {
-            return vertex_count < rhs.vertex_count;
-        }
-        return index_count < rhs.index_count;
+        return quad_count < rhs.quad_count;
     }
 };
 
 struct free_slot {
-    uint32 vertex_offset;
-    uint32 index_offset;
+    uint32 quad_offset;
 };
 
 struct entity_allocation {
@@ -144,22 +149,22 @@ struct entity_allocation {
 };
 
 struct mesh_allocation {
-    uint32 vertex_offset;
-    uint32 index_offset;
-    uint32 vertex_count;
-    uint32 index_count;
+    uint32 quad_offset;
+    uint32 quad_count;
     uint32 generation;
     uint32 ref_count;
+
+    // The quads of each face direction, in the order the mesher emits them.
+    // One draw command per direction, so the culling shader can leave out the
+    // ones pointing away from the viewer.
+    std::array<uint32, 6> face_counts{};
 };
 
 struct combined_buffer_stats {
     buffer_chunk_size chunk_size{};
-    float32 vertex_load_min  = 0.0f;
-    float32 vertex_load_max  = 0.0f;
-    float32 vertex_load_avg  = 0.0f;
-    float32 index_load_min   = 0.0f;
-    float32 index_load_max   = 0.0f;
-    float32 index_load_avg   = 0.0f;
+    float32 quad_load_min    = 0.0f;
+    float32 quad_load_max    = 0.0f;
+    float32 quad_load_avg    = 0.0f;
     uint32 mesh_capacity     = 0;
     uint32 mesh_count        = 0;
     uint32 instance_capacity = 0;
@@ -169,6 +174,9 @@ struct combined_buffer_stats {
 class combined_buffer {
 public:
     static constexpr uint32 cull_pass_count = 5;
+
+    // One draw command per face direction of a mesh.
+    static constexpr uint32 faces_per_mesh = 6;
 
     explicit combined_buffer(
         vulkan_context& context,
@@ -196,14 +204,22 @@ public:
     void write_transform(entity ent, const mat4f& transform_matrix, const vw::spatial::aabb& bounds);
     auto free(entity ent) -> std::optional<entity>;
 
+    // One flag per instance, read by the culling shader before the frustum
+    // test. The span covers instances from zero; anything past its end is
+    // treated as visible, so a buffer nobody has an opinion about draws in
+    // full.
+    void write_visibility(std::span<const uint32> flags);
+
     [[nodiscard]] auto get_entity_allocation(entity ent) -> const entity_allocation&;
-    [[nodiscard]] auto get_vertex_buffer() const -> vk::Buffer;
-    [[nodiscard]] vk::Buffer get_index_buffer() const;
+    [[nodiscard]] auto get_quad_buffer() const -> vk::Buffer;
     [[nodiscard]] vk::Buffer get_instance_index_buffer() const;
     [[nodiscard]] vk::Buffer get_indirect_draw_buffer() const;
     [[nodiscard]] vk::Buffer get_aabb_buffer() const;
     [[nodiscard]] vk::Buffer get_model_matrix_buffer() const;
     [[nodiscard]] vk::Buffer get_normal_matrix_buffer() const;
+    // Instances in the buffer, and the ceiling on commands a culling pass can
+    // produce out of them -- six a mesh, one per face direction.
+    [[nodiscard]] uint32 get_instance_count() const;
     [[nodiscard]] uint32 get_draw_command_count() const;
     [[nodiscard]] vk::Buffer get_culled_indirect_buffer() const;
     [[nodiscard]] vk::Buffer get_count_buffer() const;
@@ -232,8 +248,7 @@ private:
     buffer_chunk_size chunk_size_;
 
     uint32 mesh_capacity_{default_mesh_capacity_};
-    std::unique_ptr<device_vertex_buffer> vertex_buffer_;
-    std::unique_ptr<device_index_buffer> index_buffer_;
+    std::unique_ptr<device_storage_buffer> quad_buffer_;
     std::unique_ptr<device_storage_buffer> instance_index_buffer_;
 
     uint32 instance_capacity_{default_instance_capacity_};
@@ -243,13 +258,13 @@ private:
     std::unique_ptr<device_storage_buffer> aabb_buffer_;
     std::unique_ptr<device_storage_buffer> culled_indirect_buffer_;
     std::unique_ptr<device_storage_buffer> count_buffer_;
+    std::unique_ptr<device_storage_buffer> visibility_buffer_;
 
     std::unordered_map<entity, entity_allocation> entity_allocations_;
     std::unordered_map<uint32, mesh_allocation> mesh_allocations_;
     std::unordered_map<uint32, entity> instance_indexes_;
     std::vector<free_slot> free_slots_;
-    uint32 vertex_used_{0};
-    uint32 index_used_{0};
+    uint32 quad_used_{0};
 
     vk::DescriptorSet descriptor_set_                       = nullptr;
     vk::DescriptorPool descriptor_pool_                     = nullptr;
@@ -281,19 +296,33 @@ struct buffer_pool_timing_stats {
     float32 staging_flush_ms = 0.0f;
 };
 
+struct chunk_cull_stats {
+    uint32 chunks  = 0;
+    uint32 visible = 0;
+    float32 walk_ms = 0.0f;
+
+    // How far the walk ranged and what it walked through. Cells with no chunk
+    // count as open air, so a large `visited_empty` means the walk is getting
+    // around the world rather than through it.
+    uint32 visited       = 0;
+    uint32 visited_empty = 0;
+    uint32 sealed        = 0;
+    uint32 known_links   = 0;
+    uint32 merged        = 0;
+    uint32 max_pockets   = 0;
+};
+
 struct combined_buffer_pool_stats {
-    float32 vertex_load_min  = 0.0f;
-    float32 vertex_load_max  = 0.0f;
-    float32 vertex_load_avg  = 0.0f;
-    float32 index_load_min   = 0.0f;
-    float32 index_load_max   = 0.0f;
-    float32 index_load_avg   = 0.0f;
+    float32 quad_load_min    = 0.0f;
+    float32 quad_load_max    = 0.0f;
+    float32 quad_load_avg    = 0.0f;
     uint32 mesh_capacity     = 0;
     uint32 mesh_count        = 0;
     uint32 instance_capacity = 0;
     uint32 instance_count    = 0;
     std::vector<combined_buffer_stats> buffers;
     buffer_pool_timing_stats timing;
+    chunk_cull_stats chunk_cull;
 };
 
 class combined_buffer_pool {
@@ -323,11 +352,26 @@ public:
 
     [[nodiscard]] auto get_buffers() const -> const std::vector<std::unique_ptr<combined_buffer>>&;
 
+    // The quad index pattern, shared by every buffer and every mesh in them.
+    [[nodiscard]] auto get_index_buffer() const -> vk::Buffer;
+
     [[nodiscard]] static auto get_chunk_size_for_mesh(
-        uint32 vertex_count, uint32 index_count
+        uint32 quad_count
     ) -> buffer_chunk_size;
 
     [[nodiscard]] auto get_stats() const -> const combined_buffer_pool_stats&;
+
+    // Off by default: on the current world the walk hides nothing and costs
+    // milliseconds. See docs/frame-time-baseline.md -- a single false opening
+    // floods a cave network that is connected almost everywhere, and the cell
+    // size needed to avoid that grows with the size of the world.
+    void set_chunk_cull_enabled(bool enabled) {
+        chunk_cull_enabled_ = enabled;
+    }
+
+    [[nodiscard]] auto is_chunk_cull_enabled() const -> bool {
+        return chunk_cull_enabled_;
+    }
 
     // Where geometry moved, appeared or went away this frame. Consumed by the
     // shadow map, which only redraws the cascades those volumes touch.
@@ -341,11 +385,17 @@ private:
     void process_destroyed_(world_type& world);
     void update_meshes_(world_type& world, const vec3f& camera_pos, mesh_pool& pool);
     void update_transforms_(world_type& world);
+    void update_chunk_visibility_(world_type& world, const vec3f& camera_pos);
 
     vulkan_context* context_;
     deletion_queue* deletion_;
     staging_buffer staging_;
+    void ensure_index_pattern_(uint32 quads);
+
     std::vector<std::unique_ptr<combined_buffer>> buffers_;
+    std::unique_ptr<device_index_buffer> index_buffer_;
+    std::unique_ptr<index_buffer> index_upload_;
+    uint32 index_quads_ = 0;
     std::unordered_map<entity, entity_buffer_info> entity_buffer_infos_;
     std::map<buffer_chunk_size, size_t> chunk_size_to_buffer_index_;
 
@@ -359,6 +409,19 @@ private:
     std::vector<entity> merge_buffer_;
     std::vector<vw::spatial::aabb> touched_bounds_;
     std::vector<std::pair<float32, entity>> sort_keys_;
+
+    bool chunk_cull_enabled_ = false;
+    std::vector<std::vector<uint32>> visibility_flags_;
+
+    // Connectivity for every chunk that has been meshed, including the ones
+    // with no geometry at all. Solid rock produces an empty mesh and never
+    // reaches a buffer, but it is exactly what the walk has to stop against,
+    // so this cannot live alongside the instances.
+    std::unordered_map<entity, vw::asset::chunk_links> chunk_links_;
+
+    // Top loaded chunk per column, which is what separates sky from a gap
+    // inside the world.
+    std::unordered_map<vec2i, int32> column_top_;
 
     mutable combined_buffer_pool_stats stats_;
 };

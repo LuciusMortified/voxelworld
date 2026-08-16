@@ -29,8 +29,56 @@ void world_grid::set_voxel(
     if (it == chunks_.end()) {
         return;
     }
-    auto lc = world_to_local_coord(world_pos);
-    it->second->set_voxel(lc / voxel_scale_, v);
+    const auto lc = world_to_local_coord(world_pos) / voxel_scale_;
+    it->second->set_voxel(lc, v);
+
+    refresh_chunk(cc);
+
+    // A voxel on the skin of a chunk is half of a seam: the neighbour was
+    // meshed against the old plane and has to hear about the new one.
+    constexpr int32 last = chunk::size - 1;
+    const bool on_face[6]{
+        lc.x == last, lc.x == 0, lc.y == last, lc.y == 0, lc.z == last, lc.z == 0,
+    };
+
+    for (int32 fd = 0; fd < 6; ++fd) {
+        if (on_face[fd]) {
+            refresh_chunk(cc + boundary_face_offsets[fd]);
+        }
+    }
+}
+
+void world_grid::refresh_chunk(
+    vec3i chunk_coord
+) {
+    const auto it = chunks_.find(chunk_coord);
+    if (it == chunks_.end()) {
+        return;
+    }
+
+    auto& c    = *it->second;
+    auto& mdl  = *c.get_model();
+    uint8 mask = 0;
+
+    for (int32 fd = 0; fd < 6; ++fd) {
+        const auto neighbor = chunks_.find(chunk_coord + boundary_face_offsets[fd]);
+        if (neighbor == chunks_.end()) {
+            continue;
+        }
+        mdl.set_boundary_slice(fd, *neighbor->second->get_model());
+        mask |= static_cast<uint8>(1U << fd);
+    }
+
+    c.set_known_neighbors(mask);
+
+    // Digging into buried rock is what makes it worth drawing.
+    if (c.ensure_entity()) {
+        ++drawn_chunks_;
+    }
+
+    if (c.get_entity().is_valid()) {
+        world_->registry().request_change<model_component>(c.get_entity());
+    }
 }
 
 auto world_grid::has_chunk(
@@ -90,12 +138,24 @@ auto world_grid::has_column(
     return column_chunks_.contains(coord);
 }
 
+auto world_grid::column_levels(
+    vec2i coord
+) const -> std::span<const int32> {
+    const auto it = column_chunks_.find(coord);
+    return it != column_chunks_.end() ? std::span<const int32>{it->second}
+                                      : std::span<const int32>{};
+}
+
 auto world_grid::column_count() const -> uint32 {
     return static_cast<uint32>(column_chunks_.size());
 }
 
 auto world_grid::chunk_count() const -> uint32 {
     return static_cast<uint32>(chunks_.size());
+}
+
+auto world_grid::drawn_chunk_count() const -> uint32 {
+    return drawn_chunks_;
 }
 
 auto world_grid::place_chunk(
@@ -105,6 +165,11 @@ auto world_grid::place_chunk(
         chunk_coord,
         std::make_unique<chunk>(*world_, chunk_coord, std::move(mdl), voxel_scale_)
     );
+
+    if (inserted && it->second->is_drawn()) {
+        ++drawn_chunks_;
+    }
+
     return it->second.get();
 }
 
@@ -121,7 +186,14 @@ void world_grid::unload_column(
     if (col_it != column_chunks_.end()) {
         for (int32 y : col_it->second) {
             vec3i chunk_coord{coord.x, y, coord.y};
-            chunks_.erase(chunk_coord);
+            const auto it = chunks_.find(chunk_coord);
+            if (it == chunks_.end()) {
+                continue;
+            }
+            if (it->second->is_drawn()) {
+                --drawn_chunks_;
+            }
+            chunks_.erase(it);
         }
         column_chunks_.erase(col_it);
     }

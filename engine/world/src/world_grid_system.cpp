@@ -71,9 +71,9 @@ void world_grid_system::update(float32 /*dt*/) {
         return;
     }
 
-    auto& reg                = world_->registry();
-    stats_.integrate_ms      = measure_ms([&] { integrate_completed_columns_(); });
-    stats_.deferred_remesh_ms = measure_ms([&] { process_deferred_remeshes_(); });
+    auto& reg                 = world_->registry();
+    stats_.stage_ms           = measure_ms([&] { stage_completed_columns_(); });
+    stats_.integrate_ms       = measure_ms([&] { integrate_completed_columns_(); });
     stats_.request_columns_ms = measure_ms([&] { dispatch_column_requests_(); });
     update_grid_stats_();
 
@@ -93,95 +93,151 @@ void world_grid_system::update(float32 /*dt*/) {
     reg.clear_requested<world_view_component>();
 }
 
-void world_grid_system::integrate_completed_columns_() {
-    static constexpr int32 max_columns_per_frame = 1;
-    static constexpr vec3i neighbor_offsets[6]   = {
-        {1, 0, 0},   //
-        {-1, 0, 0},  //
-        {0, 1, 0},   //
-        {0, -1, 0},  //
-        {0, 0, 1},   //
-        {0, 0, -1}
-    };
+namespace {
+constexpr vec2i column_neighbor_offsets[4] = {
+    {1, 0},   //
+    {-1, 0},  //
+    {0, 1},   //
+    {0, -1}
+};
+}  // namespace
 
-    float32 boundary_from_total = 0.0f;
-    float32 chunk_create_total  = 0.0f;
-    float32 boundary_to_total   = 0.0f;
-    int32 processed_columns     = 0;
+auto world_grid_system::column_available_(
+    vec2i coord
+) const -> bool {
+    return staged_columns_.contains(coord) || grid_->has_column(coord);
+}
 
-    while (processed_columns < max_columns_per_frame) {
+auto world_grid_system::within_draw_(
+    vec2i coord
+) const -> bool {
+    const auto d = coord - camera_column_;
+    return std::abs(d.x) <= draw_distance_ && std::abs(d.y) <= draw_distance_;
+}
+
+auto world_grid_system::column_ready_(
+    vec2i coord
+) const -> bool {
+    return std::ranges::all_of(column_neighbor_offsets, [&](vec2i offset) -> bool {
+        return column_available_(coord + offset);
+    });
+}
+
+void world_grid_system::queue_if_ready_(
+    vec2i coord
+) {
+    const auto it = staged_columns_.find(coord);
+    if (it == staged_columns_.end() || it->second->get_phase() == column_phase::complete) {
+        return;
+    }
+    if (!column_ready_(coord)) {
+        return;
+    }
+
+    it->second->set_phase(column_phase::complete);
+    ready_columns_.push_back(coord);
+}
+
+void world_grid_system::stage_completed_columns_() {
+    while (true) {
         auto col = loader_->try_pop_completed();
         if (!col) {
             break;
         }
 
-        auto col_coord = col->get_coord();
-        if (!active_columns_.contains(col_coord) &&
-            !pending_active_columns_.contains(col_coord)) {
+        const auto coord = col->get_coord();
+        if (!active_columns_.contains(coord) && !pending_active_columns_.contains(coord)) {
             continue;
         }
+
+        staged_columns_[coord] = std::move(col);
+
+        // Staging this one can complete the neighbourhood of any column around
+        // it, and of itself.
+        queue_if_ready_(coord);
+        for (auto offset : column_neighbor_offsets) {
+            queue_if_ready_(coord + offset);
+        }
+    }
+}
+
+auto world_grid_system::model_at_(
+    vec3i chunk_coord
+) const -> asset::model* {
+    if (auto* placed = grid_->get_chunk(chunk_coord)) {
+        return placed->get_model().get();
+    }
+
+    const auto it = staged_columns_.find(vec2i{chunk_coord.x, chunk_coord.z});
+    if (it == staged_columns_.end()) {
+        return nullptr;
+    }
+
+    const auto* data = it->second->get_chunk_data(chunk_coord.y);
+    return data != nullptr ? data->chunk_model.get() : nullptr;
+}
+
+void world_grid_system::integrate_completed_columns_() {
+    static constexpr int32 max_columns_per_frame = 1;
+
+    float32 boundary_from_total = 0.0f;
+    float32 chunk_create_total  = 0.0f;
+    int32 processed_columns     = 0;
+
+    while (processed_columns < max_columns_per_frame && !ready_columns_.empty()) {
+        const auto coord = ready_columns_.back();
+        ready_columns_.pop_back();
+
+        const auto it = staged_columns_.find(coord);
+        if (it == staged_columns_.end()) {
+            continue;
+        }
+
+        // The camera may have moved since it was queued and taken a neighbour
+        // with it. Back to waiting rather than placed with a hole beside it.
+        if (!column_ready_(coord)) {
+            it->second->set_phase(column_phase::terrain);
+            continue;
+        }
+
+        // Boundaries first, for the whole column, and only then the placing:
+        // a chunk's neighbours above and below are its own column's, and taking
+        // the column out of staging before reading them leaves those faces
+        // thinking they face open air.
+        boundary_from_total += measure_ms([&] -> auto {
+            for (auto& [y, cd] : it->second->get_all_chunk_data()) {
+                // Every neighbour that will ever exist exists now, staged or
+                // placed, so this is the last word on the chunk's boundary. One
+                // that is absent is absent for good -- open sky over a shorter
+                // column -- and reads as air.
+                for (int32 fd = 0; fd < 6; ++fd) {
+                    if (auto* neighbor = model_at_(cd.coord + boundary_face_offsets[fd])) {
+                        cd.chunk_model->set_boundary_slice(fd, *neighbor);
+                    }
+                }
+            }
+        });
+
+        auto col = std::move(it->second);
+        staged_columns_.erase(it);
 
         std::vector<int32> y_levels;
 
         for (auto& [y, cd] : col->get_all_chunk_data()) {
-            boundary_from_total += measure_ms([&] -> auto {
-                for (int fd = 0; fd < 6; ++fd) {
-                    auto* neighbor = grid_->get_chunk(cd.coord + neighbor_offsets[fd]);
-                    if (neighbor) {
-                        cd.chunk_model->set_boundary_slice(fd, *neighbor->get_model());
-                    }
-                }
-            });
-
-            chunk* created = nullptr;
             chunk_create_total += measure_ms([&] -> auto {
-                created = grid_->place_chunk(cd.coord, std::move(cd.chunk_model));
-            });
-
-            boundary_to_total += measure_ms([&] -> auto {
-                for (int fd = 0; fd < 6; ++fd) {
-                    auto* neighbor = grid_->get_chunk(cd.coord + neighbor_offsets[fd]);
-                    if (neighbor && neighbor != created) {
-                        int opposite_fd = fd ^ 1;
-                        neighbor->get_model()->set_boundary_slice(
-                            opposite_fd, *created->get_model()
-                        );
-                        deferred_remeshes_.push({cd.coord + neighbor_offsets[fd], opposite_fd});
-                    }
-                }
+                grid_->place_chunk(cd.coord, std::move(cd.chunk_model));
             });
 
             y_levels.push_back(y);
         }
 
         std::sort(y_levels.begin(), y_levels.end());
-        grid_->register_column(col_coord, std::move(y_levels));
+        grid_->register_column(coord, std::move(y_levels));
         ++processed_columns;
     }
 
     stats_.boundary_from_ms = boundary_from_total;
     stats_.chunk_create_ms  = chunk_create_total;
-    stats_.boundary_to_ms   = boundary_to_total;
-}
-
-void world_grid_system::process_deferred_remeshes_() {
-    static constexpr int32 max_remeshes_per_frame = 4;
-    int32 processed                               = 0;
-
-    while (processed < max_remeshes_per_frame && !deferred_remeshes_.empty()) {
-        auto [coord, fd] = deferred_remeshes_.front();
-        deferred_remeshes_.pop();
-
-        auto* chunk_ptr = grid_->get_chunk(coord);
-        if (!chunk_ptr) {
-            continue;
-        }
-
-        auto mdl = chunk_ptr->get_model();
-        mdl->invalidate();
-        world_->system<model_system>().modify(chunk_ptr->get_entity()).set_model(mdl);
-        ++processed;
-    }
 }
 
 void world_grid_system::dispatch_column_requests_() {
@@ -197,12 +253,13 @@ void world_grid_system::dispatch_column_requests_() {
 }
 
 void world_grid_system::update_grid_stats_() {
-    stats_.active_count          = static_cast<uint32>(active_columns_.size());
-    stats_.pending_count         = loader_->pending_count();
-    stats_.loaded_count          = grid_->chunk_count();
-    stats_.deferred_remesh_count = static_cast<uint32>(deferred_remeshes_.size());
-    stats_.rebuild_active_ms     = 0.0f;
-    stats_.unload_ms             = 0.0f;
+    stats_.active_count      = static_cast<uint32>(active_columns_.size());
+    stats_.pending_count     = loader_->pending_count();
+    stats_.loaded_count      = grid_->chunk_count();
+    stats_.drawn_count       = grid_->drawn_chunk_count();
+    stats_.staged_count      = static_cast<uint32>(staged_columns_.size());
+    stats_.rebuild_active_ms = 0.0f;
+    stats_.unload_ms         = 0.0f;
 }
 
 auto world_grid_system::process_dirty_entities_() -> bool {
@@ -231,7 +288,13 @@ auto world_grid_system::rebuild_active_set_() -> vec2i {
         const auto& wv   = reg.get<world_view_component>(ent);
         auto chunk_coord = wv.get_chunk_coord();
         camera_column    = {chunk_coord.x, chunk_coord.z};
-        const auto dist  = static_cast<int32>(wv.get_view_distance());
+
+        camera_column_ = camera_column;
+        draw_distance_ = static_cast<int32>(wv.get_view_distance());
+
+        // One column past what will be drawn: the ring is generated so the ring
+        // inside it knows its boundaries and can be meshed once and for all.
+        const auto dist = draw_distance_ + apron_columns;
 
         for (int32 dx = -dist; dx <= dist; ++dx) {
             for (int32 dz = -dist; dz <= dist; ++dz) {
@@ -245,11 +308,51 @@ auto world_grid_system::rebuild_active_set_() -> vec2i {
     return camera_column;
 }
 
+void world_grid_system::demote_column_(
+    vec2i coord
+) {
+    // Out of drawing range but still needed as a neighbour. Its meshes,
+    // entities and instances go; the models stay, so coming back costs nothing
+    // and the column is never generated twice.
+    auto col = std::make_unique<gen_column>(coord.x, coord.y);
+
+    for (int32 y : grid_->column_levels(coord)) {
+        const vec3i chunk_coord{coord.x, y, coord.y};
+        if (auto* placed = grid_->get_chunk(chunk_coord)) {
+            col->create_chunk(y, chunk_data{chunk_coord, placed->get_model()});
+        }
+    }
+
+    grid_->unload_column(coord);
+
+    col->set_phase(column_phase::terrain);
+    staged_columns_[coord] = std::move(col);
+}
+
 void world_grid_system::unload_inactive_columns_() {
     for (const auto& coord : active_columns_) {
         if (!pending_active_columns_.contains(coord)) {
             grid_->unload_column(coord);
+        } else if (!within_draw_(coord) && grid_->has_column(coord)) {
+            demote_column_(coord);
         }
+    }
+
+    std::erase_if(staged_columns_, [this](const auto& entry) -> bool {
+        return !pending_active_columns_.contains(entry.first);
+    });
+
+    // A queued column whose neighbour has just gone is checked again when it
+    // comes up for placement, so the queue only needs the vanished ones out.
+    std::erase_if(ready_columns_, [this](vec2i coord) -> bool {
+        return !staged_columns_.contains(coord);
+    });
+
+    // The camera moved, so columns that were only waiting on a neighbour may be
+    // whole now, and demoted ones may be back in range. Marking one only sets a
+    // phase, so walking the table while doing it is safe.
+    for (const auto& [coord, col] : staged_columns_) {
+        queue_if_ready_(coord);
     }
 }
 
@@ -310,7 +413,7 @@ void world_grid_system::rebuild_pending_requests_(
     pending_requests_.clear();
 
     for (const auto& coord : active_columns_) {
-        if (!grid_->has_column(coord) && !loader_->is_pending(coord)) {
+        if (!column_available_(coord) && !loader_->is_pending(coord)) {
             pending_requests_.push_back(coord);
         }
     }
@@ -329,9 +432,8 @@ void world_grid_system::rebuild_pending_requests_(
 
 void world_grid_system::clear_grid_transient_state_() {
     pending_requests_.clear();
-    while (!deferred_remeshes_.empty()) {
-        deferred_remeshes_.pop();
-    }
+    staged_columns_.clear();
+    ready_columns_.clear();
     active_columns_.clear();
     pending_active_columns_.clear();
 }
