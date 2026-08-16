@@ -309,11 +309,19 @@ void shadow_map::update(
             frustum_corners[i]     = frustum_corners[i] + dist * (last_cascade_split / shadow_dist);
         }
 
-        vec3 frustum_center = vec3f{0.0f, 0.0f, 0.0f};
-        for (const auto& corner : frustum_corners) {
-            frustum_center += corner;
-        }
-        frustum_center = frustum_center * (1.0f / static_cast<float>(frustum_corners.size()));
+        // Centred on the camera, not on the middle of the slice. The middle of
+        // a slice sits far down the view axis, so turning on the spot swings it
+        // around a wide circle and every cascade leaves its padding at once --
+        // measured as four cascades redrawn on one frame in eight and a frame
+        // twice as long when it happens. Around the camera nothing moves when
+        // the camera turns; only walking makes a cascade stale.
+        //
+        // The ball has to reach the far corners of the slice rather than just
+        // its own, which is about 1.6x the radius. That is resolution paid for
+        // a frame that does not hitch, and the same 1.6x would have been the
+        // price of merely widening the padding -- which would have made the
+        // redraws rarer instead of removing them.
+        const vec3 frustum_center = camera.get_position();
 
         float radius = 0.0f;
         for (const auto& corner : frustum_corners) {
@@ -360,23 +368,26 @@ auto shadow_map::select_cascades_(
         const float32 drift = math::length(centers[i] - drawn_centers_[i]);
         const float32 reach = radii[i] > 0.0f ? drift / radii[i] : 0.0f;
 
-        priority[i] = -1.0f;
+        // Out of coverage counts as urgent rather than unconditional. Walking
+        // forward takes every cascade past its padding within a few frames of
+        // each other, and drawing all four on the same frame was two
+        // milliseconds of shadow pass against a frame of one. A cascade that
+        // waits a frame is stale at the far edge of its slice for that frame;
+        // a spike is seen every time.
+        const bool stale = reach > cascade_padding_ratio_ || radii[i] > drawn_radii_[i];
 
-        if (reach > cascade_padding_ratio_ || radii[i] > drawn_radii_[i]) {
-            selected |= bit;
-            continue;
-        }
-
-        if ((dirty_mask_ & bit) != 0) {
+        if (stale) {
+            priority[i] = 100.0f + reach;
+        } else if ((dirty_mask_ & bit) != 0) {
             priority[i] = 1.0f + reach;
         } else if (reach > cascade_trigger_ratio_) {
             priority[i] = reach;
+        } else {
+            priority[i] = -1.0f;
         }
     }
 
-    const auto forced = static_cast<uint32>(std::popcount(selected));
-    uint32 budget =
-        forced >= max_cascade_updates_per_frame_ ? 0 : max_cascade_updates_per_frame_ - forced;
+    uint32 budget = max_cascade_updates_per_frame_;
 
     while (budget > 0) {
         uint32 best        = cascade_count;
