@@ -60,6 +60,7 @@ constexpr std::array gpu_stages{
     gpu_stage_desc<gpu_stage::shadow_cascade_1>(),
     gpu_stage_desc<gpu_stage::shadow_cascade_2>(),
     gpu_stage_desc<gpu_stage::shadow_cascade_3>(),
+    gpu_stage_desc<gpu_stage::shadow_cascade_4>(),
     gpu_stage_desc<gpu_stage::world_pass>(),
     gpu_stage_desc<gpu_stage::world_geometry>(),
     gpu_stage_desc<gpu_stage::world_debug>(),

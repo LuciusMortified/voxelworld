@@ -1,9 +1,11 @@
 #version 460 core
 
+const int SHADOW_CASCADES = 5;
+
 layout(location = 2) in uint inInstanceIndex;
 
 layout(set = 0, binding = 0) uniform ShadowUniformBufferObject {
-    mat4 light_space_matrices[4];
+    mat4 light_space_matrices[SHADOW_CASCADES];
 } shadowUbo;
 
 layout(set = 1, binding = 0, std430) readonly buffer ModelMatrices {

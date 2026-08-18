@@ -56,11 +56,7 @@ void chunk::create_entity_() {
     w.system<transform_system>().modify(ent_)
         .set_position(world_pos)
         .set_scale({vs, vs, vs});
-    {
-        auto modifier = w.system<model_system>().modify(ent_);
-        modifier.set_model(model_);
-        modifier.set_top_brightness(true);
-    }
+    w.system<model_system>().modify(ent_).set_model(model_);
     w.system<spatial_system>().modify(ent_).set_layer(spatial_layer::terrain);
 }
 

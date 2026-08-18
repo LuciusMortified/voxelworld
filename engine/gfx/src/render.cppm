@@ -102,6 +102,7 @@ enum class gpu_stage : uint32 {
     shadow_cascade_1,
     shadow_cascade_2,
     shadow_cascade_3,
+    shadow_cascade_4,
     world_pass,
     world_geometry,
     world_debug,
@@ -120,6 +121,7 @@ inline constexpr std::array<std::string_view, gpu_stage_count> gpu_stage_names{
     "gpu_cascade_1",
     "gpu_cascade_2",
     "gpu_cascade_3",
+    "gpu_cascade_4",
     "gpu_world_pass",
     "gpu_world_geometry",
     "gpu_world_debug",
@@ -177,9 +179,71 @@ export namespace vw::gfx {
 class vulkan_context;
 class camera;
 
+// What the cascades are worth tuning by hand. Every one of these trades
+// sharpness against how much of the frame the shadows cost, and the balance
+// depends on how far the eye actually travels in a given game.
+struct shadow_settings {
+    // Off. Past the first cascade the edge staircased, and the staircase moved
+    // whenever the camera did; no combination of the settings below made that
+    // go away. Everything here stays as it was so the decision can be undone,
+    // but nothing runs: no depth pass, no cascade culling, no filtering. The
+    // matching switch is SHADOW_ENABLED in voxel.frag, and both have to agree.
+    // What takes over the job is sky light -- docs/lighting.md.
+    bool enabled = false;
+
+    // Where the first cascade ends. Not the reach of the sharp zone -- the
+    // first cascade's texel is roughly a thousandth of this, so pushing it out
+    // dilutes that zone rather than extending it. What it buys is the ratio
+    // between neighbours, which is what the staircase is made of. 32 out of a
+    // thousand puts that ratio at 2.37: 1.6 screen pixels of staircase in the
+    // first cascade and 2.3 at the near edge of every one after it, which is
+    // what the cascade table in the test app prints.
+    float32 first_split = 32.0f;
+
+    // How far shadows are cast at all. Past it the world is lit flat.
+    float32 distance = 1000.0f;
+
+    // How far the sun may turn before a cascade is redrawn, in texels of
+    // movement at the cascade rim. Smaller is smoother under a moving sun and
+    // costs redraws. Set this low enough and it stops deciding anything: every
+    // cascade is dirty every frame and the budget below becomes the whole
+    // policy -- a round robin at one cascade per frame, which is a reasonable
+    // thing to want, but it ties the shadow update rate to the frame rate
+    // rather than to the speed of the sun.
+    float32 turn_texels = 0.05f;
+
+    // Cascades redrawn per frame. The whole point of the cascade cache is that
+    // this is far below the cascade count.
+    uint32 updates_per_frame = 1;
+
+    // The penumbra, in texels of whichever cascade is being sampled.
+    //
+    // Half a texel is nearly nothing, and that is the point: width was worth
+    // paying for while the staircase was five pixels and the far cascades
+    // jumped a whole lattice at a time. With the ratio at 2.37 and every
+    // cascade refreshing at the same rate, the edge holds still on its own, and
+    // blurring it costs the contact between a face and its own shadow for
+    // nothing in return.
+    float32 filter_texels = 0.5f;
+
+    // Depth offset along the surface normal, in texels, scaled by the filter
+    // width. A kernel this tight reads almost the depth it was given, so it
+    // needs almost no offset -- and offset it does not need is a shadow pulled
+    // off its caster.
+    float32 normal_bias = 0.0f;
+    float32 slope_bias  = 0.5f;
+};
+
 class shadow_map {
 public:
-    static constexpr uint32 cascade_count = 4;
+    // Five rather than four. What shows at a cascade boundary is the ratio
+    // between neighbours, and with the splits in a geometric progression that
+    // ratio is the same everywhere: over a given range, five cascades step by
+    // the fourth root where four step by the third, and the staircase is that
+    // ratio times 1.66 screen pixels. Over 24 to 1000 that was 3.47 against
+    // 2.54, seven pixels against five. The price is a fifth layer of the shadow
+    // array: 17 MB.
+    static constexpr uint32 cascade_count = 5;
 
     explicit shadow_map(vulkan_context& context, uint32 size = 2048);
 
@@ -192,6 +256,9 @@ public:
     shadow_map& operator=(shadow_map&&)      = delete;
 
     void update(const camera& camera, const vec3f& light_direction);
+
+    [[nodiscard]] auto get_settings() -> shadow_settings& { return settings_; }
+    [[nodiscard]] auto get_settings() const -> const shadow_settings& { return settings_; }
 
     // A cascade holds world-space depth, so a map drawn on an earlier frame
     // stays correct as long as it still covers the segment it is asked about.
@@ -206,6 +273,11 @@ public:
     [[nodiscard]] auto get_light_space_matrix(uint32 cascade_index) const -> mat4f;
     [[nodiscard]] auto get_light_space_matrices() const -> const std::array<mat4f, cascade_count>&;
     [[nodiscard]] auto get_cascade_splits() const -> const std::array<float, cascade_count>&;
+
+    // World units per shadow texel, per cascade. What the fragment shader
+    // measures its bias and its filter width in.
+    [[nodiscard]] auto get_cascade_texel_sizes() const
+        -> const std::array<float32, cascade_count>&;
     [[nodiscard]] auto get_cascade_frustums() const -> const std::array<vw::spatial::frustum, cascade_count>&;
     [[nodiscard]] auto get_image() const -> vk::Image;
     [[nodiscard]] auto get_image_view(uint32 cascade_index) const -> vk::ImageView;
@@ -251,15 +323,29 @@ private:
     std::array<vw::spatial::frustum, cascade_count> cascade_frustums_   = {};
     std::array<float, cascade_count> cascade_splits_       = {};
 
+    std::array<float32, cascade_count> cascade_texel_sizes_ = {};
     std::array<vec3f, cascade_count> drawn_centers_ = {};
     std::array<float32, cascade_count> drawn_radii_ = {};
-    vec3f drawn_light_dir_{};
+    // The direction each cascade was actually drawn with, not the direction of
+    // the previous frame. Held per cascade because they are redrawn a couple at
+    // a time, so they fall behind the sun by different amounts.
+    std::array<vec3f, cascade_count> drawn_light_dirs_ = {};
+
+    // Frames a cascade has been dirty without being picked. Breaks the tie
+    // between cascades that all want redrawing equally badly.
+    std::array<uint32, cascade_count> frames_waited_ = {};
     uint32 dirty_mask_   = 0;
     uint32 pending_mask_ = 0;
 
     uint32 size_;
-    float split_lambda_ = 0.5f;
-    float shadow_far_   = 1000.f;
+
+    shadow_settings settings_{};
+
+    // The splits the cascades were last built for. Changing either moves every
+    // boundary, and a cascade cached against the old ones covers the wrong
+    // slice.
+    float32 built_first_split_ = 0.0f;
+    float32 built_distance_    = 0.0f;
 
     // Coverage padding traded for update rate: the map is built this much
     // larger than the segment needs, so it stays valid while the camera drifts
@@ -271,7 +357,6 @@ private:
     // them from falling due on the same frame.
     float32 cascade_trigger_ratio_ = 0.15f;
 
-    uint32 max_cascade_updates_per_frame_ = 2;
 };
 
 }  // namespace vw::gfx
@@ -282,8 +367,18 @@ export namespace vw::gfx {
 
 class vulkan_context;
 
+// The camera and every shadow cascade get culled in one dispatch, and every
+// buffer the dispatch fills is sized by this: the plane block, the culled
+// command buffer, the per-pass draw counts.
+//
+// Two copies of the number used to exist, both written out as literals, and a
+// fifth cascade walked past the end of each in turn -- the plane fill ran six
+// vec4 off a stack struct and died on the stack cookie, and the count buffer
+// then handed the last cascade an offset one uint past its end.
+inline constexpr uint32 cull_plane_count = (shadow_map::cascade_count + 1) * 6;
+
 struct cull_frustum_ubo {
-    vec4f planes[30];
+    vec4f planes[cull_plane_count];
 
     // Where the camera stands, for dropping the face directions that point away
     // from it. Only the camera pass uses it.

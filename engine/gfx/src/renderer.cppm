@@ -29,6 +29,38 @@ struct directional_light_settings {
     float32 intensity{1.0f};
 };
 
+// The light a surface gets from everything that is not a light: the sky above
+// and whatever the ground throws back. With no textures this is the only thing
+// telling one face of a block from another wherever the sun does not reach, so
+// it is a hemisphere rather than a constant -- a flat ambient makes an unlit
+// voxel a single flat colour, which is what plastic looks like.
+//
+// Sky visibility is not in here: nothing yet knows how much sky reaches a
+// point, so a cave is lit by an outdoor sky. That is what the baked sky light
+// of stage 2 fixes -- see docs/lighting.md.
+struct ambient_settings {
+    vec3f sky{0.34f, 0.42f, 0.52f};
+    vec3f ground{0.16f, 0.14f, 0.13f};
+    float32 strength{0.85f};
+
+    // How far down the ambient goes in a fully enclosed corner, and the curve
+    // the raw occlusion travels to get there. The samples are integers from
+    // zero to three, so the curve is the only say over where the middle of the
+    // ramp sits: below one it spreads the shading out across the face, above
+    // one it pulls it back into the corner.
+    float32 ao_strength = 0.35f;
+    float32 ao_curve    = 1.0f;
+};
+
+// Not a setting -- a way of looking. Lighting is a product of the block's own
+// colour and everything falling on it, and looking at the product to judge one
+// factor is guesswork. Each of these shows one factor on its own.
+enum class debug_view : uint32 {
+    off = 0,
+    ambient_occlusion,
+    normals,
+};
+
 // Настройки тумана (для CPU)
 struct fog_settings {
     vec3f color{0.1f, 0.1f, 0.1f};
@@ -40,7 +72,19 @@ struct fog_settings {
 // Для directional light (в UBO)
 struct directional_light_data {
     alignas(16) mat4f light_space_matrices[shadow_map::cascade_count];
-    alignas(16) vec4f cascade_splits;
+    // Per cascade: x is where it ends in view depth, y is how much world one
+    // of its shadow texels covers. Bias has to be measured in texels -- the
+    // offset that is generous for the near cascade is a fraction of a texel for
+    // the far one, and the far one is where the acne shows.
+    //
+    // A vec4 per cascade rather than a vec4 of splits and a vec4 of texel
+    // sizes: there are five cascades now, and five scalars do not fit a vec4.
+    alignas(16) vec4f cascades[shadow_map::cascade_count];
+
+    // x: penumbra half-width in texels, y: normal offset in texels, z: how much
+    // of that offset is added again per unit of slope.
+    alignas(16) vec4f shadow_filter;
+
     alignas(16) vec3f direction;
     alignas(16) vec3f color;
     alignas(4) float32 intensity;
@@ -62,8 +106,17 @@ struct uniform_buffer_object {
     // Directional light
     alignas(16) directional_light_data directional_light;
 
+    // Hemisphere ambient: sky above, ground below, w of each unused.
+    alignas(16) vec4f ambient_sky;
+    alignas(16) vec4f ambient_ground;
+
+    // x: how far down a fully enclosed corner goes, y: the occlusion curve.
+    alignas(16) vec4f ao_params;
+
     // Point lights count (для расширяемости)
     alignas(4) uint32 point_lights_count{0};
+
+    alignas(4) uint32 debug_view{0};
 
     // Fog
     alignas(16) fog_data fog;
@@ -170,6 +223,16 @@ public:
 
     [[nodiscard]] auto get_directional_light_settings() -> directional_light_settings&;
     [[nodiscard]] auto get_fog_settings() -> fog_settings&;
+    [[nodiscard]] auto get_ambient_settings() -> ambient_settings&;
+    [[nodiscard]] auto get_shadow_settings() -> shadow_settings&;
+
+    void set_debug_view(debug_view view);
+    [[nodiscard]] auto get_debug_view() const -> debug_view;
+
+    // Where each cascade ends and what one of its texels covers. Only worth
+    // reading to show the cost of a shadow setting while it is being turned.
+    [[nodiscard]] auto get_cascade_splits() const -> const std::array<float32, shadow_map::cascade_count>&;
+    [[nodiscard]] auto get_cascade_texel_sizes() const -> const std::array<float32, shadow_map::cascade_count>&;
 
     [[nodiscard]] auto get_mesh_pool() -> mesh_pool& { return mesh_pool_; }
     [[nodiscard]] auto get_mesh_pool() const -> const mesh_pool& { return mesh_pool_; }
@@ -384,6 +447,8 @@ private:
 
     // Настройки тумана
     fog_settings fog_settings_;
+    ambient_settings ambient_settings_;
+    debug_view debug_view_ = debug_view::off;
 
     // Статистика
     mutable renderer_stats stats_;

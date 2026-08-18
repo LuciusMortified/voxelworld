@@ -140,7 +140,6 @@ public:
         [[nodiscard]] auto get_model() const -> std::shared_ptr<asset::model>;
 
         void set_model(std::shared_ptr<asset::model> model_ptr);
-        void set_top_brightness(bool enabled);
         void set_voxel(int32 x, int32 y, int32 z, const voxel& v);
         void set_voxel(vec3i pos, const voxel& v);
         void fill(const voxel& v);

@@ -33,9 +33,9 @@ class world_grid_app final : public gfx::app {
 public:
     explicit world_grid_app(
         gfx::engine& eng, bench_scene scene = bench_scene::off, uint32 crowd_size = 0,
-        bool chunk_cull = true
+        bool chunk_cull = true, bool sun_in_bench = false
     )
-        : app{eng}, bench_scene_{scene}, crowd_size_{crowd_size} {
+        : app{eng}, bench_scene_{scene}, crowd_size_{crowd_size}, sun_in_bench_{sun_in_bench} {
         get_engine().get_renderer().set_chunk_cull_enabled(chunk_cull);
         auto& window = get_engine().get_window();
         auto& camera = get_engine().get_camera();
@@ -161,6 +161,15 @@ private:
         }
 
         if (bench_scene_ == bench_scene::advance) {
+            // Only once the world around the start is whole. Setting off from
+            // a cold start measured the first eight hundred frames of catching
+            // up, which is a different thing from walking through a world that
+            // is already there -- and looks, watching it, like the loader is
+            // broken.
+            if (!bench_ready_) {
+                return;
+            }
+
             const auto frame = static_cast<float32>(bench_frame_++);
             camera.set_position({
                 frame * bench_advance_per_frame_,
@@ -236,11 +245,16 @@ private:
         }
     }
 
-    // The sun rides an arc and the world dims with it. Off in the bench
-    // scenes: a light that turns invalidates every cascade, so a benchmark left
-    // running with it would measure the sun rather than the change under test.
+    // The sun rides an arc and the world dims with it. Off in the bench scenes
+    // by default: a light that turns invalidates every cascade, so a run left
+    // with it would measure the sun rather than the change under test.
+    //
+    // --sun puts it back on for a bench run. Off by default meant no scene ever
+    // exercised a turning light, and a bug that froze the shadows under one
+    // lived through every run of the suite. Numbers from a --sun run are not
+    // comparable with the rest.
     auto tick_day_night_(float delta_time) -> void {
-        if (bench_scene_ != bench_scene::off || !day_night_running_) {
+        if ((bench_scene_ != bench_scene::off && !sun_in_bench_) || !day_night_running_) {
             return;
         }
 
@@ -308,6 +322,26 @@ private:
         auto& renderer = get_engine().get_renderer();
         renderer.set_clear_color(sky.x, sky.y, sky.z, 1.0f);
         renderer.get_fog_settings().color = sky;
+
+        // The ambient hemisphere follows the same palette: what a face pointing
+        // up receives is the sky it is looking at. Damped, because the sky is a
+        // saturated blue and taking it neat tints the whole world; and floored,
+        // because a night with no ambient at all is a black screen rather than
+        // a dark one.
+        auto& ambient = renderer.get_ambient_settings();
+        ambient.sky = vec3f{
+            (sky.x * 0.6f) + 0.020f,
+            (sky.y * 0.6f) + 0.025f,
+            (sky.z * 0.6f) + 0.040f,
+        };
+
+        // Bounce off the ground: warm and dim, and it goes out with the sun,
+        // since there is nothing left to bounce.
+        ambient.ground = vec3f{
+            std::lerp(0.030f, 0.20f, day),
+            std::lerp(0.035f, 0.17f, day),
+            std::lerp(0.055f, 0.14f, day),
+        };
     }
 
     auto tick_crowd_settle_() -> void {
@@ -499,6 +533,38 @@ private:
 
         ImGui::Separator();
 
+        // No shadow panel: the cascades are parked, and sliders that move
+        // nothing are worse than none. Turning them back on is two edits --
+        // shadow_settings::enabled and SHADOW_ENABLED in voxel.frag.
+        if (ImGui::CollapsingHeader("Lighting")) {
+            auto& renderer = get_engine().get_renderer();
+            auto& ambient  = renderer.get_ambient_settings();
+
+            ImGui::SliderFloat("Ambient", &ambient.strength, 0.0f, 2.0f, "%.2f");
+            ImGui::SliderFloat("AO strength", &ambient.ao_strength, 0.0f, 1.0f, "%.2f");
+            ImGui::SliderFloat("AO curve", &ambient.ao_curve, 0.25f, 4.0f, "%.2f");
+
+            // Judging occlusion off the finished frame means judging a product
+            // of the block's colour and everything falling on it. These show
+            // one factor with the others taken away.
+            static constexpr std::array<const char*, 3> view_names{
+                "off", "ambient occlusion", "normals"
+            };
+            auto view = static_cast<int32>(renderer.get_debug_view());
+            if (ImGui::Combo("Debug view", &view, view_names.data(), view_names.size())) {
+                renderer.set_debug_view(static_cast<gfx::debug_view>(view));
+            }
+
+            ImGui::Text(
+                "sky   %.3f %.3f %.3f", ambient.sky.x, ambient.sky.y, ambient.sky.z
+            );
+            ImGui::Text(
+                "grnd  %.3f %.3f %.3f", ambient.ground.x, ambient.ground.y, ambient.ground.z
+            );
+        }
+
+        ImGui::Separator();
+
         const auto& camera = get_engine().get_camera();
         const auto pos     = camera.get_position();
         ImGui::Text("Camera: (%.1f, %.1f, %.1f)", pos.x, pos.y, pos.z);
@@ -573,6 +639,7 @@ private:
     float32 day_length_seconds_ = 120.0f;
     float32 night_intensity_    = 0.06f;
     bool day_night_running_     = true;
+    bool sun_in_bench_          = false;
 
     static constexpr std::array<std::string_view, 4> crowd_target_names_{
         "body", "head", "hand_left", "hand_right",
@@ -629,6 +696,7 @@ auto main(int argc, char** argv) -> int {
     auto scene        = bench_scene::off;
     uint32 crowd_size = 0;
     bool chunk_cull   = false;
+    bool sun_in_bench = false;
 
     for (int32 i = 1; i < argc; ++i) {
         if (const auto value = option_value(std::string_view{argv[i]}, "--bench")) {
@@ -669,13 +737,15 @@ auto main(int argc, char** argv) -> int {
             bench.terrain_workers = parse_uint(*value, 0);
         } else if (arg == "--chunk-cull") {
             chunk_cull = true;
+        } else if (arg == "--sun") {
+            sun_in_bench = true;
         }
     }
 
     try {
         log::add_file_sink("test_world_grid.log");
         std::make_unique<gfx::engine>(1280, 720, "Voxel World - World Grid Test", std::move(bench))
-            ->run<world_grid_app>(scene, crowd_size, chunk_cull);
+            ->run<world_grid_app>(scene, crowd_size, chunk_cull, sun_in_bench);
     } catch (const std::exception& e) {
         log::error("Error: {}", e.what());
         return 1;

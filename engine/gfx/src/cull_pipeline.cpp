@@ -146,6 +146,11 @@ void cull_pipeline::create_frustum_ubos_() {
     }
 }
 
+static_assert(
+    combined_buffer::cull_pass_count == shadow_map::cascade_count + 1,
+    "one cull pass for the camera and one per shadow cascade"
+);
+
 void cull_pipeline::update_frustums(
     uint32 frame_index,
     const vw::spatial::frustum& view_frustum,
@@ -153,7 +158,9 @@ void cull_pipeline::update_frustums(
     const vec3f& eye
 ) {
     cull_frustum_ubo ubo{};
-    ubo.pass_count = 1 + static_cast<uint32>(shadow_frustums.size());
+    ubo.pass_count =
+        std::min(combined_buffer::cull_pass_count,
+                 1 + static_cast<uint32>(shadow_frustums.size()));
     ubo.eye        = vec4f{eye.x, eye.y, eye.z, 1.0f};
 
     for (uint32 i = 0; i < 6; i++) {
@@ -161,7 +168,7 @@ void cull_pipeline::update_frustums(
         ubo.planes[i] = vec4f{p.normal.x, p.normal.y, p.normal.z, p.distance};
     }
 
-    for (uint32 c = 0; c < shadow_frustums.size(); c++) {
+    for (uint32 c = 0; c + 1 < ubo.pass_count; c++) {
         for (uint32 i = 0; i < 6; i++) {
             const auto& p = shadow_frustums[c].planes[i];
             ubo.planes[(c + 1) * 6 + i] =

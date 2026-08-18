@@ -142,15 +142,10 @@ struct model_component final {
         return model_->get_identity();
     }
 
-    [[nodiscard]] auto top_brightness() const -> bool {
-        return top_brightness_;
-    }
-
 private:
     friend class model_system;
 
     std::shared_ptr<asset::model> model_;
-    bool top_brightness_ = false;
 };
 
 struct spatial_component final {

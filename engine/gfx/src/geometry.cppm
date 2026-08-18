@@ -173,7 +173,11 @@ struct combined_buffer_stats {
 
 class combined_buffer {
 public:
-    static constexpr uint32 cull_pass_count = 5;
+    // The camera and every shadow cascade are culled in one dispatch, and the
+    // buffers it fills are sized by this. It has to equal the cascade count
+    // plus one; :geometry cannot see :render without closing a cycle in the
+    // import graph, so cull_pipeline.cpp asserts the two agree.
+    static constexpr uint32 cull_pass_count = 6;
 
     // One draw command per face direction of a mesh.
     static constexpr uint32 faces_per_mesh = 6;

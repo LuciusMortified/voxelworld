@@ -21,17 +21,15 @@ auto quad::pack(
     vec3i max_pos,
     uint8 normal_id,
     block_id block_id,
-    uint8 corners_dark,
-    uint8 corners_bright
+    uint8 corners_ao
 ) -> quad {
     quad q;
-    q.data0 =                                                //
-        (static_cast<uint32>(min_pos.x) & 0x7Fu) |           //
-        ((static_cast<uint32>(min_pos.y) & 0x7Fu) << 7) |    //
-        ((static_cast<uint32>(min_pos.z) & 0x7Fu) << 14) |   //
-        ((static_cast<uint32>(normal_id) & 0x7u) << 21) |    //
-        ((static_cast<uint32>(corners_dark) & 0xFu) << 24) |  //
-        ((static_cast<uint32>(corners_bright) & 0xFu) << 28);
+    q.data0 =                                               //
+        (static_cast<uint32>(min_pos.x) & 0x7Fu) |          //
+        ((static_cast<uint32>(min_pos.y) & 0x7Fu) << 7) |   //
+        ((static_cast<uint32>(min_pos.z) & 0x7Fu) << 14) |  //
+        ((static_cast<uint32>(normal_id) & 0x7u) << 21) |   //
+        (static_cast<uint32>(corners_ao) << 24);
 
     q.data1 =                                               //
         (static_cast<uint32>(max_pos.x) & 0x7Fu) |          //
@@ -189,6 +187,28 @@ auto is_solid_at(
     return false;
 }
 
+// How much of a corner of a face is shut in by the plane in front of it.
+//
+// The classic three samples: the two cells across an edge from the corner and
+// the one diagonally across from it. Two solid edges shut the corner off
+// whatever lies beyond them, so that case is written out rather than counted --
+// it is the rule that keeps a right angle from going grey.
+//
+// One cell is the whole reach, and that is a deliberate limit rather than an
+// oversight. A weighted kernel two cells wide was built and measured: it does
+// see the wall across a trench three voxels wide, and it costs ten percent of
+// the quad count to the greedy merge, two thirds of a second of streaming, and
+// the crispness of every corner. Three samples is also what lets the whole face
+// come out of three shifted occupancy rows below, which is where most of that
+// streaming time went. docs/lighting.md records the experiment.
+[[nodiscard]] auto corner_level(bool edge_a, bool edge_b, bool diagonal) -> uint8 {
+    if (edge_a && edge_b) {
+        return 3;
+    }
+    return static_cast<uint8>(edge_a) + static_cast<uint8>(edge_b) +
+           static_cast<uint8>(diagonal);
+}
+
 auto compute_corner_darkness(
     const vw::asset::model& mdl, int x, int y, int z, int face
 ) -> uint8 {
@@ -196,62 +216,24 @@ auto compute_corner_darkness(
     const vec3i u = ao_tangent_u[face];
     const vec3i v = ao_tangent_v[face];
 
-    const bool edge_mv = is_solid_at(mdl, n - v);
-    const bool edge_pu = is_solid_at(mdl, n + u);
-    const bool edge_pv = is_solid_at(mdl, n + v);
     const bool edge_mu = is_solid_at(mdl, n - u);
+    const bool edge_pu = is_solid_at(mdl, n + u);
+    const bool edge_mv = is_solid_at(mdl, n - v);
+    const bool edge_pv = is_solid_at(mdl, n + v);
 
     const bool diag_c0 = is_solid_at(mdl, n - u - v);
     const bool diag_c1 = is_solid_at(mdl, n + u - v);
     const bool diag_c2 = is_solid_at(mdl, n + u + v);
     const bool diag_c3 = is_solid_at(mdl, n - u + v);
 
-    auto corner = [](bool s1, bool s2, bool d) -> uint8 {
-        if (s1 && s2) {
-            return 3;
-        }
-        return static_cast<uint8>(s1) + static_cast<uint8>(s2) + static_cast<uint8>(d);
-    };
-
-    const uint8 c0 = corner(edge_mu, edge_mv, diag_c0);
-    const uint8 c1 = corner(edge_pu, edge_mv, diag_c1);
-    const uint8 c2 = corner(edge_pu, edge_pv, diag_c2);
-    const uint8 c3 = corner(edge_mu, edge_pv, diag_c3);
+    const uint8 c0 = corner_level(edge_mu, edge_mv, diag_c0);
+    const uint8 c1 = corner_level(edge_pu, edge_mv, diag_c1);
+    const uint8 c2 = corner_level(edge_pu, edge_pv, diag_c2);
+    const uint8 c3 = corner_level(edge_mu, edge_pv, diag_c3);
 
     return static_cast<uint8>(c0 | (c1 << 2) | (c2 << 4) | (c3 << 6));
 }
 
-auto compute_corner_brightness(
-    const vw::asset::model& mdl, int x, int y, int z, int face
-) -> uint8 {
-    const vec3i host = vec3i{x, y, z};
-    const vec3i u    = ao_tangent_u[face];
-    const vec3i v    = ao_tangent_v[face];
-
-    const bool miss_mv = !is_solid_at(mdl, host - v);
-    const bool miss_pu = !is_solid_at(mdl, host + u);
-    const bool miss_pv = !is_solid_at(mdl, host + v);
-    const bool miss_mu = !is_solid_at(mdl, host - u);
-
-    const bool miss_c0 = !is_solid_at(mdl, host - u - v);
-    const bool miss_c1 = !is_solid_at(mdl, host + u - v);
-    const bool miss_c2 = !is_solid_at(mdl, host + u + v);
-    const bool miss_c3 = !is_solid_at(mdl, host - u + v);
-
-    auto corner = [](bool s1, bool s2, bool d) -> uint8 {
-        if (s1 && s2) {
-            return 3;
-        }
-        return static_cast<uint8>(s1) + static_cast<uint8>(s2) + static_cast<uint8>(d);
-    };
-
-    const uint8 c0 = corner(miss_mu, miss_mv, miss_c0);
-    const uint8 c1 = corner(miss_pu, miss_mv, miss_c1);
-    const uint8 c2 = corner(miss_pu, miss_pv, miss_c2);
-    const uint8 c3 = corner(miss_mu, miss_pv, miss_c3);
-
-    return static_cast<uint8>(c0 | (c1 << 2) | (c2 << 4) | (c3 << 6));
-}
 
 auto is_face_visible(
     const vw::asset::model& mdl, int x, int y, int z, int face_direction
@@ -283,14 +265,13 @@ void build_face_mask(
     int layer,
     mesh_options opts
 ) {
-    const bool brightness_enabled = opts.enable_top_brightness && face_direction == 2;
     constexpr int ps = vw::asset::model::page_size;
 
     auto idx = [&](int u, int v) -> size_t {
         return (static_cast<size_t>(u) * static_cast<size_t>(axes.height)) + static_cast<size_t>(v);
     };
 
-    constexpr face_mask_cell empty_cell{blocks::air, 0, 0};
+    constexpr face_mask_cell empty_cell{blocks::air, 0};
 
     for (int u_block = 0; u_block < axes.width; u_block += ps) {
         int u_end = std::min(u_block + ps, axes.width);
@@ -316,11 +297,7 @@ void build_face_mask(
                         auto [mx, my, mz] = axes.to_model_coords(u, v, layer);
                         if (is_face_visible(mdl, mx, my, mz, face_direction)) {
                             storage.mask[idx(u, v)] = {
-                                fid,
-                                compute_corner_darkness(mdl, mx, my, mz, face_direction),
-                                brightness_enabled
-                                    ? compute_corner_brightness(mdl, mx, my, mz, face_direction)
-                                    : uint8{0}
+                                fid, compute_corner_darkness(mdl, mx, my, mz, face_direction)
                             };
                         } else {
                             storage.mask[idx(u, v)] = empty_cell;
@@ -340,11 +317,7 @@ void build_face_mask(
                     auto& vx          = (*page)[lx + ly * ps + lz * ps * ps];
                     if (!vx.is_empty() && is_face_visible(mdl, mx, my, mz, face_direction)) {
                         storage.mask[idx(u, v)] = {
-                            vx.id,
-                            compute_corner_darkness(mdl, mx, my, mz, face_direction),
-                            brightness_enabled
-                                ? compute_corner_brightness(mdl, mx, my, mz, face_direction)
-                                : uint8{0}
+                            vx.id, compute_corner_darkness(mdl, mx, my, mz, face_direction)
                         };
                     } else {
                         storage.mask[idx(u, v)] = empty_cell;
@@ -361,8 +334,7 @@ void add_quad(
     vec3i min_pos,
     vec3i max_pos,
     block_id block_id,
-    uint8 corner_dark,
-    uint8 corner_bright
+    uint8 corner_ao
 ) {
     // Which of the two corners each winding-order vertex takes its components
     // from. The same table lives in voxel.vert and shadow.vert -- the shader is
@@ -380,35 +352,25 @@ void add_quad(
 
     const auto normal_id = static_cast<uint8>(face_direction);
 
-    const uint8 c_dark[4] = {
-        static_cast<uint8>(corner_dark & 0x3u),
-        static_cast<uint8>((corner_dark >> 2) & 0x3u),
-        static_cast<uint8>((corner_dark >> 4) & 0x3u),
-        static_cast<uint8>((corner_dark >> 6) & 0x3u),
-    };
-    const uint8 c_bright[4] = {
-        static_cast<uint8>(corner_bright & 0x3u),
-        static_cast<uint8>((corner_bright >> 2) & 0x3u),
-        static_cast<uint8>((corner_bright >> 4) & 0x3u),
-        static_cast<uint8>((corner_bright >> 6) & 0x3u),
+    const uint8 c_ao[4] = {
+        static_cast<uint8>(corner_ao & 0x3u),
+        static_cast<uint8>((corner_ao >> 2) & 0x3u),
+        static_cast<uint8>((corner_ao >> 4) & 0x3u),
+        static_cast<uint8>((corner_ao >> 6) & 0x3u),
     };
 
-    uint8 corners_dark_winding   = 0;
-    uint8 corners_bright_winding = 0;
+    // Two bits through, not a comparison against zero. The sampler distinguishes
+    // a corner touched by one diagonal block from one closed in by two faces,
+    // and that difference is the whole of what makes the shading read as depth
+    // rather than as an outline.
+    uint8 ao_winding = 0;
     for (int i = 0; i < 4; i++) {
         const uint8 corner_i = winding_to_corner[face_direction][i];
         const uint8 ao_i     = corner_to_ao[corner_i];
-        if (c_dark[ao_i] > 0) {
-            corners_dark_winding |= static_cast<uint8>(1u << i);
-        }
-        if (c_bright[ao_i] > 0) {
-            corners_bright_winding |= static_cast<uint8>(1u << i);
-        }
+        ao_winding |= static_cast<uint8>(c_ao[ao_i] << (i * 2));
     }
 
-    quads.push_back(quad::pack(
-        min_pos, max_pos, normal_id, block_id, corners_dark_winding, corners_bright_winding
-    ));
+    quads.push_back(quad::pack(min_pos, max_pos, normal_id, block_id, ao_winding));
 }
 
 
@@ -473,7 +435,6 @@ auto build_layer_rows(
                 break;
         }
 
-        out.own[v]     = own;
         out.front[v]   = front;
         out.visible[v] = own & ~front;
         any |= out.visible[v];
@@ -512,17 +473,10 @@ auto samples_from_rows(uint64 row_mv, uint64 row, uint64 row_pv) -> corner_sampl
 auto pack_corners(const corner_samples& s, int u) -> uint8 {
     const auto bit = [u](uint64 mask) -> bool { return ((mask >> u) & 1U) != 0; };
 
-    auto corner = [](bool s1, bool s2, bool diag) -> uint8 {
-        if (s1 && s2) {
-            return 3;
-        }
-        return static_cast<uint8>(s1) + static_cast<uint8>(s2) + static_cast<uint8>(diag);
-    };
-
-    const uint8 c0 = corner(bit(s.edge_mu), bit(s.edge_mv), bit(s.diag_c0));
-    const uint8 c1 = corner(bit(s.edge_pu), bit(s.edge_mv), bit(s.diag_c1));
-    const uint8 c2 = corner(bit(s.edge_pu), bit(s.edge_pv), bit(s.diag_c2));
-    const uint8 c3 = corner(bit(s.edge_mu), bit(s.edge_pv), bit(s.diag_c3));
+    const uint8 c0 = corner_level(bit(s.edge_mu), bit(s.edge_mv), bit(s.diag_c0));
+    const uint8 c1 = corner_level(bit(s.edge_pu), bit(s.edge_mv), bit(s.diag_c1));
+    const uint8 c2 = corner_level(bit(s.edge_pu), bit(s.edge_pv), bit(s.diag_c2));
+    const uint8 c3 = corner_level(bit(s.edge_mu), bit(s.edge_pv), bit(s.diag_c3));
 
     return static_cast<uint8>(c0 | (c1 << 2) | (c2 << 4) | (c3 << 6));
 }
@@ -546,8 +500,7 @@ void emit_rect(
         min_pos,
         max_pos,
         block_id{cell.voxel_id},
-        cell.corner_dark,
-        cell.corner_bright
+        cell.corner_ao
     );
 }
 
@@ -602,18 +555,13 @@ void simple_mesh_generator::add_cube_face(
     const block_registry& registry,
     mesh_options opts
 ) {
-    uint8 corner_dark   = detail::compute_corner_darkness(*mdl, x, y, z, face_direction);
-    uint8 corner_bright = (opts.enable_top_brightness && face_direction == 2)
-        ? detail::compute_corner_brightness(*mdl, x, y, z, face_direction)
-        : uint8{0};
     detail::add_quad(
         quads,
         face_direction,
         {x, y, z},
         {x + 1, y + 1, z + 1},
         voxel_id,
-        corner_dark,
-        corner_bright
+        detail::compute_corner_darkness(*mdl, x, y, z, face_direction)
     );
 }
 
@@ -877,7 +825,7 @@ void greedy_mesh_generator::merge_and_emit_rects(
         return static_cast<size_t>(u) * static_cast<size_t>(axes.height) + static_cast<size_t>(v);
     };
 
-    face_mask_cell empty_cell{blocks::air, 0, 0};
+    face_mask_cell empty_cell{blocks::air, 0};
 
     for (int v = 0; v < axes.height; v++) {
         for (int u = 0; u < axes.width; u++) {
@@ -968,30 +916,23 @@ void greedy_mesh_generator::generate_face_quads(
                 continue;
             }
 
-            const bool want_bright = opts.enable_top_brightness && face_direction == 2;
-
             for (int v = 0; v < axes.height; v++) {
                 uint64 bits = rows.visible[v];
                 if (bits == 0) {
                     continue;
                 }
 
-                // Occlusion samples sit one cell away in u and v, so a cell on
-                // the edge of the layer reaches into the neighbouring chunk and
-                // keeps the scalar path, which knows how to ask for it. Same
-                // when the sampled plane is outside the chunk entirely.
+                // Occlusion samples sit one cell away in u and v, so a cell
+                // on the edge of the layer reaches into the neighbouring chunk
+                // and keeps the scalar path, which knows how to ask for it.
+                // Same when the sampled plane is outside the chunk entirely.
                 const bool interior_v = v > 0 && v + 1 < axes.height;
                 const bool bit_ao     = interior_v && !rows.front_outside;
 
-                const auto dark = detail::samples_from_rows(
+                const auto samples = detail::samples_from_rows(
                     interior_v ? rows.front[v - 1] : 0,
                     rows.front[v],
                     interior_v ? rows.front[v + 1] : 0
-                );
-                const auto bright = detail::samples_from_rows(
-                    interior_v ? ~rows.own[v - 1] : 0,
-                    ~rows.own[v],
-                    interior_v ? ~rows.own[v + 1] : 0
                 );
 
                 while (bits != 0) {
@@ -1003,21 +944,11 @@ void greedy_mesh_generator::generate_face_quads(
                     const bool interior = bit_ao && u > 0 && u + 1 < axes.width;
 
                     face_mask_cell cell{};
-                    cell.voxel_id = mdl.get_voxel(mx, my, mz).id;
-
-                    if (interior) {
-                        cell.corner_dark   = detail::pack_corners(dark, u);
-                        cell.corner_bright = want_bright ? detail::pack_corners(bright, u)
-                                                         : uint8{0};
-                    } else {
-                        cell.corner_dark = detail::compute_corner_darkness(
-                            mdl, mx, my, mz, face_direction
-                        );
-                        cell.corner_bright =
-                            want_bright
-                                ? detail::compute_corner_brightness(mdl, mx, my, mz, face_direction)
-                                : uint8{0};
-                    }
+                    cell.voxel_id  = mdl.get_voxel(mx, my, mz).id;
+                    cell.corner_ao = interior ? detail::pack_corners(samples, u)
+                                              : detail::compute_corner_darkness(
+                                                    mdl, mx, my, mz, face_direction
+                                                );
 
                     storage.mask[idx(u, v)] = cell;
                 }

@@ -243,6 +243,34 @@ auto renderer::get_fog_settings() -> fog_settings& {
     return fog_settings_;
 }
 
+auto renderer::get_ambient_settings() -> ambient_settings& {
+    return ambient_settings_;
+}
+
+auto renderer::get_shadow_settings() -> shadow_settings& {
+    return shadow_map_->get_settings();
+}
+
+void renderer::set_debug_view(
+    debug_view view
+) {
+    debug_view_ = view;
+}
+
+auto renderer::get_debug_view() const -> debug_view {
+    return debug_view_;
+}
+
+auto renderer::get_cascade_splits() const
+    -> const std::array<float32, shadow_map::cascade_count>& {
+    return shadow_map_->get_cascade_splits();
+}
+
+auto renderer::get_cascade_texel_sizes() const
+    -> const std::array<float32, shadow_map::cascade_count>& {
+    return shadow_map_->get_cascade_texel_sizes();
+}
+
 void renderer::draw_colliders(
     world& w, color col
 ) {
@@ -317,7 +345,6 @@ void renderer::sync_meshes_(world_type& world) {
             mesh_pool_.request_mesh(
                 comp.get_model(),
                 mesh_options{
-                    .enable_top_brightness = comp.top_brightness(),
                     // Meshes built before the walk was switched on keep their
                     // wide-open links, which hides nothing rather than too much.
                     .build_links = combined_buffer_pool_->is_chunk_cull_enabled(),
@@ -350,9 +377,14 @@ void renderer::render(
         gpu_timer_->end(cmd, gpu_stage::buffer_upload);
     });
 
+    const bool shadows_on = shadow_map_->get_settings().enabled;
+
     // The pool runs first so that the shadow map hears about this frame's
     // geometry before it decides which cascades it can leave alone.
     stats_.timing.shadow_map_update_ms = measure_ms([&] {
+        if (!shadows_on) {
+            return;
+        }
         for (const auto& bounds : combined_buffer_pool_->get_touched_bounds()) {
             shadow_map_->invalidate(bounds);
         }
@@ -386,9 +418,17 @@ void renderer::render(
             );
         }
 
+        // No cascades, no cascade passes: the culling dispatch sizes itself off
+        // the frustums it is handed, so an empty span is what takes the five
+        // shadow passes out of the frame rather than leaving them to fill
+        // command buffers nothing will draw.
         const vw::spatial::frustum& view_frustum = camera.get_frustum();
+        const std::span<const vw::spatial::frustum> cull_cascades =
+            shadows_on ? std::span<const vw::spatial::frustum>{cascade_frustums}
+                       : std::span<const vw::spatial::frustum>{};
+
         cull_pipeline_->update_frustums(
-            current_frame_, view_frustum, cascade_frustums, camera.get_position());
+            current_frame_, view_frustum, cull_cascades, camera.get_position());
 
         cull_pipeline_->dispatch(
             command_buffers_[current_image_index_],
@@ -414,6 +454,9 @@ void renderer::render(
     });
 
     stats_.timing.shadow_pass_ms = measure_ms([&] {
+        if (!shadows_on) {
+            return;
+        }
         gpu_timer_->begin(cmd, gpu_stage::shadow_pass);
         render_shadow_pass(world, camera);
         gpu_timer_->end(cmd, gpu_stage::shadow_pass);
@@ -1517,14 +1560,40 @@ void renderer::update_uniform_buffer(
     // Directional light data
     const auto& light_space_matrices = shadow_map_->get_light_space_matrices();
     const auto& cascade_splits       = shadow_map_->get_cascade_splits();
+    const auto& texels   = shadow_map_->get_cascade_texel_sizes();
+    const auto& shadows  = shadow_map_->get_settings();
+
+    ubo.directional_light.shadow_filter = vec4f{
+        shadows.filter_texels, shadows.normal_bias, shadows.slope_bias, 0.0f
+    };
+
     for (uint32 i = 0; i < shadow_map::cascade_count; ++i) {
         ubo.directional_light.light_space_matrices[i] = light_space_matrices[i];
+        ubo.directional_light.cascades[i] = vec4f{cascade_splits[i], texels[i], 0.0f, 0.0f};
     }
-    ubo.directional_light.cascade_splits =
-        vec4f{cascade_splits[0], cascade_splits[1], cascade_splits[2], cascade_splits[3]};
     ubo.directional_light.direction = directional_light_settings_.direction;
     ubo.directional_light.color     = directional_light_settings_.color;
     ubo.directional_light.intensity = directional_light_settings_.intensity;
+
+    const float32 ambient_strength = ambient_settings_.strength;
+    ubo.ambient_sky = vec4f{
+        ambient_settings_.sky.x * ambient_strength,
+        ambient_settings_.sky.y * ambient_strength,
+        ambient_settings_.sky.z * ambient_strength,
+        0.0f
+    };
+    ubo.ambient_ground = vec4f{
+        ambient_settings_.ground.x * ambient_strength,
+        ambient_settings_.ground.y * ambient_strength,
+        ambient_settings_.ground.z * ambient_strength,
+        0.0f
+    };
+
+    ubo.ao_params = vec4f{
+        ambient_settings_.ao_strength, ambient_settings_.ao_curve, 0.0f, 0.0f
+    };
+
+    ubo.debug_view = static_cast<uint32>(debug_view_);
 
     // Point lights count
     ubo.point_lights_count = light_buffer_->get_lights_count();
@@ -1872,7 +1941,6 @@ void renderer::create_shadow_map_descriptor_sets() {
     shadow_map_descriptor_sets_ =
         vk_must(context_->get_device().allocateDescriptorSets(alloc_info), "allocate shadow map descriptor sets");
 
-    // Обновляем descriptor sets с shadow map array image view и sampler
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         vk::DescriptorImageInfo image_info{};
         image_info.imageLayout = vk::ImageLayout::eDepthStencilReadOnlyOptimal;

@@ -2,9 +2,14 @@
 
 layout(location = 2) in uint inInstanceIndex;
 
+const int SHADOW_CASCADES = 5;
+
+// Only view and proj are read here, but a member missing from the middle of the
+// block shifts every offset after it, so the whole thing has to match.
 struct DirectionalLightData {
-    mat4 light_space_matrices[4];
-    vec4 cascade_splits;
+    mat4 light_space_matrices[SHADOW_CASCADES];
+    vec4 cascades[SHADOW_CASCADES];
+    vec4 shadow_filter;
     vec3 direction;
     vec3 color;
     float intensity;
@@ -15,6 +20,9 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 proj;
     vec3 viewPos;
     DirectionalLightData directional_light;
+    vec4 ambient_sky;
+    vec4 ambient_ground;
+    vec4 ao_params;
     uint point_lights_count;
 } ubo;
 
@@ -83,10 +91,9 @@ void main() {
     uvec3 mn = uvec3(q.data0 & 0x7Fu, (q.data0 >> 7) & 0x7Fu, (q.data0 >> 14) & 0x7Fu);
     uvec3 mx = uvec3(q.data1 & 0x7Fu, (q.data1 >> 7) & 0x7Fu, (q.data1 >> 14) & 0x7Fu);
 
-    uint normal_id      = (q.data0 >> 21) & 0x7u;
-    uint corners_dark   = (q.data0 >> 24) & 0xFu;
-    uint corners_bright = (q.data0 >> 28) & 0xFu;
-    uint palette_idx    = (q.data1 >> 21) & 0xFFu;
+    uint normal_id   = (q.data0 >> 21) & 0x7u;
+    uint corners_ao  = (q.data0 >> 24) & 0xFFu;
+    uint palette_idx = (q.data1 >> 21) & 0xFFu;
 
     uvec3 pick = FACE_VERTS[normal_id][corner_id];
 
@@ -107,7 +114,7 @@ void main() {
         vec2(0.0, 1.0)
     );
     fragUV = corner_uvs[corner_id];
-    fragCornersMask = corners_dark | (corners_bright << 4);
+    fragCornersMask = corners_ao;
 
     viewDepth = -(ubo.view * worldPos).z;
 

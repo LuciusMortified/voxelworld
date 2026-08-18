@@ -7,9 +7,40 @@ layout(location = 3) in float viewDepth;
 layout(location = 4) in vec2 fragUV;
 layout(location = 5) flat in uint fragCornersMask;
 
+// Cascaded shadow maps are parked, not deleted. Past the first cascade they
+// staircased, and the staircase moved whenever the camera did; what they cost
+// meanwhile is a depth pass, five extra culling passes and twelve depth
+// compares a pixel. Sky light will do the job the sun's shadow was doing -- a
+// pit is dark because little sky reaches it, not because something is in the
+// way. See docs/lighting.md. One character brings them back.
+#define SHADOW_ENABLED 0
+
+// The cascade count outlives the switch: the uniform block has to match the
+// one the renderer writes whether or not anything reads it.
+const int SHADOW_CASCADES = 5;
+
+#if SHADOW_ENABLED
+// The filter width and the two bias terms arrive in shadow_filter, all three
+// measured in shadow texels rather than world units -- a texel is a third of a
+// unit in the near cascade and three and a half in the far one, and no single
+// distance suits both.
+const float SHADOW_SLOPE_LIMIT = 3.0;
+
+// Where the crossfade into the next cascade starts, as a fraction of the split.
+const float SHADOW_CASCADE_BLEND = 0.7;
+#endif
+
 struct DirectionalLightData {
-    mat4 light_space_matrices[4];
-    vec4 cascade_splits;// x = split0, y = split1, z = split2, w = split3
+    mat4 light_space_matrices[SHADOW_CASCADES];
+
+    // Per cascade: x is where it ends in view depth, y is the world covered by
+    // one of its shadow texels.
+    vec4 cascades[SHADOW_CASCADES];
+
+    // x: penumbra half-width in texels, y: normal offset in texels, z: how much
+    // of that offset is added again per unit of slope.
+    vec4 shadow_filter;
+
     vec3 direction;
     vec3 color;
     float intensity;
@@ -27,11 +58,27 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     mat4 proj;
     vec3 viewPos;
     DirectionalLightData directional_light;
+    vec4 ambient_sky;
+    vec4 ambient_ground;
+
+    // x: how far down a fully enclosed corner goes, 0 none to 1 black.
+    // y: the exponent the raw 0..1 occlusion is raised to before that. Below
+    //    one the shading spreads out over the whole face, above one it pulls
+    //    back into the corner. The samples are integers 0..3, so this is the
+    //    only control over where the middle of the ramp sits.
+    vec4 ao_params;
+
     uint point_lights_count;
+
+    // 0 normal, 1 ambient occlusion alone on white, 2 normals.
+    uint debug_view;
+
     FogData fog;
 } ubo;
 
+#if SHADOW_ENABLED
 layout(set = 2, binding = 0) uniform sampler2DArrayShadow shadowMapArray;
+#endif
 
 struct PointLightData {
     vec4 position;
@@ -47,11 +94,38 @@ layout(set = 3, binding = 0, std430) readonly buffer PointLights {
     PointLightData lights[];
 } pointLights;
 
+#if SHADOW_ENABLED
 int selectCascade(float viewDepth) {
-    if (viewDepth < ubo.directional_light.cascade_splits.x) return 0;
-    if (viewDepth < ubo.directional_light.cascade_splits.y) return 1;
-    if (viewDepth < ubo.directional_light.cascade_splits.z) return 2;
-    return 3;
+    for (int i = 0; i < SHADOW_CASCADES - 1; ++i) {
+        if (viewDepth < ubo.directional_light.cascades[i].x) {
+            return i;
+        }
+    }
+    return SHADOW_CASCADES - 1;
+}
+
+// A Poisson disk, turned by an angle that changes from texel to texel. Four
+// taps on a ring were enough while the filter was a texel and a half wide; at
+// four texels they stop being a blur and become four spots, and the rotation
+// that hid the kernel then shows up as boiling instead. Twelve taps fill the
+// disk evenly enough that the rotation only has to break the last of the
+// banding. The comparison sampler is linear, so each tap is already the
+// weighted average of four compares.
+const vec2 PCF_DISK[12] = vec2[12](
+    vec2(-0.326, -0.406), vec2(-0.840, -0.074), vec2(-0.696,  0.457),
+    vec2(-0.203,  0.621), vec2( 0.962, -0.195), vec2( 0.473, -0.480),
+    vec2( 0.519,  0.767), vec2( 0.185, -0.893), vec2( 0.507,  0.064),
+    vec2( 0.896,  0.412), vec2(-0.322, -0.933), vec2(-0.792, -0.598)
+);
+
+// The seed is the shadow texel, not the pixel. gl_FragCoord makes every
+// surface point draw a different rotation the instant the camera moves, and
+// four taps' worth of variance then boils along every shadow edge -- which
+// reads as the edge itself crawling. The shadow grid is snapped to a world
+// lattice, so seeding from it holds the pattern still on the surface while the
+// camera moves, and still breaks up the banding between neighbouring texels.
+float pcfRotation(vec2 seed) {
+    return fract(sin(dot(seed, vec2(12.9898, 78.233))) * 43758.5453) * 6.2831853;
 }
 
 float calculateShadowForCascade(int cascadeIndex, vec3 normal) {
@@ -61,10 +135,26 @@ float calculateShadowForCascade(int cascadeIndex, vec3 normal) {
         return 1.0;
     }
 
-    // Вычисляем позицию в light space для выбранного каскада
-    float ndotl = max(ndot, 0.0);
-    float normalBias = max(0.015 * (1.0 - ndotl), 0.004);
-    vec3 newFragPos = fragPos + fragNormal * normalBias;
+    // The offset is measured in shadow texels, not in world units. The depth a
+    // texel holds is the depth of one point in it, so a surface tilted away
+    // from the light is wrong by up to a texel across its own width -- which is
+    // what striped the faces and crawled when the sun moved. The old constant
+    // was 0.015 world units against a texel of 0.16 to 1.28.
+    float texel  = ubo.directional_light.cascades[cascadeIndex].y;
+    float radius = ubo.directional_light.shadow_filter.x;
+    float ndotl  = clamp(ndot, 0.05, 1.0);
+    float slope  = sqrt(1.0 - ndotl * ndotl) / ndotl;
+
+    // The slope term is multiplied by the filter width: the depth a tap reads
+    // is the depth of a point up to `radius` texels away across the surface,
+    // and on a slope that is off by `radius * slope` texels. A bias tuned for a
+    // one-texel kernel is what turns a wide filter into stripes.
+    float bias = ubo.directional_light.shadow_filter.y +
+                 (radius * ubo.directional_light.shadow_filter.z *
+                  min(slope, SHADOW_SLOPE_LIMIT));
+
+    vec3 newFragPos = fragPos + fragNormal * (texel * bias);
+
     vec4 fragPosLightSpace =
         ubo.directional_light.light_space_matrices[cascadeIndex] * vec4(newFragPos, 1.0);
 
@@ -83,29 +173,24 @@ float calculateShadowForCascade(int cascadeIndex, vec3 normal) {
         return 1.0;
     }
 
-    ivec2 texDim = textureSize(shadowMapArray, 0).xy;
-    float scale = 1.0;
-    float dx = scale * 1.0 / float(texDim.x);
-    float dy = scale * 1.0 / float(texDim.y);
+    vec2 mapSize = vec2(textureSize(shadowMapArray, 0).xy);
+    vec2 step    = vec2(1.0) / mapSize;
 
-    float shadow = 0;
-    int count = 0;
-    int range = 0;  // 0 for off, 1 for 3x3, 2 for 5x5
-    for (int x = -range; x <= range; ++x) {
-        for (int y = -range; y <= range; ++y) {
-            shadow += texture(
-                shadowMapArray,
-                    vec4(
-                        vec2(projCoords.x + x*dx, projCoords.y + y*dy),
-                        float(cascadeIndex),
-                        projCoords.z
-                )
-            );
-            count++;
-        }
+    float angle = pcfRotation(floor(projCoords.xy * mapSize));
+    float sa    = sin(angle);
+    float ca    = cos(angle);
+    mat2 turn   = mat2(ca, -sa, sa, ca);
+
+    float shadow = 0.0;
+    for (int i = 0; i < 12; ++i) {
+        vec2 offset = turn * PCF_DISK[i] * step * radius;
+        shadow += texture(
+            shadowMapArray,
+            vec4(projCoords.xy + offset, float(cascadeIndex), projCoords.z)
+        );
     }
 
-    return shadow / count;
+    return shadow * (1.0 / 12.0);
 }
 
 float calculateShadow(vec3 normal, float viewDepth) {
@@ -113,9 +198,9 @@ float calculateShadow(vec3 normal, float viewDepth) {
 
     float shadow = calculateShadowForCascade(cascadeIndex, normal);
 
-    if (cascadeIndex < 3) {
-        float nextSplit = ubo.directional_light.cascade_splits[cascadeIndex];
-        float blendStart = nextSplit * 0.75;
+    if (cascadeIndex < SHADOW_CASCADES - 1) {
+        float nextSplit = ubo.directional_light.cascades[cascadeIndex].x;
+        float blendStart = nextSplit * SHADOW_CASCADE_BLEND;
         float blendEnd = nextSplit;
 
         if (viewDepth > blendStart && viewDepth < blendEnd) {
@@ -129,8 +214,13 @@ float calculateShadow(vec3 normal, float viewDepth) {
 
     return shadow;
 }
+#endif
 
-vec3 calculateDirectionalLight(vec3 normal, vec3 viewDir, float shadow) {
+// Diffuse only. A specular lobe used to ride along at exponent 64, and on an
+// untextured cube it reads as a smear of dirt rather than as a highlight:
+// there is no surface detail for it to break up against, so it just moves a
+// bright patch around a flat colour as the camera turns.
+vec3 calculateDirectionalLight(vec3 normal, float shadow) {
     float sunElevation = -ubo.directional_light.direction.y;
 
     float dayFactor = smoothstep(0.2, 0.4, sunElevation);
@@ -140,16 +230,10 @@ vec3 calculateDirectionalLight(vec3 normal, vec3 viewDir, float shadow) {
 
     float diff = max(dot(lightDir, normal), 0.0);
 
-    vec3 reflectDir = reflect(-lightDir, normal);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 64.0);
-
     vec3 sunColor = ubo.directional_light.color * ubo.directional_light.intensity;
     vec3 twilightColor = vec3(1.0, 0.5, 0.2) * ubo.directional_light.intensity * 0.3;
 
-    vec3 diffuse = diff * shadow * (sunColor * dayFactor + twilightColor * twilightFactor);
-    vec3 specular = spec * shadow * sunColor * dayFactor * 0.5;
-
-    return diffuse + specular;
+    return diff * shadow * (sunColor * dayFactor + twilightColor * twilightFactor);
 }
 
 vec3 calculatePointLight(uint lightIndex, vec3 normal, vec3 fragPos, vec3 viewDir) {
@@ -186,27 +270,15 @@ vec3 calculatePointLight(uint lightIndex, vec3 normal, vec3 fragPos, vec3 viewDi
     return diffuse + specular;
 }
 
-// Вычисляет rim lighting (Fresnel эффект) для подсветки краёв
-float calculateRimLight(vec3 normal, vec3 viewDir, float shadow) {
-    // Чем больше угол между нормалью и направлением взгляда, тем сильнее rim
-    float rimFactor = 1.0 - max(dot(normal, viewDir), 0.0);
-    // Усиливаем rim в тенях
-    float shadowBoost = 1.0 + (1.0 - shadow) * 2.0;
-    // Применяем степенную функцию для более плавного перехода
-    rimFactor = pow(rimFactor, 3.0) * shadowBoost;
-    return rimFactor;
-}
-
-// Вычисляет hemisphere ambient - ambient, зависящий от нормали
+// Everything that is not a light: sky from above, ground bounce from below.
+// With no textures this is all that separates one face of a block from another
+// wherever the sun does not reach, so it has to be a hemisphere -- a flat
+// ambient leaves an unlit voxel a single flat colour.
+//
+// Both colours come from the frame uniform rather than from constants here.
+// They used to be hardcoded daylight, so midnight was lit by an afternoon sky.
 vec3 calculateHemisphereAmbient(vec3 normal) {
-    // Верхнее небо (светлее)
-    vec3 skyColor = vec3(0.3, 0.4, 0.5);
-    // Нижняя земля (темнее)
-    vec3 groundColor = vec3(0.1, 0.1, 0.15);
-
-    // Смешиваем цвета в зависимости от направления нормали
-    float upFactor = normal.y * 0.5 + 0.5;// Преобразуем [-1, 1] в [0, 1]
-    return mix(groundColor, skyColor, upFactor);
+    return mix(ubo.ambient_ground.rgb, ubo.ambient_sky.rgb, normal.y * 0.5 + 0.5);
 }
 
 // Выходной цвет пикселя
@@ -216,43 +288,52 @@ void main() {
     vec3 normal = normalize(fragNormal);
     vec3 viewDir = normalize(ubo.viewPos - fragPos);
 
+#if SHADOW_ENABLED
     float sunElevation = -ubo.directional_light.direction.y;
     float shadowReliability = smoothstep(0.15, 0.3, sunElevation);
     float shadow = mix(1.0, calculateShadow(normal, viewDepth), shadowReliability);
+#else
+    float shadow = 1.0;
+#endif
 
-    // Ambient lighting
-    float ambientStrength = 0.25;
-    vec3 baseAmbient = ambientStrength * ubo.directional_light.color * ubo.directional_light.intensity;
+    // Two bits a corner, 0 open to 3 fully enclosed, interpolated across the
+    // rectangle by hand rather than by the rasteriser. That is deliberate: a
+    // quad whose corner values differ across a diagonal cannot be drawn by two
+    // triangles without the split showing, and every voxel engine that
+    // interpolates AO per vertex has to pick which way to cut it. Doing the
+    // bilinear here means there is no diagonal to pick.
+    uint m = fragCornersMask;
+    float a00 = float( m        & 3u) * (1.0 / 3.0);
+    float a10 = float((m >> 2)  & 3u) * (1.0 / 3.0);
+    float a11 = float((m >> 4)  & 3u) * (1.0 / 3.0);
+    float a01 = float((m >> 6)  & 3u) * (1.0 / 3.0);
 
-    // Hemisphere ambient для более выразительного объёма
-    float hemisphereStrength = 0.15;
-    vec3 hemisphereAmbient = calculateHemisphereAmbient(normal) * hemisphereStrength;
+    float occlusion = mix(mix(a00, a10, fragUV.x), mix(a01, a11, fragUV.x), fragUV.y);
+    occlusion = pow(occlusion, ubo.ao_params.y);
 
-    uint corners_dark   = fragCornersMask & 0xFu;
-    uint corners_bright = (fragCornersMask >> 4) & 0xFu;
+    float aoFactor = 1.0 - (occlusion * ubo.ao_params.x);
 
-    float d00 = float( corners_dark        & 1u);
-    float d10 = float((corners_dark >> 1)  & 1u);
-    float d11 = float((corners_dark >> 2)  & 1u);
-    float d01 = float((corners_dark >> 3)  & 1u);
-    float ao_dark = mix(mix(d00, d10, fragUV.x), mix(d01, d11, fragUV.x), fragUV.y);
+    if (ubo.debug_view == 1u) {
+        outColor = vec4(vec3(aoFactor), 1.0);
+        return;
+    }
+    if (ubo.debug_view == 2u) {
+        outColor = vec4((normal * 0.5) + 0.5, 1.0);
+        return;
+    }
 
-    float b00 = float( corners_bright        & 1u);
-    float b10 = float((corners_bright >> 1)  & 1u);
-    float b11 = float((corners_bright >> 2)  & 1u);
-    float b01 = float((corners_bright >> 3)  & 1u);
-    float ao_bright = mix(mix(b00, b10, fragUV.x), mix(b01, b11, fragUV.x), fragUV.y);
-
-    float upFactor = max(0.0, normal.y);
-
-    float aoStrength = 0.25;
-    float brightStrength = 0.15;
-    float aoFactor = 1.0 - ao_dark * aoStrength + ao_bright * brightStrength * upFactor;
-
-    vec3 ambient = (baseAmbient + hemisphereAmbient) * aoFactor;
+    // AO belongs to the ambient term alone. It is a measure of how much of the
+    // surroundings a point can see, so it dims the light that arrives from the
+    // surroundings; laying it over the sun as well counts the same occlusion
+    // twice and grimes up every corner the sun is shining straight into.
+    //
+    // Nothing here yet knows how much sky reaches this point, so a cave is lit
+    // by an outdoor sky and the time of day reaches a sealed room. That is the
+    // whole of what stage 2 fixes -- docs/lighting.md.
+    vec3 ambient = calculateHemisphereAmbient(normal) * aoFactor;
 
     // Directional light с sun_factor
-    vec3 directional = calculateDirectionalLight(normal, viewDir, shadow);
+    vec3 directional = calculateDirectionalLight(normal, shadow);
 
     // Point lights
     vec3 pointLighting = vec3(0.0);
@@ -260,24 +341,11 @@ void main() {
         pointLighting += calculatePointLight(i, normal, fragPos, viewDir);
     }
 
-    // Rim lighting для подсветки краёв (особенно эффективно в тенях)
-    float rimIntensity = 0.01;
-    float rimLighting = calculateRimLight(normal, viewDir, shadow);
-    vec3 rimColor = ubo.directional_light.color * rimLighting * rimIntensity;
-
-    // Усиление контраста на гранях вокселей (edge enhancement)
-    // Используем dot product нормали и направления взгляда для определения "краёв"
-    float edgeIntensity = 0.01;
-    float edgeFactor = abs(dot(normal, viewDir));
-    // Грани, перпендикулярные взгляду (края вокселей), получают дополнительное освещение
-    float edgeEnhancement = (1.0 - edgeFactor) * edgeIntensity * (1.0 - shadow);
-
-    // Комбинируем все освещение
-    vec3 lighting = ambient + (directional + pointLighting + rimColor) * aoFactor;
+    // No rim term and no edge term. Both sat at 0.01, which is invisible, and
+    // the edge one never reached the sum at all. Nothing here is a stand-in for
+    // something else any more: every term is a light with an occluder.
+    vec3 lighting = ambient + directional + pointLighting;
     vec3 result = lighting * fragColor;
-
-    // Применяем edge enhancement
-    result += edgeEnhancement * fragColor;
 
     // Linear fog
     if (ubo.fog.enabled != 0u) {

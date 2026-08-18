@@ -130,9 +130,12 @@ void shadow_map::create_shadow_map_image() {
 }
 
 void shadow_map::create_sampler() {
+    // Linear on a comparison sampler is free hardware PCF: the tap becomes the
+    // weighted average of four compares instead of one. Nearest gave a binary
+    // edge quantised to the texel grid, which is half of what read as teeth.
     vk::SamplerCreateInfo sampler_info{};
-    sampler_info.magFilter               = vk::Filter::eNearest;
-    sampler_info.minFilter               = vk::Filter::eNearest;
+    sampler_info.magFilter               = vk::Filter::eLinear;
+    sampler_info.minFilter               = vk::Filter::eLinear;
     sampler_info.mipmapMode              = vk::SamplerMipmapMode::eNearest;
     sampler_info.addressModeU            = vk::SamplerAddressMode::eClampToBorder;
     sampler_info.addressModeV            = vk::SamplerAddressMode::eClampToBorder;
@@ -248,25 +251,51 @@ void shadow_map::update(
 ) {
     const vec3f light_dir = math::normalize(light_direction);
 
-    const bool light_turned = math::length(light_dir - drawn_light_dir_) > 1e-4f;
-    if (light_turned) {
+    // Splits in a geometric progression: every cascade is the same multiple of
+    // the one before it.
+    //
+    // What is seen at a cascade boundary is that ratio and nothing else. A
+    // shadow texel is a fixed fraction of its cascade's distance, and a screen
+    // pixel grows with depth, so the staircase on a shadow edge is worst at the
+    // near edge of a cascade -- by exactly the ratio -- and settles to two
+    // pixels at the far edge. Equal ratios make that worst case the same
+    // everywhere and leave no step across a boundary.
+    //
+    // The practical split scheme this replaces distributes over [near, far],
+    // and near here is a tenth of a unit: six millimetres. Its logarithmic half
+    // spends everything on the first metre and its uniform half flattens the
+    // rest, so at lambda 0.9 the ratios came out 2.3, 2.8 and 6.1 -- the last
+    // cascade started with a twelve-pixel staircase against two pixels on the
+    // other side of the seam. Measured in docs/frame-time-baseline.md.
+    //
+    // The first split is a distance, not a fraction: it is set by how close the
+    // nearest thing worth a sharp shadow is, and everything else follows from
+    // it and the shadow distance.
+    const float cam_near   = camera.get_near();
+    const float cam_far    = camera.get_far();
+    const float shadow_far = std::min(settings_.distance, cam_far);
+
+    if (settings_.first_split != built_first_split_ ||
+        settings_.distance != built_distance_) {
+        built_first_split_ = settings_.first_split;
+        built_distance_    = settings_.distance;
         invalidate_all();
     }
-    drawn_light_dir_ = light_dir;
 
-    // Вычисляем split distances используя Practical Split Scheme
-    const float cam_near    = camera.get_near();
-    const float cam_far     = camera.get_far();
-    const float shadow_far  = std::min(shadow_far_, cam_far);
-    const float shadow_dist = shadow_far - cam_near;
+    const float first =
+        std::clamp(settings_.first_split, cam_near * 2.0f, shadow_far * 0.5f);
+    const float ratio = std::pow(
+        shadow_far / first, 1.0f / static_cast<float>(cascade_count - 1)
+    );
 
+    float split = first;
     for (uint32 i = 0; i < cascade_count; ++i) {
-        float p            = static_cast<float>(i + 1) / static_cast<float>(cascade_count);
-        float log          = cam_near * std::pow(shadow_far / cam_near, p);
-        float uniform      = cam_near + (shadow_dist * p);
-        float d            = (split_lambda_ * (log - uniform)) + uniform;
-        cascade_splits_[i] = d - cam_near;
+        cascade_splits_[i] = split - cam_near;
+        split *= ratio;
     }
+    cascade_splits_[cascade_count - 1] = shadow_far - cam_near;
+
+    const float shadow_dist = shadow_far - cam_near;
 
     // Вычисляем inverse view-projection матрицу камеры
     auto cam_proj =
@@ -336,6 +365,35 @@ void shadow_map::update(
         last_cascade_split = cascade_split;
     }
 
+    // A cascade is stale when the sun has turned since *it* was drawn. Measured
+    // against the direction the cascade was drawn with, not the direction of
+    // the previous frame: comparing frame to frame and overwriting the
+    // reference every frame let nothing accumulate, and a sun crossing a day in
+    // two minutes at six hundred frames a second never cleared any fixed
+    // threshold at all.
+    //
+    // What a turn does to a cascade is rotate its texel lattice about its own
+    // centre, and a point at the rim moves radius * turn. Bounding that in
+    // texels bounds how much of the staircase is rasterised differently in one
+    // step -- and that re-quantisation is what is seen as the shadows jumping,
+    // far more than the shadows actually moving. A caster is tens of units
+    // tall, so the shadow itself slides a fraction of a texel per step.
+    //
+    // Since a texel is 2 * radius * (1 + pad) / size, the radius cancels: this
+    // is the same angle for every cascade. Which is the point. Bounding the
+    // *shadow* movement instead put the lever arm at the throw distance of the
+    // light, a thousand units, and left the far cascades fifty times looser --
+    // they were redrawn 50 frames in 600 and jumped a whole lattice each time.
+    for (uint32 i = 0; i < cascade_count; ++i) {
+        const float32 turn = math::length(light_dir - drawn_light_dirs_[i]);
+        const float32 threshold =
+            settings_.turn_texels * cascade_texel_sizes_[i] / std::max(radii[i], 1.0f);
+
+        if (turn > threshold) {
+            dirty_mask_ |= 1U << i;
+        }
+    }
+
     pending_mask_ |= select_cascades_(centers, radii);
 
     for (uint32 cascade_index = 0; cascade_index < cascade_count; ++cascade_index) {
@@ -379,7 +437,14 @@ auto shadow_map::select_cascades_(
         if (stale) {
             priority[i] = 100.0f + reach;
         } else if ((dirty_mask_ & bit) != 0) {
-            priority[i] = 1.0f + reach;
+            // Longest wait first. Every dirty cascade used to score the same,
+            // and the search below keeps the first of an equal pair, so a still
+            // camera under a turning sun gave the whole budget to cascades 0
+            // and 1 on every frame: measured 600 redraws out of 600 for those
+            // two against 4 for the other two. Everything past the first split
+            // stood still, which is what reads as the shadows being frozen.
+            priority[i] = 1.0f + reach +
+                          (static_cast<float32>(std::min(frames_waited_[i], 1000U)) * 0.001f);
         } else if (reach > cascade_trigger_ratio_) {
             priority[i] = reach;
         } else {
@@ -387,7 +452,7 @@ auto shadow_map::select_cascades_(
         }
     }
 
-    uint32 budget = max_cascade_updates_per_frame_;
+    uint32 budget = settings_.updates_per_frame;
 
     while (budget > 0) {
         uint32 best        = cascade_count;
@@ -409,6 +474,16 @@ auto shadow_map::select_cascades_(
         --budget;
     }
 
+    for (uint32 i = 0; i < cascade_count; ++i) {
+        const uint32 bit = 1U << i;
+
+        if ((selected & bit) != 0) {
+            frames_waited_[i] = 0;
+        } else if ((dirty_mask_ & bit) != 0) {
+            ++frames_waited_[i];
+        }
+    }
+
     return selected;
 }
 
@@ -420,10 +495,13 @@ void shadow_map::build_cascade_matrix_(
     const vec3f& light_dir,
     float32 shadow_dist
 ) {
-    drawn_centers_[cascade_index] = center;
-    drawn_radii_[cascade_index]   = radius;
+    drawn_centers_[cascade_index]    = center;
+    drawn_radii_[cascade_index]      = radius;
+    drawn_light_dirs_[cascade_index] = light_dir;
 
     radius += radius * cascade_padding_ratio_;
+
+    cascade_texel_sizes_[cascade_index] = 2.0f * radius / static_cast<float32>(size_);
 
     const vec3f max_extents = vec3f{radius, radius, radius};
     const vec3f min_extents = -max_extents;
@@ -466,6 +544,11 @@ void shadow_map::build_cascade_matrix_(
 
     light_space_matrices_[cascade_index] = lsm;
     cascade_frustums_[cascade_index] = vw::spatial::frustum::from_view_projection_matrix(lsm);
+}
+
+auto shadow_map::get_cascade_texel_sizes() const
+    -> const std::array<float32, cascade_count>& {
+    return cascade_texel_sizes_;
 }
 
 mat4f shadow_map::get_light_space_matrix(

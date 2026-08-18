@@ -16,7 +16,7 @@ struct AABB {
 };
 
 layout(set = 0, binding = 0) uniform CullFrustumData {
-    vec4 planes[30];
+    vec4 planes[36];// six per pass: the camera and each of the five cascades
     vec4 eye;
     uint pass_count;
 } frustum_data;

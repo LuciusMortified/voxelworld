@@ -47,13 +47,6 @@ void model_system::model_modifier::set_model(
     system_->world_->registry().request_change<model_component>(entity_);
 }
 
-void model_system::model_modifier::set_top_brightness(
-    bool enabled
-) {
-    component_->top_brightness_ = enabled;
-    system_->world_->registry().request_change<model_component>(entity_);
-}
-
 void model_system::model_modifier::set_voxel(
     int x, int y, int z, const voxel& v
 ) {
