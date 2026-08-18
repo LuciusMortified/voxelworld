@@ -25,6 +25,12 @@ enum class bench_scene {
     // does.
     advance,
 
+    // Standing still and taking the world apart. Streaming has finished before
+    // the first voxel goes, so every mesh built from here on was paid for by an
+    // edit -- which is the number a destructible world lives or dies by and the
+    // one nothing measured until now.
+    dig,
+
     flythrough,
     crowd,
 };
@@ -33,9 +39,13 @@ class world_grid_app final : public gfx::app {
 public:
     explicit world_grid_app(
         gfx::engine& eng, bench_scene scene = bench_scene::off, uint32 crowd_size = 0,
-        bool chunk_cull = true, bool sun_in_bench = false
+        bool chunk_cull = true, bool sun_in_bench = false, int32 dig_per_frame = 1
     )
-        : app{eng}, bench_scene_{scene}, crowd_size_{crowd_size}, sun_in_bench_{sun_in_bench} {
+        : app{eng},
+          bench_scene_{scene},
+          crowd_size_{crowd_size},
+          sun_in_bench_{sun_in_bench},
+          dig_per_frame_{dig_per_frame} {
         get_engine().get_renderer().set_chunk_cull_enabled(chunk_cull);
         auto& window = get_engine().get_window();
         auto& camera = get_engine().get_camera();
@@ -70,6 +80,7 @@ public:
     }
 
     ~world_grid_app() override {
+        report_dig_();
         if (viewer_.is_valid()) {
             get_engine().get_world().destroy(viewer_);
         }
@@ -111,6 +122,7 @@ public:
             drive_bench_camera();
         }
         try_place_camera();
+        tick_dig_();
         tick_crowd_settle_();
         tick_day_night_(delta_time);
 
@@ -140,7 +152,7 @@ private:
 
         auto& camera = get_engine().get_camera();
 
-        if (bench_scene_ == bench_scene::parked) {
+        if (bench_scene_ == bench_scene::parked || bench_scene_ == bench_scene::dig) {
             camera.set_position({0.0f, bench_altitude_, 0.0f});
             camera.set_rotation(-10.0f, 0.0f);
             return;
@@ -342,6 +354,75 @@ private:
             std::lerp(0.035f, 0.17f, day),
             std::lerp(0.055f, 0.14f, day),
         };
+    }
+
+    // Takes a box of ground apart one voxel at a time, in raster order, top
+    // layer first. Driven by the frame index like every other bench scene: a
+    // dig steered by wall clock removes a different number of voxels on every
+    // machine and the per-edit numbers stop meaning anything.
+    //
+    // The box straddles the origin, which is where four columns meet, so chunk
+    // seams get crossed constantly rather than by luck. Air is stepped over
+    // rather than dug: model::set_voxel bumps the generation whatever it wrote,
+    // so writing air onto air would order a remesh for nothing and flatter the
+    // per-edit average.
+    auto tick_dig_() -> void {
+        if (bench_scene_ != bench_scene::dig || !bench_ready_ || world_grid_ == nullptr) {
+            return;
+        }
+
+        if (!dig_started_) {
+            const auto surface = world_grid_->get_surface_y(0, 0);
+            if (!surface) {
+                return;
+            }
+
+            dig_top_voxel_ = *surface / generator_params_.voxel_scale;
+            dig_started_   = true;
+            dig_mesh_base_ =
+                get_engine().get_renderer().get_mesh_pool().get_gen_stats().chunks;
+        }
+
+        for (int32 done = 0; done < dig_per_frame_ && dig_cursor_ < dig_cells; ++dig_cursor_) {
+            const int32 x = (dig_cursor_ % dig_side) - (dig_side / 2);
+            const int32 z = ((dig_cursor_ / dig_side) % dig_side) - (dig_side / 2);
+            const int32 y = dig_top_voxel_ - (dig_cursor_ / (dig_side * dig_side));
+
+            const vec3i at{
+                x * generator_params_.voxel_scale,
+                y * generator_params_.voxel_scale,
+                z * generator_params_.voxel_scale,
+            };
+
+            if (world_grid_->get_voxel(at).is_empty()) {
+                continue;
+            }
+
+            world_grid_->set_voxel(at, voxel{});
+            ++dig_edits_;
+            ++done;
+        }
+    }
+
+    void report_dig_() const {
+        if (!dig_started_ || dig_edits_ == 0) {
+            return;
+        }
+
+        const auto meshed =
+            get_engine().get_renderer().get_mesh_pool().get_gen_stats().chunks - dig_mesh_base_;
+
+        std::print(
+            "\ndig: {} voxels removed, {} chunk meshes, {:.2f} meshes an edit\n"
+            "  box {} cubed at the origin, {} voxels a frame, cursor {} of {}\n",
+            dig_edits_,
+            meshed,
+            static_cast<float64>(meshed) / static_cast<float64>(dig_edits_),
+            dig_side,
+            dig_per_frame_,
+            dig_cursor_,
+            dig_cells
+        );
     }
 
     auto tick_crowd_settle_() -> void {
@@ -647,6 +728,18 @@ private:
 
     std::vector<ecs::entity> crowd_;
     uint32 crowd_size_ = 0;
+
+    // Thirty-two voxels a side is two chunks across at worst and one at best,
+    // which is the range where a seam is crossed often enough to show up.
+    static constexpr int32 dig_side  = 32;
+    static constexpr int32 dig_cells = dig_side * dig_side * dig_side;
+
+    int32 dig_per_frame_  = 1;
+    int32 dig_cursor_     = 0;
+    int32 dig_top_voxel_  = 0;
+    uint64 dig_edits_     = 0;
+    uint64 dig_mesh_base_ = 0;
+    bool dig_started_     = false;
     uint32 crowd_settle_frames_ = 0;
     static constexpr uint32 crowd_settle_target_ = 400;
 
@@ -695,8 +788,9 @@ auto main(int argc, char** argv) -> int {
     gfx::bench_config bench;
     auto scene        = bench_scene::off;
     uint32 crowd_size = 0;
-    bool chunk_cull   = false;
-    bool sun_in_bench = false;
+    bool chunk_cull    = false;
+    bool sun_in_bench  = false;
+    int32 dig_per_frame = 1;
 
     for (int32 i = 1; i < argc; ++i) {
         if (const auto value = option_value(std::string_view{argv[i]}, "--bench")) {
@@ -711,6 +805,8 @@ auto main(int argc, char** argv) -> int {
                 scene = bench_scene::advance;
             } else if (*value == "crowd") {
                 scene = bench_scene::crowd;
+            } else if (*value == "dig") {
+                scene = bench_scene::dig;
             } else {
                 scene = bench_scene::flythrough;
             }
@@ -731,6 +827,8 @@ auto main(int argc, char** argv) -> int {
             bench.report_path = std::string{*value};
         } else if (const auto value = option_value(arg, "--bench-crowd")) {
             crowd_size = parse_uint(*value, 50);
+        } else if (const auto value = option_value(arg, "--bench-dig")) {
+            dig_per_frame = static_cast<int32>(parse_uint(*value, 1));
         } else if (const auto value = option_value(arg, "--mesh-workers")) {
             bench.mesh_workers = parse_uint(*value, 0);
         } else if (const auto value = option_value(arg, "--terrain-workers")) {
@@ -745,7 +843,7 @@ auto main(int argc, char** argv) -> int {
     try {
         log::add_file_sink("test_world_grid.log");
         std::make_unique<gfx::engine>(1280, 720, "Voxel World - World Grid Test", std::move(bench))
-            ->run<world_grid_app>(scene, crowd_size, chunk_cull, sun_in_bench);
+            ->run<world_grid_app>(scene, crowd_size, chunk_cull, sun_in_bench, dig_per_frame);
     } catch (const std::exception& e) {
         log::error("Error: {}", e.what());
         return 1;
