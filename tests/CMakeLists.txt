@@ -57,6 +57,7 @@ add_executable(world_tests
     world/column_staging.test.cpp
     world/model_fill.test.cpp
     world/surface.test.cpp
+    world/sky_light.test.cpp
     world/caves.test.cpp
     world/chunk_links.test.cpp
     world/chunk_walk.test.cpp
