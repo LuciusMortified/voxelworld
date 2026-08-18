@@ -242,8 +242,20 @@ void world_grid_system::integrate_completed_columns_() {
 
 void world_grid_system::dispatch_column_requests_() {
     static constexpr int32 max_requests_per_frame = 8;
+
+    // A ceiling on work in flight, not just on work started per frame. The
+    // loader had neither: four workers kept generating whatever had been asked
+    // for, and a column sitting generated-but-not-yet-placed holds nine models
+    // and about 280 pages. Walking forward reached a queue peak of 482 columns
+    // in a normal run, and one stall of the main thread -- a second is enough
+    // -- took that past the addressable limit of the page pool and killed the
+    // process. Backpressure instead: nothing new is asked for until what was
+    // asked for has landed.
+    static constexpr uint32 max_columns_in_flight = 96;
+
     int32 requests = 0;
-    while (!pending_requests_.empty() && requests < max_requests_per_frame) {
+    while (!pending_requests_.empty() && requests < max_requests_per_frame &&
+           loader_->pending_count() < max_columns_in_flight) {
         auto coord = pending_requests_.back();
         pending_requests_.pop_back();
         if (loader_->request(coord)) {
