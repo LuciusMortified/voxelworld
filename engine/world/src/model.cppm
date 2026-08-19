@@ -331,15 +331,56 @@ public:
 
     using page_type = std::array<uint8, page_bytes>;
 
+    // The plane of light one voxel outside the chunk, per face, in the model's
+    // own face order: +X, -X, +Y, -Y, +Z, -Z.
+    //
+    // A face on the shell of a chunk takes its light from the cell in front of
+    // it, and that cell belongs to the neighbour. Without this the mesher has
+    // nowhere to read it, and clamping back inside lands on the solid voxel the
+    // face belongs to -- which the flood leaves at zero, so every outward face
+    // of every chunk comes out black.
+    //
+    // The flood already covers fifteen voxels past the chunk, so these cost
+    // nothing to fill: they are baked with the field, not handed over later
+    // like the occupancy planes. A plane is one level or 4096 nibbles.
+    struct boundary_light {
+        static constexpr int32 face_count = 6;
+
+        std::array<uint8, face_count> uniform{};
+        std::array<std::vector<uint8>, face_count> packed{};
+
+        [[nodiscard]] auto level_at(int32 face, int32 a, int32 b) const -> uint8 {
+            const auto& plane = packed[static_cast<std::size_t>(face)];
+            if (plane.empty()) {
+                return uniform[static_cast<std::size_t>(face)];
+            }
+
+            const int32 at   = (a * side) + b;
+            const uint8 pair = plane[static_cast<std::size_t>(at / 2)];
+
+            return static_cast<uint8>((at % 2) == 0 ? (pair & 0xFU) : (pair >> 4));
+        }
+
+        [[nodiscard]] auto bytes() const -> std::size_t {
+            std::size_t total = 0;
+            for (const auto& plane : packed) {
+                total += plane.size();
+            }
+            return total;
+        }
+    };
+
     // Dark, which is what a chunk that has not been lit yet has to look like.
     sky_light_field() = default;
 
-    explicit sky_light_field(uint8 level) : uniform_{level} {}
+    sky_light_field(uint8 level, boundary_light around)
+        : uniform_{level}, around_{std::move(around)} {}
 
     // Built by sky_light_column::bake, which is the only thing that knows how
     // to fill a table.
-    sky_light_field(std::vector<uint16> table, std::vector<page_type> pages)
-        : table_{std::move(table)}, pages_{std::move(pages)} {}
+    sky_light_field(std::vector<uint16> table, std::vector<page_type> pages,
+                    boundary_light around)
+        : table_{std::move(table)}, pages_{std::move(pages)}, around_{std::move(around)} {}
 
     [[nodiscard]] auto level_at(int32 x, int32 y, int32 z) const -> uint8 {
         if (table_.empty()) {
@@ -363,6 +404,28 @@ public:
         return level_at(pos.x, pos.y, pos.z);
     }
 
+    // The same, but any one coordinate may be -1 or side: the mesher reads a
+    // voxel out along the face normal, and for a face on the shell that is the
+    // neighbour's. A cell outside on two axes at once -- the very edge of a
+    // chunk -- is clamped into the plane, which is a level out at worst and is
+    // one voxel wide.
+    [[nodiscard]] auto level_around(int32 x, int32 y, int32 z) const -> uint8 {
+        const bool inside = x >= 0 && y >= 0 && z >= 0 && x < side && y < side && z < side;
+        if (inside) {
+            return level_at(x, y, z);
+        }
+
+        const auto clamp = [](int32 v) -> int32 { return std::clamp(v, 0, side - 1); };
+
+        if (x < 0 || x >= side) {
+            return around_.level_at(x < 0 ? 1 : 0, clamp(y), clamp(z));
+        }
+        if (y < 0 || y >= side) {
+            return around_.level_at(y < 0 ? 3 : 2, clamp(x), clamp(z));
+        }
+        return around_.level_at(z < 0 ? 5 : 4, clamp(x), clamp(y));
+    }
+
     // No table: the whole chunk is uniform_level().
     [[nodiscard]] auto is_uniform() const -> bool {
         return table_.empty();
@@ -377,7 +440,8 @@ public:
     }
 
     [[nodiscard]] auto bytes() const -> std::size_t {
-        return (table_.size() * sizeof(uint16)) + (pages_.size() * sizeof(page_type));
+        return (table_.size() * sizeof(uint16)) + (pages_.size() * sizeof(page_type)) +
+               around_.bytes();
     }
 
     [[nodiscard]] static auto page_index(int32 px, int32 py, int32 pz) -> int32 {
@@ -388,6 +452,7 @@ private:
     uint8 uniform_ = 0;
     std::vector<uint16> table_;
     std::vector<page_type> pages_;
+    boundary_light around_;
 };
 
 // Paged voxel volume. Pages are empty, uniform or sparse, so a mostly solid or

@@ -246,6 +246,96 @@ void sky_light_column::flood_(const neighbourhood& around) {
     }
 }
 
+// The six planes one voxel outside the chunk, taken straight out of the skirt.
+// The flood already reached fifteen voxels past the column, so a plane costs
+// nothing to read and saves the mesher from having to ask a neighbour that may
+// not be there yet.
+//
+// Two of them can fall off the column. Below its floor is bedrock and reads
+// dark; above its top is open sky and reads 15 -- the same rule the flood
+// itself uses for a column shorter than the one beside it.
+//
+// Each face is walked in the order the column stores its levels, x innermost,
+// and the plane is written strided instead. Walking the plane in its own order
+// steps the column by a row for the Y faces and by a whole layer -- nearly nine
+// kilobytes -- for the Z ones, and that alone doubled what the bake cost.
+auto gather_boundary(
+    const sky_light_column& column, int32 y_base
+) -> sky_light_field::boundary_light {
+    constexpr int32 side = sky_light_field::side;
+
+    sky_light_field::boundary_light out;
+
+    const auto at = [&](int32 x, int32 y, int32 z) -> uint8 {
+        if (y < 0) {
+            return 0;
+        }
+        if (y >= column.height()) {
+            return sky_light_column::max_level;
+        }
+        return column.level_at(x, y, z);
+    };
+
+    // Face order is the model's: +X, -X, +Y, -Y, +Z, -Z, and a plane is
+    // addressed by the two axes that are not the normal, lower one first.
+    for (int32 face = 0; face < sky_light_field::boundary_light::face_count; ++face) {
+        std::vector<uint8> packed(static_cast<std::size_t>(side) * side / 2);
+
+        uint8 first  = 0;
+        bool uniform = true;
+
+        const auto put = [&](int32 slot, uint8 level) {
+            if (slot == 0) {
+                first = level;
+            }
+            uniform = uniform && level == first;
+
+            packed[static_cast<std::size_t>(slot / 2)] |=
+                static_cast<uint8>((slot % 2) == 0 ? level : (level << 4));
+        };
+
+        switch (face) {
+            case 0:
+            case 1: {
+                // Normal along x, so x is fixed and nothing is contiguous.
+                const int32 x = face == 0 ? side : -1;
+                for (int32 y = 0; y < side; ++y) {
+                    for (int32 z = 0; z < side; ++z) {
+                        put((y * side) + z, at(x, y_base + y, z));
+                    }
+                }
+                break;
+            }
+            case 2:
+            case 3: {
+                const int32 y = face == 2 ? y_base + side : y_base - 1;
+                for (int32 z = 0; z < side; ++z) {
+                    for (int32 x = 0; x < side; ++x) {
+                        put((x * side) + z, at(x, y, z));
+                    }
+                }
+                break;
+            }
+            default: {
+                const int32 z = face == 4 ? side : -1;
+                for (int32 y = 0; y < side; ++y) {
+                    for (int32 x = 0; x < side; ++x) {
+                        put((x * side) + y, at(x, y_base + y, z));
+                    }
+                }
+                break;
+            }
+        }
+
+        out.uniform[static_cast<std::size_t>(face)] = first;
+        if (!uniform) {
+            out.packed[static_cast<std::size_t>(face)] = std::move(packed);
+        }
+    }
+
+    return out;
+}
+
 auto sky_light_column::bake(int32 y_base) const -> sky_light_field {
     constexpr int32 pages_side = sky_light_field::pages_side;
     constexpr int32 page_count = sky_light_field::page_count;
@@ -254,6 +344,8 @@ auto sky_light_column::bake(int32 y_base) const -> sky_light_field {
     if (y_base < 0 || y_base + s > height_) {
         return sky_light_field{};
     }
+
+    auto around = gather_boundary(*this, y_base);
 
     // Two passes, because which pages vary is worth knowing before anything is
     // written. The first walks the chunk the way the column stores it -- along
@@ -301,7 +393,7 @@ auto sky_light_column::bake(int32 y_base) const -> sky_light_field {
     }) && std::ranges::all_of(level, [&](uint8 l) -> bool { return l == level[0]; });
 
     if (chunk_uniform) {
-        return sky_light_field{level[0]};
+        return sky_light_field{level[0], std::move(around)};
     }
 
     std::vector<uint16> table(page_count);
@@ -339,7 +431,7 @@ auto sky_light_column::bake(int32 y_base) const -> sky_light_field {
         }
     }
 
-    return sky_light_field{std::move(table), std::move(pages)};
+    return sky_light_field{std::move(table), std::move(pages), std::move(around)};
 }
 
 }  // namespace vw::asset

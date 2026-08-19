@@ -238,28 +238,6 @@ auto compute_corner_darkness(
 }
 
 
-// Sky light where a face can see it. Outside the model it is clamped to the
-// nearest cell inside, and a model with no light field at all -- anything that
-// is not a world chunk -- reads as open sky, so an editor model is never dark.
-//
-// The clamp is wrong at a chunk seam by up to one level, and it is on purpose
-// for now: this pass exists to find out what light costs the greedy merge, and
-// a seam a level out does not move that number. The real answer is a plane of
-// the neighbour's light handed over the way the occupancy planes already are.
-[[nodiscard]] auto sky_at(
-    const vw::asset::model& mdl, vec3i p
-) -> int32 {
-    const auto* light = mdl.get_sky_light();
-    if (light == nullptr) {
-        return vw::asset::sky_light_column::max_level;
-    }
-
-    return light->level_at(
-        std::clamp(p.x, 0, mdl.width() - 1), std::clamp(p.y, 0, mdl.height() - 1),
-        std::clamp(p.z, 0, mdl.depth() - 1)
-    );
-}
-
 // A corner is the average of the four cells that touch it on the lit side.
 // Solid ones are left out rather than counted as dark: their darkness is what
 // AO is for, and counting it twice turns every inside corner black. The cell
@@ -309,8 +287,7 @@ auto corners_from_patch(
     std::array<int32, 9> lit{};
     std::array<int32, 9> open{};
 
-    const vec3i size = mdl.size();
-    vec3i row        = n - u - v;
+    vec3i row = n - u - v;
 
     for (int32 dv = 0; dv < 3; ++dv) {
         vec3i cell = row;
@@ -320,10 +297,13 @@ auto corners_from_patch(
 
             open[slot] = static_cast<int32>((open_bits >> slot) & 1U);
             if (open[slot] != 0) {
-                lit[slot] = light->level_at(
-                    std::clamp(cell.x, 0, size.x - 1), std::clamp(cell.y, 0, size.y - 1),
-                    std::clamp(cell.z, 0, size.z - 1)
-                );
+                // level_around, not level_at: a face on the shell of the chunk
+                // reads the cell in front of it, and that cell is the
+                // neighbour's. Clamping it back inside instead lands on the
+                // solid voxel the face belongs to, which the flood leaves at
+                // zero -- and every outward face of every chunk comes out
+                // black.
+                lit[slot] = light->level_around(cell.x, cell.y, cell.z);
             }
 
             cell = cell + u;

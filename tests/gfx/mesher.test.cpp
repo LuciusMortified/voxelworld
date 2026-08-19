@@ -92,9 +92,16 @@ constexpr int32 face_verts[6][4][3] = {
 // The same geometry as expected_corner_ao, asking a different question: not
 // how shut in the corner is, but how much sky the four cells around it get.
 // Solid ones are left out of the average rather than counted as dark.
+//
+// The levels come from the flooded column rather than from the field on the
+// model, so this checks the whole chain -- bake, boundary planes, mesher --
+// against the thing all three are meant to reproduce.
 auto expected_corner_sky(
-    const asset::model& mdl, vec3i cell, int32 face, vec3i corner
+    const asset::model& mdl, const asset::sky_light_column& column, vec3i cell, int32 face,
+    vec3i corner
 ) -> uint8 {
+    constexpr int32 side = asset::sky_light_field::side;
+
     const vec3i n     = face_normal[face];
     const vec3i front = cell + n;
 
@@ -102,24 +109,32 @@ auto expected_corner_sky(
     const int32 a    = (axis + 1) % 3;
     const int32 b    = (axis + 2) % 3;
 
-    const auto inside = [&mdl](vec3i p) {
+    const auto solid = [&mdl](vec3i p) {
         return p.x >= 0 && p.y >= 0 && p.z >= 0 && p.x < mdl.width() && p.y < mdl.height() &&
-               p.z < mdl.depth();
+               p.z < mdl.depth() && !mdl.is_empty(p.x, p.y, p.z);
     };
 
-    const auto solid = [&](vec3i p) {
-        return inside(p) && !mdl.is_empty(p.x, p.y, p.z);
-    };
+    const auto level = [&column](vec3i p) -> int32 {
+        // A cell outside on two axes at once is at the very edge of the chunk,
+        // and the field only keeps one plane a face -- so the mesher clamps the
+        // other axes into it, first out of x, y, z wins. Pinned here rather
+        // than glossed over: it is the one place the answer is approximate.
+        const auto out = [](int32 v) { return v < 0 || v >= side; };
 
-    const auto level = [&](vec3i p) -> int32 {
-        const auto* light = mdl.get_sky_light();
-        if (light == nullptr) {
-            return 15;
+        if (out(p.x)) {
+            p.y = std::clamp(p.y, 0, side - 1);
+            p.z = std::clamp(p.z, 0, side - 1);
+        } else if (out(p.y)) {
+            p.z = std::clamp(p.z, 0, side - 1);
         }
-        return light->level_at(
-            std::clamp(p.x, 0, mdl.width() - 1), std::clamp(p.y, 0, mdl.height() - 1),
-            std::clamp(p.z, 0, mdl.depth() - 1)
-        );
+
+        if (p.y < 0) {
+            return 0;
+        }
+        if (p.y >= column.height()) {
+            return asset::sky_light_column::max_level;
+        }
+        return column.level_at(p.x, p.y, p.z);
     };
 
     const auto at = [&](int32 i, int32 j) {
@@ -139,8 +154,7 @@ auto expected_corner_sky(
     int32 sum   = level(at(self_i, self_j));
     int32 count = 1;
 
-    for (const vec3i p :
-         {at(other_i, self_j), at(self_i, other_j), at(other_i, other_j)}) {
+    for (const vec3i p : {at(other_i, self_j), at(self_i, other_j), at(other_i, other_j)}) {
         if (solid(p)) {
             continue;
         }
@@ -709,6 +723,19 @@ TEST_CASE("packed sky light matches the field at every corner", "[mesh]") {
             }
         }
     }
+
+    // A pillar up to the ceiling of the chunk. Its top face reads the plane one
+    // voxel outside, which here is open sky at 15 -- and reading it wrong is
+    // what turned every outward face of every chunk black. Without something
+    // touching the ceiling the test cannot tell.
+    for (int32 y = 40; y < 64; ++y) {
+        for (int32 z = 50; z < 54; ++z) {
+            for (int32 x = 50; x < 54; ++x) {
+                mdl.set_voxel_raw(x, y, z, voxel{blocks::gray_5});
+            }
+        }
+    }
+
     mdl.invalidate();
 
     asset::chunk_occupancy occupancy;
@@ -720,9 +747,10 @@ TEST_CASE("packed sky light matches the field at every corner", "[mesh]") {
     };
     mdl.set_sky_light(column.bake(0));
 
-    const auto check = [&mdl](const gfx::mesh& m, std::string_view what) {
+    const auto check = [&mdl, &column](const gfx::mesh& m, std::string_view what) {
         std::size_t checked = 0;
         std::set<uint8> levels;
+        std::size_t lit_ceiling = 0;
 
         for (const auto& q : m.quads) {
             const int32 face = unpack_normal(q);
@@ -739,7 +767,7 @@ TEST_CASE("packed sky light matches the field at every corner", "[mesh]") {
                     cell[i]         = high ? hi[i] - 1 : lo[i];
                 }
 
-                const uint8 want = expected_corner_sky(mdl, cell, face, corner);
+                const uint8 want = expected_corner_sky(mdl, column, cell, face, corner);
                 if (sky[slot] != want) {
                     INFO(
                         what << ": face " << face << " cell " << cell.x << "," << cell.y << ","
@@ -749,15 +777,26 @@ TEST_CASE("packed sky light matches the field at every corner", "[mesh]") {
                     FAIL();
                 }
 
+                // Face 2 is +Y, and a top face on the ceiling row is the one
+                // that has to reach outside the chunk to find its light.
+                if (face == 2 && hi.y == 64 && sky[slot] == 15) {
+                    ++lit_ceiling;
+                }
+
                 levels.insert(sky[slot]);
                 ++checked;
             }
         }
 
         // Not a vacuous run: a field of one value would pass every comparison
-        // above and mean nothing.
-        INFO(what << ": " << levels.size() << " distinct levels");
+        // above and mean nothing, and neither would one where the whole shell
+        // came out dark.
+        INFO(
+            what << ": " << levels.size() << " distinct levels, " << lit_ceiling
+                 << " lit ceiling corners"
+        );
         REQUIRE(levels.size() > 4);
+        REQUIRE(lit_ceiling > 0);
 
         return checked;
     };
