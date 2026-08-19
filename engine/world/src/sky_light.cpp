@@ -63,11 +63,14 @@ void shift_east(const uint64* in, uint64* out) {
 }  // namespace
 
 sky_light_column::sky_light_column(std::span<const chunk_occupancy* const> chunks_bottom_up)
-    : sky_light_column{neighbourhood{
-          {{}, {}, {}, {}, chunks_bottom_up, {}, {}, {}, {}}
-      }} {}
+    : sky_light_column{
+          neighbourhood{{{}, {}, {}, {}, chunks_bottom_up, {}, {}, {}, {}}}, {}
+      } {}
 
-sky_light_column::sky_light_column(const neighbourhood& around) {
+sky_light_column::sky_light_column(
+    const neighbourhood& around, sky_light_scratch scratch
+)
+    : buffers_{std::move(scratch)} {
     int32 chunks = 0;
     for (const auto& column : around) {
         chunks = std::max(chunks, static_cast<int32>(column.size()));
@@ -78,12 +81,17 @@ sky_light_column::sky_light_column(const neighbourhood& around) {
         return;
     }
 
-    levels_.assign(static_cast<std::size_t>(height_) * span * span, 0);
+    buffers_.levels.assign(static_cast<std::size_t>(height_) * span * span, 0);
     flood_(around);
 }
 
 void sky_light_column::flood_(const neighbourhood& around) {
-    std::vector<uint64> solid(static_cast<std::size_t>(height_) * span * words, 0);
+    auto& levels = buffers_.levels;
+    auto& solid  = buffers_.solid;
+    auto& sky    = buffers_.sky;
+
+    const auto plane = static_cast<std::size_t>(height_) * span * words;
+    solid.assign(plane, 0);
 
     for (int32 dz = -1; dz <= 1; ++dz) {
         for (int32 dx = -1; dx <= 1; ++dx) {
@@ -130,7 +138,7 @@ void sky_light_column::flood_(const neighbourhood& around) {
     // Rule one. A bit stays set while its column still sees the sky, and the
     // first opaque voxel clears it for good -- everything below has rock over
     // it whatever the shape of that rock.
-    std::vector<uint64> sky(static_cast<std::size_t>(height_) * span * words, 0);
+    sky.assign(plane, 0);
     for (int32 z = 0; z < span; ++z) {
         uint64 open[words] = {~uint64{0}, ~uint64{0}, ~uint64{0}};
         for (int32 y = height_ - 1; y >= 0; --y) {
@@ -149,8 +157,9 @@ void sky_light_column::flood_(const neighbourhood& around) {
         }
     }
 
-    std::vector<int32> current;
-    std::vector<int32> next;
+    auto& current = buffers_.frontier;
+    auto& next    = buffers_.next;
+    current.clear();
 
     // Rule two starts from the edge of rule one, not from all of it. A skylit
     // voxel has somewhere to give light only if one of its four lateral
@@ -188,7 +197,7 @@ void sky_light_column::flood_(const neighbourhood& around) {
                 while (lit != 0) {
                     const auto b = static_cast<int32>(std::countr_zero(lit));
                     lit &= lit - 1;
-                    levels_[static_cast<std::size_t>(
+                    levels[static_cast<std::size_t>(
                         index_((w * 64) + b - bit0, y, z)
                     )] = max_level;
                 }
@@ -226,11 +235,11 @@ void sky_light_column::flood_(const neighbourhood& around) {
                 }
 
                 const auto to = static_cast<std::size_t>(index_(nx, ny, nz));
-                if (levels_[to] >= child) {
+                if (levels[to] >= child) {
                     return;
                 }
 
-                levels_[to] = child;
+                levels[to] = child;
                 next.push_back(static_cast<int32>(to));
             };
 
@@ -578,6 +587,9 @@ void sky_light_baker::worker_() {
     std::vector<std::vector<asset::chunk_occupancy>> held(9);
     std::vector<std::vector<const asset::chunk_occupancy*>> pointers(9);
 
+    // And the seven megabytes the flood itself runs in, for the same reason.
+    asset::sky_light_scratch scratch;
+
     while (true) {
         sky_light_request job;
 
@@ -606,17 +618,23 @@ void sky_light_baker::worker_() {
                 const auto slot  = static_cast<std::size_t>(((dz + 1) * 3) + (dx + 1));
                 const auto& from = job.around[slot];
 
+                pointers[slot].clear();
+
                 // Only as deep as the skirt reaches. Fifteen voxels is two
                 // pages of eight, so a side neighbour is read two page columns
                 // wide and a corner two by two -- 2.25 columns of work for the
                 // whole neighbourhood instead of nine.
+                //
+                // Rows outside that range are left as the last job wrote them,
+                // which is safe: the flood skips exactly those rows on its own,
+                // and everything west or east of the skirt is sealed solid
+                // whatever it says.
                 const int32 px0 = dx < 0 ? pages_per_side - skirt_pages : 0;
                 const int32 px1 = dx > 0 ? skirt_pages : pages_per_side;
                 const int32 pz0 = dz < 0 ? pages_per_side - skirt_pages : 0;
                 const int32 pz1 = dz > 0 ? skirt_pages : pages_per_side;
 
                 held[slot].resize(from.size());
-                pointers[slot].clear();
 
                 for (std::size_t i = 0; i < from.size(); ++i) {
                     if (from[i] == nullptr) {
@@ -634,7 +652,7 @@ void sky_light_baker::worker_() {
 
         const auto rowed = std::chrono::steady_clock::now();
 
-        const asset::sky_light_column light{around};
+        asset::sky_light_column light{around, std::move(scratch)};
 
         const auto flooded = std::chrono::steady_clock::now();
 
@@ -650,6 +668,8 @@ void sky_light_baker::worker_() {
         }
 
         const auto baked = std::chrono::steady_clock::now();
+
+        scratch = std::move(light).release();
 
         const auto span = [](auto from, auto to) -> uint64 {
             return static_cast<uint64>(

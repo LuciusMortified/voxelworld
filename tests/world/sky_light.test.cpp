@@ -502,7 +502,7 @@ TEST_CASE("a column shorter than its neighbours is not walled off", "[sky_light]
 // so they get measured rather than guessed. Run with
 // `world_tests "[.sky_light_measure]"`.
 TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
-    static constexpr int32 grid           = 4;
+    static constexpr int32 grid           = 5;
     static constexpr int32 pages_per_side = side / 8;
     static constexpr int32 skirt_pages    = 2;
 
@@ -553,15 +553,20 @@ TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
     uint64 bake_ns  = 0;
     int32 lit       = 0;
 
+    uint64 held_ns   = 0;
+    uint64 unheld_ns = 0;
+
     std::size_t field_bytes = 0;
     int32 field_chunks      = 0;
     int32 uniform_chunks    = 0;
     int32 mixed_pages       = 0;
 
     // The scratch a worker would keep, not allocate: nine columns of occupancy
-    // is 4.6 MB, and creating it per job costs more than filling it.
+    // is 4.6 MB and the flood runs in seven more, and creating either per job
+    // costs more than filling it.
     std::vector<std::vector<asset::chunk_occupancy>> held(9);
     std::vector<std::vector<const asset::chunk_occupancy*>> pointers(9);
+    asset::sky_light_scratch scratch;
 
     // Only the columns that have all eight neighbours, which is the only case
     // the engine ever lights.
@@ -597,8 +602,44 @@ TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
             }
 
             const auto rowed = std::chrono::steady_clock::now();
-            const asset::sky_light_column light{around};
+
+            // The same flood twice, once in the buffers a worker keeps and once
+            // in fresh ones, with the order alternating so that neither gets
+            // the warm cache every time. Seven megabytes of fresh pages a
+            // column is the whole of what the scratch saves, and on a machine
+            // with anything else running on it the difference is smaller than
+            // the noise between two runs -- so the two have to be measured
+            // against each other rather than against yesterday.
+            const bool scratch_first = ((cx + cz) % 2) == 0;
+            uint64 fresh_ns          = 0;
+
+            const auto time_fresh = [&] -> void {
+                const auto from = std::chrono::steady_clock::now();
+                const asset::sky_light_column fresh{around};
+                fresh_ns += static_cast<uint64>(
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::steady_clock::now() - from
+                    )
+                        .count()
+                );
+            };
+
+            if (!scratch_first) {
+                time_fresh();
+            }
+
+            const auto held_from = std::chrono::steady_clock::now();
+            asset::sky_light_column light{around, std::move(scratch)};
             const auto flooded = std::chrono::steady_clock::now();
+
+            if (scratch_first) {
+                time_fresh();
+            }
+
+            held_ns += static_cast<uint64>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(flooded - held_from).count()
+            );
+            unheld_ns += fresh_ns;
 
             for (int32 y_base = 0; y_base < light.height();
                  y_base += asset::sky_light_field::side) {
@@ -612,6 +653,8 @@ TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
 
             const auto baked = std::chrono::steady_clock::now();
 
+            scratch = std::move(light).release();
+
             const auto span = [](auto from, auto to) -> uint64 {
                 return static_cast<uint64>(
                     std::chrono::duration_cast<std::chrono::nanoseconds>(to - from).count()
@@ -619,7 +662,7 @@ TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
             };
 
             rows_ns += span(rows_started, rowed);
-            flood_ns += span(rowed, flooded);
+            flood_ns += span(held_from, flooded);
             bake_ns += span(flooded, baked);
             ++lit;
         }
@@ -637,7 +680,13 @@ TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
                      << "%), " << mixed_pages << " mixed pages ("
                      << (100.0 * mixed_pages / (field_chunks * 512)) << "%)\n  resident "
                      << (field_bytes / 1024) << " KB, "
-                     << (field_bytes / static_cast<std::size_t>(field_chunks)) << " bytes a chunk"
+                     << (field_bytes / static_cast<std::size_t>(field_chunks))
+                     << " bytes a chunk\n  flood in kept buffers "
+                     << (held_ns / 1000 / static_cast<uint64>(lit)) << " us, in fresh ones "
+                     << (unheld_ns / 1000 / static_cast<uint64>(lit)) << " us -- "
+                     << (100.0 - (100.0 * static_cast<float64>(held_ns) /
+                                  static_cast<float64>(unheld_ns)))
+                     << "% saved"
     );
 
     REQUIRE(field_chunks > 0);
