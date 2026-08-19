@@ -6,6 +6,7 @@ layout(location = 2) in vec3 fragColor;
 layout(location = 3) in float viewDepth;
 layout(location = 4) in vec2 fragUV;
 layout(location = 5) flat in uint fragCornersMask;
+layout(location = 6) flat in uint fragSkyMask;
 
 // Cascaded shadow maps are parked, not deleted. Past the first cascade they
 // staircased, and the staircase moved whenever the camera did; what they cost
@@ -68,9 +69,18 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     //    only control over where the middle of the ramp sits.
     vec4 ao_params;
 
+    // rgb: what lights a place no sky reaches. Its own colour rather than a
+    //      fraction of the sky, so a sealed room does not follow the time of
+    //      day above it.
+    vec4 cave_ambient;
+
+    // x: the exponent the raw 0..1 sky visibility is raised to. Below one the
+    //    daylight reaches further in, above one it stops at the mouth.
+    vec4 sky_params;
+
     uint point_lights_count;
 
-    // 0 normal, 1 ambient occlusion alone on white, 2 normals.
+    // 0 normal, 1 ambient occlusion alone on white, 2 normals, 3 sky light.
     uint debug_view;
 
     FogData fog;
@@ -322,15 +332,35 @@ void main() {
         return;
     }
 
+    // Sky light, four bits a corner, through the same bilinear as AO and for the
+    // same reason: corner values that differ across a diagonal cannot be split
+    // into two triangles without the split showing.
+    uint sm = fragSkyMask;
+    float s00 = float( sm        & 15u) * (1.0 / 15.0);
+    float s10 = float((sm >> 4)  & 15u) * (1.0 / 15.0);
+    float s11 = float((sm >> 8)  & 15u) * (1.0 / 15.0);
+    float s01 = float((sm >> 12) & 15u) * (1.0 / 15.0);
+
+    float skyReach = mix(mix(s00, s10, fragUV.x), mix(s01, s11, fragUV.x), fragUV.y);
+    skyReach = pow(skyReach, ubo.sky_params.x);
+
+    if (ubo.debug_view == 3u) {
+        outColor = vec4(vec3(skyReach), 1.0);
+        return;
+    }
+
     // AO belongs to the ambient term alone. It is a measure of how much of the
     // surroundings a point can see, so it dims the light that arrives from the
     // surroundings; laying it over the sun as well counts the same occlusion
     // twice and grimes up every corner the sun is shining straight into.
     //
-    // Nothing here yet knows how much sky reaches this point, so a cave is lit
-    // by an outdoor sky and the time of day reaches a sealed room. That is the
-    // whole of what stage 2 fixes -- docs/lighting.md.
-    vec3 ambient = calculateHemisphereAmbient(normal) * aoFactor;
+    // Sky light goes in the same term, and only there. It says how much of the
+    // sky reaches this point, so it chooses between the sky overhead and the
+    // colour of a place the sky never gets to. The sun is not scaled by it: the
+    // shadow map already says what the sun cannot reach, and multiplying the two
+    // darkens every overhang twice over.
+    vec3 sky = mix(ubo.cave_ambient.rgb, calculateHemisphereAmbient(normal), skyReach);
+    vec3 ambient = sky * aoFactor;
 
     // Directional light с sun_factor
     vec3 directional = calculateDirectionalLight(normal, shadow);

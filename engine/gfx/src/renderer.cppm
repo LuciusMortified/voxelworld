@@ -35,9 +35,6 @@ struct directional_light_settings {
 // it is a hemisphere rather than a constant -- a flat ambient makes an unlit
 // voxel a single flat colour, which is what plastic looks like.
 //
-// Sky visibility is not in here: nothing yet knows how much sky reaches a
-// point, so a cave is lit by an outdoor sky. That is what the baked sky light
-// of stage 2 fixes -- see docs/lighting.md.
 struct ambient_settings {
     vec3f sky{0.34f, 0.42f, 0.52f};
     vec3f ground{0.16f, 0.14f, 0.13f};
@@ -50,6 +47,15 @@ struct ambient_settings {
     // one it pulls it back into the corner.
     float32 ao_strength = 0.35f;
     float32 ao_curve    = 1.0f;
+
+    // What lights a place no sky reaches. A colour of its own rather than a
+    // fraction of the sky above, so a sealed room stays the same brightness
+    // while the day turns over its ceiling.
+    vec3f cave{0.05f, 0.055f, 0.07f};
+
+    // The curve sky visibility travels from sealed to open. Below one daylight
+    // reaches further into a cave mouth, above one it stops at the entrance.
+    float32 sky_curve = 1.0f;
 };
 
 // Not a setting -- a way of looking. Lighting is a product of the block's own
@@ -59,6 +65,7 @@ enum class debug_view : uint32 {
     off = 0,
     ambient_occlusion,
     normals,
+    sky_light,
 };
 
 // Настройки тумана (для CPU)
@@ -112,6 +119,12 @@ struct uniform_buffer_object {
 
     // x: how far down a fully enclosed corner goes, y: the occlusion curve.
     alignas(16) vec4f ao_params;
+
+    // rgb: what lights a place no sky reaches.
+    alignas(16) vec4f cave_ambient;
+
+    // x: the curve sky visibility travels from sealed to open.
+    alignas(16) vec4f sky_params;
 
     // Point lights count (для расширяемости)
     alignas(4) uint32 point_lights_count{0};

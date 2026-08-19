@@ -21,7 +21,8 @@ auto quad::pack(
     vec3i max_pos,
     uint8 normal_id,
     block_id block_id,
-    uint8 corners_ao
+    uint8 corners_ao,
+    uint16 corners_sky
 ) -> quad {
     quad q;
     q.data0 =                                               //
@@ -36,6 +37,8 @@ auto quad::pack(
         ((static_cast<uint32>(max_pos.y) & 0x7Fu) << 7) |   //
         ((static_cast<uint32>(max_pos.z) & 0x7Fu) << 14) |  //
         (static_cast<uint32>(block_id.value) << 21);
+
+    q.data2 = static_cast<uint32>(corners_sky);
 
     return q;
 }
@@ -506,7 +509,8 @@ void add_quad(
     vec3i min_pos,
     vec3i max_pos,
     block_id block_id,
-    uint8 corner_ao
+    uint8 corner_ao,
+    uint16 corner_sky
 ) {
     // Which of the two corners each winding-order vertex takes its components
     // from. The same table lives in voxel.vert and shadow.vert -- the shader is
@@ -535,14 +539,22 @@ void add_quad(
     // a corner touched by one diagonal block from one closed in by two faces,
     // and that difference is the whole of what makes the shading read as depth
     // rather than as an outline.
-    uint8 ao_winding = 0;
+    uint8 ao_winding   = 0;
+    uint16 sky_winding = 0;
     for (int i = 0; i < 4; i++) {
         const uint8 corner_i = winding_to_corner[face_direction][i];
         const uint8 ao_i     = corner_to_ao[corner_i];
         ao_winding |= static_cast<uint8>(c_ao[ao_i] << (i * 2));
+
+        // Sky travels the same reorder as AO, and has to: the shader reads
+        // both off the same four corners with the same bilinear.
+        const auto level = static_cast<uint16>((corner_sky >> (ao_i * 4)) & 0xFu);
+        sky_winding |= static_cast<uint16>(level << (i * 4));
     }
 
-    quads.push_back(quad::pack(min_pos, max_pos, normal_id, block_id, ao_winding));
+    quads.push_back(
+        quad::pack(min_pos, max_pos, normal_id, block_id, ao_winding, sky_winding)
+    );
 }
 
 
@@ -672,7 +684,8 @@ void emit_rect(
         min_pos,
         max_pos,
         block_id{cell.voxel_id},
-        cell.corner_ao
+        cell.corner_ao,
+        cell.corner_sky
     );
 }
 
@@ -733,7 +746,8 @@ void simple_mesh_generator::add_cube_face(
         {x, y, z},
         {x + 1, y + 1, z + 1},
         voxel_id,
-        detail::compute_corner_darkness(*mdl, x, y, z, face_direction)
+        detail::compute_corner_darkness(*mdl, x, y, z, face_direction),
+        detail::compute_corner_sky(*mdl, x, y, z, face_direction)
     );
 }
 

@@ -49,6 +49,15 @@ auto unpack_block(const gfx::quad& q) -> uint8 {
 }
 
 // Two bits a corner, in winding order: 0 open, 3 shut in by two faces.
+auto unpack_sky(const gfx::quad& q) -> std::array<uint8, 4> {
+    return {
+        static_cast<uint8>(q.data2 & 0xFU),
+        static_cast<uint8>((q.data2 >> 4) & 0xFU),
+        static_cast<uint8>((q.data2 >> 8) & 0xFU),
+        static_cast<uint8>((q.data2 >> 12) & 0xFU),
+    };
+}
+
 auto unpack_ao(const gfx::quad& q) -> std::array<uint8, 4> {
     const uint32 packed = (q.data0 >> 24) & 0xFFU;
     return {
@@ -80,6 +89,68 @@ constexpr int32 face_verts[6][4][3] = {
 // below is the same one the mesher applies, but where it lands on the face is
 // derived here from world coordinates, so a tangent table that is turned or
 // mirrored for one face out of six shows up as a mismatch.
+// The same geometry as expected_corner_ao, asking a different question: not
+// how shut in the corner is, but how much sky the four cells around it get.
+// Solid ones are left out of the average rather than counted as dark.
+auto expected_corner_sky(
+    const asset::model& mdl, vec3i cell, int32 face, vec3i corner
+) -> uint8 {
+    const vec3i n     = face_normal[face];
+    const vec3i front = cell + n;
+
+    const int32 axis = (n.x != 0) ? 0 : ((n.y != 0) ? 1 : 2);
+    const int32 a    = (axis + 1) % 3;
+    const int32 b    = (axis + 2) % 3;
+
+    const auto inside = [&mdl](vec3i p) {
+        return p.x >= 0 && p.y >= 0 && p.z >= 0 && p.x < mdl.width() && p.y < mdl.height() &&
+               p.z < mdl.depth();
+    };
+
+    const auto solid = [&](vec3i p) {
+        return inside(p) && !mdl.is_empty(p.x, p.y, p.z);
+    };
+
+    const auto level = [&](vec3i p) -> int32 {
+        const auto* light = mdl.get_sky_light();
+        if (light == nullptr) {
+            return 15;
+        }
+        return light->level_at(
+            std::clamp(p.x, 0, mdl.width() - 1), std::clamp(p.y, 0, mdl.height() - 1),
+            std::clamp(p.z, 0, mdl.depth() - 1)
+        );
+    };
+
+    const auto at = [&](int32 i, int32 j) {
+        vec3i p = front;
+        p[a]    = corner[a] + i;
+        p[b]    = corner[b] + j;
+        return p;
+    };
+
+    const int32 self_i  = front[a] - corner[a];
+    const int32 self_j  = front[b] - corner[b];
+    const int32 other_i = (self_i == 0) ? -1 : 0;
+    const int32 other_j = (self_j == 0) ? -1 : 0;
+
+    // The face's own front cell is air whenever the face is drawn, so the
+    // average always has something in it.
+    int32 sum   = level(at(self_i, self_j));
+    int32 count = 1;
+
+    for (const vec3i p :
+         {at(other_i, self_j), at(self_i, other_j), at(other_i, other_j)}) {
+        if (solid(p)) {
+            continue;
+        }
+        sum += level(p);
+        ++count;
+    }
+
+    return static_cast<uint8>(sum / count);
+}
+
 auto expected_corner_ao(
     const asset::model& mdl, vec3i cell, int32 face, vec3i corner
 ) -> uint8 {
@@ -603,6 +674,96 @@ TEST_CASE("packed occlusion matches the model at every corner", "[mesh]") {
 
     REQUIRE(check(fixture.simple(), "simple") > 1000);
     REQUIRE(check(fixture.greedy(), "greedy") > 1000);
+}
+
+// Sky light all the way through: flood a column, bake it onto the model, mesh
+// it, and check every corner of every quad against a plain recomputation. Both
+// mesh generators are checked, which also pins the fast path -- greedy reads
+// the corners out of occupancy bit rows, simple asks the voxels one at a time,
+// and the two have to agree.
+TEST_CASE("packed sky light matches the field at every corner", "[mesh]") {
+    model_fixture fixture{64};
+    auto& mdl = *fixture.get();
+
+    // Rock with a shaft down into it and a tunnel off the bottom of the shaft.
+    // The tunnel is what makes the test say anything: along it the light falls
+    // a level a voxel, so most corners have four different numbers around them.
+    for (int32 y = 0; y < 40; ++y) {
+        for (int32 z = 0; z < 64; ++z) {
+            for (int32 x = 0; x < 64; ++x) {
+                mdl.set_voxel_raw(x, y, z, voxel{blocks::gray_5});
+            }
+        }
+    }
+    for (int32 y = 10; y < 40; ++y) {
+        for (int32 z = 30; z < 34; ++z) {
+            for (int32 x = 30; x < 34; ++x) {
+                mdl.set_voxel_raw(x, y, z, voxel{});
+            }
+        }
+    }
+    for (int32 y = 10; y < 14; ++y) {
+        for (int32 z = 30; z < 34; ++z) {
+            for (int32 x = 8; x < 34; ++x) {
+                mdl.set_voxel_raw(x, y, z, voxel{});
+            }
+        }
+    }
+    mdl.invalidate();
+
+    asset::chunk_occupancy occupancy;
+    REQUIRE(mdl.build_occupancy(occupancy));
+
+    const asset::chunk_occupancy* stack[1] = {&occupancy};
+    const asset::sky_light_column column{
+        std::span<const asset::chunk_occupancy* const>{stack, 1}
+    };
+    mdl.set_sky_light(column.bake(0));
+
+    const auto check = [&mdl](const gfx::mesh& m, std::string_view what) {
+        std::size_t checked = 0;
+        std::set<uint8> levels;
+
+        for (const auto& q : m.quads) {
+            const int32 face = unpack_normal(q);
+            const auto lo    = unpack_min(q);
+            const auto hi    = unpack_max(q);
+            const auto sky   = unpack_sky(q);
+
+            for (int32 slot = 0; slot < 4; ++slot) {
+                vec3i corner{};
+                vec3i cell{};
+                for (std::size_t i = 0; i < 3; ++i) {
+                    const bool high = face_verts[face][slot][i] != 0;
+                    corner[i]       = high ? hi[i] : lo[i];
+                    cell[i]         = high ? hi[i] - 1 : lo[i];
+                }
+
+                const uint8 want = expected_corner_sky(mdl, cell, face, corner);
+                if (sky[slot] != want) {
+                    INFO(
+                        what << ": face " << face << " cell " << cell.x << "," << cell.y << ","
+                             << cell.z << " slot " << slot << " packed " << int32{sky[slot]}
+                             << " expected " << int32{want}
+                    );
+                    FAIL();
+                }
+
+                levels.insert(sky[slot]);
+                ++checked;
+            }
+        }
+
+        // Not a vacuous run: a field of one value would pass every comparison
+        // above and mean nothing.
+        INFO(what << ": " << levels.size() << " distinct levels");
+        REQUIRE(levels.size() > 4);
+
+        return checked;
+    };
+
+    REQUIRE(check(fixture.greedy(), "greedy") > 1000);
+    REQUIRE(check(fixture.simple(), "simple") > 1000);
 }
 
 // Occlusion samples reach one cell past the face, so a face on the edge of a

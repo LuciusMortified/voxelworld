@@ -1593,6 +1593,14 @@ void renderer::update_uniform_buffer(
         ambient_settings_.ao_strength, ambient_settings_.ao_curve, 0.0f, 0.0f
     };
 
+    // Not scaled by ambient strength: the point of it is to be the one light
+    // that does not answer to the sky.
+    ubo.cave_ambient = vec4f{
+        ambient_settings_.cave.x, ambient_settings_.cave.y, ambient_settings_.cave.z, 0.0f
+    };
+
+    ubo.sky_params = vec4f{ambient_settings_.sky_curve, 0.0f, 0.0f, 0.0f};
+
     ubo.debug_view = static_cast<uint32>(debug_view_);
 
     // Point lights count

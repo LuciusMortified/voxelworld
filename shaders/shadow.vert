@@ -21,6 +21,10 @@ layout(set = 1, binding = 1, std430) readonly buffer NormalMatrices {
 struct Quad {
     uint data0;
     uint data1;
+
+    // Shadows do not read the light, but the record has to be the size the
+    // buffer was written at.
+    uint data2;
 };
 
 layout(set = 1, binding = 2, std430) readonly buffer Quads {

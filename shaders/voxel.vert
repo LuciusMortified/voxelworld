@@ -39,6 +39,7 @@ layout(set = 1, binding = 1, std430) readonly buffer NormalMatrices {
 struct Quad {
     uint data0;
     uint data1;
+    uint data2;
 };
 
 layout(set = 1, binding = 2, std430) readonly buffer Quads {
@@ -55,6 +56,7 @@ layout(location = 2) out vec3 fragColor;
 layout(location = 3) out float viewDepth;
 layout(location = 4) out vec2 fragUV;
 layout(location = 5) flat out uint fragCornersMask;
+layout(location = 6) flat out uint fragSkyMask;
 
 const vec3 NORMALS[6] = vec3[6](
     vec3( 1,  0,  0),
@@ -115,6 +117,7 @@ void main() {
     );
     fragUV = corner_uvs[corner_id];
     fragCornersMask = corners_ao;
+    fragSkyMask = q.data2 & 0xFFFFu;
 
     viewDepth = -(ubo.view * worldPos).z;
 

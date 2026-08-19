@@ -9,7 +9,7 @@ import vulkan;
 // ---- from vw/gfx/resource/mesh.h
 export namespace vw::gfx {
 
-// One greedy rectangle, eight bytes. There is no vertex buffer and no index
+// One greedy rectangle, twelve bytes. There is no vertex buffer and no index
 // buffer: the draw asks for six vertices per quad and the vertex shader picks
 // the corner out of this record by gl_VertexIndex. Four vertices of eight bytes
 // plus six indices of four came to fifty-six.
@@ -17,12 +17,20 @@ export namespace vw::gfx {
 // data0: min.x[6:0] | min.y[13:7] | min.z[20:14] | normal_id[23:21]
 //      | corners_ao[31:24]
 // data1: max.x[6:0] | max.y[13:7] | max.z[20:14] | palette_index[28:21]
+// data2: corners_sky[15:0]
+//
+// The third word is what sky light cost. Four bits a corner do not fit in the
+// three left over in data1, and cutting the levels down to two bits a corner
+// would throw away the gradient the flood exists to produce. The upper half of
+// data2 is where block light goes in stage 3.
 //
 // The two corners are the box the rectangle spans; along the face axis they are
 // equal. Seven bits each, so a model is at most 128 voxels a side -- the same
 // ceiling the packed vertex had.
 //
 // corners_ao: two bits per corner in winding order, 0 open to 3 fully enclosed.
+// corners_sky: four bits per corner in the same winding order, 0 sealed to 15
+// under open sky.
 // It used to be one bit per corner plus one more mask that brightened whatever
 // nothing stood over -- so a corner touched by a single diagonal block came out
 // exactly as dark as the inside of a right angle, and the gradation the sampler
@@ -31,11 +39,13 @@ export namespace vw::gfx {
 struct quad {
     uint32 data0 = 0;
     uint32 data1 = 0;
+    uint32 data2 = 0;
 
     quad() = default;
 
     [[nodiscard]] static auto pack(
-        vec3i min_pos, vec3i max_pos, uint8 normal_id, block_id block_id, uint8 corners_ao
+        vec3i min_pos, vec3i max_pos, uint8 normal_id, block_id block_id, uint8 corners_ao,
+        uint16 corners_sky
     ) -> quad;
 
     // Only the per-instance index is still fed through vertex input; the
@@ -171,7 +181,8 @@ void add_quad(
     vec3i min_pos,
     vec3i max_pos,
     uint8 palette_index,
-    uint8 corner_ao
+    uint8 corner_ao,
+    uint16 corner_sky
 );
 
 // Takes the mask cell rather than just the block id: the mask already holds the
