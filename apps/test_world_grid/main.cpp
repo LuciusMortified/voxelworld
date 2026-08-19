@@ -98,7 +98,11 @@ public:
         }
 
         const auto& wgs = get_engine().get_world().system<ecs::world_grid_system>();
+
+        // Three queues deep now: generated, lit, meshed. A column still waiting
+        // on its light is not on screen yet.
         const bool streamed = wgs.get_stats().pending_count == 0 &&
+            wgs.get_stats().lighting_count == 0 &&
             get_engine().get_renderer().get_mesh_pool().get_pending_count() == 0;
 
         // The crowd is spawned in the air and has to land before it is worth

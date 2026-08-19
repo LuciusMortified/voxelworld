@@ -343,3 +343,239 @@ auto sky_light_column::bake(int32 y_base) const -> sky_light_field {
 }
 
 }  // namespace vw::asset
+
+namespace vw::ecs {
+
+namespace {
+
+constexpr int32 light_page     = asset::model::page_size;
+constexpr int32 pages_per_side = asset::sky_light_column::side / light_page;
+constexpr int32 skirt_pages = (asset::sky_light_column::apron + light_page - 1) / light_page;
+
+static_assert(skirt_pages * light_page >= asset::sky_light_column::apron);
+
+}  // namespace
+
+sky_light_baker::sky_light_baker(
+    uint32 workers
+) {
+    auto count = workers != 0 ? workers : std::min(std::thread::hardware_concurrency(), 4U);
+    if (count == 0) {
+        count = 1;
+    }
+    for (uint32 i = 0; i < count; ++i) {
+        threads_.emplace_back(&sky_light_baker::worker_, this);
+    }
+}
+
+sky_light_baker::~sky_light_baker() {
+    {
+        std::scoped_lock lock(mutex_);
+        running_ = false;
+    }
+    cv_.notify_all();
+
+    for (auto& t : threads_) {
+        if (t.joinable()) {
+            t.join();
+        }
+    }
+}
+
+auto sky_light_baker::request(
+    sky_light_request job
+) -> bool {
+    if (pending_.contains(job.coord)) {
+        return false;
+    }
+    pending_.insert(job.coord);
+
+    {
+        std::scoped_lock lock(mutex_);
+        queue_.push(std::move(job));
+        queue_peak_ = std::max(queue_peak_, static_cast<uint32>(queue_.size()));
+    }
+    cv_.notify_one();
+    return true;
+}
+
+auto sky_light_baker::try_pop_completed() -> std::optional<sky_light_result> {
+    sky_light_result result;
+    {
+        std::scoped_lock lock(completed_mutex_);
+        if (completed_.empty()) {
+            return std::nullopt;
+        }
+        result = std::move(completed_.front());
+        completed_.pop();
+    }
+    pending_.erase(result.coord);
+    return result;
+}
+
+auto sky_light_baker::is_pending(
+    vec2i coord
+) const -> bool {
+    return pending_.contains(coord);
+}
+
+auto sky_light_baker::pending_count() const -> uint32 {
+    return static_cast<uint32>(pending_.size());
+}
+
+void sky_light_baker::merge_worker_stats_(
+    sky_light_worker_stats& worker
+) {
+    if (worker.columns == 0) {
+        return;
+    }
+
+    totals_.columns += worker.columns;
+    totals_.rows_nanos += worker.rows_nanos;
+    totals_.flood_nanos += worker.flood_nanos;
+    totals_.bake_nanos += worker.bake_nanos;
+    totals_.micros.insert(totals_.micros.end(), worker.micros.begin(), worker.micros.end());
+
+    worker = sky_light_worker_stats{};
+}
+
+auto sky_light_baker::get_stats() const -> sky_light_stats {
+    std::scoped_lock lock(mutex_);
+
+    sky_light_stats out{};
+    out.columns     = totals_.columns;
+    out.rows_ms     = static_cast<float32>(static_cast<float64>(totals_.rows_nanos) / 1.0e6);
+    out.flood_ms    = static_cast<float32>(static_cast<float64>(totals_.flood_nanos) / 1.0e6);
+    out.bake_ms     = static_cast<float32>(static_cast<float64>(totals_.bake_nanos) / 1.0e6);
+    out.queue_depth = static_cast<uint32>(queue_.size());
+    out.queue_peak  = queue_peak_;
+
+    if (totals_.micros.empty()) {
+        return out;
+    }
+
+    auto samples = totals_.micros;
+    std::ranges::sort(samples);
+
+    const auto at = [&samples](float32 quantile) -> float32 {
+        const auto count = static_cast<float32>(samples.size());
+        const auto rank  = static_cast<uint64>(std::ceil(quantile * count));
+        const auto index = std::clamp<uint64>(rank, 1, samples.size()) - 1;
+        return static_cast<float32>(samples[index]);
+    };
+
+    const auto total = totals_.rows_nanos + totals_.flood_nanos + totals_.bake_nanos;
+
+    out.mean_us = static_cast<float32>(
+        static_cast<float64>(total) / 1000.0 / static_cast<float64>(totals_.columns)
+    );
+    out.p50_us = at(0.50F);
+    out.p99_us = at(0.99F);
+    out.max_us = at(1.00F);
+
+    return out;
+}
+
+void sky_light_baker::worker_() {
+    sky_light_worker_stats local;
+
+    // Nine columns of occupancy is 4.6 MB. It is scratch, not a result, so a
+    // worker keeps it for as long as it lives. Rows outside the page range a
+    // neighbour is read at are left as the last job wrote them, which is safe:
+    // the flood skips exactly those rows on its own.
+    std::vector<std::vector<asset::chunk_occupancy>> held(9);
+    std::vector<std::vector<const asset::chunk_occupancy*>> pointers(9);
+
+    while (true) {
+        sky_light_request job;
+
+        {
+            std::unique_lock lock(mutex_);
+            merge_worker_stats_(local);
+            cv_.wait(lock, [this] -> bool { return !queue_.empty() || !running_; });
+
+            if (!running_ && queue_.empty()) {
+                break;
+            }
+            if (queue_.empty()) {
+                continue;
+            }
+
+            job = std::move(queue_.front());
+            queue_.pop();
+        }
+
+        const auto started = std::chrono::steady_clock::now();
+
+        asset::sky_light_column::neighbourhood around{};
+
+        for (int32 dz = -1; dz <= 1; ++dz) {
+            for (int32 dx = -1; dx <= 1; ++dx) {
+                const auto slot  = static_cast<std::size_t>(((dz + 1) * 3) + (dx + 1));
+                const auto& from = job.around[slot];
+
+                // Only as deep as the skirt reaches. Fifteen voxels is two
+                // pages of eight, so a side neighbour is read two page columns
+                // wide and a corner two by two -- 2.25 columns of work for the
+                // whole neighbourhood instead of nine.
+                const int32 px0 = dx < 0 ? pages_per_side - skirt_pages : 0;
+                const int32 px1 = dx > 0 ? skirt_pages : pages_per_side;
+                const int32 pz0 = dz < 0 ? pages_per_side - skirt_pages : 0;
+                const int32 pz1 = dz > 0 ? skirt_pages : pages_per_side;
+
+                held[slot].resize(from.size());
+                pointers[slot].clear();
+
+                for (std::size_t i = 0; i < from.size(); ++i) {
+                    if (from[i] == nullptr) {
+                        pointers[slot].push_back(nullptr);
+                        continue;
+                    }
+
+                    static_cast<void>(from[i]->build_x_rows(held[slot][i], px0, px1, pz0, pz1));
+                    pointers[slot].push_back(&held[slot][i]);
+                }
+
+                around[slot] = pointers[slot];
+            }
+        }
+
+        const auto rowed = std::chrono::steady_clock::now();
+
+        const asset::sky_light_column light{around};
+
+        const auto flooded = std::chrono::steady_clock::now();
+
+        sky_light_result result;
+        result.coord    = job.coord;
+        result.bottom_y = job.bottom_y;
+        result.fields.reserve(job.around[4].size());
+
+        for (std::size_t i = 0; i < job.around[4].size(); ++i) {
+            result.fields.push_back(
+                light.bake(static_cast<int32>(i) * asset::sky_light_field::side)
+            );
+        }
+
+        const auto baked = std::chrono::steady_clock::now();
+
+        const auto span = [](auto from, auto to) -> uint64 {
+            return static_cast<uint64>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(to - from).count()
+            );
+        };
+
+        ++local.columns;
+        local.rows_nanos += span(started, rowed);
+        local.flood_nanos += span(rowed, flooded);
+        local.bake_nanos += span(flooded, baked);
+        local.micros.push_back(static_cast<uint32>(span(started, baked) / 1000));
+
+        {
+            std::scoped_lock lock(completed_mutex_);
+            completed_.push(std::move(result));
+        }
+    }
+}
+
+}  // namespace vw::ecs

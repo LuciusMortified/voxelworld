@@ -29,7 +29,10 @@ public:
     virtual void generate(terrain_context& ctx) = 0;
 };
 
-enum class column_phase : uint8 { empty, terrain, complete };
+// A column is generated, then lit -- which needs its eight neighbours to
+// exist -- and only then placed. Placing it before the light is in would
+// mesh every chunk twice.
+enum class column_phase : uint8 { empty, terrain, lighting, complete };
 
 // One vertical stack of chunks as it is being generated, before the chunks
 // reach the grid.

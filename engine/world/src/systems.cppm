@@ -9,6 +9,7 @@ import :components;
 import :grid;
 import :index;
 import :model;
+import :sky_light;
 import :terrain;
 
 export namespace vw::ecs {
@@ -539,8 +540,15 @@ struct world_grid_system_stats {
     // air have nothing to draw and get neither entity nor mesh.
     uint32 drawn_count = 0;
 
-    // Generated, held back until its four neighbours are there too.
+    // Generated, held back until its eight neighbours are there too.
     uint32 staged_count = 0;
+
+    // Of the staged ones, those with a light job in flight.
+    uint32 lighting_count = 0;
+
+    // Attaching finished light to the models it belongs to. The flood runs
+    // on a worker; this is the part that lands on the frame.
+    float32 light_apply_ms = 0.0F;
 };
 
 class world_grid_system {
@@ -568,6 +576,7 @@ public:
 
     [[nodiscard]] auto get_stats() const -> const world_grid_system_stats&;
     [[nodiscard]] auto get_loader_stats() const -> column_gen_stats;
+    [[nodiscard]] auto get_light_stats() const -> sky_light_stats;
 
     class view_modifier {
     public:
@@ -584,10 +593,14 @@ public:
     auto modify_view(entity ent) -> view_modifier;
 
 private:
-    // A column waits in staging until its four horizontal neighbours have been
-    // generated too. Only then are its chunks put in the grid, with every
-    // boundary already known -- so each chunk is meshed once instead of once
-    // per neighbour that turns up after it.
+    // A column waits in staging until its eight horizontal neighbours have
+    // been generated too, and then until its sky light is flooded. Only then
+    // are its chunks put in the grid, with every boundary and every level
+    // already known -- so each chunk is meshed once instead of once per
+    // neighbour that turns up after it.
+    //
+    // Four neighbours were enough for boundaries. Light needs the diagonals
+    // too: a cave mouth on a corner is lit through it.
     //
     // The active set is therefore one column wider than the view distance: the
     // outermost ring exists to complete the ring inside it and is never placed.
@@ -596,7 +609,13 @@ private:
     auto process_dirty_entity_(entity ent) -> bool;
     auto process_dirty_entities_() -> bool;
     void stage_completed_columns_();
+    void collect_lit_columns_();
     void integrate_completed_columns_();
+    auto dispatch_light_(vec2i coord) -> bool;
+    [[nodiscard]] auto column_stack_(vec2i coord, int32 bottom)
+        -> std::vector<std::shared_ptr<asset::model>>;
+    [[nodiscard]] auto column_bottom_(vec2i coord) -> std::optional<int32>;
+    [[nodiscard]] static auto already_lit_(gen_column& col) -> bool;
     [[nodiscard]] auto column_available_(vec2i coord) const -> bool;
     [[nodiscard]] auto column_ready_(vec2i coord) const -> bool;
     [[nodiscard]] auto within_draw_(vec2i coord) const -> bool;
@@ -614,6 +633,7 @@ private:
     world* world_;
     std::unique_ptr<world_grid> grid_;
     std::unique_ptr<chunk_loader> loader_;
+    std::unique_ptr<sky_light_baker> baker_;
     std::unordered_set<vec2i> active_columns_;
     std::unordered_set<vec2i> pending_active_columns_;
     std::vector<vec2i> pending_requests_;

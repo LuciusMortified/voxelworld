@@ -48,7 +48,11 @@ public:
             w.update(0.016F);
             observe_();
 
-            const bool waiting = gs.get_stats().pending_count > 0;
+            // Two stages to wait on now, not one: a column that is generated
+            // still has to be lit before it is placed, and light runs on its
+            // own workers.
+            const auto& stats  = gs.get_stats();
+            const bool waiting = stats.pending_count > 0 || stats.lighting_count > 0;
             quiet              = (waiting || placed_this_frame_ > 0) ? 0 : quiet + 1;
 
             // An empty update takes microseconds and generation takes
@@ -310,6 +314,62 @@ TEST_CASE("digging a seam tells both sides", "[world][grid]") {
 
     // ...and the rock beside the hole is still rock.
     REQUIRE(east->get_model()->is_boundary_solid(1, 0, local.y + 1, local.z));
+}
+
+// The light stage, from the outside. A column is generated, then lit on a
+// worker once its eight neighbours exist, and only then placed -- so a chunk
+// that is in the grid at all has its light, and no chunk is ever meshed
+// unlit and meshed again.
+TEST_CASE("a placed chunk arrives with its sky light", "[world][grid]") {
+    world w;
+    const settled_grid settled{w};
+
+    std::size_t chunks     = 0;
+    std::size_t with_light = 0;
+    std::size_t paged      = 0;
+    std::size_t dark       = 0;
+    bool saw_open_sky      = false;
+
+    settled.grid().for_each_chunk([&](vec3i, const chunk& c) -> void {
+        ++chunks;
+
+        const auto* light = c.get_model()->get_sky_light();
+        if (light == nullptr) {
+            return;
+        }
+        ++with_light;
+
+        if (light->is_uniform()) {
+            dark += light->uniform_level() == 0 ? 1 : 0;
+            return;
+        }
+
+        ++paged;
+
+        for (int32 z = 0; z < asset::sky_light_field::side && !saw_open_sky; ++z) {
+            for (int32 x = 0; x < asset::sky_light_field::side; ++x) {
+                if (light->level_at(x, asset::sky_light_field::side - 1, z) ==
+                    asset::sky_light_column::max_level) {
+                    saw_open_sky = true;
+                    break;
+                }
+            }
+        }
+    });
+
+    INFO(
+        "chunks " << chunks << ", with light " << with_light << ", paged " << paged << ", dark "
+                  << dark
+    );
+
+    REQUIRE(chunks > 0);
+    REQUIRE(with_light == chunks);
+
+    // And it is really light, not a field of zeroes: rock is dark, the top of
+    // the world is 15, and the ground between them is what the pages are for.
+    REQUIRE(dark > 0);
+    REQUIRE(saw_open_sky);
+    REQUIRE(paged > 0);
 }
 
 TEST_CASE("the apron is generated but not placed", "[world][grid]") {

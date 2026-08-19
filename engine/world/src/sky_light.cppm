@@ -94,3 +94,87 @@ private:
 };
 
 }  // namespace vw::asset
+
+export namespace vw::ecs {
+
+// One column ready to be lit: the chunk models of its own column and of its
+// eight neighbours, bottom up from a floor they all share, indexed
+// (dz + 1) * 3 + (dx + 1) so that 4 is the middle one.
+//
+// Models are held by shared_ptr for the length of the job: it runs on a worker,
+// and nothing stops the grid letting a chunk go while it does. An entry that is
+// empty is a column that does not exist, which the flood reads as rock.
+struct sky_light_request {
+    vec2i coord;
+    int32 bottom_y = 0;
+    std::array<std::vector<std::shared_ptr<asset::model>>, 9> around;
+};
+
+// One field per chunk of the middle column, in the same order the request had
+// them.
+struct sky_light_result {
+    vec2i coord;
+    int32 bottom_y = 0;
+    std::vector<asset::sky_light_field> fields;
+};
+
+struct sky_light_worker_stats {
+    uint64 columns      = 0;
+    uint64 rows_nanos   = 0;
+    uint64 flood_nanos  = 0;
+    uint64 bake_nanos   = 0;
+    std::vector<uint32> micros;
+};
+
+struct sky_light_stats {
+    uint64 columns     = 0;
+    float32 rows_ms    = 0.0F;
+    float32 flood_ms   = 0.0F;
+    float32 bake_ms    = 0.0F;
+    float32 mean_us    = 0.0F;
+    float32 p50_us     = 0.0F;
+    float32 p99_us     = 0.0F;
+    float32 max_us     = 0.0F;
+    uint32 queue_depth = 0;
+    uint32 queue_peak  = 0;
+};
+
+// Lights columns on worker threads and hands the finished fields back through a
+// queue, the same shape as chunk_loader. It is a stage of its own rather than
+// part of generation because a column can only be lit once its eight
+// neighbours exist, and the thread that generated it knows nothing about them.
+class sky_light_baker {
+public:
+    explicit sky_light_baker(uint32 workers = 0);
+    ~sky_light_baker();
+
+    sky_light_baker(const sky_light_baker&)                    = delete;
+    auto operator=(const sky_light_baker&) -> sky_light_baker& = delete;
+    sky_light_baker(sky_light_baker&&)                         = delete;
+    auto operator=(sky_light_baker&&) -> sky_light_baker&      = delete;
+
+    auto request(sky_light_request job) -> bool;
+
+    [[nodiscard]] auto try_pop_completed() -> std::optional<sky_light_result>;
+    [[nodiscard]] auto is_pending(vec2i coord) const -> bool;
+    [[nodiscard]] auto pending_count() const -> uint32;
+    [[nodiscard]] auto get_stats() const -> sky_light_stats;
+
+private:
+    void worker_();
+    void merge_worker_stats_(sky_light_worker_stats& worker);
+
+    std::vector<std::thread> threads_;
+    std::queue<sky_light_request> queue_;
+    std::queue<sky_light_result> completed_;
+    mutable std::mutex mutex_;
+    mutable std::mutex completed_mutex_;
+    std::condition_variable cv_;
+    bool running_ = true;
+    std::unordered_set<vec2i> pending_;
+
+    sky_light_worker_stats totals_;
+    uint32 queue_peak_ = 0;
+};
+
+}  // namespace vw::ecs

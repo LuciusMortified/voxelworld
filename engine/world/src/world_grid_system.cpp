@@ -27,6 +27,7 @@ void world_grid_system::set_loader(
 ) {
     clear_loader_transient_state_();
     loader_ = std::move(loader);
+    baker_  = loader_ != nullptr ? std::make_unique<sky_light_baker>() : nullptr;
 }
 
 auto world_grid_system::grid() -> world_grid* {
@@ -57,12 +58,17 @@ auto world_grid_system::get_loader_stats() const -> column_gen_stats {
     return loader_ ? loader_->get_gen_stats() : column_gen_stats{};
 }
 
+auto world_grid_system::get_light_stats() const -> sky_light_stats {
+    return baker_ ? baker_->get_stats() : sky_light_stats{};
+}
+
 auto world_grid_system::get_stats() const -> const world_grid_system_stats& {
     return stats_;
 }
 
 void world_grid_system::shutdown() {
     grid_.reset();
+    baker_.reset();
     loader_.reset();
 }
 
@@ -73,6 +79,7 @@ void world_grid_system::update(float32 /*dt*/) {
 
     auto& reg                 = world_->registry();
     stats_.stage_ms           = measure_ms([&] { stage_completed_columns_(); });
+    stats_.light_apply_ms     = measure_ms([&] { collect_lit_columns_(); });
     stats_.integrate_ms       = measure_ms([&] { integrate_completed_columns_(); });
     stats_.request_columns_ms = measure_ms([&] { dispatch_column_requests_(); });
     update_grid_stats_();
@@ -94,11 +101,18 @@ void world_grid_system::update(float32 /*dt*/) {
 }
 
 namespace {
-constexpr vec2i column_neighbor_offsets[4] = {
-    {1, 0},   //
-    {-1, 0},  //
-    {0, 1},   //
-    {0, -1}
+// All eight, diagonals included. Boundaries only ever needed the four, but
+// sky light comes across a corner as readily as across a side, and a column
+// lit without its diagonals has dark wedges where two seams meet.
+constexpr vec2i column_neighbor_offsets[8] = {
+    {1, 0},    //
+    {-1, 0},   //
+    {0, 1},    //
+    {0, -1},   //
+    {1, 1},    //
+    {1, -1},   //
+    {-1, 1},   //
+    {-1, -1}
 };
 }  // namespace
 
@@ -127,15 +141,151 @@ void world_grid_system::queue_if_ready_(
     vec2i coord
 ) {
     const auto it = staged_columns_.find(coord);
-    if (it == staged_columns_.end() || it->second->get_phase() == column_phase::complete) {
+    if (it == staged_columns_.end()) {
+        return;
+    }
+
+    const auto phase = it->second->get_phase();
+    if (phase == column_phase::complete || phase == column_phase::lighting) {
         return;
     }
     if (!column_ready_(coord)) {
         return;
     }
 
-    it->second->set_phase(column_phase::complete);
-    ready_columns_.push_back(coord);
+    // A column that went out of drawing range and came back is a fresh
+    // gen_column around the same models, so its phase says terrain however
+    // long ago it was lit. The models are the ones that remember.
+    if (already_lit_(*it->second)) {
+        it->second->set_phase(column_phase::complete);
+        ready_columns_.push_back(coord);
+        return;
+    }
+
+    if (dispatch_light_(coord)) {
+        it->second->set_phase(column_phase::lighting);
+    }
+}
+
+auto world_grid_system::already_lit_(
+    gen_column& col
+) -> bool {
+    const auto& chunks = col.get_all_chunk_data();
+    return !chunks.empty() && std::ranges::all_of(chunks, [](const auto& entry) -> bool {
+        return entry.second.chunk_model->has_sky_light();
+    });
+}
+
+auto world_grid_system::column_bottom_(
+    vec2i coord
+) -> std::optional<int32> {
+    if (const auto it = staged_columns_.find(coord); it != staged_columns_.end()) {
+        const auto& chunks = it->second->get_all_chunk_data();
+        if (chunks.empty()) {
+            return std::nullopt;
+        }
+        // The map runs top down, so the last entry is the floor.
+        return chunks.rbegin()->first;
+    }
+
+    const auto levels = grid_->column_levels(coord);
+    if (levels.empty()) {
+        return std::nullopt;
+    }
+    return levels.front();
+}
+
+auto world_grid_system::column_stack_(
+    vec2i coord, int32 bottom
+) -> std::vector<std::shared_ptr<asset::model>> {
+    std::vector<std::shared_ptr<asset::model>> stack;
+
+    const auto put = [&](int32 y, std::shared_ptr<asset::model> mdl) -> void {
+        if (y < bottom) {
+            return;
+        }
+        const auto slot = static_cast<std::size_t>(y - bottom);
+        if (stack.size() <= slot) {
+            stack.resize(slot + 1);
+        }
+        stack[slot] = std::move(mdl);
+    };
+
+    if (const auto it = staged_columns_.find(coord); it != staged_columns_.end()) {
+        for (auto& [y, cd] : it->second->get_all_chunk_data()) {
+            put(y, cd.chunk_model);
+        }
+        return stack;
+    }
+
+    for (int32 y : grid_->column_levels(coord)) {
+        if (auto* placed = grid_->get_chunk(vec3i{coord.x, y, coord.y})) {
+            put(y, placed->get_model());
+        }
+    }
+    return stack;
+}
+
+auto world_grid_system::dispatch_light_(
+    vec2i coord
+) -> bool {
+    if (baker_ == nullptr) {
+        return false;
+    }
+    if (baker_->is_pending(coord)) {
+        return true;
+    }
+
+    // Every column in this world stands on the same floor, so any one of the
+    // nine gives it. Taking the lowest is the same answer with one less
+    // assumption.
+    int32 bottom = std::numeric_limits<int32>::max();
+    for (auto offset : column_neighbor_offsets) {
+        if (const auto at = column_bottom_(coord + offset)) {
+            bottom = std::min(bottom, *at);
+        }
+    }
+    const auto own = column_bottom_(coord);
+    if (!own) {
+        return false;
+    }
+    bottom = std::min(bottom, *own);
+
+    sky_light_request job;
+    job.coord    = coord;
+    job.bottom_y = bottom;
+
+    for (int32 dz = -1; dz <= 1; ++dz) {
+        for (int32 dx = -1; dx <= 1; ++dx) {
+            const auto slot  = static_cast<std::size_t>(((dz + 1) * 3) + (dx + 1));
+            job.around[slot] = column_stack_(coord + vec2i{dx, dz}, bottom);
+        }
+    }
+
+    return baker_->request(std::move(job));
+}
+
+void world_grid_system::collect_lit_columns_() {
+    if (baker_ == nullptr) {
+        return;
+    }
+
+    while (auto result = baker_->try_pop_completed()) {
+        const auto it = staged_columns_.find(result->coord);
+        if (it == staged_columns_.end()) {
+            continue;
+        }
+
+        for (auto& [y, cd] : it->second->get_all_chunk_data()) {
+            const auto slot = static_cast<std::size_t>(y - result->bottom_y);
+            if (slot < result->fields.size()) {
+                cd.chunk_model->set_sky_light(std::move(result->fields[slot]));
+            }
+        }
+
+        it->second->set_phase(column_phase::complete);
+        ready_columns_.push_back(result->coord);
+    }
 }
 
 void world_grid_system::stage_completed_columns_() {
@@ -253,9 +403,15 @@ void world_grid_system::dispatch_column_requests_() {
     // asked for has landed.
     static constexpr uint32 max_columns_in_flight = 96;
 
+    // Light is a second stage with a queue of its own, and a column waiting
+    // to be lit holds the same nine models as one waiting to be generated.
+    // Counting only the loader would let generation run away from it.
+    const uint32 in_flight =
+        loader_->pending_count() + (baker_ != nullptr ? baker_->pending_count() : 0U);
+
     int32 requests = 0;
     while (!pending_requests_.empty() && requests < max_requests_per_frame &&
-           loader_->pending_count() < max_columns_in_flight) {
+           in_flight < max_columns_in_flight) {
         auto coord = pending_requests_.back();
         pending_requests_.pop_back();
         if (loader_->request(coord)) {
@@ -270,6 +426,7 @@ void world_grid_system::update_grid_stats_() {
     stats_.loaded_count      = grid_->chunk_count();
     stats_.drawn_count       = grid_->drawn_chunk_count();
     stats_.staged_count      = static_cast<uint32>(staged_columns_.size());
+    stats_.lighting_count    = baker_ != nullptr ? baker_->pending_count() : 0U;
     stats_.rebuild_active_ms = 0.0f;
     stats_.unload_ms         = 0.0f;
 }
