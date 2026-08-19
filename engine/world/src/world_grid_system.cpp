@@ -77,9 +77,12 @@ void world_grid_system::update(float32 /*dt*/) {
         return;
     }
 
-    auto& reg                 = world_->registry();
-    stats_.stage_ms           = measure_ms([&] { stage_completed_columns_(); });
-    stats_.light_apply_ms     = measure_ms([&] { collect_lit_columns_(); });
+    auto& reg       = world_->registry();
+    stats_.stage_ms = measure_ms([&] { stage_completed_columns_(); });
+    stats_.light_apply_ms = measure_ms([&] {
+        collect_lit_columns_();
+        relight_dirty_columns_();
+    });
     stats_.integrate_ms       = measure_ms([&] { integrate_completed_columns_(); });
     stats_.request_columns_ms = measure_ms([&] { dispatch_column_requests_(); });
     update_grid_stats_();
@@ -273,6 +276,10 @@ void world_grid_system::collect_lit_columns_() {
     while (auto result = baker_->try_pop_completed()) {
         const auto it = staged_columns_.find(result->coord);
         if (it == staged_columns_.end()) {
+            // Not staged, so this is a relight of a column already standing in
+            // the world -- or of one that has since been unloaded, which
+            // apply_relit_column_ finds nothing of and drops.
+            apply_relit_column_(*result);
             continue;
         }
 
@@ -286,6 +293,90 @@ void world_grid_system::collect_lit_columns_() {
         it->second->set_phase(column_phase::complete);
         ready_columns_.push_back(result->coord);
     }
+}
+
+// A relit column is already in the world with meshes built against its old
+// light, so every chunk whose light has really moved has to be meshed again.
+//
+// Most of them have not. A relight bakes the whole column because sky light
+// after an edit can change anywhere below it, but a spade underground changes
+// nothing at all: rock is dark before and dark after, and comparing the fields
+// is what keeps digging a mine from remeshing nine chunks a stroke.
+void world_grid_system::apply_relit_column_(
+    sky_light_result& result
+) {
+    for (int32 y : grid_->column_levels(result.coord)) {
+        const auto slot = static_cast<std::size_t>(y - result.bottom_y);
+        if (slot >= result.fields.size()) {
+            continue;
+        }
+
+        const vec3i at{result.coord.x, y, result.coord.y};
+        auto* placed = grid_->get_chunk(at);
+        if (placed == nullptr) {
+            continue;
+        }
+
+        auto& mdl         = *placed->get_model();
+        const auto* stood = mdl.get_sky_light();
+        if (stood != nullptr && *stood == result.fields[slot]) {
+            continue;
+        }
+
+        mdl.set_sky_light(std::move(result.fields[slot]));
+        grid_->remesh_drawn_chunk(at);
+        ++stats_.relit_chunks;
+    }
+}
+
+// Edits name the columns they spoiled; this sends them back through the same
+// baker that lit them in the first place. Nothing incremental happens here --
+// the column is flooded again from scratch, which is what makes the answer
+// after an edit exactly the answer the column would have been generated with.
+//
+// A column being lit right now is left dirty rather than asked again: the job
+// in flight was started from voxels that have since moved, so its result is
+// already wrong and the next frame has to order another one anyway.
+void world_grid_system::relight_dirty_columns_() {
+    if (baker_ == nullptr) {
+        return;
+    }
+
+    for (vec2i coord : grid_->take_light_dirty()) {
+        light_dirty_.insert(coord);
+    }
+
+    if (light_dirty_.empty()) {
+        return;
+    }
+
+    // Relights compete with streaming for the same four workers, and the
+    // camera getting its ground is worth more than a shaft lighting up a frame
+    // sooner.
+    static constexpr int32 max_relights_per_frame = 2;
+    int32 started                                 = 0;
+
+    std::erase_if(light_dirty_, [&](vec2i coord) -> bool {
+        if (!column_available_(coord)) {
+            return true;
+        }
+        if (started >= max_relights_per_frame || baker_->is_pending(coord)) {
+            return false;
+        }
+        if (!column_ready_(coord)) {
+            return false;
+        }
+
+        if (!dispatch_light_(coord)) {
+            return true;
+        }
+
+        ++started;
+        ++stats_.relit_columns;
+        return true;
+    });
+
+    stats_.relight_backlog = static_cast<uint32>(light_dirty_.size());
 }
 
 void world_grid_system::stage_completed_columns_() {
@@ -603,6 +694,7 @@ void world_grid_system::clear_grid_transient_state_() {
     pending_requests_.clear();
     staged_columns_.clear();
     ready_columns_.clear();
+    light_dirty_.clear();
     active_columns_.clear();
     pending_active_columns_.clear();
 }

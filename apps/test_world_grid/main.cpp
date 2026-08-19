@@ -381,10 +381,20 @@ private:
                 return;
             }
 
-            dig_top_voxel_ = *surface / generator_params_.voxel_scale;
+            // get_surface_y answers in voxels, and so does dig_top_voxel_. It
+            // used to be divided by the voxel scale here, which put the spade
+            // an eighth of the way up the world -- deep in rock, where nothing
+            // is lit and nothing is drawn. The scene measured a dig that never
+            // broke the surface.
+            dig_top_voxel_ = *surface;
             dig_started_   = true;
             dig_mesh_base_ =
                 get_engine().get_renderer().get_mesh_pool().get_gen_stats().chunks;
+
+            const auto& wgs       = get_engine().get_world().system<ecs::world_grid_system>();
+            dig_relight_base_     = wgs.get_stats().relit_columns;
+            dig_relit_chunk_base_ = wgs.get_stats().relit_chunks;
+            dig_light_base_       = wgs.get_light_stats().columns;
         }
 
         for (int32 done = 0; done < dig_per_frame_ && dig_cursor_ < dig_cells; ++dig_cursor_) {
@@ -416,16 +426,33 @@ private:
         const auto meshed =
             get_engine().get_renderer().get_mesh_pool().get_gen_stats().chunks - dig_mesh_base_;
 
+        const auto& wgs     = get_engine().get_world().system<ecs::world_grid_system>();
+        const auto& stats   = wgs.get_stats();
+        const auto relit    = stats.relit_columns - dig_relight_base_;
+        const auto relit_ch = stats.relit_chunks - dig_relit_chunk_base_;
+        const auto lit      = wgs.get_light_stats().columns - dig_light_base_;
+
+        const auto per = [this](uint64 n) -> float64 {
+            return static_cast<float64>(n) / static_cast<float64>(dig_edits_);
+        };
+
         std::print(
             "\ndig: {} voxels removed, {} chunk meshes, {:.2f} meshes an edit\n"
-            "  box {} cubed at the origin, {} voxels a frame, cursor {} of {}\n",
+            "  box {} cubed at the origin, {} voxels a frame, cursor {} of {}\n"
+            "  relight: {} columns asked ({:.3f} an edit), {} flooded, {} chunks changed\n"
+            "  backlog {} columns left over\n",
             dig_edits_,
             meshed,
-            static_cast<float64>(meshed) / static_cast<float64>(dig_edits_),
+            per(meshed),
             dig_side,
             dig_per_frame_,
             dig_cursor_,
-            dig_cells
+            dig_cells,
+            relit,
+            per(relit),
+            lit,
+            relit_ch,
+            stats.relight_backlog
         );
     }
 
@@ -745,7 +772,10 @@ private:
     int32 dig_cursor_     = 0;
     int32 dig_top_voxel_  = 0;
     uint64 dig_edits_     = 0;
-    uint64 dig_mesh_base_ = 0;
+    uint64 dig_mesh_base_        = 0;
+    uint64 dig_relight_base_     = 0;
+    uint64 dig_relit_chunk_base_ = 0;
+    uint64 dig_light_base_       = 0;
     bool dig_started_     = false;
     uint32 crowd_settle_frames_ = 0;
     static constexpr uint32 crowd_settle_target_ = 400;

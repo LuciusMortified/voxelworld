@@ -5,6 +5,7 @@ import std;
 import vw.core;
 import vw.ecs;
 import :model;
+import :sky_light;
 
 export namespace vw::ecs {
 
@@ -255,7 +256,10 @@ public:
     [[nodiscard]] auto has_chunk(vec3i chunk_coord) const -> bool;
     [[nodiscard]] auto get_chunk(vec3i chunk_coord) -> chunk*;
 
-    [[nodiscard]] auto get_surface_y(int32 wx, int32 wz) const -> std::optional<int32>;
+    // The topmost solid voxel over a spot, in voxels rather than world units --
+    // both the argument and the answer. Everything else on this class takes
+    // world units, so multiply by voxel_scale() to get back to them.
+    [[nodiscard]] auto get_surface_y(int32 vx, int32 vz) const -> std::optional<int32>;
     [[nodiscard]] auto has_column(vec2i coord) const -> bool;
 
     // Which chunk levels a loaded column has. Empty for a column that is not
@@ -279,6 +283,18 @@ public:
     // side of the seam.
     void refresh_chunk(vec3i chunk_coord);
 
+    // The same, for a chunk that is already in the scene, and only for one:
+    // relighting touches every chunk of a column, and buried rock has no faces
+    // for light to land on. refresh_chunk would hand it an entity and a mesh
+    // for nothing.
+    void remesh_drawn_chunk(vec3i chunk_coord);
+
+    // Columns whose sky light no longer matches their voxels, taken and
+    // cleared. The grid does not know what light is -- it knows which voxels
+    // moved and how far a change can carry -- so it names the columns and
+    // leaves the relighting to whoever owns the baker.
+    [[nodiscard]] auto take_light_dirty() -> std::vector<vec2i>;
+
     [[nodiscard]] auto voxel_scale() const -> int32;
 
     // f(vec3i coord, const chunk&). Used by the renderer, which has to say
@@ -295,10 +311,13 @@ public:
     [[nodiscard]] auto chunk_to_world_coord(vec3i chunk_coord) const -> vec3i;
 
 private:
+    void mark_light_dirty_(vec3i chunk_coord, vec3i local);
+
     world* world_;
     int32 voxel_scale_{1};
     std::unordered_map<vec3i, std::unique_ptr<chunk>> chunks_;
     std::unordered_map<vec2i, std::vector<int32>> column_chunks_;
+    std::unordered_set<vec2i> light_dirty_;
     uint32 drawn_chunks_ = 0;
 };
 

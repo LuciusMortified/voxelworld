@@ -546,9 +546,20 @@ struct world_grid_system_stats {
     // Of the staged ones, those with a light job in flight.
     uint32 lighting_count = 0;
 
-    // Attaching finished light to the models it belongs to. The flood runs
-    // on a worker; this is the part that lands on the frame.
+    // Attaching finished light to the models it belongs to, and handing edited
+    // columns back to the baker. The flood runs on a worker; this is the part
+    // that lands on the frame.
     float32 light_apply_ms = 0.0F;
+
+    // Placed columns waiting to be lit again after an edit, and the count of
+    // those sent off since the world was loaded.
+    uint32 relight_backlog = 0;
+    uint64 relit_columns   = 0;
+
+    // Of the chunks a relight came back with, the ones whose light had really
+    // changed and so had to be meshed again. Digging in the dark changes
+    // nothing and must cost nothing.
+    uint64 relit_chunks = 0;
 };
 
 class world_grid_system {
@@ -610,6 +621,8 @@ private:
     auto process_dirty_entities_() -> bool;
     void stage_completed_columns_();
     void collect_lit_columns_();
+    void relight_dirty_columns_();
+    void apply_relit_column_(sky_light_result& result);
     void integrate_completed_columns_();
     auto dispatch_light_(vec2i coord) -> bool;
     [[nodiscard]] auto column_stack_(vec2i coord, int32 bottom)
@@ -639,6 +652,11 @@ private:
     std::vector<vec2i> pending_requests_;
     std::unordered_map<vec2i, std::unique_ptr<gen_column>> staged_columns_;
     std::vector<vec2i> ready_columns_;
+
+    // Placed columns an edit has made wrong. A column already being lit stays
+    // here until that job lands, because the job it is in was started from the
+    // voxels as they were before the edit.
+    std::unordered_set<vec2i> light_dirty_;
 
     // The apron is generated but never drawn, so it must not keep drawn columns
     // alive behind the camera: staging reaches one column further than this,

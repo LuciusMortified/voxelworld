@@ -235,12 +235,14 @@ auto engine::write_bench_report_() const -> void {
     // once its eight neighbours exist, and only then placed and meshed. Split
     // three ways because the parts move independently -- rows is memory, flood
     // is the wave, bake is the paging.
-    const auto light = world_->system<ecs::world_grid_system>().get_light_stats();
+    const auto light      = world_->system<ecs::world_grid_system>().get_light_stats();
+    const auto grid_stats = world_->system<ecs::world_grid_system>().get_stats();
     std::format_to(
         std::back_inserter(report),
         "\nsky light: {} columns, rows {:.1f} ms, flood {:.1f} ms, bake {:.1f} ms\n"
         "  per column (us): mean {:.0f}  p50 {:.0f}  p99 {:.0f}  max {:.0f}\n"
-        "  queue: {} left, {} peak\n",
+        "  queue: {} left, {} peak\n"
+        "  relight: {} columns after edits, {} chunks changed, {} in the backlog\n",
         light.columns,
         light.rows_ms,
         light.flood_ms,
@@ -250,7 +252,10 @@ auto engine::write_bench_report_() const -> void {
         light.p99_us,
         light.max_us,
         light.queue_depth,
-        light.queue_peak
+        light.queue_peak,
+        grid_stats.relit_columns,
+        grid_stats.relit_chunks,
+        grid_stats.relight_backlog
     );
 
     std::format_to(

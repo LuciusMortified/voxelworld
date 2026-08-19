@@ -32,6 +32,7 @@ void world_grid::set_voxel(
     const auto lc = world_to_local_coord(world_pos) / voxel_scale_;
     it->second->set_voxel(lc, v);
 
+    mark_light_dirty_(cc, lc);
     refresh_chunk(cc);
 
     // A voxel on the skin of a chunk is half of a seam: the neighbour was
@@ -46,6 +47,60 @@ void world_grid::set_voxel(
             refresh_chunk(cc + boundary_face_offsets[fd]);
         }
     }
+}
+
+// Sky light carries fifteen steps from wherever it changed, so an edit within
+// fifteen voxels of the side of a column changes the light in the column beside
+// it as well -- and across a corner as readily as across a side, which is why
+// the diagonal is named too.
+//
+// Nothing is said here about height, because a column is lit as one thing and
+// has to be. Digging down from open sky relights the whole shaft under the
+// spade; walling the shaft off darkens the same volume again.
+void world_grid::mark_light_dirty_(
+    vec3i chunk_coord, vec3i local
+) {
+    constexpr int32 reach = asset::sky_light_column::max_level;
+    static_assert(reach * 2 < chunk::size, "an edit must not reach past the next column");
+
+    const vec2i column{chunk_coord.x, chunk_coord.z};
+    light_dirty_.insert(column);
+
+    const auto side_of = [](int32 at) -> int32 {
+        if (at + 1 <= reach) {
+            return -1;
+        }
+        return (chunk::size - at) <= reach ? 1 : 0;
+    };
+
+    const int32 dx = side_of(local.x);
+    const int32 dz = side_of(local.z);
+
+    if (dx != 0) {
+        light_dirty_.insert(column + vec2i{dx, 0});
+    }
+    if (dz != 0) {
+        light_dirty_.insert(column + vec2i{0, dz});
+    }
+    if (dx != 0 && dz != 0) {
+        light_dirty_.insert(column + vec2i{dx, dz});
+    }
+}
+
+auto world_grid::take_light_dirty() -> std::vector<vec2i> {
+    std::vector<vec2i> out(light_dirty_.begin(), light_dirty_.end());
+    light_dirty_.clear();
+    return out;
+}
+
+void world_grid::remesh_drawn_chunk(
+    vec3i chunk_coord
+) {
+    const auto it = chunks_.find(chunk_coord);
+    if (it == chunks_.end() || !it->second->is_drawn()) {
+        return;
+    }
+    refresh_chunk(chunk_coord);
 }
 
 void world_grid::refresh_chunk(
@@ -95,13 +150,13 @@ auto world_grid::get_chunk(
 }
 
 auto world_grid::get_surface_y(
-    int32 wx, int32 wz
+    int32 vx, int32 vz
 ) const -> std::optional<int32> {
     constexpr int32 s = chunk::size;
 
     auto floor_div = [](int32 a, int32 b) -> int32 { return a >= 0 ? a / b : (a - b + 1) / b; };
-    int32 cx       = floor_div(wx, s);
-    int32 cz       = floor_div(wz, s);
+    int32 cx       = floor_div(vx, s);
+    int32 cz       = floor_div(vz, s);
     vec2i col_coord{cx, cz};
 
     auto col_it = column_chunks_.find(col_coord);
@@ -111,8 +166,8 @@ auto world_grid::get_surface_y(
 
     const auto& y_levels = col_it->second;
 
-    int32 local_x = ((wx % s) + s) % s;
-    int32 local_z = ((wz % s) + s) % s;
+    int32 local_x = ((vx % s) + s) % s;
+    int32 local_z = ((vz % s) + s) % s;
 
     for (auto it = y_levels.rbegin(); it != y_levels.rend(); ++it) {
         int32 cy = *it;

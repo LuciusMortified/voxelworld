@@ -368,6 +368,8 @@ public:
             }
             return total;
         }
+
+        auto operator==(const boundary_light&) const -> bool = default;
     };
 
     // Dark, which is what a chunk that has not been lit yet has to look like.
@@ -447,6 +449,16 @@ public:
     [[nodiscard]] static auto page_index(int32 px, int32 py, int32 pz) -> int32 {
         return px + (py * pages_side) + (pz * pages_side * pages_side);
     }
+
+    // Relighting a column bakes every chunk of it whether or not anything
+    // about that chunk changed, and a chunk whose light is what it already was
+    // must not be meshed again. Five kilobytes of compare against a whole
+    // remesh is not a close call.
+    //
+    // The forms are canonical, so this is as exact as it looks: bake collapses
+    // a chunk of one level to uniform and a plane of one level to its uniform,
+    // and never leaves a table that says the same thing a shorter one would.
+    auto operator==(const sky_light_field&) const -> bool = default;
 
 private:
     uint8 uniform_ = 0;

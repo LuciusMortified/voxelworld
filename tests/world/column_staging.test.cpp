@@ -39,21 +39,32 @@ public:
         viewer_ = w.create().with<transform_component>().with<world_view_component>().get_entity();
         gs.modify_view(viewer_).set_view_distance(view_distance);
 
+        settle();
+    }
+
+    // Runs frames until nothing is in flight. Called once to build the world,
+    // and again by the tests that edit it: an edit relights the columns it
+    // touched, and that lands frames later on a worker of its own.
+    void settle() {
+        auto& gs = world_->system<world_grid_system>();
+
         // Quiet frames rather than one quiet frame: requests go out eight per
         // frame and columns are placed one per frame, so the loader is idle for
         // stretches long before the world is whole.
         int32 quiet = 0;
 
         for (int32 frame = 0; frame < max_frames && quiet < quiet_frames; ++frame) {
-            w.update(0.016F);
+            world_->update(0.016F);
             observe_();
 
-            // Two stages to wait on now, not one: a column that is generated
-            // still has to be lit before it is placed, and light runs on its
-            // own workers.
+            // Three stages to wait on now, not one: a column that is generated
+            // still has to be lit before it is placed, light runs on its own
+            // workers, and an edited column is queued for relighting before any
+            // of it is in flight.
             const auto& stats  = gs.get_stats();
-            const bool waiting = stats.pending_count > 0 || stats.lighting_count > 0;
-            quiet              = (waiting || placed_this_frame_ > 0) ? 0 : quiet + 1;
+            const bool waiting = stats.pending_count > 0 || stats.lighting_count > 0 ||
+                                 stats.relight_backlog > 0;
+            quiet = (waiting || placed_this_frame_ > 0) ? 0 : quiet + 1;
 
             // An empty update takes microseconds and generation takes
             // milliseconds, so a tight loop would run out of frames before the
@@ -110,6 +121,70 @@ private:
     std::unordered_map<vec3i, asset::model_identity> first_seen_;
     int32 placed_this_frame_ = 0;
 };
+
+// The baked level at a world position, out of the field on the model the voxel
+// belongs to. Nothing here reads the flood -- the point is what the world is
+// carrying around, which is what the mesher will read.
+auto light_at(world_grid& grid, vec3i world_pos) -> std::optional<int32> {
+    auto* c = grid.get_chunk(grid.world_to_chunk_coord(world_pos));
+    if (c == nullptr) {
+        return std::nullopt;
+    }
+
+    const auto* light = c->get_model()->get_sky_light();
+    if (light == nullptr) {
+        return std::nullopt;
+    }
+
+    return light->level_at(grid.world_to_local_coord(world_pos) / grid.voxel_scale());
+}
+
+// Somewhere in the middle of a column with solid rock straight down from the
+// surface for as far as asked. Caves are everywhere in this terrain, so a fixed
+// spot would be luck: a shaft that breaks into one is a hole into somewhere
+// already lit, and says nothing about relighting.
+//
+// The middle of the column, so the shaft stays more than fifteen voxels from
+// every side and the columns around it are left out of it.
+auto solid_shaft_site(world_grid& grid, vec2i column, int32 depth) -> std::optional<vec3i> {
+    const auto levels = grid.column_levels(column);
+    if (levels.empty()) {
+        return std::nullopt;
+    }
+
+    const int32 scale = grid.voxel_scale();
+    const int32 span  = chunk::size * scale;
+    const int32 top   = ((levels.back() + 1) * span) - scale;
+    const int32 floor = levels.front() * span;
+
+    for (int32 lz = 16; lz < 48; ++lz) {
+        for (int32 lx = 16; lx < 48; ++lx) {
+            const int32 wx = (column.x * span) + (lx * scale);
+            const int32 wz = (column.y * span) + (lz * scale);
+
+            int32 y = top;
+            while (y >= floor && grid.get_voxel(vec3i{wx, y, wz}).is_empty()) {
+                y -= scale;
+            }
+
+            const int32 deepest = y - ((depth - 1) * scale);
+            if (y < floor || deepest < floor) {
+                continue;
+            }
+
+            bool all_rock = true;
+            for (int32 at = y; at >= deepest && all_rock; at -= scale) {
+                all_rock = !grid.get_voxel(vec3i{wx, at, wz}).is_empty();
+            }
+
+            if (all_rock) {
+                return vec3i{wx, y, wz};
+            }
+        }
+    }
+
+    return std::nullopt;
+}
 
 }  // namespace
 
@@ -370,6 +445,113 @@ TEST_CASE("a placed chunk arrives with its sky light", "[world][grid]") {
     REQUIRE(dark > 0);
     REQUIRE(saw_open_sky);
     REQUIRE(paged > 0);
+}
+
+// An edit has to move the light, and a spade is the case that proves it.
+//
+// Sinking a shaft from open sky lights the whole of it, twenty voxels down.
+// No patch around the edit could do that: the bottom of the shaft is far past
+// the fifteen steps light carries, and is bright only because nothing opaque
+// stands above it in its own column. That is rule one, it is a property of the
+// column as a whole, and the only thing that re-applies it is flooding the
+// column again.
+TEST_CASE("digging to the sky relights the shaft", "[world][grid]") {
+    world w;
+    settled_grid settled{w};
+
+    auto& gs         = w.system<world_grid_system>();
+    auto& grid       = *gs.grid();
+    const int32 scale = grid.voxel_scale();
+
+    constexpr int32 depth = 20;
+
+    const auto surface = solid_shaft_site(grid, vec2i{0, 0}, depth);
+    REQUIRE(surface.has_value());
+
+    std::vector<vec3i> shaft;
+    for (int32 i = 0; i < depth; ++i) {
+        shaft.push_back(vec3i{surface->x, surface->y - (i * scale), surface->z});
+    }
+
+    // Rock, and dark: the flood leaves a solid voxel at zero.
+    for (vec3i at : shaft) {
+        REQUIRE_FALSE(grid.get_voxel(at).is_empty());
+        REQUIRE(light_at(grid, at) == 0);
+    }
+
+    const auto columns_before = gs.get_stats().relit_columns;
+
+    for (vec3i at : shaft) {
+        grid.set_voxel(at, empty_voxel);
+    }
+
+    // The frame the spade lands on has the geometry and not the light: the
+    // flood runs on a worker like every other one.
+    REQUIRE(grid.get_voxel(shaft.back()).is_empty());
+    REQUIRE(light_at(grid, shaft.back()) == 0);
+
+    settled.settle();
+
+    for (vec3i at : shaft) {
+        INFO("world y " << at.y);
+        REQUIRE(light_at(grid, at) == asset::sky_light_column::max_level);
+    }
+
+    // And only the column that was dug. The shaft is in the middle of it, more
+    // than fifteen voxels from every side, so nothing outside had light to
+    // gain and nothing outside was asked.
+    REQUIRE(gs.get_stats().relit_columns == columns_before + 1);
+}
+
+// The other half of the bargain. A relight bakes the whole column because sky
+// light after an edit can move anywhere below it -- but almost never does.
+//
+// Cutting a pocket out of rock deep underground changes no light at all: rock
+// is dark and so is a sealed pocket. The fields say so, and because they say so
+// not one chunk is meshed again. Without that comparison a mine would remesh
+// nine chunks a stroke for nothing.
+TEST_CASE("digging in the dark relights nothing", "[world][grid]") {
+    world w;
+    settled_grid settled{w};
+
+    auto& gs   = w.system<world_grid_system>();
+    auto& grid = *gs.grid();
+
+    // Solid all through, so its field is one dark level and the middle of it is
+    // thirty-two voxels from any face -- twice what light can carry.
+    std::optional<vec3i> target;
+    grid.for_each_chunk([&](vec3i coord, const chunk& c) -> void {
+        if (target.has_value() || !c.is_solid()) {
+            return;
+        }
+
+        const auto* light = c.get_model()->get_sky_light();
+        if (light != nullptr && light->is_uniform() && light->uniform_level() == 0) {
+            target = coord;
+        }
+    });
+
+    REQUIRE(target.has_value());
+
+    const auto& stats         = gs.get_stats();
+    const auto chunks_before  = stats.relit_chunks;
+    const auto columns_before = stats.relit_columns;
+
+    const vec3i at =
+        grid.chunk_to_world_coord(*target) + (vec3i{32, 32, 32} * grid.voxel_scale());
+
+    REQUIRE_FALSE(grid.get_voxel(at).is_empty());
+    grid.set_voxel(at, empty_voxel);
+
+    settled.settle();
+
+    INFO(
+        "relit " << (stats.relit_columns - columns_before) << " columns, "
+                 << (stats.relit_chunks - chunks_before) << " chunks"
+    );
+
+    REQUIRE(stats.relit_columns > columns_before);
+    REQUIRE(stats.relit_chunks == chunks_before);
 }
 
 TEST_CASE("the apron is generated but not placed", "[world][grid]") {
