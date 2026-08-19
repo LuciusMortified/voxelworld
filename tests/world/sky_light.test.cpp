@@ -157,20 +157,63 @@ TEST_CASE("light reaches into a chamber a height map would call sealed", "[sky_l
     }
 }
 
-// The number that decides where this field ends up living. A flat world has to
+// The number that decided where this field ends up living. A flat world has to
 // come out nearly free: rock below, sky above, and one layer of pages where the
 // two meet.
-TEST_CASE("page counts say what a paged form would cost", "[sky_light]") {
+TEST_CASE("a flat world costs one layer of pages", "[sky_light]") {
     column_fixture fixture{2};
     fixture.floor_at(40);
 
-    const auto stats = fixture.light().count_pages();
+    const auto light = fixture.light();
+    const asset::sky_light_field bottom{light, 0};
+    const asset::sky_light_field top{light, side};
 
-    REQUIRE(stats.lit + stats.dark + stats.uniform_other + stats.mixed == 1024);
-    REQUIRE(stats.dark == 320);
-    REQUIRE(stats.lit == 640);
-    REQUIRE(stats.uniform_other == 0);
-    REQUIRE(stats.mixed == 64);
+    SECTION("a chunk of open sky is a byte") {
+        REQUIRE(top.is_uniform());
+        REQUIRE(top.uniform_level() == 15);
+        REQUIRE(top.bytes() == 0);
+    }
+
+    SECTION("only the layer the floor cuts through is paged") {
+        REQUIRE_FALSE(bottom.is_uniform());
+        REQUIRE(bottom.mixed_pages() == 64);
+        REQUIRE(bottom.bytes() == (512 * sizeof(uint16)) + (64 * 256));
+    }
+}
+
+// The nibble packing, and the only part of the field that can be wrong quietly.
+// Two levels one apart in x land in the two halves of the same byte, so a swap
+// shows up here and nowhere else.
+TEST_CASE("a paged field reads back what was flooded", "[sky_light]") {
+    column_fixture fixture{2};
+    fixture.floor_at(40);
+    fixture.fill_solid(0, 60, 0, 31, 60, side - 1);
+    fixture.fill_solid(32, 41, 0, 32, 58, side - 1);
+
+    const auto light = fixture.light();
+
+    int32 mismatches = 0;
+    for (int32 chunk = 0; chunk < 2; ++chunk) {
+        const asset::sky_light_field field{light, chunk * side};
+
+        for (int32 y = 0; y < side; ++y) {
+            for (int32 z = 0; z < side; ++z) {
+                for (int32 x = 0; x < side; ++x) {
+                    if (field.level_at(x, y, z) != light.level_at(x, (chunk * side) + y, z)) {
+                        ++mismatches;
+                    }
+                }
+            }
+        }
+    }
+
+    REQUIRE(mismatches == 0);
+
+    // Not a vacuous run: the gradient under the overhang puts different levels
+    // in the two halves of one byte.
+    const asset::sky_light_field bottom{light, 0};
+    REQUIRE(bottom.level_at(31, 59, 32) == 14);
+    REQUIRE(bottom.level_at(30, 59, 32) == 13);
 }
 
 namespace {
@@ -453,10 +496,11 @@ TEST_CASE("a column shorter than its neighbours is not walled off", "[sky_light]
     REQUIRE(fixture.light().level_at(32, 130, 32) == 15);
 }
 
-// Not run by default: it generates real terrain and reports what the skirt
-// costs and what a paged form would have to allocate. Those two numbers decide
-// where this field lives and how it is scheduled, so they get measured rather
-// than guessed. Run with `world_tests "[.sky_light_measure]"`.
+// Not run by default: it generates real terrain and reports what the flood
+// costs, what the bake costs, and what the fields weigh once they are paged.
+// Those numbers decide how this is scheduled and whether it can stay resident,
+// so they get measured rather than guessed. Run with
+// `world_tests "[.sky_light_measure]"`.
 TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
     static constexpr int32 grid = 4;
 
@@ -502,9 +546,14 @@ TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
         }
     }
 
-    asset::sky_light_column::page_stats total;
     uint64 flood_ns = 0;
+    uint64 bake_ns  = 0;
     int32 lit       = 0;
+
+    std::size_t field_bytes  = 0;
+    int32 field_chunks       = 0;
+    int32 uniform_chunks     = 0;
+    int32 mixed_pages        = 0;
 
     // Only the columns that have all eight neighbours, which is the only case
     // the engine ever lights.
@@ -525,34 +574,40 @@ TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
 
             const auto started = std::chrono::steady_clock::now();
             const asset::sky_light_column light{around};
-            flood_ns += static_cast<uint64>(
-                std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::steady_clock::now() - started
-                )
-                    .count()
-            );
+            const auto flooded = std::chrono::steady_clock::now();
 
-            const auto stats = light.count_pages();
-            total.lit += stats.lit;
-            total.dark += stats.dark;
-            total.uniform_other += stats.uniform_other;
-            total.mixed += stats.mixed;
+            for (int32 y_base = 0; y_base < light.height(); y_base += asset::sky_light_field::side) {
+                const asset::sky_light_field field{light, y_base};
+
+                field_bytes += field.bytes();
+                mixed_pages += field.mixed_pages();
+                uniform_chunks += field.is_uniform() ? 1 : 0;
+                ++field_chunks;
+            }
+
+            const auto baked = std::chrono::steady_clock::now();
+
+            flood_ns += static_cast<uint64>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(flooded - started).count()
+            );
+            bake_ns += static_cast<uint64>(
+                std::chrono::duration_cast<std::chrono::nanoseconds>(baked - flooded).count()
+            );
             ++lit;
         }
     }
 
-    const int32 all = total.lit + total.dark + total.uniform_other + total.mixed;
-
     WARN(
         "generated " << columns.size() << " columns / " << chunk_count << " chunks, lit " << lit
-                     << " of them with a skirt\n  pages " << all << ": lit " << total.lit
-                     << ", dark " << total.dark << ", uniform_other " << total.uniform_other
-                     << ", mixed " << total.mixed << " (" << (100.0 * total.mixed / all)
-                     << "%)\n  mixed bytes " << (total.mixed * 256) << " over " << (all / 512)
-                     << " chunks, " << (total.mixed * 256 / (all / 512))
-                     << " a chunk\n  flood " << (flood_ns / 1000 / static_cast<uint64>(lit))
-                     << " us a column"
+                     << " of them with a skirt\n  flood "
+                     << (flood_ns / 1000 / static_cast<uint64>(lit)) << " us a column, bake "
+                     << (bake_ns / 1000 / static_cast<uint64>(lit)) << " us a column\n  fields "
+                     << field_chunks << " chunks, " << uniform_chunks << " uniform ("
+                     << (100.0 * uniform_chunks / field_chunks) << "%), " << mixed_pages
+                     << " mixed pages (" << (100.0 * mixed_pages / (field_chunks * 512))
+                     << "%)\n  resident " << (field_bytes / 1024) << " KB, "
+                     << (field_bytes / static_cast<std::size_t>(field_chunks)) << " bytes a chunk"
     );
 
-    REQUIRE(all > 0);
+    REQUIRE(field_chunks > 0);
 }

@@ -246,41 +246,94 @@ void sky_light_column::flood_(const neighbourhood& around) {
     }
 }
 
-auto sky_light_column::count_pages() const -> page_stats {
-    page_stats stats;
+sky_light_field::sky_light_field(const sky_light_column& column, int32 y_base) {
+    if (y_base < 0 || y_base + side > column.height()) {
+        return;
+    }
 
-    for (int32 py = 0; py < height_ / page; ++py) {
-        for (int32 pz = 0; pz < s / page; ++pz) {
-            for (int32 px = 0; px < s / page; ++px) {
-                const uint8 first = level_at(px * page, py * page, pz * page);
+    // Two passes, because which pages vary is worth knowing before anything is
+    // written. The first walks the chunk the way the column stores it -- along
+    // x, one row after another -- and tests eight voxels at a time: a run of
+    // eight equal levels is one 64-bit compare against the first byte splatted.
+    // The second visits only the pages that came out mixed, which on real
+    // terrain is one page in forty.
+    //
+    // Doing it the obvious way instead, page by page through level_at, reads
+    // every source byte off a different cache line and costs four times the
+    // flood that produced it.
+    std::array<uint8, page_count> level{};
+    std::array<uint8, page_count> mixed{};
 
-                bool uniform = true;
-                for (int32 y = 0; y < page && uniform; ++y) {
-                    for (int32 z = 0; z < page && uniform; ++z) {
-                        for (int32 x = 0; x < page; ++x) {
-                            if (level_at((px * page) + x, (py * page) + y, (pz * page) + z)
-                                != first) {
-                                uniform = false;
-                                break;
-                            }
-                        }
+    for (int32 py = 0; py < pages_side; ++py) {
+        for (int32 ly = 0; ly < page; ++ly) {
+            const int32 y = y_base + (py * page) + ly;
+
+            for (int32 z = 0; z < side; ++z) {
+                const uint8* row = column.row(y, z);
+                const int32 pz   = z / page;
+
+                for (int32 px = 0; px < pages_side; ++px) {
+                    uint64 run = 0;
+                    std::memcpy(&run, row + (px * page), sizeof(run));
+
+                    const auto first = static_cast<uint8>(run & 0xFFU);
+                    const auto slot  = static_cast<std::size_t>(page_index_(px, py, pz));
+
+                    if (ly == 0 && (z % page) == 0) {
+                        level[slot] = first;
                     }
-                }
 
-                if (!uniform) {
-                    ++stats.mixed;
-                } else if (first == max_level) {
-                    ++stats.lit;
-                } else if (first == 0) {
-                    ++stats.dark;
-                } else {
-                    ++stats.uniform_other;
+                    const bool same =
+                        run == (static_cast<uint64>(first) * 0x0101010101010101ULL) &&
+                        first == level[slot];
+                    mixed[slot] |= static_cast<uint8>(!same);
                 }
             }
         }
     }
 
-    return stats;
+    const bool chunk_uniform = std::ranges::none_of(mixed, [](uint8 m) -> bool {
+        return m != 0;
+    }) && std::ranges::all_of(level, [&](uint8 l) -> bool { return l == level[0]; });
+
+    if (chunk_uniform) {
+        uniform_ = level[0];
+        return;
+    }
+
+    table_.assign(page_count, 0);
+
+    for (int32 pz = 0; pz < pages_side; ++pz) {
+        for (int32 py = 0; py < pages_side; ++py) {
+            for (int32 px = 0; px < pages_side; ++px) {
+                const auto slot = static_cast<std::size_t>(page_index_(px, py, pz));
+
+                if (mixed[slot] == 0) {
+                    table_[slot] = static_cast<uint16>(level[slot] << 1);
+                    continue;
+                }
+
+                page_type packed{};
+                for (int32 lz = 0; lz < page; ++lz) {
+                    for (int32 ly = 0; ly < page; ++ly) {
+                        const uint8* row =
+                            column.row(y_base + (py * page) + ly, (pz * page) + lz) +
+                            (px * page);
+
+                        for (int32 lx = 0; lx < page; ++lx) {
+                            const int32 at = lx + (ly * page) + (lz * page * page);
+                            packed[static_cast<std::size_t>(at / 2)] |= static_cast<uint8>(
+                                (at % 2) == 0 ? row[lx] : (row[lx] << 4)
+                            );
+                        }
+                    }
+                }
+
+                table_[slot] = static_cast<uint16>(1U | (pages_.size() << 1));
+                pages_.push_back(packed);
+            }
+        }
+    }
 }
 
 }  // namespace vw::asset
