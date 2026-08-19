@@ -104,6 +104,11 @@ struct face_mask_cell {
     block_id voxel_id;
     uint8 corner_ao;
 
+    // Four nibbles, one a corner, in the same order as corner_ao. Part of
+    // the merge key, so two cells only join when their light matches all
+    // round -- which is what makes a gradient cost quads.
+    uint16 corner_sky = 0;
+
     [[nodiscard]]
     auto operator==(const face_mask_cell&) const -> bool = default;
 
@@ -146,6 +151,7 @@ struct face_axis_mapping {
 };
 
 [[nodiscard]] auto compute_corner_darkness(const vw::asset::model& mdl, int x, int y, int z, int face) -> uint8;
+[[nodiscard]] auto compute_corner_sky(const vw::asset::model& mdl, int x, int y, int z, int face) -> uint16;
 
 [[nodiscard]] auto is_face_visible(const vw::asset::model& mdl, int x, int y, int z, int face_direction)
     -> bool;
@@ -182,6 +188,9 @@ struct layer_rows {
     // around it leaves the chunk on two axes and reads as empty.
     bool front_outside = false;
 };
+
+[[nodiscard]] auto sky_from_rows(const vw::asset::model& mdl, const layer_rows& rows, int32 u_at,
+                                 int32 v_at, int x, int y, int z, int face) -> uint16;
 
 [[nodiscard]] auto build_layer_rows(
     const vw::asset::model& mdl,

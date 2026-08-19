@@ -235,6 +235,174 @@ auto compute_corner_darkness(
 }
 
 
+// Sky light where a face can see it. Outside the model it is clamped to the
+// nearest cell inside, and a model with no light field at all -- anything that
+// is not a world chunk -- reads as open sky, so an editor model is never dark.
+//
+// The clamp is wrong at a chunk seam by up to one level, and it is on purpose
+// for now: this pass exists to find out what light costs the greedy merge, and
+// a seam a level out does not move that number. The real answer is a plane of
+// the neighbour's light handed over the way the occupancy planes already are.
+[[nodiscard]] auto sky_at(
+    const vw::asset::model& mdl, vec3i p
+) -> int32 {
+    const auto* light = mdl.get_sky_light();
+    if (light == nullptr) {
+        return vw::asset::sky_light_column::max_level;
+    }
+
+    return light->level_at(
+        std::clamp(p.x, 0, mdl.width() - 1), std::clamp(p.y, 0, mdl.height() - 1),
+        std::clamp(p.z, 0, mdl.depth() - 1)
+    );
+}
+
+// A corner is the average of the four cells that touch it on the lit side.
+// Solid ones are left out rather than counted as dark: their darkness is what
+// AO is for, and counting it twice turns every inside corner black. The cell
+// straight out from the face is always air -- the face would not be visible
+// otherwise -- so an average always has something in it.
+//
+// Divide by one, two or four is a shift; by three it is a multiply. Four
+// integer divisions a face is not something a mesher can afford, and count is
+// only ever one of those.
+[[nodiscard]] auto average_of(int32 sum, int32 count) -> int32 {
+    switch (count) {
+        case 1:
+            return sum;
+        case 2:
+            return sum >> 1;
+        case 4:
+            return sum >> 2;
+        default:
+            return (sum * 21846) >> 16;
+    }
+}
+
+// bit i of open_bits is the cell at (du, dv) = (i % 3 - 1, i / 3 - 1), set
+// where that cell is air. Bit 4, the centre, is always set.
+auto corners_from_patch(
+    const vw::asset::model& mdl, vec3i n, vec3i u, vec3i v, uint32 open_bits
+) -> uint16 {
+    const auto* light = mdl.get_sky_light();
+    if (light == nullptr) {
+        // Anything that is not a world chunk has no sky over it. Open sky is
+        // the only answer that leaves an editor model looking like itself.
+        return 0xFFFF;
+    }
+
+    // A chunk lit all the way through -- rock below the caves, air above the
+    // surface -- has the same level at every corner of every face in it, and
+    // four fifths of them are like that.
+    if (light->is_uniform()) {
+        const auto level = static_cast<uint16>(light->uniform_level());
+        return static_cast<uint16>(level * 0x1111U);
+    }
+
+    // The four corners between them name sixteen cells, but only nine are
+    // distinct: the centre belongs to all four and every side cell to two.
+    // Read the patch once, walking it by adding the tangents rather than
+    // rebuilding a position per cell.
+    std::array<int32, 9> lit{};
+    std::array<int32, 9> open{};
+
+    const vec3i size = mdl.size();
+    vec3i row        = n - u - v;
+
+    for (int32 dv = 0; dv < 3; ++dv) {
+        vec3i cell = row;
+
+        for (int32 du = 0; du < 3; ++du) {
+            const auto slot = static_cast<std::size_t>((dv * 3) + du);
+
+            open[slot] = static_cast<int32>((open_bits >> slot) & 1U);
+            if (open[slot] != 0) {
+                lit[slot] = light->level_at(
+                    std::clamp(cell.x, 0, size.x - 1), std::clamp(cell.y, 0, size.y - 1),
+                    std::clamp(cell.z, 0, size.z - 1)
+                );
+            }
+
+            cell = cell + u;
+        }
+
+        row = row + v;
+    }
+
+    const auto corner = [&](std::size_t a, std::size_t b, std::size_t c) -> uint16 {
+        const int32 sum   = lit[4] + lit[a] + lit[b] + lit[c];
+        const int32 count = 1 + open[a] + open[b] + open[c];
+        return static_cast<uint16>(average_of(sum, count));
+    };
+
+    const uint16 c0 = corner(0, 1, 3);
+    const uint16 c1 = corner(1, 2, 5);
+    const uint16 c2 = corner(5, 7, 8);
+    const uint16 c3 = corner(3, 6, 7);
+
+    return static_cast<uint16>(c0 | (c1 << 4) | (c2 << 8) | (c3 << 12));
+}
+
+// The slow way in, for anything that has no occupancy rows to read: nine
+// voxel lookups to learn what the bit path already knows.
+auto compute_corner_sky(
+    const vw::asset::model& mdl, int x, int y, int z, int face
+) -> uint16 {
+    const vec3i n = vec3i{x, y, z} + ao_normal[face];
+    const vec3i u = ao_tangent_u[face];
+    const vec3i v = ao_tangent_v[face];
+
+    uint32 open_bits = 1U << 4;
+
+    for (int32 dv = -1; dv <= 1; ++dv) {
+        for (int32 du = -1; du <= 1; ++du) {
+            const auto slot = static_cast<uint32>(((dv + 1) * 3) + (du + 1));
+            if (slot == 4) {
+                continue;
+            }
+
+            vec3i at = n;
+            if (du < 0) {
+                at = at - u;
+            } else if (du > 0) {
+                at = at + u;
+            }
+            if (dv < 0) {
+                at = at - v;
+            } else if (dv > 0) {
+                at = at + v;
+            }
+
+            open_bits |= is_solid_at(mdl, at) ? 0U : (1U << slot);
+        }
+    }
+
+    return corners_from_patch(mdl, n, u, v, open_bits);
+}
+
+// And the fast way: the plane in front of the face is already three rows of
+// occupancy bits, the same three the AO kernel reads.
+auto sky_from_rows(
+    const vw::asset::model& mdl, const layer_rows& rows, int32 u_at, int32 v_at, int x,
+    int y, int z, int face
+) -> uint16 {
+    uint32 open_bits = 0;
+
+    for (int32 dv = -1; dv <= 1; ++dv) {
+        const uint64 row = rows.front[v_at + dv];
+        for (int32 du = -1; du <= 1; ++du) {
+            const auto slot = static_cast<uint32>(((dv + 1) * 3) + (du + 1));
+            open_bits |= ((row >> (u_at + du)) & 1U) == 0 ? (1U << slot) : 0U;
+        }
+    }
+    open_bits |= 1U << 4;
+
+    return corners_from_patch(
+        mdl, vec3i{x, y, z} + ao_normal[face], ao_tangent_u[face], ao_tangent_v[face],
+        open_bits
+    );
+}
+
 auto is_face_visible(
     const vw::asset::model& mdl, int x, int y, int z, int face_direction
 ) -> bool {
@@ -297,7 +465,9 @@ void build_face_mask(
                         auto [mx, my, mz] = axes.to_model_coords(u, v, layer);
                         if (is_face_visible(mdl, mx, my, mz, face_direction)) {
                             storage.mask[idx(u, v)] = {
-                                fid, compute_corner_darkness(mdl, mx, my, mz, face_direction)
+                                fid,
+                                compute_corner_darkness(mdl, mx, my, mz, face_direction),
+                                compute_corner_sky(mdl, mx, my, mz, face_direction)
                             };
                         } else {
                             storage.mask[idx(u, v)] = empty_cell;
@@ -317,7 +487,9 @@ void build_face_mask(
                     auto& vx          = (*page)[lx + ly * ps + lz * ps * ps];
                     if (!vx.is_empty() && is_face_visible(mdl, mx, my, mz, face_direction)) {
                         storage.mask[idx(u, v)] = {
-                            vx.id, compute_corner_darkness(mdl, mx, my, mz, face_direction)
+                            vx.id,
+                            compute_corner_darkness(mdl, mx, my, mz, face_direction),
+                            compute_corner_sky(mdl, mx, my, mz, face_direction)
                         };
                     } else {
                         storage.mask[idx(u, v)] = empty_cell;
@@ -949,6 +1121,10 @@ void greedy_mesh_generator::generate_face_quads(
                                               : detail::compute_corner_darkness(
                                                     mdl, mx, my, mz, face_direction
                                                 );
+                    cell.corner_sky =
+                        interior
+                            ? detail::sky_from_rows(mdl, rows, u, v, mx, my, mz, face_direction)
+                            : detail::compute_corner_sky(mdl, mx, my, mz, face_direction);
 
                     storage.mask[idx(u, v)] = cell;
                 }
