@@ -341,8 +341,15 @@ void main() {
     float s11 = float((sm >> 8)  & 15u) * (1.0 / 15.0);
     float s01 = float((sm >> 12) & 15u) * (1.0 / 15.0);
 
-    float skyReach = mix(mix(s00, s10, fragUV.x), mix(s01, s11, fragUV.x), fragUV.y);
-    skyReach = pow(skyReach, ubo.sky_params.x);
+    float skyRaw = mix(mix(s00, s10, fragUV.x), mix(s01, s11, fragUV.x), fragUV.y);
+
+    // Two curves off the one number, because the sky and the sun do not arrive
+    // the same way. Sky light is a flood: it bends round a corner, and fifteen
+    // voxels into a cave mouth there really is some daylight. The sun does not
+    // bend at all, so where the sky is at a half the sun should already be most
+    // of the way gone. One exponent each, and the sun's is the steeper.
+    float skyReach = pow(skyRaw, ubo.sky_params.x);
+    float sunReach = pow(skyRaw, ubo.sky_params.y);
 
     if (ubo.debug_view == 3u) {
         outColor = vec4(vec3(skyReach), 1.0);
@@ -354,16 +361,28 @@ void main() {
     // surroundings; laying it over the sun as well counts the same occlusion
     // twice and grimes up every corner the sun is shining straight into.
     //
-    // Sky light goes in the same term, and only there. It says how much of the
-    // sky reaches this point, so it chooses between the sky overhead and the
-    // colour of a place the sky never gets to. The sun is not scaled by it: the
-    // shadow map already says what the sun cannot reach, and multiplying the two
-    // darkens every overhang twice over.
+    // Sky light is the occluder of everything that comes from the sky, and that
+    // is both terms below, not just the ambient one.
+    //
+    // It used to scale only the ambient, on the grounds that the shadow map
+    // already said where the sun could not reach. That was true while there was
+    // a shadow map. There is not: SHADOW_ENABLED is off, shadow is a constant
+    // one, and the sun was landing on the walls of sealed caves -- so a room the
+    // daylight cannot enter still brightened and dimmed as the day turned over
+    // the ground above it.
+    //
+    // Sky light is now the sun's only occluder, which is what taking the
+    // cascades out was for. Turning SHADOW_ENABLED back on would put two
+    // occluders on one light and darken every overhang twice; whichever of the
+    // two is kept, it has to be one.
     vec3 sky = mix(ubo.cave_ambient.rgb, calculateHemisphereAmbient(normal), skyReach);
     vec3 ambient = sky * aoFactor;
 
-    // Directional light с sun_factor
-    vec3 directional = calculateDirectionalLight(normal, shadow);
+    // AO is deliberately not here. It measures how much of the surroundings a
+    // point can see, so it belongs to the light that arrives from the
+    // surroundings; over the sun it counts the same occlusion twice and grimes
+    // up every corner the sun shines straight into.
+    vec3 directional = calculateDirectionalLight(normal, shadow) * sunReach;
 
     // Point lights
     vec3 pointLighting = vec3(0.0);

@@ -1599,7 +1599,8 @@ void renderer::update_uniform_buffer(
         ambient_settings_.cave.x, ambient_settings_.cave.y, ambient_settings_.cave.z, 0.0f
     };
 
-    ubo.sky_params = vec4f{ambient_settings_.sky_curve, 0.0f, 0.0f, 0.0f};
+    ubo.sky_params =
+        vec4f{ambient_settings_.sky_curve, ambient_settings_.sun_curve, 0.0f, 0.0f};
 
     ubo.debug_view = static_cast<uint32>(debug_view_);
 

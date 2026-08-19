@@ -659,6 +659,12 @@ private:
             ImGui::ColorEdit3("Cave ambient", &ambient.cave.x);
             ImGui::SliderFloat("Sky curve", &ambient.sky_curve, 0.25f, 4.0f, "%.2f");
 
+            // Drag this to one and stand in a cave mouth: daylight walks
+            // fifteen voxels in, because that is how far the flood carries it.
+            // Sky light is the sun's only occluder now, so this is the whole
+            // say over how sharply the sun stops at an opening.
+            ImGui::SliderFloat("Sun curve", &ambient.sun_curve, 0.25f, 8.0f, "%.2f");
+
             // Judging occlusion off the finished frame means judging a product
             // of the block's colour and everything falling on it. These show
             // one factor with the others taken away.

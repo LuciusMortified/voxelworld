@@ -56,6 +56,12 @@ struct ambient_settings {
     // The curve sky visibility travels from sealed to open. Below one daylight
     // reaches further into a cave mouth, above one it stops at the entrance.
     float32 sky_curve = 1.0f;
+
+    // The same visibility on its way to the sun, which needs a steeper curve of
+    // its own. Sky light bends round corners because it is a flood; the sun
+    // does not bend at all, so it has to be gone well before the sky is. At one
+    // the two agree and daylight creeps fifteen voxels into a cave.
+    float32 sun_curve = 2.0f;
 };
 
 // Not a setting -- a way of looking. Lighting is a product of the block's own
@@ -123,7 +129,8 @@ struct uniform_buffer_object {
     // rgb: what lights a place no sky reaches.
     alignas(16) vec4f cave_ambient;
 
-    // x: the curve sky visibility travels from sealed to open.
+    // x: the curve sky visibility travels from sealed to open, for the ambient.
+    // y: the same for the sun, which needs a steeper one -- see ambient_settings.
     alignas(16) vec4f sky_params;
 
     // Point lights count (для расширяемости)
