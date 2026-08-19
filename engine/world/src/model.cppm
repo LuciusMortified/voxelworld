@@ -311,6 +311,85 @@ struct chunk_link_scratch {
 
 [[nodiscard]] auto build_chunk_links(const chunk_occupancy& occupancy) -> chunk_links;
 
+// One chunk of sky light in the form it is actually kept: pages of 8x8x8, four
+// bits a voxel. The nibble is not a saving to be clever about -- a level is
+// 0 to 15 and nothing else, so a byte would be half padding.
+//
+// Two degenerate cases carry almost everything. Rock below the caves is dark
+// all through and air above the surface is 15 all through, and either costs one
+// byte and no table at all. What is left keeps a table of 512 entries, one a
+// page, and a packed page only for the pages that really vary. On real terrain
+// 2.4% of pages vary; the rest of the chunk is the table.
+class sky_light_field {
+public:
+    static constexpr int32 side        = chunk_occupancy::side;
+    static constexpr int32 page        = 8;
+    static constexpr int32 pages_side  = side / page;
+    static constexpr int32 page_count  = pages_side * pages_side * pages_side;
+    static constexpr int32 page_voxels = page * page * page;
+    static constexpr int32 page_bytes  = page_voxels / 2;
+
+    using page_type = std::array<uint8, page_bytes>;
+
+    // Dark, which is what a chunk that has not been lit yet has to look like.
+    sky_light_field() = default;
+
+    explicit sky_light_field(uint8 level) : uniform_{level} {}
+
+    // Built by sky_light_column::bake, which is the only thing that knows how
+    // to fill a table.
+    sky_light_field(std::vector<uint16> table, std::vector<page_type> pages)
+        : table_{std::move(table)}, pages_{std::move(pages)} {}
+
+    [[nodiscard]] auto level_at(int32 x, int32 y, int32 z) const -> uint8 {
+        if (table_.empty()) {
+            return uniform_;
+        }
+
+        const uint16 entry =
+            table_[static_cast<std::size_t>(page_index(x / page, y / page, z / page))];
+        if ((entry & 1U) == 0) {
+            return static_cast<uint8>(entry >> 1);
+        }
+
+        const page_type& packed = pages_[entry >> 1];
+        const int32 at          = (x % page) + ((y % page) * page) + ((z % page) * page * page);
+        const uint8 pair        = packed[static_cast<std::size_t>(at / 2)];
+
+        return static_cast<uint8>((at % 2) == 0 ? (pair & 0xFU) : (pair >> 4));
+    }
+
+    [[nodiscard]] auto level_at(vec3i pos) const -> uint8 {
+        return level_at(pos.x, pos.y, pos.z);
+    }
+
+    // No table: the whole chunk is uniform_level().
+    [[nodiscard]] auto is_uniform() const -> bool {
+        return table_.empty();
+    }
+
+    [[nodiscard]] auto uniform_level() const -> uint8 {
+        return uniform_;
+    }
+
+    [[nodiscard]] auto mixed_pages() const -> int32 {
+        return static_cast<int32>(pages_.size());
+    }
+
+    [[nodiscard]] auto bytes() const -> std::size_t {
+        return (table_.size() * sizeof(uint16)) + (pages_.size() * sizeof(page_type));
+    }
+
+    [[nodiscard]] static auto page_index(int32 px, int32 py, int32 pz) -> int32 {
+        return px + (py * pages_side) + (pz * pages_side * pages_side);
+    }
+
+private:
+    uint8 uniform_ = 0;
+    std::vector<uint16> table_;
+    std::vector<page_type> pages_;
+};
+
 // Paged voxel volume. Pages are empty, uniform or sparse, so a mostly solid or
 // mostly empty model costs one entry per page instead of a voxel array.
 class model {
@@ -432,6 +511,24 @@ public:
     // empty page contributes nothing, a uniform one contributes eight set bits
     // per row at once. False when the model is not a 64-cube.
     [[nodiscard]] auto build_occupancy(chunk_occupancy& out) const -> bool;
+
+    // Only the rows along X, leaving zrows alone, and only over the given range
+    // of pages -- x in [px0 * 8, px1 * 8) and z in [pz0 * 8, pz1 * 8). Rows
+    // outside the z range are zeroed, not filled.
+    //
+    // The range is what makes sky light affordable. Building all nine columns
+    // of a neighbourhood whole costs about fourteen milliseconds, five times
+    // the flood it feeds, and almost all of it is the cost of touching every
+    // voxel of eight chunks. But the skirt is fifteen voxels, which is two
+    // pages of eight: a side neighbour is read two page columns wide and a
+    // corner two by two, so a neighbourhood is 2.25 columns of work instead of
+    // nine.
+    [[nodiscard]] auto build_x_rows(chunk_occupancy& out, int32 px0, int32 px1, int32 pz0,
+                                    int32 pz1) const -> bool;
+
+    [[nodiscard]] auto build_x_rows(chunk_occupancy& out) const -> bool {
+        return build_x_rows(out, 0, pages_x_, 0, pages_z_);
+    }
     void set_boundary_slice(int32 face_direction, const model& neighbor);
 
     // Only valid while has_boundary_slice says so.
@@ -452,6 +549,24 @@ public:
         -> bool;
 
     void invalidate();
+
+    // Sky light for this chunk, or nothing where it has not been lit yet.
+    // Kept the way the boundary planes are kept, behind a pointer, because only
+    // world chunks ever have any: an editor model has no sky over it. Three
+    // kilobytes when it is there.
+    //
+    // An edit leaves it in place rather than dropping it. Stale light for the
+    // frame it takes to reflood looks like nothing at all; no light looks like
+    // the chunk went black.
+    void set_sky_light(sky_light_field light);
+
+    [[nodiscard]] auto get_sky_light() const -> const sky_light_field* {
+        return light_.get();
+    }
+
+    [[nodiscard]] auto has_sky_light() const -> bool {
+        return light_ != nullptr;
+    }
 
     void fill(const voxel& v);
 
@@ -515,6 +630,7 @@ private:
     std::vector<uint32> owned_pages_;
     model_identity identity_;
     std::unique_ptr<model_boundary> boundary_;
+    std::unique_ptr<sky_light_field> light_;
     mutable model_fill fill_  = model_fill::mixed;
     mutable bool fill_known_  = false;
 };

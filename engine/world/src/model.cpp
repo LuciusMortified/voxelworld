@@ -170,6 +170,7 @@ model::model(model&& other) noexcept
     , owned_pages_(std::move(other.owned_pages_))
     , identity_(other.identity_)
     , boundary_(std::move(other.boundary_))
+    , light_(std::move(other.light_))
     , fill_(other.fill_)
     , fill_known_(other.fill_known_) {
     other.identity_pool_ = nullptr;
@@ -197,6 +198,7 @@ auto model::operator=(model&& other) noexcept -> model& {
         owned_pages_         = std::move(other.owned_pages_);
         identity_            = other.identity_;
         boundary_            = std::move(other.boundary_);
+        light_               = std::move(other.light_);
         fill_                = other.fill_;
         fill_known_          = other.fill_known_;
         other.identity_pool_ = nullptr;
@@ -292,6 +294,67 @@ auto model::build_occupancy(chunk_occupancy& out) const -> bool {
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    return true;
+}
+
+auto model::build_x_rows(
+    chunk_occupancy& out, int32 px0, int32 px1, int32 pz0, int32 pz1
+) const -> bool {
+    constexpr int32 ps   = page_size;
+    constexpr int32 side = chunk_occupancy::side;
+
+    static_assert(sizeof(voxel) == 1);
+    static_assert(blocks::air.value == 0);
+
+    if (width_ != side || height_ != side || depth_ != side) {
+        return false;
+    }
+
+    for (int32 py = 0; py < pages_y_; ++py) {
+        for (int32 pz = pz0; pz < pz1; ++pz) {
+            for (int32 ly = 0; ly < ps; ++ly) {
+                const int32 y = (py * ps) + ly;
+
+                for (int32 lz = 0; lz < ps; ++lz) {
+                    const int32 z = (pz * ps) + lz;
+                    uint64 bits   = 0;
+
+                    for (int32 px = px0; px < px1; ++px) {
+                        const auto& entry = pages_[page_index(px, py, pz)];
+
+                        if (entry.mode() == page_mode::empty) {
+                            continue;
+                        }
+                        if (entry.mode() == page_mode::uniform) {
+                            bits |= uint64{0xFF} << (px * ps);
+                            continue;
+                        }
+
+                        // The eight voxels of a page row are eight bytes side
+                        // by side, so they come in as one word and the mask of
+                        // the non-empty ones falls out of six operations. Read
+                        // one at a time it is eight loads and eight branches,
+                        // and that -- not the row writing -- was where the
+                        // whole of build_occupancy's time went.
+                        const auto& page = pool_ptr_->get(entry.pool_index());
+
+                        uint64 run = 0;
+                        std::memcpy(&run, &page[local_index(0, ly, lz)], sizeof(run));
+
+                        run |= run >> 4;
+                        run |= run >> 2;
+                        run |= run >> 1;
+                        run &= 0x0101010101010101ULL;
+
+                        bits |= ((run * 0x0102040810204080ULL) >> 56) << (px * ps);
+                    }
+
+                    out.rows[(y * side) + z] = bits;
                 }
             }
         }
@@ -707,6 +770,10 @@ void model::set_boundary_slice(int32 face_direction, const model& neighbor) {
 
 void model::release_boundary() {
     boundary_.reset();
+}
+
+void model::set_sky_light(sky_light_field light) {
+    light_ = std::make_unique<sky_light_field>(std::move(light));
 }
 
 auto model::is_boundary_solid(int32 face_direction, int32 x, int32 y, int32 z) const -> bool {

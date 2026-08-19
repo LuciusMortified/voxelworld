@@ -165,8 +165,8 @@ TEST_CASE("a flat world costs one layer of pages", "[sky_light]") {
     fixture.floor_at(40);
 
     const auto light = fixture.light();
-    const asset::sky_light_field bottom{light, 0};
-    const asset::sky_light_field top{light, side};
+    const asset::sky_light_field bottom = light.bake(0);
+    const asset::sky_light_field top = light.bake(side);
 
     SECTION("a chunk of open sky is a byte") {
         REQUIRE(top.is_uniform());
@@ -194,7 +194,7 @@ TEST_CASE("a paged field reads back what was flooded", "[sky_light]") {
 
     int32 mismatches = 0;
     for (int32 chunk = 0; chunk < 2; ++chunk) {
-        const asset::sky_light_field field{light, chunk * side};
+        const asset::sky_light_field field = light.bake(chunk * side);
 
         for (int32 y = 0; y < side; ++y) {
             for (int32 z = 0; z < side; ++z) {
@@ -211,7 +211,7 @@ TEST_CASE("a paged field reads back what was flooded", "[sky_light]") {
 
     // Not a vacuous run: the gradient under the overhang puts different levels
     // in the two halves of one byte.
-    const asset::sky_light_field bottom{light, 0};
+    const asset::sky_light_field bottom = light.bake(0);
     REQUIRE(bottom.level_at(31, 59, 32) == 14);
     REQUIRE(bottom.level_at(30, 59, 32) == 13);
 }
@@ -502,7 +502,9 @@ TEST_CASE("a column shorter than its neighbours is not walled off", "[sky_light]
 // so they get measured rather than guessed. Run with
 // `world_tests "[.sky_light_measure]"`.
 TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
-    static constexpr int32 grid = 4;
+    static constexpr int32 grid           = 4;
+    static constexpr int32 pages_per_side = side / 8;
+    static constexpr int32 skirt_pages    = 2;
 
     asset::model_identity_pool identity_pool;
     asset::page_pool pages;
@@ -530,54 +532,77 @@ TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
         }
     }
 
-    // Occupancy once per chunk, bottom up from the floor every column shares.
-    std::unordered_map<vec2i, std::vector<asset::chunk_occupancy>> occupancy;
+    // Chunk models per column, bottom up from the floor every column shares.
+    std::unordered_map<vec2i, std::vector<asset::model*>> stacks;
     int32 chunk_count = 0;
 
     for (auto& [coord, column] : columns) {
-        auto& stack = occupancy[coord];
+        auto& stack = stacks[coord];
         for (const auto& [cy, data] : column->get_all_chunk_data()) {
             const auto slot = static_cast<std::size_t>(cy - bottom);
             if (stack.size() <= slot) {
-                stack.resize(slot + 1);
+                stack.resize(slot + 1, nullptr);
             }
-            static_cast<void>(data.chunk_model->build_occupancy(stack[slot]));
+            stack[slot] = data.chunk_model.get();
             ++chunk_count;
         }
     }
 
+    uint64 rows_ns  = 0;
     uint64 flood_ns = 0;
     uint64 bake_ns  = 0;
     int32 lit       = 0;
 
-    std::size_t field_bytes  = 0;
-    int32 field_chunks       = 0;
-    int32 uniform_chunks     = 0;
-    int32 mixed_pages        = 0;
+    std::size_t field_bytes = 0;
+    int32 field_chunks      = 0;
+    int32 uniform_chunks    = 0;
+    int32 mixed_pages       = 0;
+
+    // The scratch a worker would keep, not allocate: nine columns of occupancy
+    // is 4.6 MB, and creating it per job costs more than filling it.
+    std::vector<std::vector<asset::chunk_occupancy>> held(9);
+    std::vector<std::vector<const asset::chunk_occupancy*>> pointers(9);
 
     // Only the columns that have all eight neighbours, which is the only case
     // the engine ever lights.
     for (int32 cx = 1; cx < grid - 1; ++cx) {
         for (int32 cz = 1; cz < grid - 1; ++cz) {
-            std::vector<std::vector<const asset::chunk_occupancy*>> held(9);
             asset::sky_light_column::neighbourhood around{};
+
+            const auto rows_started = std::chrono::steady_clock::now();
 
             for (int32 dz = -1; dz <= 1; ++dz) {
                 for (int32 dx = -1; dx <= 1; ++dx) {
-                    const auto slot = static_cast<std::size_t>(((dz + 1) * 3) + (dx + 1));
-                    for (const auto& occ : occupancy.at(vec2i{cx + dx, cz + dz})) {
-                        held[slot].push_back(&occ);
+                    const auto slot  = static_cast<std::size_t>(((dz + 1) * 3) + (dx + 1));
+                    const auto& from = stacks.at(vec2i{cx + dx, cz + dz});
+
+                    // Only as deep as the skirt reaches: fifteen voxels is two
+                    // pages of eight, so a neighbour is read two page columns
+                    // wide and the middle one whole.
+                    const int32 px0 = dx < 0 ? pages_per_side - skirt_pages : 0;
+                    const int32 px1 = dx > 0 ? skirt_pages : pages_per_side;
+                    const int32 pz0 = dz < 0 ? pages_per_side - skirt_pages : 0;
+                    const int32 pz1 = dz > 0 ? skirt_pages : pages_per_side;
+
+                    held[slot].resize(from.size());
+                    pointers[slot].clear();
+                    for (std::size_t i = 0; i < from.size(); ++i) {
+                        static_cast<void>(
+                            from[i]->build_x_rows(held[slot][i], px0, px1, pz0, pz1)
+                        );
+                        pointers[slot].push_back(&held[slot][i]);
                     }
-                    around[slot] = held[slot];
+                    around[slot] = pointers[slot];
                 }
             }
 
-            const auto started = std::chrono::steady_clock::now();
+            const auto rowed = std::chrono::steady_clock::now();
             const asset::sky_light_column light{around};
             const auto flooded = std::chrono::steady_clock::now();
 
-            for (int32 y_base = 0; y_base < light.height(); y_base += asset::sky_light_field::side) {
-                const asset::sky_light_field field{light, y_base};
+            for (int32 y_base = 0; y_base < light.height();
+                 y_base += asset::sky_light_field::side) {
+                const asset::sky_light_field field = light.bake(y_base);
 
                 field_bytes += field.bytes();
                 mixed_pages += field.mixed_pages();
@@ -587,25 +612,31 @@ TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
 
             const auto baked = std::chrono::steady_clock::now();
 
-            flood_ns += static_cast<uint64>(
-                std::chrono::duration_cast<std::chrono::nanoseconds>(flooded - started).count()
-            );
-            bake_ns += static_cast<uint64>(
-                std::chrono::duration_cast<std::chrono::nanoseconds>(baked - flooded).count()
-            );
+            const auto span = [](auto from, auto to) -> uint64 {
+                return static_cast<uint64>(
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(to - from).count()
+                );
+            };
+
+            rows_ns += span(rows_started, rowed);
+            flood_ns += span(rowed, flooded);
+            bake_ns += span(flooded, baked);
             ++lit;
         }
     }
 
     WARN(
         "generated " << columns.size() << " columns / " << chunk_count << " chunks, lit " << lit
-                     << " of them with a skirt\n  flood "
-                     << (flood_ns / 1000 / static_cast<uint64>(lit)) << " us a column, bake "
-                     << (bake_ns / 1000 / static_cast<uint64>(lit)) << " us a column\n  fields "
-                     << field_chunks << " chunks, " << uniform_chunks << " uniform ("
-                     << (100.0 * uniform_chunks / field_chunks) << "%), " << mixed_pages
-                     << " mixed pages (" << (100.0 * mixed_pages / (field_chunks * 512))
-                     << "%)\n  resident " << (field_bytes / 1024) << " KB, "
+                     << " of them with a skirt\n  rows "
+                     << (rows_ns / 1000 / static_cast<uint64>(lit)) << " us, flood "
+                     << (flood_ns / 1000 / static_cast<uint64>(lit)) << " us, bake "
+                     << (bake_ns / 1000 / static_cast<uint64>(lit)) << " us -- job "
+                     << ((rows_ns + flood_ns + bake_ns) / 1000 / static_cast<uint64>(lit))
+                     << " us a column\n  fields " << field_chunks << " chunks, "
+                     << uniform_chunks << " uniform (" << (100.0 * uniform_chunks / field_chunks)
+                     << "%), " << mixed_pages << " mixed pages ("
+                     << (100.0 * mixed_pages / (field_chunks * 512)) << "%)\n  resident "
+                     << (field_bytes / 1024) << " KB, "
                      << (field_bytes / static_cast<std::size_t>(field_chunks)) << " bytes a chunk"
     );
 

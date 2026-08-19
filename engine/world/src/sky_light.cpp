@@ -246,9 +246,13 @@ void sky_light_column::flood_(const neighbourhood& around) {
     }
 }
 
-sky_light_field::sky_light_field(const sky_light_column& column, int32 y_base) {
-    if (y_base < 0 || y_base + side > column.height()) {
-        return;
+auto sky_light_column::bake(int32 y_base) const -> sky_light_field {
+    constexpr int32 pages_side = sky_light_field::pages_side;
+    constexpr int32 page_count = sky_light_field::page_count;
+    constexpr int32 page       = sky_light_field::page;
+
+    if (y_base < 0 || y_base + s > height_) {
+        return sky_light_field{};
     }
 
     // Two passes, because which pages vary is worth knowing before anything is
@@ -268,8 +272,8 @@ sky_light_field::sky_light_field(const sky_light_column& column, int32 y_base) {
         for (int32 ly = 0; ly < page; ++ly) {
             const int32 y = y_base + (py * page) + ly;
 
-            for (int32 z = 0; z < side; ++z) {
-                const uint8* row = column.row(y, z);
+            for (int32 z = 0; z < s; ++z) {
+                const uint8* row = row_(y, z);
                 const int32 pz   = z / page;
 
                 for (int32 px = 0; px < pages_side; ++px) {
@@ -277,7 +281,7 @@ sky_light_field::sky_light_field(const sky_light_column& column, int32 y_base) {
                     std::memcpy(&run, row + (px * page), sizeof(run));
 
                     const auto first = static_cast<uint8>(run & 0xFFU);
-                    const auto slot  = static_cast<std::size_t>(page_index_(px, py, pz));
+                    const auto slot  = static_cast<std::size_t>(sky_light_field::page_index(px, py, pz));
 
                     if (ly == 0 && (z % page) == 0) {
                         level[slot] = first;
@@ -297,27 +301,27 @@ sky_light_field::sky_light_field(const sky_light_column& column, int32 y_base) {
     }) && std::ranges::all_of(level, [&](uint8 l) -> bool { return l == level[0]; });
 
     if (chunk_uniform) {
-        uniform_ = level[0];
-        return;
+        return sky_light_field{level[0]};
     }
 
-    table_.assign(page_count, 0);
+    std::vector<uint16> table(page_count);
+    std::vector<sky_light_field::page_type> pages;
 
     for (int32 pz = 0; pz < pages_side; ++pz) {
         for (int32 py = 0; py < pages_side; ++py) {
             for (int32 px = 0; px < pages_side; ++px) {
-                const auto slot = static_cast<std::size_t>(page_index_(px, py, pz));
+                const auto slot = static_cast<std::size_t>(sky_light_field::page_index(px, py, pz));
 
                 if (mixed[slot] == 0) {
-                    table_[slot] = static_cast<uint16>(level[slot] << 1);
+                    table[slot] = static_cast<uint16>(level[slot] << 1);
                     continue;
                 }
 
-                page_type packed{};
+                sky_light_field::page_type packed{};
                 for (int32 lz = 0; lz < page; ++lz) {
                     for (int32 ly = 0; ly < page; ++ly) {
                         const uint8* row =
-                            column.row(y_base + (py * page) + ly, (pz * page) + lz) +
+                            row_(y_base + (py * page) + ly, (pz * page) + lz) +
                             (px * page);
 
                         for (int32 lx = 0; lx < page; ++lx) {
@@ -329,11 +333,13 @@ sky_light_field::sky_light_field(const sky_light_column& column, int32 y_base) {
                     }
                 }
 
-                table_[slot] = static_cast<uint16>(1U | (pages_.size() << 1));
-                pages_.push_back(packed);
+                table[slot] = static_cast<uint16>(1U | (pages.size() << 1));
+                pages.push_back(packed);
             }
         }
     }
+
+    return sky_light_field{std::move(table), std::move(pages)};
 }
 
 }  // namespace vw::asset
