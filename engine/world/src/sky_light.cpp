@@ -6,53 +6,146 @@ namespace vw::asset {
 
 namespace {
 
-constexpr int32 s = sky_light_column::side;
+constexpr int32 s     = sky_light_column::side;
+constexpr int32 apron = sky_light_column::apron;
+constexpr int32 span  = sky_light_column::span;
 
-[[nodiscard]] auto row_of(int32 y, int32 z) -> std::size_t {
-    return (static_cast<std::size_t>(y) * s) + static_cast<std::size_t>(z);
+// Three words a row, and the middle column sits in the whole of the second one.
+// That is what the offset buys: a neighbour's sixty-four bits land at bit
+// 64 + dx * 64, so every one of the nine blits is word aligned and the skirt
+// costs no shifting at all.
+constexpr int32 words = 3;
+constexpr int32 bit0  = s - apron;
+
+static_assert(bit0 + span <= words * 64);
+static_assert(bit0 + apron == 64);
+
+// Everything outside the skirt is sealed, so those bits read as solid and as
+// "already lit" -- the first stops light leaving, the second stops the frontier
+// pass seeding along the outer edge for nothing.
+constexpr uint64 outside_low  = (uint64{1} << bit0) - 1;
+constexpr uint64 outside_high = ~((uint64{1} << (bit0 + span - 128)) - 1);
+
+[[nodiscard]] auto row_base(int32 y, int32 z) -> std::size_t {
+    return ((static_cast<std::size_t>(y) * span) + static_cast<std::size_t>(z)) * words;
+}
+
+void seal_outside(uint64* row) {
+    row[0] |= outside_low;
+    row[2] |= outside_high;
+}
+
+// Sky as the frontier test wants to read it: everything beyond the skirt counts
+// as lit. It has to be done before the shift, not after -- a shift pulls the
+// bit just past the edge into the first bit inside it, and reading that as dark
+// seeds the whole outer wall of the skirt for nothing.
+void pad_as_sky(const uint64* in, uint64* out) {
+    out[0] = in[0] | outside_low;
+    out[1] = in[1];
+    out[2] = in[2] | outside_high;
+}
+
+// Bit x of the result is bit x - 1 of the input: what lies one step west.
+void shift_west(const uint64* in, uint64* out) {
+    out[2] = (in[2] << 1) | (in[1] >> 63);
+    out[1] = (in[1] << 1) | (in[0] >> 63);
+    out[0] = in[0] << 1;
+    seal_outside(out);
+}
+
+void shift_east(const uint64* in, uint64* out) {
+    out[0] = (in[0] >> 1) | (in[1] << 63);
+    out[1] = (in[1] >> 1) | (in[2] << 63);
+    out[2] = in[2] >> 1;
+    seal_outside(out);
 }
 
 }  // namespace
 
-sky_light_column::sky_light_column(std::span<const chunk_occupancy* const> chunks_top_down)
-    : height_{static_cast<int32>(chunks_top_down.size()) * s} {
+sky_light_column::sky_light_column(std::span<const chunk_occupancy* const> chunks_bottom_up)
+    : sky_light_column{neighbourhood{
+          {{}, {}, {}, {}, chunks_bottom_up, {}, {}, {}, {}}
+      }} {}
+
+sky_light_column::sky_light_column(const neighbourhood& around) {
+    int32 chunks = 0;
+    for (const auto& column : around) {
+        chunks = std::max(chunks, static_cast<int32>(column.size()));
+    }
+
+    height_ = chunks * s;
     if (height_ == 0) {
         return;
     }
 
-    levels_.assign(static_cast<std::size_t>(height_) * s * s, 0);
+    levels_.assign(static_cast<std::size_t>(height_) * span * span, 0);
+    flood_(around);
+}
 
-    // One flat bit field for the whole column, so the flood never repeats the
-    // top-down-to-bottom-up arithmetic once per neighbour test.
-    std::vector<uint64> solid(static_cast<std::size_t>(height_) * s, 0);
+void sky_light_column::flood_(const neighbourhood& around) {
+    std::vector<uint64> solid(static_cast<std::size_t>(height_) * span * words, 0);
 
-    const auto chunks = static_cast<int32>(chunks_top_down.size());
-    for (int32 i = 0; i < chunks; ++i) {
-        const chunk_occupancy* occ = chunks_top_down[i];
-        if (occ == nullptr) {
-            continue;
-        }
+    for (int32 dz = -1; dz <= 1; ++dz) {
+        for (int32 dx = -1; dx <= 1; ++dx) {
+            const auto& column = around[static_cast<std::size_t>(((dz + 1) * 3) + (dx + 1))];
+            const int32 word   = 1 + dx;
 
-        const int32 base = (chunks - 1 - i) * s;
-        for (int32 ly = 0; ly < s; ++ly) {
-            for (int32 z = 0; z < s; ++z) {
-                solid[row_of(base + ly, z)] = occ->row(ly, z);
+            for (int32 lz = 0; lz < s; ++lz) {
+                const int32 z = apron + (dz * s) + lz;
+                if (z < 0 || z >= span) {
+                    continue;
+                }
+
+                // A column that is not there is rock to the top of the world.
+                // One that is there but ends lower has open air above it.
+                if (column.empty()) {
+                    for (int32 y = 0; y < height_; ++y) {
+                        solid[row_base(y, z) + static_cast<std::size_t>(word)] = ~uint64{0};
+                    }
+                    continue;
+                }
+
+                for (std::size_t i = 0; i < column.size(); ++i) {
+                    const chunk_occupancy* occ = column[i];
+                    if (occ == nullptr) {
+                        continue;
+                    }
+
+                    const int32 base = static_cast<int32>(i) * s;
+                    for (int32 ly = 0; ly < s; ++ly) {
+                        solid[row_base(base + ly, z) + static_cast<std::size_t>(word)] =
+                            occ->row(ly, lz);
+                    }
+                }
             }
+        }
+    }
+
+    for (int32 y = 0; y < height_; ++y) {
+        for (int32 z = 0; z < span; ++z) {
+            seal_outside(&solid[row_base(y, z)]);
         }
     }
 
     // Rule one. A bit stays set while its column still sees the sky, and the
     // first opaque voxel clears it for good -- everything below has rock over
     // it whatever the shape of that rock.
-    std::vector<uint64> sky(static_cast<std::size_t>(height_) * s, 0);
-    for (int32 z = 0; z < s; ++z) {
-        uint64 open = ~uint64{0};
+    std::vector<uint64> sky(static_cast<std::size_t>(height_) * span * words, 0);
+    for (int32 z = 0; z < span; ++z) {
+        uint64 open[words] = {~uint64{0}, ~uint64{0}, ~uint64{0}};
         for (int32 y = height_ - 1; y >= 0; --y) {
-            open &= ~solid[row_of(y, z)];
-            if (open == 0) {
+            const auto at = row_base(y, z);
+
+            uint64 any = 0;
+            for (int32 w = 0; w < words; ++w) {
+                open[w] &= ~solid[at + static_cast<std::size_t>(w)];
+                sky[at + static_cast<std::size_t>(w)] = open[w];
+                any |= open[w];
+            }
+
+            if (any == 0) {
                 break;
             }
-            sky[row_of(y, z)] = open;
         }
     }
 
@@ -65,30 +158,48 @@ sky_light_column::sky_light_column(std::span<const chunk_occupancy* const> chunk
     // solid, by how the mask above is built, and the one above is skylit
     // whenever this one is. Seeding the interior of an open sky instead would
     // make the work proportional to the volume of the column.
+    const uint64 all_sky[words] = {~uint64{0}, ~uint64{0}, ~uint64{0}};
+
     for (int32 y = 0; y < height_; ++y) {
-        for (int32 z = 0; z < s; ++z) {
-            const uint64 here = sky[row_of(y, z)];
-            if (here == 0) {
+        for (int32 z = 0; z < span; ++z) {
+            const auto at        = row_base(y, z);
+            const uint64* here   = &sky[at];
+            const uint64* north  = (z > 0) ? &sky[row_base(y, z - 1)] : all_sky;
+            const uint64* south  = (z + 1 < span) ? &sky[row_base(y, z + 1)] : all_sky;
+
+            if ((here[0] | here[1] | here[2]) == 0) {
                 continue;
             }
 
-            const uint64 west  = (here << 1) | 1U;
-            const uint64 east  = (here >> 1) | (uint64{1} << (s - 1));
-            const uint64 north = (z > 0) ? sky[row_of(y, z - 1)] : ~uint64{0};
-            const uint64 south = (z + 1 < s) ? sky[row_of(y, z + 1)] : ~uint64{0};
+            uint64 padded[words]{};
+            uint64 west[words]{};
+            uint64 east[words]{};
+            uint64 north_pad[words]{};
+            uint64 south_pad[words]{};
 
-            uint64 bits = here;
-            while (bits != 0) {
-                const auto x = static_cast<int32>(std::countr_zero(bits));
-                bits &= bits - 1;
-                levels_[static_cast<std::size_t>(index_(x, y, z))] = max_level;
-            }
+            pad_as_sky(here, padded);
+            pad_as_sky(north, north_pad);
+            pad_as_sky(south, south_pad);
+            shift_west(padded, west);
+            shift_east(padded, east);
 
-            uint64 edge = here & ~(west & east & north & south);
-            while (edge != 0) {
-                const auto x = static_cast<int32>(std::countr_zero(edge));
-                edge &= edge - 1;
-                current.push_back(index_(x, y, z));
+            for (int32 w = 0; w < words; ++w) {
+                uint64 lit = here[w];
+                while (lit != 0) {
+                    const auto b = static_cast<int32>(std::countr_zero(lit));
+                    lit &= lit - 1;
+                    levels_[static_cast<std::size_t>(
+                        index_((w * 64) + b - bit0, y, z)
+                    )] = max_level;
+                }
+
+                uint64 edge =
+                    here[w] & ~(west[w] & east[w] & north_pad[w] & south_pad[w]);
+                while (edge != 0) {
+                    const auto b = static_cast<int32>(std::countr_zero(edge));
+                    edge &= edge - 1;
+                    current.push_back(index_((w * 64) + b - bit0, y, z));
+                }
             }
         }
     }
@@ -98,15 +209,19 @@ sky_light_column::sky_light_column(std::span<const chunk_occupancy* const> chunk
         next.clear();
 
         for (const int32 at : current) {
-            const int32 x = at % s;
-            const int32 z = (at / s) % s;
-            const int32 y = at / (s * s);
+            const int32 x = at % span;
+            const int32 z = (at / span) % span;
+            const int32 y = at / (span * span);
 
             const auto visit = [&](int32 nx, int32 ny, int32 nz) {
-                if (nx < 0 || nx >= s || nz < 0 || nz >= s || ny < 0 || ny >= height_) {
+                if (nx < 0 || nx >= span || nz < 0 || nz >= span || ny < 0 || ny >= height_) {
                     return;
                 }
-                if (((solid[row_of(ny, nz)] >> nx) & 1U) != 0) {
+
+                const int32 bit = nx + bit0;
+                if (((solid[row_base(ny, nz) + static_cast<std::size_t>(bit / 64)] >>
+                      (bit % 64)) &
+                     1U) != 0) {
                     return;
                 }
 
