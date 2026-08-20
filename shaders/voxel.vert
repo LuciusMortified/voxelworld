@@ -13,6 +13,7 @@ struct DirectionalLightData {
     vec3 direction;
     vec3 color;
     float intensity;
+    float wrap;
 };
 
 layout(set = 0, binding = 0) uniform UniformBufferObject {
@@ -46,8 +47,11 @@ layout(set = 1, binding = 2, std430) readonly buffer Quads {
     Quad quads[];
 };
 
+// Albedo, already decoded: gfx::palette_buffer runs the palette through its
+// gamma once on the way in rather than making every vertex do it. How much
+// decoding is a setting, not a constant -- see the note there.
 layout(set = 4, binding = 0, std430) readonly buffer PaletteBuffer {
-    uint palette[];
+    vec4 palette[];
 };
 
 layout(location = 0) out vec3 fragPos;
@@ -67,13 +71,6 @@ const vec3 NORMALS[6] = vec3[6](
     vec3( 0,  0,  1),
     vec3( 0,  0, -1)
 );
-
-vec3 unpackPaletteColor(uint packedColor) {
-    float r = float((packedColor >> 24) & 0xFFu) / 255.0;
-    float g = float((packedColor >> 16) & 0xFFu) / 255.0;
-    float b = float((packedColor >>  8) & 0xFFu) / 255.0;
-    return vec3(r, g, b);
-}
 
 // Which world axis each face's two tangents run along. gfx::quad::pack carries
 // the same two tables and packs the extents in this order.
@@ -126,7 +123,7 @@ void main() {
 
     fragNormal = normalize(mat3(normalMatrices.normals[inInstanceIndex]) * NORMALS[normal_id]);
 
-    fragColor = unpackPaletteColor(palette[palette_idx]);
+    fragColor = palette[palette_idx].rgb;
 
     vec2 corner_uvs[4] = vec2[4](
         vec2(0.0, 0.0),

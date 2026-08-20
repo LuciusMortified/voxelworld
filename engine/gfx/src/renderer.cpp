@@ -243,6 +243,10 @@ auto renderer::get_fog_settings() -> fog_settings& {
     return fog_settings_;
 }
 
+auto renderer::get_tonemap_settings() -> tonemap_settings& {
+    return tonemap_settings_;
+}
+
 auto renderer::get_ambient_settings() -> ambient_settings& {
     return ambient_settings_;
 }
@@ -1574,6 +1578,7 @@ void renderer::update_uniform_buffer(
     ubo.directional_light.direction = directional_light_settings_.direction;
     ubo.directional_light.color     = directional_light_settings_.color;
     ubo.directional_light.intensity = directional_light_settings_.intensity;
+    ubo.directional_light.wrap      = directional_light_settings_.wrap;
 
     const float32 ambient_strength = ambient_settings_.strength;
     ubo.ambient_sky = vec4f{
@@ -1604,6 +1609,13 @@ void renderer::update_uniform_buffer(
 
     ubo.sky_params =
         vec4f{ambient_settings_.sky_curve, ambient_settings_.sun_curve, 0.0f, 0.0f};
+
+    // The white point is squared and divided by in the shader, so zero there is
+    // a division by zero on every pixel. Floored once here rather than guarded
+    // per pixel.
+    ubo.tonemap_params = vec4f{
+        tonemap_settings_.exposure, std::max(tonemap_settings_.white_point, 0.01f), 0.0f, 0.0f
+    };
 
     ubo.debug_view = static_cast<uint32>(debug_view_);
 

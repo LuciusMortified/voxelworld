@@ -46,6 +46,10 @@ struct DirectionalLightData {
     vec3 direction;
     vec3 color;
     float intensity;
+
+    // How far past ninety degrees the terminator is dragged. See
+    // calculateDirectionalLight.
+    float wrap;
 };
 
 struct FogData {
@@ -79,9 +83,14 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     //    daylight reaches further in, above one it stops at the mouth.
     vec4 sky_params;
 
+    // x: exposure, applied before the tone curve. y: the light level that comes
+    // out as exactly one.
+    vec4 tonemap_params;
+
     uint point_lights_count;
 
-    // 0 normal, 1 ambient occlusion alone on white, 2 normals, 3 sky light.
+    // 0 normal, 1 ambient occlusion alone on white, 2 normals, 3 sky light,
+    // 4 convexity.
     uint debug_view;
 
     FogData fog;
@@ -239,7 +248,16 @@ vec3 calculateDirectionalLight(vec3 normal, float shadow) {
 
     vec3 lightDir = normalize(-ubo.directional_light.direction);
 
-    float diff = max(dot(lightDir, normal), 0.0);
+    // Wrapped Lambert, not Lambert. Six axis-aligned normals give the dot
+    // product six values and no more, and with the sun overhead three of the
+    // four vertical faces get exactly zero: +X, -X and -Z then differ by
+    // nothing, because the ambient below reads normal.y and cannot separate
+    // them either. Wrapping spreads the terminator past ninety degrees and
+    // hands each of them a different number. A face pointing fully away still
+    // gets nothing -- the cutoff moves out to a hundred and twenty degrees, it
+    // does not disappear.
+    float wrap = ubo.directional_light.wrap;
+    float diff = max((dot(lightDir, normal) + wrap) / (1.0 + wrap), 0.0);
 
     vec3 sunColor = ubo.directional_light.color * ubo.directional_light.intensity;
     vec3 twilightColor = vec3(1.0, 0.5, 0.2) * ubo.directional_light.intensity * 0.3;
@@ -343,10 +361,14 @@ void main() {
         return;
     }
 
-    // One factor, two directions off one: shut in goes below one, sticking out
-    // goes above it. Occlusion alone could only ever darken, and a surface that
-    // can only be darker than flat has no way to say "this edge is nearer".
-    float aoFactor = 1.0 - (occlusion * ubo.ao_params.x) + (exposure * ubo.ao_params.z);
+    // Two factors, not one. Occlusion measures how much of the surroundings a
+    // point can see, so it belongs to the light arriving from the surroundings
+    // and to nothing else. Convexity measures nothing -- it is a shape cue
+    // standing in for curvature a cube does not have -- so tying it to the
+    // ambient alone was arbitrary, and under a high sun the ambient is a
+    // quarter of a top face. That is where the cue was going.
+    float aoFactor     = 1.0 - (occlusion * ubo.ao_params.x);
+    float convexFactor = 1.0 + (exposure * ubo.ao_params.z);
 
     if (ubo.debug_view == 1u) {
         outColor = vec4(vec3(aoFactor), 1.0);
@@ -418,10 +440,23 @@ void main() {
     // No rim term and no edge term. Both sat at 0.01, which is invisible, and
     // the edge one never reached the sum at all. Nothing here is a stand-in for
     // something else any more: every term is a light with an occluder.
-    vec3 lighting = ambient + directional + pointLighting;
+    vec3 lighting = (ambient + directional + pointLighting) * convexFactor;
     vec3 result = lighting * fragColor;
 
-    // Linear fog
+    // Extended Reinhard, per channel. Per channel and not on luminance:
+    // scaling three channels by one luminance ratio does not stop the brightest
+    // of them clipping, and (1.5, 0.3, 0.3) has a luminance of 0.55 yet still
+    // comes out over one. Rolling each channel on its own cannot clip below the
+    // white point, at the price of extreme highlights drifting toward white --
+    // which is what film does, and a far smaller drift than the hard cut it
+    // replaces.
+    result *= ubo.tonemap_params.x;
+    vec3 white = vec3(ubo.tonemap_params.y);
+    result = result * (1.0 + (result / (white * white))) / (1.0 + result);
+
+    // Fog after the curve, not before. It converges on the same colour the
+    // frame is cleared to, and mapping the terrain but not the clear would open
+    // a seam along the horizon.
     if (ubo.fog.enabled != 0u) {
         float fogFactor = clamp(
             (ubo.fog.far_distance - viewDepth) / (ubo.fog.far_distance - ubo.fog.near_distance),

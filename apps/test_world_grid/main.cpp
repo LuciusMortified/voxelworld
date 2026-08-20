@@ -663,6 +663,21 @@ private:
             ImGui::SliderFloat("Convex curve", &ambient.convex_curve, 0.25f, 4.0f, "%.2f");
 
             ImGui::ColorEdit3("Cave ambient", &ambient.cave.x);
+
+            // Exposure moves the whole picture; the white point decides where
+            // the roll-off lands. Drop the white point under what the brightest
+            // face reaches and that face clips again, which is the state this
+            // replaced.
+            auto& tonemap = renderer.get_tonemap_settings();
+            ImGui::SliderFloat("Exposure", &tonemap.exposure, 0.1f, 4.0f, "%.2f");
+            ImGui::SliderFloat("White point", &tonemap.white_point, 0.25f, 4.0f, "%.2f");
+
+            // Zero is plain Lambert. Set the time to noon and drag it there:
+            // three of the four walls of every voxel collapse onto one colour,
+            // because the sun gives all three exactly nothing.
+            auto& sun = renderer.get_directional_light_settings();
+            ImGui::SliderFloat("Sun wrap", &sun.wrap, 0.0f, 1.0f, "%.2f");
+
             ImGui::SliderFloat("Sky curve", &ambient.sky_curve, 0.25f, 4.0f, "%.2f");
 
             // Drag this to one and stand in a cave mouth: daylight walks

@@ -27,6 +27,14 @@ struct directional_light_settings {
     vec3f direction{0.0f, -1.0f, 0.0f};
     vec3f color{1.f, 1.f, 1.f};
     float32 intensity{1.0f};
+
+    // How far past ninety degrees the terminator is dragged. Six axis-aligned
+    // normals give the dot product six values and no more, and with the sun
+    // overhead three of the four vertical faces get exactly zero -- +X, -X and
+    // -Z come out the same colour, since the ambient reads normal.y and cannot
+    // separate them either. At a half each of them gets a different number
+    // back, and a face pointing fully away still gets nothing.
+    float32 wrap{0.5f};
 };
 
 // The light a surface gets from everything that is not a light: the sky above
@@ -38,7 +46,7 @@ struct directional_light_settings {
 struct ambient_settings {
     vec3f sky{0.34f, 0.42f, 0.52f};
     vec3f ground{0.16f, 0.14f, 0.13f};
-    float32 strength{0.85f};
+    float32 strength{1.15f};
 
     // How far down the ambient goes in a fully enclosed corner, and the curve
     // the raw occlusion travels to get there. The samples are integers from
@@ -54,7 +62,7 @@ struct ambient_settings {
     // sky is exactly as bright as every other top face and the terrain reads
     // flat from the side the drops are on.
     float32 convex_strength = 0.35f;
-    float32 convex_curve    = 1.0f;
+    float32 convex_curve    = 2.0f;
 
     // What lights a place no sky reaches. A colour of its own rather than a
     // fraction of the sky above, so a sealed room stays the same brightness
@@ -70,6 +78,23 @@ struct ambient_settings {
     // does not bend at all, so it has to be gone well before the sky is. At one
     // the two agree and daylight creeps fifteen voxels into a cave.
     float32 sun_curve = 2.0f;
+};
+
+// What turns light into a pixel. The swapchain is eight bits a channel and the
+// fragment shader writes straight into it, so with no curve here everything
+// above one is simply cut off -- and at noon a lit top face is past one in its
+// strongest channel before any of the light is even wrong. A cut top end costs
+// twice: the colour walks toward white, and every shape cue laid over it stops
+// changing the picture, because the number it is changing is already clipped.
+struct tonemap_settings {
+    // Applied before the curve, so it moves the whole picture rather than
+    // trading one end of it against the other.
+    float32 exposure = 1.3f;
+
+    // The light level that comes out as exactly one. Below it the curve is
+    // nearly straight, and nothing between zero and here is lost. Point lights
+    // and emissive will want this higher than daylight alone does.
+    float32 white_point = 1.75f;
 };
 
 // Not a setting -- a way of looking. Lighting is a product of the block's own
@@ -110,6 +135,12 @@ struct directional_light_data {
     alignas(16) vec3f direction;
     alignas(16) vec3f color;
     alignas(4) float32 intensity;
+
+    // Sixteen bytes wider, not free: intensity happened to end exactly on a
+    // sixteen-byte boundary, so there was no padding here to slip into. What
+    // has to hold is that C++ and std140 round the struct up the same way,
+    // because ambient_sky starts straight after it.
+    alignas(4) float32 wrap;
 };
 
 struct fog_data {
@@ -142,6 +173,10 @@ struct uniform_buffer_object {
     // x: the curve sky visibility travels from sealed to open, for the ambient.
     // y: the same for the sun, which needs a steeper one -- see ambient_settings.
     alignas(16) vec4f sky_params;
+
+    // x: exposure, applied before the curve. y: the light level that maps to
+    // exactly one. See tonemap_settings.
+    alignas(16) vec4f tonemap_params;
 
     // Point lights count (для расширяемости)
     alignas(4) uint32 point_lights_count{0};
@@ -254,6 +289,7 @@ public:
     [[nodiscard]] auto get_directional_light_settings() -> directional_light_settings&;
     [[nodiscard]] auto get_fog_settings() -> fog_settings&;
     [[nodiscard]] auto get_ambient_settings() -> ambient_settings&;
+    [[nodiscard]] auto get_tonemap_settings() -> tonemap_settings&;
     [[nodiscard]] auto get_shadow_settings() -> shadow_settings&;
 
     void set_debug_view(debug_view view);
@@ -478,6 +514,7 @@ private:
     // Настройки тумана
     fog_settings fog_settings_;
     ambient_settings ambient_settings_;
+    tonemap_settings tonemap_settings_;
     debug_view debug_view_ = debug_view::off;
 
     // Статистика
