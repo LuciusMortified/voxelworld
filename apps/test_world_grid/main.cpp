@@ -656,6 +656,12 @@ private:
             ImGui::SliderFloat("AO strength", &ambient.ao_strength, 0.0f, 1.0f, "%.2f");
             ImGui::SliderFloat("AO curve", &ambient.ao_curve, 0.25f, 4.0f, "%.2f");
 
+            // Drag this to zero and look at a hillside from the downhill side:
+            // the steps flatten into one plane, because occlusion has nothing
+            // to say about a corner with nothing above it.
+            ImGui::SliderFloat("Convex strength", &ambient.convex_strength, 0.0f, 1.0f, "%.2f");
+            ImGui::SliderFloat("Convex curve", &ambient.convex_curve, 0.25f, 4.0f, "%.2f");
+
             ImGui::ColorEdit3("Cave ambient", &ambient.cave.x);
             ImGui::SliderFloat("Sky curve", &ambient.sky_curve, 0.25f, 4.0f, "%.2f");
 
@@ -668,8 +674,8 @@ private:
             // Judging occlusion off the finished frame means judging a product
             // of the block's colour and everything falling on it. These show
             // one factor with the others taken away.
-            static constexpr std::array<const char*, 4> view_names{
-                "off", "ambient occlusion", "normals", "sky light"
+            static constexpr std::array<const char*, 5> view_names{
+                "off", "ambient occlusion", "normals", "sky light", "convexity"
             };
             auto view = static_cast<int32>(renderer.get_debug_view());
             if (ImGui::Combo("Debug view", &view, view_names.data(), view_names.size())) {

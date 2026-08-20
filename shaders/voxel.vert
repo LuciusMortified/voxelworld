@@ -57,6 +57,7 @@ layout(location = 3) out float viewDepth;
 layout(location = 4) out vec2 fragUV;
 layout(location = 5) flat out uint fragCornersMask;
 layout(location = 6) flat out uint fragSkyMask;
+layout(location = 7) flat out uint fragConvexMask;
 
 const vec3 NORMALS[6] = vec3[6](
     vec3( 1,  0,  0),
@@ -72,6 +73,22 @@ vec3 unpackPaletteColor(uint packedColor) {
     float g = float((packedColor >> 16) & 0xFFu) / 255.0;
     float b = float((packedColor >>  8) & 0xFFu) / 255.0;
     return vec3(r, g, b);
+}
+
+// Which world axis each face's two tangents run along. gfx::quad::pack carries
+// the same two tables and packs the extents in this order.
+const uint TANGENT_U_AXIS[6] = uint[6](2u, 2u, 0u, 0u, 0u, 0u);
+const uint TANGENT_V_AXIS[6] = uint[6](1u, 1u, 2u, 2u, 1u, 1u);
+
+// data1 keeps the two tangent extents, one less than the cell count, instead of
+// the far corner: along the face axis the far corner is always the near one
+// plus a cell, so storing it said nothing the normal had not already said.
+uvec3 unpackMax(uint data1, uvec3 mn, uint normal_id) {
+    uvec3 mx = mn;
+    mx[normal_id >> 1u] += 1u;
+    mx[TANGENT_U_AXIS[normal_id]] += (data1 & 0x7Fu) + 1u;
+    mx[TANGENT_V_AXIS[normal_id]] += ((data1 >> 7u) & 0x7Fu) + 1u;
+    return mx;
 }
 
 // Which corner of the rectangle each of the six vertices takes, and which end
@@ -91,11 +108,13 @@ void main() {
     uint corner_id = uint(gl_VertexIndex) % 4u;
 
     uvec3 mn = uvec3(q.data0 & 0x7Fu, (q.data0 >> 7) & 0x7Fu, (q.data0 >> 14) & 0x7Fu);
-    uvec3 mx = uvec3(q.data1 & 0x7Fu, (q.data1 >> 7) & 0x7Fu, (q.data1 >> 14) & 0x7Fu);
 
-    uint normal_id   = (q.data0 >> 21) & 0x7u;
-    uint corners_ao  = (q.data0 >> 24) & 0xFFu;
-    uint palette_idx = (q.data1 >> 21) & 0xFFu;
+    uint normal_id      = (q.data0 >> 21) & 0x7u;
+    uint corners_ao     = (q.data0 >> 24) & 0xFFu;
+    uint palette_idx    = (q.data1 >> 14) & 0xFFu;
+    uint corners_convex = (q.data1 >> 22) & 0xFFu;
+
+    uvec3 mx = unpackMax(q.data1, mn, normal_id);
 
     uvec3 pick = FACE_VERTS[normal_id][corner_id];
 
@@ -118,6 +137,7 @@ void main() {
     fragUV = corner_uvs[corner_id];
     fragCornersMask = corners_ao;
     fragSkyMask = q.data2 & 0xFFFFu;
+    fragConvexMask = corners_convex;
 
     viewDepth = -(ubo.view * worldPos).z;
 

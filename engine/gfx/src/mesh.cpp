@@ -16,14 +16,29 @@ namespace vw::gfx {
 
 // ==================== quad ====================
 
+// Which world axis each face's two tangents run along. The shaders carry the
+// same two tables; a rectangle packed by one and unpacked by the other has to
+// agree about which extent is which.
+static constexpr std::array<int32, 6> tangent_u_axis = {2, 2, 0, 0, 0, 0};
+static constexpr std::array<int32, 6> tangent_v_axis = {1, 1, 2, 2, 1, 1};
+
 auto quad::pack(
     vec3i min_pos,
     vec3i max_pos,
     uint8 normal_id,
     block_id block_id,
     uint8 corners_ao,
+    uint8 corners_convex,
     uint16 corners_sky
 ) -> quad {
+    const int32 u_axis = tangent_u_axis[normal_id];
+    const int32 v_axis = tangent_v_axis[normal_id];
+
+    // One less than the cell count, so a full 128 still fits in seven bits. The
+    // extent along the face axis is always one cell and is not stored.
+    const auto span_u = static_cast<uint32>(max_pos[u_axis] - min_pos[u_axis] - 1);
+    const auto span_v = static_cast<uint32>(max_pos[v_axis] - min_pos[v_axis] - 1);
+
     quad q;
     q.data0 =                                               //
         (static_cast<uint32>(min_pos.x) & 0x7Fu) |          //
@@ -33,10 +48,10 @@ auto quad::pack(
         (static_cast<uint32>(corners_ao) << 24);
 
     q.data1 =                                               //
-        (static_cast<uint32>(max_pos.x) & 0x7Fu) |          //
-        ((static_cast<uint32>(max_pos.y) & 0x7Fu) << 7) |   //
-        ((static_cast<uint32>(max_pos.z) & 0x7Fu) << 14) |  //
-        (static_cast<uint32>(block_id.value) << 21);
+        (span_u & 0x7Fu) |                                  //
+        ((span_v & 0x7Fu) << 7) |                           //
+        (static_cast<uint32>(block_id.value) << 14) |       //
+        (static_cast<uint32>(corners_convex) << 22);
 
     q.data2 = static_cast<uint32>(corners_sky);
 
@@ -210,6 +225,83 @@ auto is_solid_at(
     }
     return static_cast<uint8>(edge_a) + static_cast<uint8>(edge_b) +
            static_cast<uint8>(diagonal);
+}
+
+// The mirror of is_solid_at, and it cannot be written as its negation. Out of
+// range with no boundary slice to ask, is_solid_at answers "not solid", which
+// for occlusion is the harmless way to be wrong: no occluder, nothing darkens.
+// Convexity reads the same answer as "no neighbour here", which would draw a
+// bright rim right round the bounding box of every model that has no slices --
+// everything in the editor. Unknown has to read as filled.
+[[nodiscard]] auto is_open_at(const vw::asset::model& mdl, vec3i p) -> bool {
+    const bool ox = p.x < 0 || p.x >= mdl.width();
+    const bool oy = p.y < 0 || p.y >= mdl.height();
+    const bool oz = p.z < 0 || p.z >= mdl.depth();
+
+    if (!ox && !oy && !oz) {
+        return mdl.is_empty(p.x, p.y, p.z);
+    }
+    if (static_cast<int>(ox) + static_cast<int>(oy) + static_cast<int>(oz) > 1) {
+        return false;
+    }
+
+    if (p.x >= mdl.width()) {
+        return mdl.has_boundary_slice(0) && !mdl.is_boundary_solid(0, 0, p.y, p.z);
+    }
+    if (p.x < 0) {
+        return mdl.has_boundary_slice(1) && !mdl.is_boundary_solid(1, 0, p.y, p.z);
+    }
+    if (p.y >= mdl.height()) {
+        return mdl.has_boundary_slice(2) && !mdl.is_boundary_solid(2, p.x, 0, p.z);
+    }
+    if (p.y < 0) {
+        return mdl.has_boundary_slice(3) && !mdl.is_boundary_solid(3, p.x, 0, p.z);
+    }
+    if (p.z >= mdl.depth()) {
+        return mdl.has_boundary_slice(4) && !mdl.is_boundary_solid(4, p.x, p.y, 0);
+    }
+    return mdl.has_boundary_slice(5) && !mdl.is_boundary_solid(5, p.x, p.y, 0);
+}
+
+// How far a corner of a face sticks out of the surface it belongs to: the same
+// three samples as occlusion, counted for absence, in the layer the face's own
+// voxel stands in rather than the layer in front of it. Both edges missing is
+// a spike corner and is written out for the same reason the right angle is.
+[[nodiscard]] auto corner_open_level(bool open_a, bool open_b, bool open_diagonal) -> uint8 {
+    if (open_a && open_b) {
+        return 3;
+    }
+    return static_cast<uint8>(open_a) + static_cast<uint8>(open_b) +
+           static_cast<uint8>(open_diagonal);
+}
+
+[[nodiscard]] auto compute_corner_convexity(
+    const vw::asset::model& mdl, int x, int y, int z, int face
+) -> uint8 {
+    if (face != convex_face) {
+        return 0;
+    }
+
+    const vec3i host = vec3i{x, y, z};
+    const vec3i u    = ao_tangent_u[face];
+    const vec3i v    = ao_tangent_v[face];
+
+    const bool open_mu = is_open_at(mdl, host - u);
+    const bool open_pu = is_open_at(mdl, host + u);
+    const bool open_mv = is_open_at(mdl, host - v);
+    const bool open_pv = is_open_at(mdl, host + v);
+
+    const bool diag_c0 = is_open_at(mdl, host - u - v);
+    const bool diag_c1 = is_open_at(mdl, host + u - v);
+    const bool diag_c2 = is_open_at(mdl, host + u + v);
+    const bool diag_c3 = is_open_at(mdl, host - u + v);
+
+    const uint8 c0 = corner_open_level(open_mu, open_mv, diag_c0);
+    const uint8 c1 = corner_open_level(open_pu, open_mv, diag_c1);
+    const uint8 c2 = corner_open_level(open_pu, open_pv, diag_c2);
+    const uint8 c3 = corner_open_level(open_mu, open_pv, diag_c3);
+
+    return static_cast<uint8>(c0 | (c1 << 2) | (c2 << 4) | (c3 << 6));
 }
 
 auto compute_corner_darkness(
@@ -450,7 +542,8 @@ void build_face_mask(
                             storage.mask[idx(u, v)] = {
                                 fid,
                                 compute_corner_darkness(mdl, mx, my, mz, face_direction),
-                                compute_corner_sky(mdl, mx, my, mz, face_direction)
+                                compute_corner_sky(mdl, mx, my, mz, face_direction),
+                                compute_corner_convexity(mdl, mx, my, mz, face_direction)
                             };
                         } else {
                             storage.mask[idx(u, v)] = empty_cell;
@@ -472,7 +565,8 @@ void build_face_mask(
                         storage.mask[idx(u, v)] = {
                             vx.id,
                             compute_corner_darkness(mdl, mx, my, mz, face_direction),
-                            compute_corner_sky(mdl, mx, my, mz, face_direction)
+                            compute_corner_sky(mdl, mx, my, mz, face_direction),
+                            compute_corner_convexity(mdl, mx, my, mz, face_direction)
                         };
                     } else {
                         storage.mask[idx(u, v)] = empty_cell;
@@ -490,6 +584,7 @@ void add_quad(
     vec3i max_pos,
     block_id block_id,
     uint8 corner_ao,
+    uint8 corner_convex,
     uint16 corner_sky
 ) {
     // Which of the two corners each winding-order vertex takes its components
@@ -519,22 +614,34 @@ void add_quad(
     // a corner touched by one diagonal block from one closed in by two faces,
     // and that difference is the whole of what makes the shading read as depth
     // rather than as an outline.
-    uint8 ao_winding   = 0;
-    uint16 sky_winding = 0;
+    uint8 ao_winding     = 0;
+    uint8 convex_winding = 0;
+    uint16 sky_winding   = 0;
     for (int i = 0; i < 4; i++) {
         const uint8 corner_i = winding_to_corner[face_direction][i];
         const uint8 ao_i     = corner_to_ao[corner_i];
         ao_winding |= static_cast<uint8>(c_ao[ao_i] << (i * 2));
 
-        // Sky travels the same reorder as AO, and has to: the shader reads
-        // both off the same four corners with the same bilinear.
+        // Sky and convexity travel the same reorder as AO, and have to: the
+        // shader reads all three off the same four corners with the same
+        // bilinear, and one of them arriving in sampler order would blend a
+        // different rectangle than the other two.
+        //
+        // No test catches convexity getting this wrong, and that is not a gap
+        // in the test. On +Y the two tables compose to the identity, and +Y is
+        // the only face convexity is computed for, so there is nothing here to
+        // permute. It is written out anyway because the day the face rule
+        // widens is not the day to remember this.
         const auto level = static_cast<uint16>((corner_sky >> (ao_i * 4)) & 0xFu);
         sky_winding |= static_cast<uint16>(level << (i * 4));
+
+        const auto out = static_cast<uint8>((corner_convex >> (ao_i * 2)) & 0x3u);
+        convex_winding |= static_cast<uint8>(out << (i * 2));
     }
 
-    quads.push_back(
-        quad::pack(min_pos, max_pos, normal_id, block_id, ao_winding, sky_winding)
-    );
+    quads.push_back(quad::pack(
+        min_pos, max_pos, normal_id, block_id, ao_winding, convex_winding, sky_winding
+    ));
 }
 
 
@@ -600,6 +707,7 @@ auto build_layer_rows(
         }
 
         out.front[v]   = front;
+        out.own[v]     = own;
         out.visible[v] = own & ~front;
         any |= out.visible[v];
     }
@@ -645,6 +753,19 @@ auto pack_corners(const corner_samples& s, int u) -> uint8 {
     return static_cast<uint8>(c0 | (c1 << 2) | (c2 << 4) | (c3 << 6));
 }
 
+// The same eight samples read the other way round, off the rows of the face's
+// own layer instead of the layer in front. A clear bit is an absent neighbour.
+auto pack_corners_convex(const corner_samples& s, int u) -> uint8 {
+    const auto open = [u](uint64 mask) -> bool { return ((mask >> u) & 1U) == 0; };
+
+    const uint8 c0 = corner_open_level(open(s.edge_mu), open(s.edge_mv), open(s.diag_c0));
+    const uint8 c1 = corner_open_level(open(s.edge_pu), open(s.edge_mv), open(s.diag_c1));
+    const uint8 c2 = corner_open_level(open(s.edge_pu), open(s.edge_pv), open(s.diag_c2));
+    const uint8 c3 = corner_open_level(open(s.edge_mu), open(s.edge_pv), open(s.diag_c3));
+
+    return static_cast<uint8>(c0 | (c1 << 2) | (c2 << 4) | (c3 << 6));
+}
+
 void emit_rect(
     mesh_generation_storage& storage,
     const face_axis_mapping& axes,
@@ -665,6 +786,7 @@ void emit_rect(
         max_pos,
         block_id{cell.voxel_id},
         cell.corner_ao,
+        cell.corner_convex,
         cell.corner_sky
     );
 }
@@ -727,6 +849,7 @@ void simple_mesh_generator::add_cube_face(
         {x + 1, y + 1, z + 1},
         voxel_id,
         detail::compute_corner_darkness(*mdl, x, y, z, face_direction),
+        detail::compute_corner_convexity(*mdl, x, y, z, face_direction),
         detail::compute_corner_sky(*mdl, x, y, z, face_direction)
     );
 }
@@ -1101,6 +1224,20 @@ void greedy_mesh_generator::generate_face_quads(
                     interior_v ? rows.front[v + 1] : 0
                 );
 
+                // Convexity reads the same shifted-row machinery over the own
+                // layer -- the one the faces stand in rather than the one in
+                // front. It does not care whether the plane in front is outside
+                // the chunk, but it shares the interior flag anyway: the only
+                // cost is falling back to the scalar path on a boundary layer,
+                // and one flag is cheaper to reason about than two.
+                const bool wants_convex = face_direction == detail::convex_face;
+
+                const auto own_samples = detail::samples_from_rows(
+                    interior_v && wants_convex ? rows.own[v - 1] : 0,
+                    wants_convex ? rows.own[v] : 0,
+                    interior_v && wants_convex ? rows.own[v + 1] : 0
+                );
+
                 while (bits != 0) {
                     const int u = std::countr_zero(bits);
                     bits &= bits - 1;
@@ -1109,18 +1246,24 @@ void greedy_mesh_generator::generate_face_quads(
 
                     const bool interior = bit_ao && u > 0 && u + 1 < axes.width;
 
-                    face_mask_cell cell{};
-                    cell.voxel_id  = mdl.get_voxel(mx, my, mz).id;
-                    cell.corner_ao = interior ? detail::pack_corners(samples, u)
-                                              : detail::compute_corner_darkness(
-                                                    mdl, mx, my, mz, face_direction
-                                                );
-                    cell.corner_sky =
+                    const uint8 dark   = interior ? detail::pack_corners(samples, u)
+                                                  : detail::compute_corner_darkness(
+                                                        mdl, mx, my, mz, face_direction
+                                                    );
+                    uint8 convex = 0;
+                    if (wants_convex) {
+                        convex = interior
+                            ? detail::pack_corners_convex(own_samples, u)
+                            : detail::compute_corner_convexity(mdl, mx, my, mz, face_direction);
+                    }
+                    const uint16 sky =
                         interior
                             ? detail::sky_from_rows(mdl, rows, u, v, mx, my, mz, face_direction)
                             : detail::compute_corner_sky(mdl, mx, my, mz, face_direction);
 
-                    storage.mask[idx(u, v)] = cell;
+                    storage.mask[idx(u, v)] = {
+                        mdl.get_voxel(mx, my, mz).id, dark, sky, convex
+                    };
                 }
             }
 

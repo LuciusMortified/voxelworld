@@ -7,6 +7,7 @@ layout(location = 3) in float viewDepth;
 layout(location = 4) in vec2 fragUV;
 layout(location = 5) flat in uint fragCornersMask;
 layout(location = 6) flat in uint fragSkyMask;
+layout(location = 7) flat in uint fragConvexMask;
 
 // Cascaded shadow maps are parked, not deleted. Past the first cascade they
 // staircased, and the staircase moved whenever the camera did; what they cost
@@ -321,7 +322,31 @@ void main() {
     float occlusion = mix(mix(a00, a10, fragUV.x), mix(a01, a11, fragUV.x), fragUV.y);
     occlusion = pow(occlusion, ubo.ao_params.y);
 
-    float aoFactor = 1.0 - (occlusion * ubo.ao_params.x);
+    // The other half of the same question, and the reason a hillside reads as a
+    // hillside. Occlusion looks at the layer in front of the face, and above a
+    // top face that layer is air by definition -- so under open sky, where the
+    // light is a flat fifteen everywhere, two plateaus at different heights come
+    // out the same colour and the step between them disappears. This looks at
+    // the layer the face stands in and finds the drop. Top faces only: the mask
+    // is zero on the other five, which is why nothing else changes.
+    uint cm = fragConvexMask;
+    float x00 = float( cm        & 3u) * (1.0 / 3.0);
+    float x10 = float((cm >> 2)  & 3u) * (1.0 / 3.0);
+    float x11 = float((cm >> 4)  & 3u) * (1.0 / 3.0);
+    float x01 = float((cm >> 6)  & 3u) * (1.0 / 3.0);
+
+    float exposure = mix(mix(x00, x10, fragUV.x), mix(x01, x11, fragUV.x), fragUV.y);
+    exposure = pow(exposure, ubo.ao_params.w);
+
+    if (ubo.debug_view == 4u) {
+        outColor = vec4(vec3(exposure), 1.0);
+        return;
+    }
+
+    // One factor, two directions off one: shut in goes below one, sticking out
+    // goes above it. Occlusion alone could only ever darken, and a surface that
+    // can only be darker than flat has no way to say "this edge is nearer".
+    float aoFactor = 1.0 - (occlusion * ubo.ao_params.x) + (exposure * ubo.ao_params.z);
 
     if (ubo.debug_view == 1u) {
         outColor = vec4(vec3(aoFactor), 1.0);

@@ -45,8 +45,16 @@ struct ambient_settings {
     // zero to three, so the curve is the only say over where the middle of the
     // ramp sits: below one it spreads the shading out across the face, above
     // one it pulls it back into the corner.
-    float32 ao_strength = 0.35f;
+    float32 ao_strength = 0.65f;
     float32 ao_curve    = 1.0f;
+
+    // The other direction of the same factor: how much brighter a corner gets
+    // where it sticks out instead of being shut in, and the curve that ramp
+    // travels. Occlusion can only darken, so without this a top face under open
+    // sky is exactly as bright as every other top face and the terrain reads
+    // flat from the side the drops are on.
+    float32 convex_strength = 0.35f;
+    float32 convex_curve    = 1.0f;
 
     // What lights a place no sky reaches. A colour of its own rather than a
     // fraction of the sky above, so a sealed room stays the same brightness
@@ -72,6 +80,7 @@ enum class debug_view : uint32 {
     ambient_occlusion,
     normals,
     sky_light,
+    convexity,
 };
 
 // Настройки тумана (для CPU)
@@ -124,6 +133,7 @@ struct uniform_buffer_object {
     alignas(16) vec4f ambient_ground;
 
     // x: how far down a fully enclosed corner goes, y: the occlusion curve.
+    // z: how far up a corner that sticks out goes, w: the curve it travels.
     alignas(16) vec4f ao_params;
 
     // rgb: what lights a place no sky reaches.

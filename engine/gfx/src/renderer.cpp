@@ -1590,7 +1590,10 @@ void renderer::update_uniform_buffer(
     };
 
     ubo.ao_params = vec4f{
-        ambient_settings_.ao_strength, ambient_settings_.ao_curve, 0.0f, 0.0f
+        ambient_settings_.ao_strength,
+        ambient_settings_.ao_curve,
+        ambient_settings_.convex_strength,
+        ambient_settings_.convex_curve
     };
 
     // Not scaled by ambient strength: the point of it is to be the one light

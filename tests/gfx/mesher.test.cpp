@@ -32,12 +32,20 @@ auto unpack_min(const gfx::quad& q) -> vec3i {
     };
 }
 
+// data1 carries the two tangent extents rather than the far corner; the third
+// component is always one cell along the face axis. Same two tables the shaders
+// and gfx::quad::pack use.
 auto unpack_max(const gfx::quad& q) -> vec3i {
-    return {
-        static_cast<int32>(q.data1 & 0x7FU),
-        static_cast<int32>((q.data1 >> 7) & 0x7FU),
-        static_cast<int32>((q.data1 >> 14) & 0x7FU),
-    };
+    constexpr int32 u_axis[6] = {2, 2, 0, 0, 0, 0};
+    constexpr int32 v_axis[6] = {1, 1, 2, 2, 1, 1};
+
+    const auto normal = static_cast<std::size_t>((q.data0 >> 21) & 0x7U);
+
+    vec3i mx = unpack_min(q);
+    mx[normal >> 1U] += 1;
+    mx[u_axis[normal]] += static_cast<int32>(q.data1 & 0x7FU) + 1;
+    mx[v_axis[normal]] += static_cast<int32>((q.data1 >> 7) & 0x7FU) + 1;
+    return mx;
 }
 
 auto unpack_normal(const gfx::quad& q) -> uint8 {
@@ -45,7 +53,7 @@ auto unpack_normal(const gfx::quad& q) -> uint8 {
 }
 
 auto unpack_block(const gfx::quad& q) -> uint8 {
-    return static_cast<uint8>((q.data1 >> 21) & 0xFFU);
+    return static_cast<uint8>((q.data1 >> 14) & 0xFFU);
 }
 
 // Two bits a corner, in winding order: 0 open, 3 shut in by two faces.
@@ -60,6 +68,16 @@ auto unpack_sky(const gfx::quad& q) -> std::array<uint8, 4> {
 
 auto unpack_ao(const gfx::quad& q) -> std::array<uint8, 4> {
     const uint32 packed = (q.data0 >> 24) & 0xFFU;
+    return {
+        static_cast<uint8>(packed & 0x3U),
+        static_cast<uint8>((packed >> 2) & 0x3U),
+        static_cast<uint8>((packed >> 4) & 0x3U),
+        static_cast<uint8>((packed >> 6) & 0x3U),
+    };
+}
+
+auto unpack_convex(const gfx::quad& q) -> std::array<uint8, 4> {
+    const uint32 packed = (q.data1 >> 22) & 0xFFU;
     return {
         static_cast<uint8>(packed & 0x3U),
         static_cast<uint8>((packed >> 2) & 0x3U),
@@ -207,6 +225,60 @@ auto expected_corner_ao(
     const bool edge_a   = solid(at(other_i, self_j));
     const bool edge_b   = solid(at(self_i, other_j));
     const bool diagonal = solid(at(other_i, other_j));
+
+    if (edge_a && edge_b) {
+        return 3;
+    }
+    return static_cast<uint8>(edge_a) + static_cast<uint8>(edge_b) +
+           static_cast<uint8>(diagonal);
+}
+
+// The same three samples as expected_corner_ao, read in the layer the face's
+// own cell stands in rather than the one in front of it, and counted for
+// absence instead of presence. Zero on every face but the top one, which is the
+// rule the mesher applies and the reason five faces out of six cost the greedy
+// merge nothing.
+auto expected_corner_convex(
+    const asset::model& mdl, vec3i cell, int32 face, vec3i corner
+) -> uint8 {
+    if (face != 2) {
+        return 0;
+    }
+
+    const vec3i n = face_normal[face];
+
+    const int32 axis = (n.x != 0) ? 0 : ((n.y != 0) ? 1 : 2);
+    const int32 a    = (axis + 1) % 3;
+    const int32 b    = (axis + 2) % 3;
+
+    // Outside the model is not open. With no boundary slice to ask, treating a
+    // missing neighbour as absent would light a rim round the whole bounding
+    // box -- which is the one place this rule differs from occlusion's.
+    const auto open = [&mdl](vec3i p) {
+        if (p.x < 0 || p.y < 0 || p.z < 0) {
+            return false;
+        }
+        if (p.x >= mdl.width() || p.y >= mdl.height() || p.z >= mdl.depth()) {
+            return false;
+        }
+        return mdl.is_empty(p.x, p.y, p.z);
+    };
+
+    const auto at = [&](int32 i, int32 j) {
+        vec3i p = cell;
+        p[a]    = corner[a] + i;
+        p[b]    = corner[b] + j;
+        return p;
+    };
+
+    const int32 self_i  = cell[a] - corner[a];
+    const int32 self_j  = cell[b] - corner[b];
+    const int32 other_i = (self_i == 0) ? -1 : 0;
+    const int32 other_j = (self_j == 0) ? -1 : 0;
+
+    const bool edge_a   = open(at(other_i, self_j));
+    const bool edge_b   = open(at(self_i, other_j));
+    const bool diagonal = open(at(other_i, other_j));
 
     if (edge_a && edge_b) {
         return 3;
@@ -879,8 +951,8 @@ TEST_CASE("greedy meshing output is stable", "[mesh]") {
 
     const auto digest = hash_mesh(mesh);
     INFO("mesh digest: " << digest << ", quads: " << mesh.quads.size());
-    REQUIRE(mesh.quads.size() == 5452);
-    REQUIRE(digest == 16222259620568564683ULL);
+    REQUIRE(mesh.quads.size() == 5490);
+    REQUIRE(digest == 17446053651666445563ULL);
 }
 
 // The 32-cube above never reaches the bit path, so ambient occlusion out of
@@ -903,6 +975,101 @@ TEST_CASE("full-size greedy meshing output is stable", "[mesh]") {
     const auto mesh = fixture.greedy();
     const auto digest = hash_mesh(mesh);
     INFO("full-size digest: " << digest << ", quads: " << mesh.quads.size());
-    REQUIRE(mesh.quads.size() == 29218);
-    REQUIRE(digest == 8033663954171315545ULL);
+    REQUIRE(mesh.quads.size() == 29276);
+    REQUIRE(digest == 16366739229996460779ULL);
+}
+
+
+// Convexity all the way through: the same shape of check as occlusion, over
+// both mesh generators, which pins the fast path against the slow one -- greedy
+// reads the corners out of occupancy bit rows, simple asks the voxels one at a
+// time. It also pins the winding reorder: convexity has to travel the same
+// shuffle out of sampler order that occlusion and sky light do, or the shader
+// bilinearly blends one rectangle for two of them and another for the third.
+TEST_CASE("packed convexity matches the model at every corner", "[mesh]") {
+    model_fixture fixture{16};
+
+    // Away from the model's own walls, so nothing is decided by the absence of
+    // a boundary slice, and a height field rather than noise: convexity lives
+    // on the steps of a surface, and a cloud of loose voxels has few.
+    uint32 state = 4127;
+    for (int32 x = 2; x < 14; ++x) {
+        for (int32 z = 2; z < 14; ++z) {
+            state = (state * 1664525U) + 1013904223U;
+            const int32 height = 3 + static_cast<int32>((state >> 28) % 6);
+            for (int32 y = 2; y < 2 + height; ++y) {
+                fixture.get()->set_voxel(x, y, z, voxel{blocks::gray_5});
+            }
+        }
+    }
+
+    const auto check = [&fixture](const gfx::mesh& m, std::string_view what) {
+        std::size_t spikes = 0;
+
+        for (const auto& q : m.quads) {
+            const int32 face  = unpack_normal(q);
+            const auto lo     = unpack_min(q);
+            const auto hi     = unpack_max(q);
+            const auto convex = unpack_convex(q);
+
+            for (int32 slot = 0; slot < 4; ++slot) {
+                vec3i corner{};
+                vec3i cell{};
+                for (std::size_t i = 0; i < 3; ++i) {
+                    const bool high = face_verts[face][slot][i] != 0;
+                    corner[i]       = high ? hi[i] : lo[i];
+                    cell[i]         = high ? hi[i] - 1 : lo[i];
+                }
+
+                const uint8 want = expected_corner_convex(*fixture.get(), cell, face, corner);
+                if (convex[slot] != want) {
+                    INFO(
+                        what << ": face " << face << " cell " << cell.x << "," << cell.y << ","
+                             << cell.z << " slot " << slot << " packed " << int32{convex[slot]}
+                             << " expected " << int32{want}
+                    );
+                    FAIL();
+                }
+                if (want == 3) {
+                    ++spikes;
+                }
+            }
+        }
+
+        return spikes;
+    };
+
+    // A count, not a smoke test: a surface of random steps has outside corners
+    // all over it, and a check that only ever compared zero against zero would
+    // pass with the whole term deleted.
+    REQUIRE(check(fixture.simple(), "simple") > 50);
+    REQUIRE(check(fixture.greedy(), "greedy") > 50);
+}
+
+// Convexity is the one sampler whose out-of-range default is not occlusion's.
+// A model with no boundary slices has to come out flush all round its own
+// bounding box, not ringed in light.
+TEST_CASE("a model without neighbours has no rim", "[mesh]") {
+    model_fixture fixture{16};
+
+    for (int32 x = 0; x < 16; ++x) {
+        for (int32 z = 0; z < 16; ++z) {
+            for (int32 y = 0; y < 8; ++y) {
+                fixture.get()->set_voxel(x, y, z, voxel{blocks::gray_5});
+            }
+        }
+    }
+
+    std::size_t tops = 0;
+    for (const auto& q : fixture.greedy().quads) {
+        if (unpack_normal(q) != 2) {
+            continue;
+        }
+        ++tops;
+        for (const uint8 value : unpack_convex(q)) {
+            REQUIRE(value == 0);
+        }
+    }
+
+    REQUIRE(tops > 0);
 }

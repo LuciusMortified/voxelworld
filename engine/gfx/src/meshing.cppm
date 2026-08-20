@@ -16,7 +16,8 @@ export namespace vw::gfx {
 //
 // data0: min.x[6:0] | min.y[13:7] | min.z[20:14] | normal_id[23:21]
 //      | corners_ao[31:24]
-// data1: max.x[6:0] | max.y[13:7] | max.z[20:14] | palette_index[28:21]
+// data1: span_u[6:0] | span_v[13:7] | palette_index[21:14]
+//      | corners_convex[29:22]
 // data2: corners_sky[15:0]
 //
 // The third word is what sky light cost. Four bits a corner do not fit in the
@@ -24,18 +25,37 @@ export namespace vw::gfx {
 // would throw away the gradient the flood exists to produce. The upper half of
 // data2 is where block light goes in stage 3.
 //
-// The two corners are the box the rectangle spans; along the face axis they are
-// equal. Seven bits each, so a model is at most 128 voxels a side -- the same
-// ceiling the packed vertex had.
+// data1 used to hold the far corner outright, all three components of it, and
+// the comment here said the two corners were equal along the face axis. They
+// were never equal -- the far one is the near one plus a cell -- which is the
+// point: that component was being stored to say what the normal already said.
+// What is stored now is the extent along the two tangent axes, one less than
+// the cell count, and the eight bits that freed are where convexity lives.
+//
+// Extents rather than the far corner because extents also fit. A rectangle 128
+// cells wide has its far corner at 128, and seven bits stop at 127, so the old
+// packing wrapped it to zero on the outermost face of a model at the documented
+// ceiling. A span of 128 cells stores as 127 and fits exactly.
 //
 // corners_ao: two bits per corner in winding order, 0 open to 3 fully enclosed.
+// corners_convex: two bits per corner in the same order, 0 flush with its
+// neighbours to 3 a spike with neither edge neighbour present. Top faces only.
 // corners_sky: four bits per corner in the same winding order, 0 sealed to 15
 // under open sky.
-// It used to be one bit per corner plus one more mask that brightened whatever
-// nothing stood over -- so a corner touched by a single diagonal block came out
-// exactly as dark as the inside of a right angle, and the gradation the sampler
-// computes was thrown away at the last step. The brightening was standing in
-// for sky light before there was any; sky light replaces it and takes its bits.
+//
+// Occlusion and convexity answer two halves of one question -- how much of its
+// surroundings a corner can see -- and were tried as a single signed number,
+// three bits a corner, four bits cheaper than two masks. The merge that was
+// meant to pay for it recovered 0.46% of the quad count and no more. Two masks
+// keep both strengths and both curves adjustable without a remesh, so two masks
+// it is. docs/lighting.md records the run.
+//
+// Convexity was here once before, as one bit a corner, and was taken out on the
+// grounds that it stood in for sky light. It does not: under open sky the light
+// is a flat fifteen everywhere, so two plateaus at different heights come out
+// the same colour and the step between them disappears. Occlusion cannot show
+// it either -- it looks at the layer in front of the face, and above a top face
+// that layer is air by definition. Only the layer the face stands in knows.
 struct quad {
     uint32 data0 = 0;
     uint32 data1 = 0;
@@ -45,7 +65,7 @@ struct quad {
 
     [[nodiscard]] static auto pack(
         vec3i min_pos, vec3i max_pos, uint8 normal_id, block_id block_id, uint8 corners_ao,
-        uint16 corners_sky
+        uint8 corners_convex, uint16 corners_sky
     ) -> quad;
 
     // Only the per-instance index is still fed through vertex input; the
@@ -119,6 +139,12 @@ struct face_mask_cell {
     // round -- which is what makes a gradient cost quads.
     uint16 corner_sky = 0;
 
+    // Two bits a corner again, and in the merge key like the rest: two cells
+    // join only when the shape around them agrees. That is what it costs --
+    // 6.6% of the quad count on the advance scene, against 13.2% when it was
+    // computed for all six faces instead of the top one.
+    uint8 corner_convex = 0;
+
     [[nodiscard]]
     auto operator==(const face_mask_cell&) const -> bool = default;
 
@@ -161,7 +187,13 @@ struct face_axis_mapping {
 };
 
 [[nodiscard]] auto compute_corner_darkness(const vw::asset::model& mdl, int x, int y, int z, int face) -> uint8;
+[[nodiscard]] auto compute_corner_convexity(const vw::asset::model& mdl, int x, int y, int z, int face) -> uint8;
 [[nodiscard]] auto compute_corner_sky(const vw::asset::model& mdl, int x, int y, int z, int face) -> uint16;
+
+// The one face convexity is computed for. A side face already reads its own
+// shape off the normal and a bottom face is never the surface anyone is trying
+// to read, so the other five would pay the merge key and show nothing.
+inline constexpr int32 convex_face = 2;
 
 [[nodiscard]] auto is_face_visible(const vw::asset::model& mdl, int x, int y, int z, int face_direction)
     -> bool;
@@ -182,6 +214,7 @@ void add_quad(
     vec3i max_pos,
     uint8 palette_index,
     uint8 corner_ao,
+    uint8 corner_convex,
     uint16 corner_sky
 );
 
@@ -194,6 +227,11 @@ void add_quad(
 struct layer_rows {
     std::array<uint64, 64> visible{};
     std::array<uint64, 64> front{};
+
+    // The layer the faces themselves stand in. Convexity samples it the way
+    // ambient occlusion samples the plane in front, and it was already being
+    // read to work out what is visible -- it just was not being kept.
+    std::array<uint64, 64> own{};
 
     // The plane in front lies outside the chunk, so every occlusion sample
     // around it leaves the chunk on two axes and reads as empty.
