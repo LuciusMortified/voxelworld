@@ -335,6 +335,12 @@ public:
     [[nodiscard]] auto get_cascade_splits() const -> const std::array<float32, shadow_map::cascade_count>&;
     [[nodiscard]] auto get_cascade_texel_sizes() const -> const std::array<float32, shadow_map::cascade_count>&;
 
+    // How many point lights survived the cull into the buffer this frame,
+    // which is the number the fragment shader walks for every pixel. The
+    // only honest way to tell a scene that is stressing the loop from one
+    // whose lights are all behind the camera.
+    [[nodiscard]] auto get_visible_light_count() const -> uint32;
+
     [[nodiscard]] auto get_mesh_pool() -> mesh_pool& { return mesh_pool_; }
     [[nodiscard]] auto get_mesh_pool() const -> const mesh_pool& { return mesh_pool_; }
 

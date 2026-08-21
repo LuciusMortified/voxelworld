@@ -251,6 +251,10 @@ auto renderer::get_block_light_settings() -> block_light_settings& {
     return block_light_settings_;
 }
 
+auto renderer::get_visible_light_count() const -> uint32 {
+    return light_buffer_ ? light_buffer_->get_lights_count() : 0;
+}
+
 auto renderer::get_ambient_settings() -> ambient_settings& {
     return ambient_settings_;
 }
