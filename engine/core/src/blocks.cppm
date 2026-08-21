@@ -10,7 +10,9 @@ export namespace vw {
 namespace block_flags {
 constexpr uint8 none        = 0;
 constexpr uint8 transparent = 1 << 0;
-constexpr uint8 emissive    = 1 << 1;
+// Bit 1 was emissive, and block_type::glow says the same thing with a number
+// instead of a yes. Two ways to ask whether a block glows is one too many; the
+// bit is left as a hole rather than renumbering what sits above it.
 constexpr uint8 liquid      = 1 << 2;
 }  // namespace block_flags
 
@@ -37,6 +39,16 @@ struct block_type {
     // corner, and there is one nibble there, not two. Minecraft's scale for the
     // same reason -- torch 14, glowstone 15.
     uint8 light = 0;
+
+    // How brightly the block draws itself, nothing to do with what it gives its
+    // neighbours. 255 means it renders at exactly the colour it was drawn even
+    // where no light reaches it at all.
+    //
+    // Two properties and not one because they come apart: lava has both, a
+    // crystal that glows without lighting the room has only this, and a lamp
+    // sunk into a wall could have only the other. Nothing in the shader ties
+    // them together either -- this term takes no occluder, that one takes AO.
+    uint8 glow = 0;
 };
 
 namespace blocks {
@@ -118,7 +130,8 @@ public:
     [[nodiscard]] auto blocks() const -> const std::array<block_type, 256>&;
 
 private:
-    void reg(block_id id, color c, uint8 flags = block_flags::none, uint8 light = 0);
+    void reg(block_id id, color c, uint8 flags = block_flags::none, uint8 light = 0,
+             uint8 glow = 0);
 
     std::array<block_type, 256> blocks_{};
 };

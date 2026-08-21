@@ -56,7 +56,10 @@ layout(set = 4, binding = 0, std430) readonly buffer PaletteBuffer {
 
 layout(location = 0) out vec3 fragPos;
 layout(location = 1) out vec3 fragNormal;
-layout(location = 2) out vec3 fragColor;
+// Alpha is how brightly the block draws itself; see gfx::palette_buffer.
+// A vec4 and not a vec3 plus a float: a location is vec4-sized either way,
+// so the fourth component rides along for nothing.
+layout(location = 2) out vec4 fragColor;
 layout(location = 3) out float viewDepth;
 layout(location = 4) out vec2 fragUV;
 layout(location = 5) flat out uint fragCornersMask;
@@ -123,7 +126,7 @@ void main() {
 
     fragNormal = normalize(mat3(normalMatrices.normals[inInstanceIndex]) * NORMALS[normal_id]);
 
-    fragColor = palette[palette_idx].rgb;
+    fragColor = palette[palette_idx];
 
     vec2 corner_uvs[4] = vec2[4](
         vec2(0.0, 0.0),

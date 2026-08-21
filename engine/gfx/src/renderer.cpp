@@ -1621,6 +1621,8 @@ void renderer::update_uniform_buffer(
         block_light_settings_.curve,
     };
 
+    ubo.glow_params = vec4f{block_light_settings_.glow, 0.0f, 0.0f, 0.0f};
+
     // The white point is squared and divided by in the shader, so zero there is
     // a division by zero on every pixel. Floored once here rather than guarded
     // per pixel.

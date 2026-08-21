@@ -2,7 +2,7 @@
 
 layout(location = 0) in vec3 fragPos;
 layout(location = 1) in vec3 fragNormal;
-layout(location = 2) in vec3 fragColor;
+layout(location = 2) in vec4 fragColor;
 layout(location = 3) in float viewDepth;
 layout(location = 4) in vec2 fragUV;
 layout(location = 5) flat in uint fragCornersMask;
@@ -89,6 +89,12 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     // w:   the exponent that level travels. Fifteen linear steps read as a
     //      ramp rather than as a lamp, so this is well above one.
     vec4 lamp_params;
+
+    // x: how much of a block's own glow reaches the frame. Its own vec4 rather
+    //    than a spare lane above, because the two are different things: that
+    //    one is a light with an occluder, this is a surface that ignores every
+    //    occluder there is.
+    vec4 glow_params;
 
     // x: exposure, applied before the tone curve. y: the light level that comes
     // out as exactly one.
@@ -473,7 +479,18 @@ void main() {
     // the edge one never reached the sum at all. Nothing here is a stand-in for
     // something else any more: every term is a light with an occluder.
     vec3 lighting = (ambient + directional + lamp + pointLighting) * convexFactor;
-    vec3 result = lighting * fragColor;
+    vec3 result = lighting * fragColor.rgb;
+
+    // Emissive, and outside everything on purpose. No AO, no convexity, no sky
+    // light, no time of day: a glowing voxel is not lit, it is a source, and
+    // dimming a source by how shut in it is would be saying that lava shines
+    // less in a corner.
+    //
+    // Its own albedo is the colour, so lava glows lava-coloured and a crystal
+    // glows its own. Inside the tone curve rather than after it, because it has
+    // to roll off the way everything else does -- a source that skipped the
+    // curve would be the one thing left in the frame still able to clip.
+    result += fragColor.rgb * fragColor.a * ubo.glow_params.x;
 
     // Extended Reinhard, per channel. Per channel and not on luminance:
     // scaling three channels by one luminance ratio does not stop the brightest

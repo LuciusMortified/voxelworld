@@ -52,11 +52,19 @@ palette_buffer::palette_buffer(
     // All 256, not 255: the bound used to be numeric_limits<uint8>::max(), which
     // left the last entry black, and a block that landed on it would have
     // rendered unlit rather than wrong-coloured.
+    // Alpha carries how brightly the block draws itself. It was a constant one
+    // and read by nobody, so the emissive term costs no second buffer, no
+    // second lookup and no extra byte anywhere -- the vertex shader already
+    // fetches this vec4 and was throwing the fourth component away.
     std::array<vec4f, 256> palette_data{};
     for (std::size_t i = 0; i < palette_data.size(); ++i) {
-        const color clr = registry.get_color(block_id{static_cast<uint8>(i)});
-        palette_data[i] =
-            vec4f{decode(clr.r()), decode(clr.g()), decode(clr.b()), 1.0f};
+        const block_type& block = registry.get(block_id{static_cast<uint8>(i)});
+        const color clr         = block.clr;
+
+        palette_data[i] = vec4f{
+            decode(clr.r()), decode(clr.g()), decode(clr.b()),
+            static_cast<float32>(block.glow) / 255.0f
+        };
     }
 
     buffer_ = std::make_unique<storage_buffer>(*context_, sizeof(palette_data));

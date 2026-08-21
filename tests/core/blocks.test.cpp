@@ -5,24 +5,30 @@ import vw.core;
 
 using namespace vw;
 
-TEST_CASE("blocks default to unlit", "[blocks]") {
+TEST_CASE("blocks default to unlit and unglowing", "[blocks]") {
     const block_registry registry;
 
     REQUIRE(registry.get(blocks::air).light == 0);
+    REQUIRE(registry.get(blocks::air).glow == 0);
     REQUIRE(registry.get(blocks::green_5).light == 0);
-    REQUIRE((registry.get(blocks::green_5).flags & block_flags::emissive) == 0);
+    REQUIRE(registry.get(blocks::green_5).glow == 0);
 }
 
-TEST_CASE("emitting blocks carry a level and the emissive flag", "[blocks]") {
+// Two properties, not one. What a block gives its neighbours is a level the
+// flood carries; what it draws itself with is a brightness the shader adds
+// outside every occluder. Lava has both, and nothing in the engine makes one
+// follow from the other -- a crystal that glows without lighting the room is a
+// glow with no light, and a lamp buried in a wall is a light with no glow.
+TEST_CASE("an emitter carries a flood level and a glow apart", "[blocks]") {
     const block_registry registry;
 
     const block_type& lamp = registry.get(blocks::lamp);
     REQUIRE(lamp.light == 14);
-    REQUIRE((lamp.flags & block_flags::emissive) != 0);
+    REQUIRE(lamp.glow == 200);
 
     const block_type& lava = registry.get(blocks::lava);
     REQUIRE(lava.light == 15);
-    REQUIRE((lava.flags & block_flags::emissive) != 0);
+    REQUIRE(lava.glow == 255);
 }
 
 // A level over fifteen cannot be baked: the quad keeps four bits a corner and

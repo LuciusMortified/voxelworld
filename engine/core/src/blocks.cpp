@@ -67,15 +67,15 @@ block_registry::block_registry() {
     reg(white,    colors::all[46]);
     reg(black,    colors::all[47]);
 
-    reg(lamp,     colors::light_yellow, f::emissive, 14);
-    reg(lava,     colors::lava,         f::emissive, 15);
+    reg(lamp,     colors::light_yellow, f::none, 14, 200);
+    reg(lava,     colors::lava,         f::none, 15, 255);
     // clang-format on
 }
 
 void block_registry::reg(
-    block_id id, color c, uint8 flags, uint8 light
+    block_id id, color c, uint8 flags, uint8 light, uint8 glow
 ) {
-    blocks_[id.value] = {id, c, flags, light};
+    blocks_[id.value] = {id, c, flags, light, glow};
 }
 
 auto block_registry::get(

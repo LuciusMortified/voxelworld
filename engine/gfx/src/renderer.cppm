@@ -122,6 +122,12 @@ struct block_light_settings {
     // than as light falling off from a lamp. Two is close to the curve
     // Minecraft's own lightmap uses, which is f / (4 - 3f).
     float32 curve{2.0f};
+
+    // How much of a block's own glow reaches the frame. At one, a block with
+    // glow 255 comes out as exactly the colour it was drawn where nothing else
+    // lights it -- the only setting of this that has a meaning rather than a
+    // taste, and the one worth going back to when the picture drifts.
+    float32 glow{1.0f};
 };
 
 // Настройки тумана (для CPU)
@@ -195,6 +201,12 @@ struct uniform_buffer_object {
     // voxel.frag, and the two have to agree -- std140 gives no warning for a
     // block that disagrees, only wrong pixels.
     alignas(16) vec4f lamp_params;
+
+    // x: how much of a block's own glow reaches the frame. Its own vec4 rather
+    // than a spare lane of lamp_params, because the two are different things:
+    // that one is a light with an occluder, this one is a surface that ignores
+    // every occluder there is.
+    alignas(16) vec4f glow_params;
 
     // x: exposure, applied before the curve. y: the light level that maps to
     // exactly one. See tonemap_settings.

@@ -1131,6 +1131,11 @@ private:
             // uses and reads as falloff.
             ImGui::SliderFloat("Lamp curve", &lamp.curve, 0.25f, 4.0f, "%.2f");
 
+            // At one a lava face comes out as exactly the colour lava was
+            // drawn where nothing else reaches it. That is the anchor; above
+            // it the tone curve starts taking the difference back.
+            ImGui::SliderFloat("Glow", &lamp.glow, 0.0f, 3.0f, "%.2f");
+
             // Nothing in the terrain emits, so without these there is nothing
             // to look at. Both write through world_grid::set_voxel, which is
             // the same path an edit takes -- the column goes dirty, the baker
