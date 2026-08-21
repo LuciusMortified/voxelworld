@@ -14,10 +14,17 @@ void light_system::on_add(entity e) {
 }
 
 // Nothing consumes the notification any more: gfx::light_buffer rebuilds from
-// the world every frame instead, because a light that moves does not touch its
-// own component and the change set never mentioned it. The drain still has to
-// happen -- the modifiers keep filling the requested set, and a set nobody
-// empties only grows.
+// the world every frame instead. Not because a light that moves escapes the
+// change set -- it does not. world.cpp hangs a change dependency off
+// transform_component, and this system runs after transform_system, so a
+// carried torch is marked changed in the same frame it moves.
+//
+// It is the cull that cannot be hung on a component. The buffer is trimmed
+// against the frustum, and the frustum follows the camera, which turns without
+// any component changing.
+//
+// The drain still has to happen: the modifiers keep filling the requested set,
+// and a set nobody empties only grows.
 void light_system::update(float32 /*dt*/) {
     auto& reg       = world_->registry();
     auto& requested = reg.requested<light_component>();
