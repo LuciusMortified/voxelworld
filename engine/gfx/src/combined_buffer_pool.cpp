@@ -234,6 +234,7 @@ void combined_buffer_pool::update_meshes_(
 
     merge_buffer_.clear();
     merge_buffer_.reserve(entities_to_process_.size());
+    uploaded_models_.clear();
 
     for (size_t i = 0; i < entities_to_process_.size(); ++i) {
         entity ent = entities_to_process_[i];
@@ -318,7 +319,7 @@ void combined_buffer_pool::update_meshes_(
                         continue;
                     }
                     buffer->write_mesh(model_id, *mesh_ptr);
-                    pool.evict(model_id);
+                    uploaded_models_.push_back(model_id);
                     touched_bounds_.push_back(buffer_info.bounds);
                     touched_bounds_.push_back(ent_bounds);
                     buffer_info.bounds = ent_bounds;
@@ -353,7 +354,7 @@ void combined_buffer_pool::update_meshes_(
         const auto buffer_index = chunk_size_to_buffer_index_[required_chunk_size];
 
         buffer->allocate(ent, model_id, *mesh_ptr, transform_matrix, ent_bounds);
-        pool.evict(model_id);
+        uploaded_models_.push_back(model_id);
 
         entity_buffer_infos_[ent] =
             entity_buffer_info{required_chunk_size, buffer_index, ent_bounds};
@@ -363,6 +364,47 @@ void combined_buffer_pool::update_meshes_(
 
     std::sort(merge_buffer_.begin(), merge_buffer_.end());
     mesh_pending_entities_.swap(merge_buffer_);
+
+    evict_uploaded_(world, pool);
+}
+
+// The CPU copy of a mesh goes as soon as the geometry is on the GPU: a column
+// of terrain is megabytes and nothing reads it a second time. What it may not
+// do is go while another entity is still queued for the same model. mesh_pool
+// is the only place that copy exists, and an entity that finds it missing goes
+// back on the pending list -- where nothing will ever build it again, because a
+// mesh is only requested for a model_component in the frame it changes.
+//
+// That is what two entities sharing one model hit. The first uploaded, the copy
+// was dropped, and every other one waited for ever. The GPU side was never the
+// problem: combined_buffer keys geometry on the model index and reference
+// counts it, so the second entity shares the quads the first one wrote.
+void combined_buffer_pool::evict_uploaded_(
+    world_type& world, mesh_pool& pool
+) {
+    if (uploaded_models_.empty()) {
+        return;
+    }
+
+    // By identity and not by index: an entity queued for a newer generation of
+    // the same model is waiting for a different mesh, and holding the old one
+    // back for it would keep memory alive that nobody will read.
+    awaited_models_.clear();
+    for (entity ent : mesh_pending_entities_) {
+        if (!world.has<model_component>(ent)) {
+            continue;
+        }
+        const auto& model_comp = world.get<model_component>(ent);
+        if (model_comp.has_model()) {
+            awaited_models_.insert(model_comp.get_identity());
+        }
+    }
+
+    for (const auto& model_id : uploaded_models_) {
+        if (!awaited_models_.contains(model_id)) {
+            pool.evict(model_id);
+        }
+    }
 }
 
 void combined_buffer_pool::update_chunk_visibility_(

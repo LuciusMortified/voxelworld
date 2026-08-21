@@ -401,6 +401,7 @@ private:
     void update_meshes_(world_type& world, const vec3f& camera_pos, mesh_pool& pool);
     void update_transforms_(world_type& world);
     void update_chunk_visibility_(world_type& world, const vec3f& camera_pos);
+    void evict_uploaded_(world_type& world, mesh_pool& pool);
 
     vulkan_context* context_;
     deletion_queue* deletion_;
@@ -424,6 +425,12 @@ private:
     std::vector<entity> merge_buffer_;
     std::vector<vw::spatial::aabb> touched_bounds_;
     std::vector<std::pair<float32, entity>> sort_keys_;
+
+    // Models whose geometry reached the GPU this frame, and the models entities
+    // still queued are waiting on. The first set minus the second is the CPU
+    // copy that may be dropped -- see evict_uploaded_.
+    std::vector<vw::asset::model_identity> uploaded_models_;
+    std::unordered_set<vw::asset::model_identity> awaited_models_;
 
     bool chunk_cull_enabled_ = false;
     std::vector<std::vector<uint32>> visibility_flags_;
