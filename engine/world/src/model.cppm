@@ -311,16 +311,29 @@ struct chunk_link_scratch {
 
 [[nodiscard]] auto build_chunk_links(const chunk_occupancy& occupancy) -> chunk_links;
 
-// One chunk of sky light in the form it is actually kept: pages of 8x8x8, four
-// bits a voxel. The nibble is not a saving to be clever about -- a level is
-// 0 to 15 and nothing else, so a byte would be half padding.
+// Emission level by block id, 0 to 15. A flat table rather than the registry
+// itself, because a scan wants one byte a voxel and block_type is twelve, with
+// light at offset nine -- reading it in place drags three kilobytes through
+// cache for 256 bytes of answer.
 //
-// Two degenerate cases carry almost everything. Rock below the caves is dark
-// all through and air above the surface is 15 all through, and either costs one
-// byte and no table at all. What is left keeps a table of 512 entries, one a
-// page, and a packed page only for the pages that really vary. On real terrain
-// 2.4% of pages vary; the rest of the chunk is the table.
-class sky_light_field {
+// A copy, not a second source of truth: the registry is where a block's
+// emission is written down, and this is built from it once and passed around.
+using emission_table = std::array<uint8, 256>;
+
+[[nodiscard]] auto build_emission_table(const block_registry& registry) -> emission_table;
+
+
+// One chunk of baked light in the form it is actually kept: pages of 8x8x8,
+// four bits a voxel. The nibble is not a saving to be clever about -- a level
+// is 0 to 15 and nothing else, so a byte would be half padding.
+//
+// Two degenerate cases carry almost everything. For sky light, rock below the
+// caves is dark all through and air above the surface is 15 all through, and
+// either costs one byte and no table at all; for block light nearly every
+// chunk in the world is the dark case. What is left keeps a table of 512
+// entries, one a page, and a packed page only for the pages that really vary.
+// On real terrain 2.4% of sky pages vary; the rest of the chunk is the table.
+class light_field {
 public:
     static constexpr int32 side        = chunk_occupancy::side;
     static constexpr int32 page        = 8;
@@ -373,14 +386,14 @@ public:
     };
 
     // Dark, which is what a chunk that has not been lit yet has to look like.
-    sky_light_field() = default;
+    light_field() = default;
 
-    sky_light_field(uint8 level, boundary_light around)
+    light_field(uint8 level, boundary_light around)
         : uniform_{level}, around_{std::move(around)} {}
 
-    // Built by sky_light_column::bake, which is the only thing that knows how
+    // Built by light_column::bake, which is the only thing that knows how
     // to fill a table.
-    sky_light_field(std::vector<uint16> table, std::vector<page_type> pages,
+    light_field(std::vector<uint16> table, std::vector<page_type> pages,
                     boundary_light around)
         : table_{std::move(table)}, pages_{std::move(pages)}, around_{std::move(around)} {}
 
@@ -458,7 +471,7 @@ public:
     // The forms are canonical, so this is as exact as it looks: bake collapses
     // a chunk of one level to uniform and a plane of one level to its uniform,
     // and never leaves a table that says the same thing a shorter one would.
-    auto operator==(const sky_light_field&) const -> bool = default;
+    auto operator==(const light_field&) const -> bool = default;
 
 private:
     uint8 uniform_ = 0;
@@ -635,14 +648,28 @@ public:
     // An edit leaves it in place rather than dropping it. Stale light for the
     // frame it takes to reflood looks like nothing at all; no light looks like
     // the chunk went black.
-    void set_sky_light(sky_light_field light);
+    void set_sky_light(light_field light);
 
-    [[nodiscard]] auto get_sky_light() const -> const sky_light_field* {
+    [[nodiscard]] auto get_sky_light() const -> const light_field* {
         return light_.get();
     }
 
     [[nodiscard]] auto has_sky_light() const -> bool {
         return light_ != nullptr;
+    }
+
+    // The other channel, kept the same way and for the same reason. Held apart
+    // from the first and never summed into it: sky light is a visibility that
+    // the time of day multiplies, block light is a light that it must not
+    // touch. Added together, a lamp would go out at dusk.
+    void set_block_light(light_field light);
+
+    [[nodiscard]] auto get_block_light() const -> const light_field* {
+        return block_light_.get();
+    }
+
+    [[nodiscard]] auto has_block_light() const -> bool {
+        return block_light_ != nullptr;
     }
 
     void fill(const voxel& v);
@@ -707,7 +734,8 @@ private:
     std::vector<uint32> owned_pages_;
     model_identity identity_;
     std::unique_ptr<model_boundary> boundary_;
-    std::unique_ptr<sky_light_field> light_;
+    std::unique_ptr<light_field> light_;
+    std::unique_ptr<light_field> block_light_;
     mutable model_fill fill_  = model_fill::mixed;
     mutable bool fill_known_  = false;
 };

@@ -9,7 +9,7 @@ import :components;
 import :grid;
 import :index;
 import :model;
-import :sky_light;
+import :light;
 import :terrain;
 
 export namespace vw::ecs {
@@ -587,7 +587,7 @@ public:
 
     [[nodiscard]] auto get_stats() const -> const world_grid_system_stats&;
     [[nodiscard]] auto get_loader_stats() const -> column_gen_stats;
-    [[nodiscard]] auto get_light_stats() const -> sky_light_stats;
+    [[nodiscard]] auto get_light_stats() const -> light_stats;
 
     class view_modifier {
     public:
@@ -622,7 +622,7 @@ private:
     void stage_completed_columns_();
     void collect_lit_columns_();
     void relight_dirty_columns_();
-    void apply_relit_column_(sky_light_result& result);
+    void apply_relit_column_(light_result& result);
     void integrate_completed_columns_();
     auto dispatch_light_(vec2i coord) -> bool;
     [[nodiscard]] auto column_stack_(vec2i coord, int32 bottom)
@@ -646,7 +646,7 @@ private:
     world* world_;
     std::unique_ptr<world_grid> grid_;
     std::unique_ptr<chunk_loader> loader_;
-    std::unique_ptr<sky_light_baker> baker_;
+    std::unique_ptr<light_baker> baker_;
     std::unordered_set<vec2i> active_columns_;
     std::unordered_set<vec2i> pending_active_columns_;
     std::vector<vec2i> pending_requests_;

@@ -247,6 +247,10 @@ auto renderer::get_tonemap_settings() -> tonemap_settings& {
     return tonemap_settings_;
 }
 
+auto renderer::get_block_light_settings() -> block_light_settings& {
+    return block_light_settings_;
+}
+
 auto renderer::get_ambient_settings() -> ambient_settings& {
     return ambient_settings_;
 }
@@ -1609,6 +1613,13 @@ void renderer::update_uniform_buffer(
 
     ubo.sky_params =
         vec4f{ambient_settings_.sky_curve, ambient_settings_.sun_curve, 0.0f, 0.0f};
+
+    ubo.lamp_params = vec4f{
+        block_light_settings_.color.x * block_light_settings_.intensity,
+        block_light_settings_.color.y * block_light_settings_.intensity,
+        block_light_settings_.color.z * block_light_settings_.intensity,
+        block_light_settings_.curve,
+    };
 
     // The white point is squared and divided by in the shader, so zero there is
     // a division by zero on every pixel. Floored once here rather than guarded

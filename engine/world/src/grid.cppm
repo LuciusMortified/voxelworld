@@ -5,7 +5,7 @@ import std;
 import vw.core;
 import vw.ecs;
 import :model;
-import :sky_light;
+import :light;
 
 export namespace vw::ecs {
 

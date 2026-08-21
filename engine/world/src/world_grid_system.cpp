@@ -27,7 +27,7 @@ void world_grid_system::set_loader(
 ) {
     clear_loader_transient_state_();
     loader_ = std::move(loader);
-    baker_  = loader_ != nullptr ? std::make_unique<sky_light_baker>() : nullptr;
+    baker_  = loader_ != nullptr ? std::make_unique<light_baker>() : nullptr;
 }
 
 auto world_grid_system::grid() -> world_grid* {
@@ -58,8 +58,8 @@ auto world_grid_system::get_loader_stats() const -> column_gen_stats {
     return loader_ ? loader_->get_gen_stats() : column_gen_stats{};
 }
 
-auto world_grid_system::get_light_stats() const -> sky_light_stats {
-    return baker_ ? baker_->get_stats() : sky_light_stats{};
+auto world_grid_system::get_light_stats() const -> light_stats {
+    return baker_ ? baker_->get_stats() : light_stats{};
 }
 
 auto world_grid_system::get_stats() const -> const world_grid_system_stats& {
@@ -254,7 +254,7 @@ auto world_grid_system::dispatch_light_(
     }
     bottom = std::min(bottom, *own);
 
-    sky_light_request job;
+    light_request job;
     job.coord    = coord;
     job.bottom_y = bottom;
 
@@ -285,8 +285,9 @@ void world_grid_system::collect_lit_columns_() {
 
         for (auto& [y, cd] : it->second->get_all_chunk_data()) {
             const auto slot = static_cast<std::size_t>(y - result->bottom_y);
-            if (slot < result->fields.size()) {
-                cd.chunk_model->set_sky_light(std::move(result->fields[slot]));
+            if (slot < result->sky.size()) {
+                cd.chunk_model->set_sky_light(std::move(result->sky[slot]));
+                cd.chunk_model->set_block_light(std::move(result->block[slot]));
             }
         }
 
@@ -302,12 +303,16 @@ void world_grid_system::collect_lit_columns_() {
 // after an edit can change anywhere below it, but a spade underground changes
 // nothing at all: rock is dark before and dark after, and comparing the fields
 // is what keeps digging a mine from remeshing nine chunks a stroke.
+//
+// Both channels are compared and the chunk is meshed once if either moved. A
+// torch lit in a sealed room moves the block channel and not the sky one; a
+// hole in a roof moves the sky channel and not the block one.
 void world_grid_system::apply_relit_column_(
-    sky_light_result& result
+    light_result& result
 ) {
     for (int32 y : grid_->column_levels(result.coord)) {
         const auto slot = static_cast<std::size_t>(y - result.bottom_y);
-        if (slot >= result.fields.size()) {
+        if (slot >= result.sky.size()) {
             continue;
         }
 
@@ -317,13 +322,19 @@ void world_grid_system::apply_relit_column_(
             continue;
         }
 
-        auto& mdl         = *placed->get_model();
-        const auto* stood = mdl.get_sky_light();
-        if (stood != nullptr && *stood == result.fields[slot]) {
+        auto& mdl              = *placed->get_model();
+        const auto* stood_sky   = mdl.get_sky_light();
+        const auto* stood_block = mdl.get_block_light();
+
+        const bool sky_moved   = stood_sky == nullptr || *stood_sky != result.sky[slot];
+        const bool block_moved = stood_block == nullptr || *stood_block != result.block[slot];
+
+        if (!sky_moved && !block_moved) {
             continue;
         }
 
-        mdl.set_sky_light(std::move(result.fields[slot]));
+        mdl.set_sky_light(std::move(result.sky[slot]));
+        mdl.set_block_light(std::move(result.block[slot]));
         grid_->remesh_drawn_chunk(at);
         ++stats_.relit_chunks;
     }

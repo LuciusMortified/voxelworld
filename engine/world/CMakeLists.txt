@@ -10,7 +10,7 @@ target_sources(vw_world
             src/index.cppm
             src/components.cppm
             src/terrain.cppm
-            src/sky_light.cppm
+            src/light.cppm
             src/grid.cppm
             src/systems.cppm
     PRIVATE
@@ -19,7 +19,7 @@ target_sources(vw_world
         src/serial.cpp
         src/index.cpp
         src/terrain.cpp
-        src/sky_light.cpp
+        src/light.cpp
         src/scene_serial.cpp
         src/world.cpp
         src/animation_fsm_system.cpp

@@ -30,6 +30,13 @@ struct block_type {
     block_id id = block_id{0};
     color clr = colors::empty;
     uint8 flags = block_flags::none;
+
+    // Zero to fifteen, and it is both numbers at once: how bright the source is
+    // and how far it carries. A flood step costs exactly one, so a block that
+    // was bright but short-ranged would need a second value on every quad
+    // corner, and there is one nibble there, not two. Minecraft's scale for the
+    // same reason -- torch 14, glowstone 15.
+    uint8 light = 0;
 };
 
 namespace blocks {
@@ -91,6 +98,12 @@ constexpr auto gray_9   = block_id{46};
 
 constexpr auto white    = block_id{47};
 constexpr auto black    = block_id{48};
+
+// The two that emit. Their colours are deliberately not Apollo's: find_by_color
+// returns the first block wearing a colour, and that is the function .vox
+// import maps a palette through, so a duplicate would silently reassign it.
+constexpr auto lamp     = block_id{49};
+constexpr auto lava     = block_id{50};
 // clang-format on
 
 }  // namespace blocks
@@ -105,7 +118,7 @@ public:
     [[nodiscard]] auto blocks() const -> const std::array<block_type, 256>&;
 
 private:
-    void reg(block_id id, color c, uint8 flags = block_flags::none);
+    void reg(block_id id, color c, uint8 flags = block_flags::none, uint8 light = 0);
 
     std::array<block_type, 256> blocks_{};
 };

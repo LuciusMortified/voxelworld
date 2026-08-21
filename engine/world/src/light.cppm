@@ -1,4 +1,4 @@
-export module vw.world:sky_light;
+export module vw.world:light;
 
 import std;
 
@@ -6,6 +6,16 @@ import vw.core;
 import :model;
 
 export namespace vw::asset {
+
+// Which of the two lights a level belongs to. They share one byte of levels --
+// sky in the low nibble, block light in the high one -- because a level is 0 to
+// 15 and the array was already a byte a voxel with half of it spare. A second
+// array would have been five megabytes a worker for nothing.
+enum class light_channel : uint8 { sky = 0, block = 1 };
+
+[[nodiscard]] constexpr auto shift_of(light_channel channel) -> int32 {
+    return channel == light_channel::sky ? 0 : 4;
+}
 
 // The buffers one flood runs in. Seven megabytes for a column nine chunks
 // tall: five of levels, and a megabyte and a quarter each of the two bit planes
@@ -20,12 +30,18 @@ export namespace vw::asset {
 // They are still cleared per column. The flood writes only where light reaches
 // and only as far up as the column goes, so a column that took what the last
 // one left would find its ceiling already lit.
-struct sky_light_scratch {
+struct light_scratch {
     std::vector<uint8> levels;
     std::vector<uint64> solid;
     std::vector<uint64> sky;
     std::vector<int32> frontier;
     std::vector<int32> next;
+
+    // Seeds by the level they enter the spread at. Sky puts everything in slot
+    // 15 and has done; block light has a source for every emission the
+    // registry names, and a torch at 14 must wait its turn behind the lava at
+    // 15 or the spread would reach it from above and walk it a second time.
+    std::array<std::vector<int32>, 16> seeds;
 };
 
 // Sky light over one column of chunks, copied from Minecraft exactly.
@@ -53,8 +69,8 @@ struct sky_light_scratch {
 //
 // Storage here is dense, one byte a voxel over the skirted volume, and meant to
 // be built on a worker, read once and dropped. What survives it is
-// sky_light_field, one paged chunk at a time.
-class sky_light_column {
+// light_field, one paged chunk at a time.
+class light_column {
 public:
     static constexpr int32 side      = chunk_occupancy::side;
     static constexpr int32 apron     = 15;
@@ -62,30 +78,42 @@ public:
     static constexpr int32 page      = 8;
     static constexpr uint8 max_level = 15;
 
-    // Nine columns, indexed (dz + 1) * 3 + (dx + 1), so index 4 is the middle
-    // one. Each holds that column's chunk occupancy bottom up -- every column
-    // in this world starts at the same world_bottom_y, so a common floor is
-    // safe to assume and a common ceiling is not.
+    // One of the nine columns: the occupancy the flood runs over, and the
+    // models the emitters are read out of. Both bottom up from the floor every
+    // column in this world shares, so a common floor is safe to assume and a
+    // common ceiling is not.
     //
-    // An empty span is a column that is not there at all, and reads as solid
-    // rock: it neither gives light nor lets any through. Above the top of a
-    // column that *is* there is open air, and rule one seeds it -- that is what
-    // keeps a plain beside a mountain from being walled off in the dark.
-    using neighbourhood = std::array<std::span<const chunk_occupancy* const>, 9>;
+    // An empty occupancy is a column that is not there at all, and reads as
+    // solid rock: it neither gives light nor lets any through. Above the top of
+    // a column that *is* there is open air, and rule one seeds it -- that is
+    // what keeps a plain beside a mountain from being walled off in the dark.
+    //
+    // The models are walked page by page and only where something emits, so an
+    // empty span here is not an error but the ordinary answer for anything with
+    // no light blocks in it -- and what the sky-only constructors hand over.
+    struct column_slice {
+        std::span<const chunk_occupancy* const> occupancy;
+        std::span<const model* const> models;
+    };
 
-    explicit sky_light_column(const neighbourhood& around) : sky_light_column{around, {}} {}
+    // Indexed (dz + 1) * 3 + (dx + 1), so index 4 is the middle one.
+    using neighbourhood = std::array<column_slice, 9>;
+
+    explicit light_column(const neighbourhood& around)
+        : light_column{around, emission_table{}, {}} {}
 
     // The same, running in buffers somebody else is keeping. Take them back
     // with release() when the bake is done.
-    sky_light_column(const neighbourhood& around, sky_light_scratch scratch);
+    light_column(const neighbourhood& around, const emission_table& emission,
+                 light_scratch scratch);
 
-    // One column with its four sides sealed. Exact only where nothing outside
-    // it matters, which is why the skirted form exists.
-    explicit sky_light_column(std::span<const chunk_occupancy* const> chunks_bottom_up);
+    // One column with its four sides sealed, sky only. Exact only where nothing
+    // outside it matters, which is why the skirted form exists.
+    explicit light_column(std::span<const chunk_occupancy* const> chunks_bottom_up);
 
     // The buffers back, to be handed to the next column. What is left behind is
     // a moved-from column and must not be read.
-    [[nodiscard]] auto release() && -> sky_light_scratch {
+    [[nodiscard]] auto release() && -> light_scratch {
         return std::move(buffers_);
     }
 
@@ -94,8 +122,12 @@ public:
     }
 
     // x and z address the middle column, 0 to 63. y counts up from the bottom.
-    [[nodiscard]] auto level_at(int32 x, int32 y, int32 z) const -> uint8 {
-        return buffers_.levels[static_cast<std::size_t>(index_(x + apron, y, z + apron))];
+    // The channel defaults to the one that existed before there were two.
+    [[nodiscard]] auto level_at(int32 x, int32 y, int32 z,
+                                light_channel channel = light_channel::sky) const -> uint8 {
+        const uint8 byte =
+            buffers_.levels[static_cast<std::size_t>(index_(x + apron, y, z + apron))];
+        return static_cast<uint8>((byte >> shift_of(channel)) & 0x0FU);
     }
 
     // One chunk of the middle column in the form it is kept in: the chunk whose
@@ -103,7 +135,7 @@ public:
     // column does not cover comes back dark rather than read past its end --
     // the pipeline cannot ask for that, and a wrong answer beats a wild read if
     // it ever does.
-    [[nodiscard]] auto bake(int32 y_base) const -> sky_light_field;
+    [[nodiscard]] auto bake(int32 y_base, light_channel channel) const -> light_field;
 
 private:
     // The middle column's sixty-four levels along x, contiguous. Baking a chunk
@@ -118,10 +150,27 @@ private:
         return (((y * span) + z) * span) + x;
     }
 
-    void flood_(const neighbourhood& around);
+    [[nodiscard]] auto solid_at_(int32 x, int32 y, int32 z) const -> bool;
+
+    void build_solid_(const neighbourhood& around);
+
+    // Rule one and the seeds that come out of its edge. Sky only -- it is the
+    // one channel whose sources are a property of shape rather than of what a
+    // block is.
+    void seed_sky_();
+
+    // The other seeding: what the blocks say. Two page walks, and the second
+    // has to be second -- whether a source has anything to give depends on the
+    // level its neighbours were seeded with, and a neighbour can live in a page
+    // that has not been walked yet.
+    void seed_block_(const neighbourhood& around, const emission_table& emission);
+
+    // Rule two, shared. Once the seeds are in their buckets neither channel is
+    // distinguishable from the other: six neighbours, one level a step.
+    void spread_(light_channel channel);
 
     int32 height_ = 0;
-    sky_light_scratch buffers_;
+    light_scratch buffers_;
 };
 
 }  // namespace vw::asset
@@ -135,21 +184,24 @@ export namespace vw::ecs {
 // Models are held by shared_ptr for the length of the job: it runs on a worker,
 // and nothing stops the grid letting a chunk go while it does. An entry that is
 // empty is a column that does not exist, which the flood reads as rock.
-struct sky_light_request {
+struct light_request {
     vec2i coord;
     int32 bottom_y = 0;
     std::array<std::vector<std::shared_ptr<asset::model>>, 9> around;
 };
 
-// One field per chunk of the middle column, in the same order the request had
-// them.
-struct sky_light_result {
+// Two fields per chunk of the middle column, in the same order the request had
+// them. Both channels come back from one job because both were flooded in one
+// pass over one set of buffers, and because a chunk whose light moved has to be
+// meshed again exactly once however many channels moved.
+struct light_result {
     vec2i coord;
     int32 bottom_y = 0;
-    std::vector<asset::sky_light_field> fields;
+    std::vector<asset::light_field> sky;
+    std::vector<asset::light_field> block;
 };
 
-struct sky_light_worker_stats {
+struct light_worker_stats {
     uint64 columns      = 0;
     uint64 rows_nanos   = 0;
     uint64 flood_nanos  = 0;
@@ -157,7 +209,7 @@ struct sky_light_worker_stats {
     std::vector<uint32> micros;
 };
 
-struct sky_light_stats {
+struct light_stats {
     uint64 columns     = 0;
     float32 rows_ms    = 0.0F;
     float32 flood_ms   = 0.0F;
@@ -174,22 +226,22 @@ struct sky_light_stats {
 // queue, the same shape as chunk_loader. It is a stage of its own rather than
 // part of generation because a column can only be lit once its eight
 // neighbours exist, and the thread that generated it knows nothing about them.
-class sky_light_baker {
+class light_baker {
 public:
-    explicit sky_light_baker(uint32 workers = 0);
-    ~sky_light_baker();
+    explicit light_baker(uint32 workers = 0);
+    ~light_baker();
 
-    sky_light_baker(const sky_light_baker&)                    = delete;
-    auto operator=(const sky_light_baker&) -> sky_light_baker& = delete;
-    sky_light_baker(sky_light_baker&&)                         = delete;
-    auto operator=(sky_light_baker&&) -> sky_light_baker&      = delete;
+    light_baker(const light_baker&)                    = delete;
+    auto operator=(const light_baker&) -> light_baker& = delete;
+    light_baker(light_baker&&)                         = delete;
+    auto operator=(light_baker&&) -> light_baker&      = delete;
 
-    auto request(sky_light_request job) -> bool;
+    auto request(light_request job) -> bool;
 
-    [[nodiscard]] auto try_pop_completed() -> std::optional<sky_light_result>;
+    [[nodiscard]] auto try_pop_completed() -> std::optional<light_result>;
     [[nodiscard]] auto is_pending(vec2i coord) const -> bool;
     [[nodiscard]] auto pending_count() const -> uint32;
-    [[nodiscard]] auto get_stats() const -> sky_light_stats;
+    [[nodiscard]] auto get_stats() const -> light_stats;
 
 private:
     // A cache of whole-column rows was built here and taken back out again. The
@@ -202,19 +254,24 @@ private:
     // and measured 22% off rows -- eight percent of the job -- for 25 MB
     // resident. Not worth the memory for a stage that never touches a frame.
     void worker_();
-    void merge_worker_stats_(sky_light_worker_stats& worker);
+    void merge_worker_stats_(light_worker_stats& worker);
 
     std::vector<std::thread> threads_;
-    std::queue<sky_light_request> queue_;
-    std::queue<sky_light_result> completed_;
+    std::queue<light_request> queue_;
+    std::queue<light_result> completed_;
     mutable std::mutex mutex_;
     mutable std::mutex completed_mutex_;
     std::condition_variable cv_;
     bool running_ = true;
     std::unordered_set<vec2i> pending_;
 
-    sky_light_worker_stats totals_;
+    light_worker_stats totals_;
     uint32 queue_peak_ = 0;
+
+    // Built here and not handed in. block_registry has a private reg and no
+    // configuration, so there is exactly one table it can produce -- threading
+    // it through set_loader would be an argument with one possible value.
+    asset::emission_table emission_;
 };
 
 }  // namespace vw::ecs

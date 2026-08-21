@@ -29,7 +29,8 @@ auto quad::pack(
     block_id block_id,
     uint8 corners_ao,
     uint8 corners_convex,
-    uint16 corners_sky
+    uint16 corners_sky,
+    uint16 corners_block
 ) -> quad {
     const int32 u_axis = tangent_u_axis[normal_id];
     const int32 v_axis = tangent_v_axis[normal_id];
@@ -53,7 +54,10 @@ auto quad::pack(
         (static_cast<uint32>(block_id.value) << 14) |       //
         (static_cast<uint32>(corners_convex) << 22);
 
-    q.data2 = static_cast<uint32>(corners_sky);
+    // Both channels in one word, sky low. The upper half was free -- data2
+    // held sixteen bits and nothing else -- so the second channel cost no
+    // format change, no extra vertex attribute and no byte of geometry.
+    q.data2 = static_cast<uint32>(corners_sky) | (static_cast<uint32>(corners_block) << 16);
 
     return q;
 }
@@ -356,27 +360,40 @@ auto compute_corner_darkness(
 // where that cell is air. Bit 4, the centre, is always set.
 auto corners_from_patch(
     const vw::asset::model& mdl, vec3i n, vec3i u, vec3i v, uint32 open_bits
-) -> uint16 {
-    const auto* light = mdl.get_sky_light();
-    if (light == nullptr) {
-        // Anything that is not a world chunk has no sky over it. Open sky is
-        // the only answer that leaves an editor model looking like itself.
-        return 0xFFFF;
-    }
+) -> corner_light {
+    const auto* sky   = mdl.get_sky_light();
+    const auto* block = mdl.get_block_light();
 
     // A chunk lit all the way through -- rock below the caves, air above the
     // surface -- has the same level at every corner of every face in it, and
-    // four fifths of them are like that.
-    if (light->is_uniform()) {
-        const auto level = static_cast<uint16>(light->uniform_level());
-        return static_cast<uint16>(level * 0x1111U);
+    // four fifths of them are like that for sky. Nearly all of them are like
+    // that for block light, which is dark everywhere no lamp stands.
+    //
+    // A field that is not there at all is a model that is not a world chunk:
+    // nothing over it and no lamps in it, so open above and dark within. That
+    // pair is the only one that leaves an editor model looking like itself.
+    const auto flat = [](const vw::asset::light_field* field, uint16 absent) -> uint16 {
+        if (field == nullptr) {
+            return absent;
+        }
+        return static_cast<uint16>(static_cast<uint16>(field->uniform_level()) * 0x1111U);
+    };
+
+    const bool walk_sky   = sky != nullptr && !sky->is_uniform();
+    const bool walk_block = block != nullptr && !block->is_uniform();
+
+    if (!walk_sky && !walk_block) {
+        return corner_light{.sky = flat(sky, 0xFFFFU), .block = flat(block, 0x0000U)};
     }
 
     // The four corners between them name sixteen cells, but only nine are
     // distinct: the centre belongs to all four and every side cell to two.
     // Read the patch once, walking it by adding the tangents rather than
-    // rebuilding a position per cell.
-    std::array<int32, 9> lit{};
+    // rebuilding a position per cell -- and read both channels at each cell,
+    // because which cells are open and where they are is the same question for
+    // either of them.
+    std::array<int32, 9> lit_sky{};
+    std::array<int32, 9> lit_block{};
     std::array<int32, 9> open{};
 
     vec3i row = n - u - v;
@@ -395,7 +412,12 @@ auto corners_from_patch(
                 // solid voxel the face belongs to, which the flood leaves at
                 // zero -- and every outward face of every chunk comes out
                 // black.
-                lit[slot] = light->level_around(cell.x, cell.y, cell.z);
+                if (walk_sky) {
+                    lit_sky[slot] = sky->level_around(cell.x, cell.y, cell.z);
+                }
+                if (walk_block) {
+                    lit_block[slot] = block->level_around(cell.x, cell.y, cell.z);
+                }
             }
 
             cell = cell + u;
@@ -404,25 +426,32 @@ auto corners_from_patch(
         row = row + v;
     }
 
-    const auto corner = [&](std::size_t a, std::size_t b, std::size_t c) -> uint16 {
-        const int32 sum   = lit[4] + lit[a] + lit[b] + lit[c];
-        const int32 count = 1 + open[a] + open[b] + open[c];
-        return static_cast<uint16>(average_of(sum, count));
+    const auto pack_corners = [&](const std::array<int32, 9>& lit) -> uint16 {
+        const auto corner = [&](std::size_t a, std::size_t b, std::size_t c) -> uint16 {
+            const int32 sum   = lit[4] + lit[a] + lit[b] + lit[c];
+            const int32 count = 1 + open[a] + open[b] + open[c];
+            return static_cast<uint16>(average_of(sum, count));
+        };
+
+        const uint16 c0 = corner(0, 1, 3);
+        const uint16 c1 = corner(1, 2, 5);
+        const uint16 c2 = corner(5, 7, 8);
+        const uint16 c3 = corner(3, 6, 7);
+
+        return static_cast<uint16>(c0 | (c1 << 4) | (c2 << 8) | (c3 << 12));
     };
 
-    const uint16 c0 = corner(0, 1, 3);
-    const uint16 c1 = corner(1, 2, 5);
-    const uint16 c2 = corner(5, 7, 8);
-    const uint16 c3 = corner(3, 6, 7);
-
-    return static_cast<uint16>(c0 | (c1 << 4) | (c2 << 8) | (c3 << 12));
+    return corner_light{
+        .sky   = walk_sky ? pack_corners(lit_sky) : flat(sky, 0xFFFFU),
+        .block = walk_block ? pack_corners(lit_block) : flat(block, 0x0000U),
+    };
 }
 
 // The slow way in, for anything that has no occupancy rows to read: nine
 // voxel lookups to learn what the bit path already knows.
-auto compute_corner_sky(
+auto compute_corner_light(
     const vw::asset::model& mdl, int x, int y, int z, int face
-) -> uint16 {
+) -> corner_light {
     const vec3i n = vec3i{x, y, z} + ao_normal[face];
     const vec3i u = ao_tangent_u[face];
     const vec3i v = ao_tangent_v[face];
@@ -457,10 +486,10 @@ auto compute_corner_sky(
 
 // And the fast way: the plane in front of the face is already three rows of
 // occupancy bits, the same three the AO kernel reads.
-auto sky_from_rows(
+auto light_from_rows(
     const vw::asset::model& mdl, const layer_rows& rows, int32 u_at, int32 v_at, int x,
     int y, int z, int face
-) -> uint16 {
+) -> corner_light {
     uint32 open_bits = 0;
 
     for (int32 dv = -1; dv <= 1; ++dv) {
@@ -542,7 +571,7 @@ void build_face_mask(
                             storage.mask[idx(u, v)] = {
                                 fid,
                                 compute_corner_darkness(mdl, mx, my, mz, face_direction),
-                                compute_corner_sky(mdl, mx, my, mz, face_direction),
+                                compute_corner_light(mdl, mx, my, mz, face_direction),
                                 compute_corner_convexity(mdl, mx, my, mz, face_direction)
                             };
                         } else {
@@ -565,7 +594,7 @@ void build_face_mask(
                         storage.mask[idx(u, v)] = {
                             vx.id,
                             compute_corner_darkness(mdl, mx, my, mz, face_direction),
-                            compute_corner_sky(mdl, mx, my, mz, face_direction),
+                            compute_corner_light(mdl, mx, my, mz, face_direction),
                             compute_corner_convexity(mdl, mx, my, mz, face_direction)
                         };
                     } else {
@@ -585,7 +614,7 @@ void add_quad(
     block_id block_id,
     uint8 corner_ao,
     uint8 corner_convex,
-    uint16 corner_sky
+    corner_light light
 ) {
     // Which of the two corners each winding-order vertex takes its components
     // from. The same table lives in voxel.vert and shadow.vert -- the shader is
@@ -617,6 +646,7 @@ void add_quad(
     uint8 ao_winding     = 0;
     uint8 convex_winding = 0;
     uint16 sky_winding   = 0;
+    uint16 block_winding = 0;
     for (int i = 0; i < 4; i++) {
         const uint8 corner_i = winding_to_corner[face_direction][i];
         const uint8 ao_i     = corner_to_ao[corner_i];
@@ -632,15 +662,19 @@ void add_quad(
         // the only face convexity is computed for, so there is nothing here to
         // permute. It is written out anyway because the day the face rule
         // widens is not the day to remember this.
-        const auto level = static_cast<uint16>((corner_sky >> (ao_i * 4)) & 0xFu);
+        const auto level = static_cast<uint16>((light.sky >> (ao_i * 4)) & 0xFu);
         sky_winding |= static_cast<uint16>(level << (i * 4));
+
+        const auto lamp = static_cast<uint16>((light.block >> (ao_i * 4)) & 0xFu);
+        block_winding |= static_cast<uint16>(lamp << (i * 4));
 
         const auto out = static_cast<uint8>((corner_convex >> (ao_i * 2)) & 0x3u);
         convex_winding |= static_cast<uint8>(out << (i * 2));
     }
 
     quads.push_back(quad::pack(
-        min_pos, max_pos, normal_id, block_id, ao_winding, convex_winding, sky_winding
+        min_pos, max_pos, normal_id, block_id, ao_winding, convex_winding, sky_winding,
+        block_winding
     ));
 }
 
@@ -787,7 +821,7 @@ void emit_rect(
         block_id{cell.voxel_id},
         cell.corner_ao,
         cell.corner_convex,
-        cell.corner_sky
+        cell.light
     );
 }
 
@@ -850,7 +884,7 @@ void simple_mesh_generator::add_cube_face(
         voxel_id,
         detail::compute_corner_darkness(*mdl, x, y, z, face_direction),
         detail::compute_corner_convexity(*mdl, x, y, z, face_direction),
-        detail::compute_corner_sky(*mdl, x, y, z, face_direction)
+        detail::compute_corner_light(*mdl, x, y, z, face_direction)
     );
 }
 
@@ -1256,13 +1290,13 @@ void greedy_mesh_generator::generate_face_quads(
                             ? detail::pack_corners_convex(own_samples, u)
                             : detail::compute_corner_convexity(mdl, mx, my, mz, face_direction);
                     }
-                    const uint16 sky =
+                    const corner_light light =
                         interior
-                            ? detail::sky_from_rows(mdl, rows, u, v, mx, my, mz, face_direction)
-                            : detail::compute_corner_sky(mdl, mx, my, mz, face_direction);
+                            ? detail::light_from_rows(mdl, rows, u, v, mx, my, mz, face_direction)
+                            : detail::compute_corner_light(mdl, mx, my, mz, face_direction);
 
                     storage.mask[idx(u, v)] = {
-                        mdl.get_voxel(mx, my, mz).id, dark, sky, convex
+                        mdl.get_voxel(mx, my, mz).id, dark, light, convex
                     };
                 }
             }

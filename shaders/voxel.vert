@@ -60,7 +60,7 @@ layout(location = 2) out vec3 fragColor;
 layout(location = 3) out float viewDepth;
 layout(location = 4) out vec2 fragUV;
 layout(location = 5) flat out uint fragCornersMask;
-layout(location = 6) flat out uint fragSkyMask;
+layout(location = 6) flat out uint fragLightMask;
 layout(location = 7) flat out uint fragConvexMask;
 
 const vec3 NORMALS[6] = vec3[6](
@@ -133,7 +133,10 @@ void main() {
     );
     fragUV = corner_uvs[corner_id];
     fragCornersMask = corners_ao;
-    fragSkyMask = q.data2 & 0xFFFFu;
+    // The whole word, both channels, unpacked in the fragment. Passing them
+    // as two interpolants would cost one more for nothing: data2 is sky in the
+    // low half and block light in the high one, and neither is interpolated.
+    fragLightMask = q.data2;
     fragConvexMask = corners_convex;
 
     viewDepth = -(ubo.view * worldPos).z;

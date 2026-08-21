@@ -6,9 +6,9 @@ namespace vw::asset {
 
 namespace {
 
-constexpr int32 s     = sky_light_column::side;
-constexpr int32 apron = sky_light_column::apron;
-constexpr int32 span  = sky_light_column::span;
+constexpr int32 s     = light_column::side;
+constexpr int32 apron = light_column::apron;
+constexpr int32 span  = light_column::span;
 
 // Three words a row, and the middle column sits in the whole of the second one.
 // That is what the offset buys: a neighbour's sixty-four bits land at bit
@@ -62,18 +62,23 @@ void shift_east(const uint64* in, uint64* out) {
 
 }  // namespace
 
-sky_light_column::sky_light_column(std::span<const chunk_occupancy* const> chunks_bottom_up)
-    : sky_light_column{
-          neighbourhood{{{}, {}, {}, {}, chunks_bottom_up, {}, {}, {}, {}}}, {}
+light_column::light_column(std::span<const chunk_occupancy* const> chunks_bottom_up)
+    : light_column{
+          neighbourhood{{
+              {}, {}, {}, {}, column_slice{.occupancy = chunks_bottom_up, .models = {}},
+              {}, {}, {}, {}
+          }},
+          emission_table{},
+          {}
       } {}
 
-sky_light_column::sky_light_column(
-    const neighbourhood& around, sky_light_scratch scratch
+light_column::light_column(
+    const neighbourhood& around, const emission_table& emission, light_scratch scratch
 )
     : buffers_{std::move(scratch)} {
     int32 chunks = 0;
     for (const auto& column : around) {
-        chunks = std::max(chunks, static_cast<int32>(column.size()));
+        chunks = std::max(chunks, static_cast<int32>(column.occupancy.size()));
     }
 
     height_ = chunks * s;
@@ -82,21 +87,37 @@ sky_light_column::sky_light_column(
     }
 
     buffers_.levels.assign(static_cast<std::size_t>(height_) * span * span, 0);
-    flood_(around);
+
+    build_solid_(around);
+
+    // Sky first, into an array that was just cleared, so its seeding can write
+    // a whole byte. Block light comes second and has to keep the nibble it
+    // finds; the spread masks either way.
+    seed_sky_();
+    spread_(light_channel::sky);
+
+    seed_block_(around, emission);
+    spread_(light_channel::block);
 }
 
-void sky_light_column::flood_(const neighbourhood& around) {
-    auto& levels = buffers_.levels;
-    auto& solid  = buffers_.solid;
-    auto& sky    = buffers_.sky;
+auto light_column::solid_at_(int32 x, int32 y, int32 z) const -> bool {
+    const int32 bit = x + bit0;
+    return ((buffers_.solid[row_base(y, z) + static_cast<std::size_t>(bit / 64)] >>
+             (bit % 64)) &
+            1U) != 0;
+}
+
+void light_column::build_solid_(const neighbourhood& around) {
+    auto& solid = buffers_.solid;
 
     const auto plane = static_cast<std::size_t>(height_) * span * words;
     solid.assign(plane, 0);
 
     for (int32 dz = -1; dz <= 1; ++dz) {
         for (int32 dx = -1; dx <= 1; ++dx) {
-            const auto& column = around[static_cast<std::size_t>(((dz + 1) * 3) + (dx + 1))];
-            const int32 word   = 1 + dx;
+            const auto& column =
+                around[static_cast<std::size_t>(((dz + 1) * 3) + (dx + 1))].occupancy;
+            const int32 word = 1 + dx;
 
             for (int32 lz = 0; lz < s; ++lz) {
                 const int32 z = apron + (dz * s) + lz;
@@ -134,6 +155,14 @@ void sky_light_column::flood_(const neighbourhood& around) {
             seal_outside(&solid[row_base(y, z)]);
         }
     }
+}
+
+void light_column::seed_sky_() {
+    auto& levels = buffers_.levels;
+    auto& solid  = buffers_.solid;
+    auto& sky    = buffers_.sky;
+
+    const auto plane = static_cast<std::size_t>(height_) * span * words;
 
     // Rule one. A bit stays set while its column still sees the sky, and the
     // first opaque voxel clears it for good -- everything below has rock over
@@ -157,9 +186,8 @@ void sky_light_column::flood_(const neighbourhood& around) {
         }
     }
 
-    auto& current = buffers_.frontier;
-    auto& next    = buffers_.next;
-    current.clear();
+    auto& seeds = buffers_.seeds[max_level];
+    seeds.clear();
 
     // Rule two starts from the edge of rule one, not from all of it. A skylit
     // voxel has somewhere to give light only if one of its four lateral
@@ -199,7 +227,7 @@ void sky_light_column::flood_(const neighbourhood& around) {
                     lit &= lit - 1;
                     levels[static_cast<std::size_t>(
                         index_((w * 64) + b - bit0, y, z)
-                    )] = max_level;
+                    )] = max_level;  // low nibble, and the array is still clear
                 }
 
                 uint64 edge =
@@ -207,13 +235,208 @@ void sky_light_column::flood_(const neighbourhood& around) {
                 while (edge != 0) {
                     const auto b = static_cast<int32>(std::countr_zero(edge));
                     edge &= edge - 1;
-                    current.push_back(index_((w * 64) + b - bit0, y, z));
+                    seeds.push_back(index_((w * 64) + b - bit0, y, z));
                 }
             }
         }
     }
 
-    for (uint8 level = max_level; level > 1 && !current.empty(); --level) {
+}
+
+void light_column::seed_block_(
+    const neighbourhood& around, const emission_table& emission
+) {
+    auto& levels = buffers_.levels;
+
+    constexpr int32 ps = model::page_size;
+
+    // Both walks cover the same pages, and neither reads a voxel of a page that
+    // emits nothing: an empty page is one check and a uniform one is a single
+    // lookup in the table for all 512 of its voxels. A world with no light
+    // blocks in it pays a walk of the page table and not a byte more, and a
+    // world made of lava pays the same walk -- it is the scattered case, not
+    // the dense one, that costs here.
+    const auto each_page = [&](auto&& body) {
+        for (int32 dz = -1; dz <= 1; ++dz) {
+            for (int32 dx = -1; dx <= 1; ++dx) {
+                const auto slot    = static_cast<std::size_t>(((dz + 1) * 3) + (dx + 1));
+                const auto& models = around[slot].models;
+
+                for (std::size_t i = 0; i < models.size(); ++i) {
+                    const model* mdl = models[i];
+                    if (mdl == nullptr) {
+                        continue;
+                    }
+
+                    const int32 floor = static_cast<int32>(i) * s;
+
+                    for (int32 pz = 0; pz < mdl->pages_z(); ++pz) {
+                        const int32 z0 = apron + (dz * s) + (pz * ps);
+                        if (z0 + ps <= 0 || z0 >= span) {
+                            continue;
+                        }
+
+                        for (int32 px = 0; px < mdl->pages_x(); ++px) {
+                            const int32 x0 = apron + (dx * s) + (px * ps);
+                            if (x0 + ps <= 0 || x0 >= span) {
+                                continue;
+                            }
+
+                            for (int32 py = 0; py < mdl->pages_y(); ++py) {
+                                const page_mode mode = mdl->get_page_mode(px, py, pz);
+                                if (mode == page_mode::empty) {
+                                    continue;
+                                }
+
+                                const bool uniform = mode == page_mode::uniform;
+                                const uint8 fill =
+                                    uniform
+                                        ? emission[mdl->get_page_fill_id(px, py, pz).value]
+                                        : uint8{0};
+
+                                if (uniform && fill == 0) {
+                                    continue;
+                                }
+
+                                body(
+                                    *mdl, px, py, pz, x0, floor + (py * ps), z0, uniform, fill
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    };
+
+    // Walk one: the levels, straight into the high nibble of the array the
+    // spread already runs in. Nothing is materialised in between -- a list of
+    // sources would have been the one part of this pipeline whose size grows
+    // with the volume of what is lit rather than its surface.
+    each_page([&](const model& mdl, int32 px, int32 py, int32 pz, int32 x0, int32 y0,
+                  int32 z0, bool uniform, uint8 fill) {
+        const model::page_type* page = uniform ? nullptr : mdl.get_page(px, py, pz);
+
+        for (int32 lz = 0; lz < ps; ++lz) {
+            const int32 z = z0 + lz;
+            if (z < 0 || z >= span) {
+                continue;
+            }
+
+            for (int32 ly = 0; ly < ps; ++ly) {
+                const int32 y = y0 + ly;
+
+                for (int32 lx = 0; lx < ps; ++lx) {
+                    const int32 x = x0 + lx;
+                    if (x < 0 || x >= span) {
+                        continue;
+                    }
+
+                    const uint8 level =
+                        uniform ? fill
+                                : emission[(*page)[static_cast<std::size_t>(
+                                                lx + (ly * ps) + (lz * ps * ps)
+                                            )]
+                                               .id.value];
+                    if (level == 0) {
+                        continue;
+                    }
+
+                    const auto at = static_cast<std::size_t>(index_(x, y, z));
+                    levels[at]    = static_cast<uint8>((levels[at] & 0x0FU) | (level << 4));
+                }
+            }
+        }
+    });
+
+    // Whether a source has anything to give depends on what its neighbours were
+    // seeded with, and a neighbour can live in a page walked later -- which is
+    // why this is a second pass and not the tail of the first.
+    const auto gives = [&](int32 x, int32 y, int32 z, uint8 level) -> bool {
+        const auto child = static_cast<uint8>(level - 1);
+
+        const auto lower = [&](int32 nx, int32 ny, int32 nz) -> bool {
+            if (nx < 0 || nx >= span || nz < 0 || nz >= span || ny < 0 || ny >= height_) {
+                return false;
+            }
+            if (solid_at_(nx, ny, nz)) {
+                return false;
+            }
+            return (levels[static_cast<std::size_t>(index_(nx, ny, nz))] >> 4) < child;
+        };
+
+        return lower(x - 1, y, z) || lower(x + 1, y, z) || lower(x, y, z - 1) ||
+               lower(x, y, z + 1) || lower(x, y - 1, z) || lower(x, y + 1, z);
+    };
+
+    each_page([&]([[maybe_unused]] const model& mdl, [[maybe_unused]] int32 px,
+                  [[maybe_unused]] int32 py, [[maybe_unused]] int32 pz, int32 x0, int32 y0,
+                  int32 z0, bool uniform, [[maybe_unused]] uint8 fill) {
+        for (int32 lz = 0; lz < ps; ++lz) {
+            const int32 z = z0 + lz;
+            if (z < 0 || z >= span) {
+                continue;
+            }
+
+            for (int32 ly = 0; ly < ps; ++ly) {
+                const int32 y = y0 + ly;
+
+                for (int32 lx = 0; lx < ps; ++lx) {
+                    // The inside of a uniform page is walled in by its own
+                    // level and can give nothing to anybody. Skipping it is
+                    // what makes a lava lake cost its surface rather than its
+                    // volume -- an interior page of one pushes nothing at all.
+                    const bool shell = lx == 0 || lx == ps - 1 || ly == 0 || ly == ps - 1 ||
+                                       lz == 0 || lz == ps - 1;
+                    if (uniform && !shell) {
+                        continue;
+                    }
+
+                    const int32 x = x0 + lx;
+                    if (x < 0 || x >= span) {
+                        continue;
+                    }
+
+                    const auto at    = static_cast<std::size_t>(index_(x, y, z));
+                    const auto level = static_cast<uint8>(levels[at] >> 4);
+
+                    // One is not worth a walk: everything it could reach is
+                    // already at the zero it would hand over.
+                    if (level <= 1) {
+                        continue;
+                    }
+
+                    if (gives(x, y, z, level)) {
+                        buffers_.seeds[level].push_back(static_cast<int32>(at));
+                    }
+                }
+            }
+        }
+    });
+}
+
+void light_column::spread_(light_channel channel) {
+    auto& levels  = buffers_.levels;
+    auto& solid   = buffers_.solid;
+    auto& current = buffers_.frontier;
+    auto& next    = buffers_.next;
+
+    const int32 shift = shift_of(channel);
+    const auto keep   = static_cast<uint8>(channel == light_channel::sky ? 0xF0U : 0x0FU);
+
+    current.clear();
+
+    for (uint8 level = max_level; level > 1; --level) {
+        auto& entering = buffers_.seeds[level];
+        current.insert(current.end(), entering.begin(), entering.end());
+        entering.clear();
+
+        if (current.empty()) {
+            // Not a break: a dimmer source enters at its own level, and the
+            // one below may still have sources even where this one had none.
+            continue;
+        }
+
         const auto child = static_cast<uint8>(level - 1);
         next.clear();
 
@@ -235,11 +458,12 @@ void sky_light_column::flood_(const neighbourhood& around) {
                 }
 
                 const auto to = static_cast<std::size_t>(index_(nx, ny, nz));
-                if (levels[to] >= child) {
+                if (((levels[to] >> shift) & 0x0FU) >= child) {
                     return;
                 }
 
-                levels[to] = child;
+                levels[to] =
+                    static_cast<uint8>((levels[to] & keep) | (child << shift));
                 next.push_back(static_cast<int32>(to));
             };
 
@@ -253,6 +477,12 @@ void sky_light_column::flood_(const neighbourhood& around) {
 
         current.swap(next);
     }
+
+    // Level 1 has nowhere to give: its neighbours would be at zero, which is
+    // what they already are. Cleared rather than walked.
+    buffers_.seeds[1].clear();
+    buffers_.seeds[0].clear();
+    current.clear();
 }
 
 // The six planes one voxel outside the chunk, taken straight out of the skirt.
@@ -269,25 +499,27 @@ void sky_light_column::flood_(const neighbourhood& around) {
 // steps the column by a row for the Y faces and by a whole layer -- nearly nine
 // kilobytes -- for the Z ones, and that alone doubled what the bake cost.
 auto gather_boundary(
-    const sky_light_column& column, int32 y_base
-) -> sky_light_field::boundary_light {
-    constexpr int32 side = sky_light_field::side;
+    const light_column& column, int32 y_base, light_channel channel
+) -> light_field::boundary_light {
+    constexpr int32 side = light_field::side;
 
-    sky_light_field::boundary_light out;
+    light_field::boundary_light out;
 
     const auto at = [&](int32 x, int32 y, int32 z) -> uint8 {
         if (y < 0) {
             return 0;
         }
         if (y >= column.height()) {
-            return sky_light_column::max_level;
+            // Above the top of a column is open sky, and open sky only. No
+            // lamp hangs over the world, so the other channel reads dark.
+            return channel == light_channel::sky ? light_column::max_level : uint8{0};
         }
-        return column.level_at(x, y, z);
+        return column.level_at(x, y, z, channel);
     };
 
     // Face order is the model's: +X, -X, +Y, -Y, +Z, -Z, and a plane is
     // addressed by the two axes that are not the normal, lower one first.
-    for (int32 face = 0; face < sky_light_field::boundary_light::face_count; ++face) {
+    for (int32 face = 0; face < light_field::boundary_light::face_count; ++face) {
         std::vector<uint8> packed(static_cast<std::size_t>(side) * side / 2);
 
         uint8 first  = 0;
@@ -345,16 +577,19 @@ auto gather_boundary(
     return out;
 }
 
-auto sky_light_column::bake(int32 y_base) const -> sky_light_field {
-    constexpr int32 pages_side = sky_light_field::pages_side;
-    constexpr int32 page_count = sky_light_field::page_count;
-    constexpr int32 page       = sky_light_field::page;
+auto light_column::bake(int32 y_base, light_channel channel) const -> light_field {
+    constexpr int32 pages_side = light_field::pages_side;
+    constexpr int32 page_count = light_field::page_count;
+    constexpr int32 page       = light_field::page;
 
     if (y_base < 0 || y_base + s > height_) {
-        return sky_light_field{};
+        return light_field{};
     }
 
-    auto around = gather_boundary(*this, y_base);
+    const int32 shift          = shift_of(channel);
+    constexpr uint64 nibbles   = 0x0F0F0F0F0F0F0F0FULL;
+
+    auto around = gather_boundary(*this, y_base, channel);
 
     // Two passes, because which pages vary is worth knowing before anything is
     // written. The first walks the chunk the way the column stores it -- along
@@ -381,8 +616,14 @@ auto sky_light_column::bake(int32 y_base) const -> sky_light_field {
                     uint64 run = 0;
                     std::memcpy(&run, row + (px * page), sizeof(run));
 
+                    // One nibble a voxel out of the byte the two channels
+                    // share, eight voxels at a time, before anything is
+                    // compared -- the run test below only means what it says
+                    // if the other channel is masked off first.
+                    run = (run >> shift) & nibbles;
+
                     const auto first = static_cast<uint8>(run & 0xFFU);
-                    const auto slot  = static_cast<std::size_t>(sky_light_field::page_index(px, py, pz));
+                    const auto slot  = static_cast<std::size_t>(light_field::page_index(px, py, pz));
 
                     if (ly == 0 && (z % page) == 0) {
                         level[slot] = first;
@@ -402,23 +643,23 @@ auto sky_light_column::bake(int32 y_base) const -> sky_light_field {
     }) && std::ranges::all_of(level, [&](uint8 l) -> bool { return l == level[0]; });
 
     if (chunk_uniform) {
-        return sky_light_field{level[0], std::move(around)};
+        return light_field{level[0], std::move(around)};
     }
 
     std::vector<uint16> table(page_count);
-    std::vector<sky_light_field::page_type> pages;
+    std::vector<light_field::page_type> pages;
 
     for (int32 pz = 0; pz < pages_side; ++pz) {
         for (int32 py = 0; py < pages_side; ++py) {
             for (int32 px = 0; px < pages_side; ++px) {
-                const auto slot = static_cast<std::size_t>(sky_light_field::page_index(px, py, pz));
+                const auto slot = static_cast<std::size_t>(light_field::page_index(px, py, pz));
 
                 if (mixed[slot] == 0) {
                     table[slot] = static_cast<uint16>(level[slot] << 1);
                     continue;
                 }
 
-                sky_light_field::page_type packed{};
+                light_field::page_type packed{};
                 for (int32 lz = 0; lz < page; ++lz) {
                     for (int32 ly = 0; ly < page; ++ly) {
                         const uint8* row =
@@ -427,8 +668,10 @@ auto sky_light_column::bake(int32 y_base) const -> sky_light_field {
 
                         for (int32 lx = 0; lx < page; ++lx) {
                             const int32 at = lx + (ly * page) + (lz * page * page);
+                            const auto level =
+                                static_cast<uint8>((row[lx] >> shift) & 0x0FU);
                             packed[static_cast<std::size_t>(at / 2)] |= static_cast<uint8>(
-                                (at % 2) == 0 ? row[lx] : (row[lx] << 4)
+                                (at % 2) == 0 ? level : (level << 4)
                             );
                         }
                     }
@@ -440,7 +683,7 @@ auto sky_light_column::bake(int32 y_base) const -> sky_light_field {
         }
     }
 
-    return sky_light_field{std::move(table), std::move(pages), std::move(around)};
+    return light_field{std::move(table), std::move(pages), std::move(around)};
 }
 
 }  // namespace vw::asset
@@ -450,26 +693,27 @@ namespace vw::ecs {
 namespace {
 
 constexpr int32 light_page     = asset::model::page_size;
-constexpr int32 pages_per_side = asset::sky_light_column::side / light_page;
-constexpr int32 skirt_pages = (asset::sky_light_column::apron + light_page - 1) / light_page;
+constexpr int32 pages_per_side = asset::light_column::side / light_page;
+constexpr int32 skirt_pages = (asset::light_column::apron + light_page - 1) / light_page;
 
-static_assert(skirt_pages * light_page >= asset::sky_light_column::apron);
+static_assert(skirt_pages * light_page >= asset::light_column::apron);
 
 }  // namespace
 
-sky_light_baker::sky_light_baker(
+light_baker::light_baker(
     uint32 workers
-) {
+)
+    : emission_{asset::build_emission_table(block_registry{})} {
     auto count = workers != 0 ? workers : std::min(std::thread::hardware_concurrency(), 4U);
     if (count == 0) {
         count = 1;
     }
     for (uint32 i = 0; i < count; ++i) {
-        threads_.emplace_back(&sky_light_baker::worker_, this);
+        threads_.emplace_back(&light_baker::worker_, this);
     }
 }
 
-sky_light_baker::~sky_light_baker() {
+light_baker::~light_baker() {
     {
         std::scoped_lock lock(mutex_);
         running_ = false;
@@ -483,8 +727,8 @@ sky_light_baker::~sky_light_baker() {
     }
 }
 
-auto sky_light_baker::request(
-    sky_light_request job
+auto light_baker::request(
+    light_request job
 ) -> bool {
     if (pending_.contains(job.coord)) {
         return false;
@@ -500,8 +744,8 @@ auto sky_light_baker::request(
     return true;
 }
 
-auto sky_light_baker::try_pop_completed() -> std::optional<sky_light_result> {
-    sky_light_result result;
+auto light_baker::try_pop_completed() -> std::optional<light_result> {
+    light_result result;
     {
         std::scoped_lock lock(completed_mutex_);
         if (completed_.empty()) {
@@ -514,18 +758,18 @@ auto sky_light_baker::try_pop_completed() -> std::optional<sky_light_result> {
     return result;
 }
 
-auto sky_light_baker::is_pending(
+auto light_baker::is_pending(
     vec2i coord
 ) const -> bool {
     return pending_.contains(coord);
 }
 
-auto sky_light_baker::pending_count() const -> uint32 {
+auto light_baker::pending_count() const -> uint32 {
     return static_cast<uint32>(pending_.size());
 }
 
-void sky_light_baker::merge_worker_stats_(
-    sky_light_worker_stats& worker
+void light_baker::merge_worker_stats_(
+    light_worker_stats& worker
 ) {
     if (worker.columns == 0) {
         return;
@@ -537,13 +781,13 @@ void sky_light_baker::merge_worker_stats_(
     totals_.bake_nanos += worker.bake_nanos;
     totals_.micros.insert(totals_.micros.end(), worker.micros.begin(), worker.micros.end());
 
-    worker = sky_light_worker_stats{};
+    worker = light_worker_stats{};
 }
 
-auto sky_light_baker::get_stats() const -> sky_light_stats {
+auto light_baker::get_stats() const -> light_stats {
     std::scoped_lock lock(mutex_);
 
-    sky_light_stats out{};
+    light_stats out{};
     out.columns     = totals_.columns;
     out.rows_ms     = static_cast<float32>(static_cast<float64>(totals_.rows_nanos) / 1.0e6);
     out.flood_ms    = static_cast<float32>(static_cast<float64>(totals_.flood_nanos) / 1.0e6);
@@ -577,8 +821,8 @@ auto sky_light_baker::get_stats() const -> sky_light_stats {
     return out;
 }
 
-void sky_light_baker::worker_() {
-    sky_light_worker_stats local;
+void light_baker::worker_() {
+    light_worker_stats local;
 
     // Nine columns of occupancy is 4.6 MB. It is scratch, not a result, so a
     // worker keeps it for as long as it lives. Rows outside the page range a
@@ -587,11 +831,16 @@ void sky_light_baker::worker_() {
     std::vector<std::vector<asset::chunk_occupancy>> held(9);
     std::vector<std::vector<const asset::chunk_occupancy*>> pointers(9);
 
+    // The models themselves, for the emitters. Nothing is copied out of them:
+    // the seeding walks their page tables and writes straight into the levels
+    // the flood runs in.
+    std::vector<std::vector<const asset::model*>> emitters(9);
+
     // And the seven megabytes the flood itself runs in, for the same reason.
-    asset::sky_light_scratch scratch;
+    asset::light_scratch scratch;
 
     while (true) {
-        sky_light_request job;
+        light_request job;
 
         {
             std::unique_lock lock(mutex_);
@@ -611,7 +860,7 @@ void sky_light_baker::worker_() {
 
         const auto started = std::chrono::steady_clock::now();
 
-        asset::sky_light_column::neighbourhood around{};
+        asset::light_column::neighbourhood around{};
 
         for (int32 dz = -1; dz <= 1; ++dz) {
             for (int32 dx = -1; dx <= 1; ++dx) {
@@ -619,6 +868,7 @@ void sky_light_baker::worker_() {
                 const auto& from = job.around[slot];
 
                 pointers[slot].clear();
+                emitters[slot].clear();
 
                 // Only as deep as the skirt reaches. Fifteen voxels is two
                 // pages of eight, so a side neighbour is read two page columns
@@ -637,6 +887,8 @@ void sky_light_baker::worker_() {
                 held[slot].resize(from.size());
 
                 for (std::size_t i = 0; i < from.size(); ++i) {
+                    emitters[slot].push_back(from[i].get());
+
                     if (from[i] == nullptr) {
                         pointers[slot].push_back(nullptr);
                         continue;
@@ -646,25 +898,29 @@ void sky_light_baker::worker_() {
                     pointers[slot].push_back(&held[slot][i]);
                 }
 
-                around[slot] = pointers[slot];
+                around[slot] = asset::light_column::column_slice{
+                    .occupancy = pointers[slot],
+                    .models    = emitters[slot],
+                };
             }
         }
 
         const auto rowed = std::chrono::steady_clock::now();
 
-        asset::sky_light_column light{around, std::move(scratch)};
+        asset::light_column light{around, emission_, std::move(scratch)};
 
         const auto flooded = std::chrono::steady_clock::now();
 
-        sky_light_result result;
+        light_result result;
         result.coord    = job.coord;
         result.bottom_y = job.bottom_y;
-        result.fields.reserve(job.around[4].size());
+        result.sky.reserve(job.around[4].size());
+        result.block.reserve(job.around[4].size());
 
         for (std::size_t i = 0; i < job.around[4].size(); ++i) {
-            result.fields.push_back(
-                light.bake(static_cast<int32>(i) * asset::sky_light_field::side)
-            );
+            const auto y_base = static_cast<int32>(i) * asset::light_field::side;
+            result.sky.push_back(light.bake(y_base, asset::light_channel::sky));
+            result.block.push_back(light.bake(y_base, asset::light_channel::block));
         }
 
         const auto baked = std::chrono::steady_clock::now();

@@ -15,7 +15,7 @@ constexpr int32 side = asset::chunk_occupancy::side;
 
 // A column built by hand out of occupancy bits, with nothing around it. The
 // four sides come out sealed, which is what the tests below are about.
-// Coordinates are the ones sky_light_column uses: y counts up from the bottom.
+// Coordinates are the ones light_column uses: y counts up from the bottom.
 class column_fixture {
 public:
     explicit column_fixture(int32 chunks) : occupancy_(static_cast<std::size_t>(chunks)) {}
@@ -39,12 +39,12 @@ public:
         fill_solid(0, 0, 0, side - 1, y, side - 1);
     }
 
-    [[nodiscard]] auto light() const -> asset::sky_light_column {
+    [[nodiscard]] auto light() const -> asset::light_column {
         std::vector<const asset::chunk_occupancy*> bottom_up;
         for (const auto& occ : occupancy_) {
             bottom_up.push_back(&occ);
         }
-        return asset::sky_light_column{
+        return asset::light_column{
             std::span<const asset::chunk_occupancy* const>{bottom_up}
         };
     }
@@ -165,8 +165,8 @@ TEST_CASE("a flat world costs one layer of pages", "[sky_light]") {
     fixture.floor_at(40);
 
     const auto light = fixture.light();
-    const asset::sky_light_field bottom = light.bake(0);
-    const asset::sky_light_field top = light.bake(side);
+    const asset::light_field bottom = light.bake(0, asset::light_channel::sky);
+    const asset::light_field top = light.bake(side, asset::light_channel::sky);
 
     SECTION("a chunk of open sky is a byte") {
         REQUIRE(top.is_uniform());
@@ -194,7 +194,7 @@ TEST_CASE("a paged field reads back what was flooded", "[sky_light]") {
 
     int32 mismatches = 0;
     for (int32 chunk = 0; chunk < 2; ++chunk) {
-        const asset::sky_light_field field = light.bake(chunk * side);
+        const asset::light_field field = light.bake(chunk * side, asset::light_channel::sky);
 
         for (int32 y = 0; y < side; ++y) {
             for (int32 z = 0; z < side; ++z) {
@@ -211,7 +211,7 @@ TEST_CASE("a paged field reads back what was flooded", "[sky_light]") {
 
     // Not a vacuous run: the gradient under the overhang puts different levels
     // in the two halves of one byte.
-    const asset::sky_light_field bottom = light.bake(0);
+    const asset::light_field bottom = light.bake(0, asset::light_channel::sky);
     REQUIRE(bottom.level_at(31, 59, 32) == 14);
     REQUIRE(bottom.level_at(30, 59, 32) == 13);
 }
@@ -281,12 +281,12 @@ public:
         return occupancy_[slot(cx, cz, y / side)].test(x % side, y % side, z % side);
     }
 
-    // The nine columns as sky_light_column wants them. drop_diagonals turns the
+    // The nine columns as light_column wants them. drop_diagonals turns the
     // four corner columns into rock, which is how the tests below show the
     // corners are being read at all.
-    [[nodiscard]] auto light(bool drop_diagonals = false) const -> asset::sky_light_column {
+    [[nodiscard]] auto light(bool drop_diagonals = false) const -> asset::light_column {
         std::vector<std::vector<const asset::chunk_occupancy*>> held(9);
-        asset::sky_light_column::neighbourhood around{};
+        asset::light_column::neighbourhood around{};
 
         for (int32 i = 0; i < 9; ++i) {
             const bool corner = (i % 3) != 1 && (i / 3) != 1;
@@ -296,18 +296,18 @@ public:
             for (int32 y = 0; y < heights_[static_cast<std::size_t>(i)]; ++y) {
                 held[static_cast<std::size_t>(i)].push_back(&occupancy_[slot(i % 3, i / 3, y)]);
             }
-            around[static_cast<std::size_t>(i)] = held[static_cast<std::size_t>(i)];
+            around[static_cast<std::size_t>(i)].occupancy = held[static_cast<std::size_t>(i)];
         }
 
-        return asset::sky_light_column{around};
+        return asset::light_column{around};
     }
 
-    [[nodiscard]] auto sealed() const -> asset::sky_light_column {
+    [[nodiscard]] auto sealed() const -> asset::light_column {
         std::vector<const asset::chunk_occupancy*> middle;
         for (int32 y = 0; y < heights_[4]; ++y) {
             middle.push_back(&occupancy_[slot(1, 1, y)]);
         }
-        return asset::sky_light_column{std::span<const asset::chunk_occupancy* const>{middle}};
+        return asset::light_column{std::span<const asset::chunk_occupancy* const>{middle}};
     }
 
     // A second implementation, on purpose the dumbest one that can be right: a
@@ -329,7 +329,7 @@ public:
                     if (solid_at(x, y, z)) {
                         break;
                     }
-                    level[flat(x, y, z)] = asset::sky_light_column::max_level;
+                    level[flat(x, y, z)] = asset::light_column::max_level;
                     current.push_back(flat(x, y, z));
                 }
             }
@@ -340,7 +340,7 @@ public:
         };
 
         std::vector<std::size_t> next;
-        for (uint8 value = asset::sky_light_column::max_level; value > 1 && !current.empty();
+        for (uint8 value = asset::light_column::max_level; value > 1 && !current.empty();
              --value) {
             const auto child = static_cast<uint8>(value - 1);
             next.clear();
@@ -394,7 +394,7 @@ private:
 // Every voxel of the middle column against the reference. Returns how many
 // disagreed, and names the first one on the way past.
 auto middle_mismatches(
-    const asset::sky_light_column& light, const world_fixture& fixture,
+    const asset::light_column& light, const world_fixture& fixture,
     const std::vector<uint8>& reference
 ) -> int32 {
     int32 mismatches = 0;
@@ -566,13 +566,13 @@ TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
     // costs more than filling it.
     std::vector<std::vector<asset::chunk_occupancy>> held(9);
     std::vector<std::vector<const asset::chunk_occupancy*>> pointers(9);
-    asset::sky_light_scratch scratch;
+    asset::light_scratch scratch;
 
     // Only the columns that have all eight neighbours, which is the only case
     // the engine ever lights.
     for (int32 cx = 1; cx < grid - 1; ++cx) {
         for (int32 cz = 1; cz < grid - 1; ++cz) {
-            asset::sky_light_column::neighbourhood around{};
+            asset::light_column::neighbourhood around{};
 
             const auto rows_started = std::chrono::steady_clock::now();
 
@@ -597,7 +597,7 @@ TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
                         );
                         pointers[slot].push_back(&held[slot][i]);
                     }
-                    around[slot] = pointers[slot];
+                    around[slot].occupancy = pointers[slot];
                 }
             }
 
@@ -615,7 +615,7 @@ TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
 
             const auto time_fresh = [&] -> void {
                 const auto from = std::chrono::steady_clock::now();
-                const asset::sky_light_column fresh{around};
+                const asset::light_column fresh{around};
                 fresh_ns += static_cast<uint64>(
                     std::chrono::duration_cast<std::chrono::nanoseconds>(
                         std::chrono::steady_clock::now() - from
@@ -629,7 +629,7 @@ TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
             }
 
             const auto held_from = std::chrono::steady_clock::now();
-            asset::sky_light_column light{around, std::move(scratch)};
+            asset::light_column light{around, asset::emission_table{}, std::move(scratch)};
             const auto flooded = std::chrono::steady_clock::now();
 
             if (scratch_first) {
@@ -642,8 +642,8 @@ TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
             unheld_ns += fresh_ns;
 
             for (int32 y_base = 0; y_base < light.height();
-                 y_base += asset::sky_light_field::side) {
-                const asset::sky_light_field field = light.bake(y_base);
+                 y_base += asset::light_field::side) {
+                const asset::light_field field = light.bake(y_base, asset::light_channel::sky);
 
                 field_bytes += field.bytes();
                 mixed_pages += field.mixed_pages();

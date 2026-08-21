@@ -10,6 +10,7 @@ include(Catch)
 # a GPU, and a headless configuration must not drag Vulkan into the link.
 add_executable(core_tests
     core/voxel.test.cpp
+    core/blocks.test.cpp
     core/color.test.cpp
     core/vec2.test.cpp
     core/vec3.test.cpp
@@ -58,6 +59,8 @@ add_executable(world_tests
     world/model_fill.test.cpp
     world/surface.test.cpp
     world/sky_light.test.cpp
+    world/emission.test.cpp
+    world/block_light.test.cpp
     world/caves.test.cpp
     world/chunk_links.test.cpp
     world/chunk_walk.test.cpp

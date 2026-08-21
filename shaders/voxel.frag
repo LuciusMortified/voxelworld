@@ -6,7 +6,7 @@ layout(location = 2) in vec3 fragColor;
 layout(location = 3) in float viewDepth;
 layout(location = 4) in vec2 fragUV;
 layout(location = 5) flat in uint fragCornersMask;
-layout(location = 6) flat in uint fragSkyMask;
+layout(location = 6) flat in uint fragLightMask;
 layout(location = 7) flat in uint fragConvexMask;
 
 // Cascaded shadow maps are parked, not deleted. Past the first cascade they
@@ -83,6 +83,13 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     //    daylight reaches further in, above one it stops at the mouth.
     vec4 sky_params;
 
+    // rgb: what every light block in the world looks like, colour times
+    //      strength. One colour for all of them, as in Minecraft: the level
+    //      baked into the quad says how much, this says what.
+    // w:   the exponent that level travels. Fifteen linear steps read as a
+    //      ramp rather than as a lamp, so this is well above one.
+    vec4 lamp_params;
+
     // x: exposure, applied before the tone curve. y: the light level that comes
     // out as exactly one.
     vec4 tonemap_params;
@@ -90,7 +97,7 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     uint point_lights_count;
 
     // 0 normal, 1 ambient occlusion alone on white, 2 normals, 3 sky light,
-    // 4 convexity.
+    // 4 convexity, 5 block light.
     uint debug_view;
 
     FogData fog;
@@ -382,7 +389,7 @@ void main() {
     // Sky light, four bits a corner, through the same bilinear as AO and for the
     // same reason: corner values that differ across a diagonal cannot be split
     // into two triangles without the split showing.
-    uint sm = fragSkyMask;
+    uint sm = fragLightMask & 0xFFFFu;
     float s00 = float( sm        & 15u) * (1.0 / 15.0);
     float s10 = float((sm >> 4)  & 15u) * (1.0 / 15.0);
     float s11 = float((sm >> 8)  & 15u) * (1.0 / 15.0);
@@ -400,6 +407,25 @@ void main() {
 
     if (ubo.debug_view == 3u) {
         outColor = vec4(vec3(skyReach), 1.0);
+        return;
+    }
+
+    // Block light, the other half of the same word, through the same bilinear
+    // and for the same reason. Separate from the sky half all the way down:
+    // this one is a light and the one above is a visibility, so the time of day
+    // multiplies that one and must never touch this one -- summed at bake time
+    // a lamp would go out at dusk.
+    uint bm = fragLightMask >> 16;
+    float l00 = float( bm        & 15u) * (1.0 / 15.0);
+    float l10 = float((bm >> 4)  & 15u) * (1.0 / 15.0);
+    float l11 = float((bm >> 8)  & 15u) * (1.0 / 15.0);
+    float l01 = float((bm >> 12) & 15u) * (1.0 / 15.0);
+
+    float lampRaw   = mix(mix(l00, l10, fragUV.x), mix(l01, l11, fragUV.x), fragUV.y);
+    float lampReach = pow(lampRaw, ubo.lamp_params.w);
+
+    if (ubo.debug_view == 5u) {
+        outColor = vec4(vec3(lampReach), 1.0);
         return;
     }
 
@@ -431,6 +457,12 @@ void main() {
     // up every corner the sun shines straight into.
     vec3 directional = calculateDirectionalLight(normal, shadow) * sunReach;
 
+    // AO is here, and belongs here: a baked lamp is light arriving from the
+    // surroundings exactly as the sky is, and the corner it cannot reach into
+    // is the same corner. No time of day anywhere in this term -- that is the
+    // whole of why the channel is kept apart.
+    vec3 lamp = ubo.lamp_params.rgb * lampReach * aoFactor;
+
     // Point lights
     vec3 pointLighting = vec3(0.0);
     for (uint i = 0; i < ubo.point_lights_count; i++) {
@@ -440,7 +472,7 @@ void main() {
     // No rim term and no edge term. Both sat at 0.01, which is invisible, and
     // the edge one never reached the sum at all. Nothing here is a stand-in for
     // something else any more: every term is a light with an occluder.
-    vec3 lighting = (ambient + directional + pointLighting) * convexFactor;
+    vec3 lighting = (ambient + directional + lamp + pointLighting) * convexFactor;
     vec3 result = lighting * fragColor;
 
     // Extended Reinhard, per channel. Per channel and not on luminance:

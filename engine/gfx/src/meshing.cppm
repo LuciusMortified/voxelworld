@@ -65,7 +65,7 @@ struct quad {
 
     [[nodiscard]] static auto pack(
         vec3i min_pos, vec3i max_pos, uint8 normal_id, block_id block_id, uint8 corners_ao,
-        uint8 corners_convex, uint16 corners_sky
+        uint8 corners_convex, uint16 corners_sky, uint16 corners_block
     ) -> quad;
 
     // Only the per-instance index is still fed through vertex input; the
@@ -130,14 +130,26 @@ private:
     ) -> bool;
 };
 
+// The two baked channels at the four corners of one face, four bits each, in
+// the same order as corner_ao. Sampled together because the patch they come out
+// of is the same patch: nine cells, the same nine, and only the field read at
+// each of them differs.
+struct corner_light {
+    uint16 sky   = 0;
+    uint16 block = 0;
+
+    [[nodiscard]] auto operator==(const corner_light&) const -> bool = default;
+};
+
 struct face_mask_cell {
     block_id voxel_id;
     uint8 corner_ao;
 
-    // Four nibbles, one a corner, in the same order as corner_ao. Part of
-    // the merge key, so two cells only join when their light matches all
-    // round -- which is what makes a gradient cost quads.
-    uint16 corner_sky = 0;
+    // Part of the merge key, so two cells only join when their light matches
+    // all round -- which is what makes a gradient cost quads. Both channels,
+    // and both have to match: a wall half in daylight and half under a torch
+    // has two gradients running across it, not one.
+    corner_light light{};
 
     // Two bits a corner again, and in the merge key like the rest: two cells
     // join only when the shape around them agrees. That is what it costs --
@@ -188,7 +200,7 @@ struct face_axis_mapping {
 
 [[nodiscard]] auto compute_corner_darkness(const vw::asset::model& mdl, int x, int y, int z, int face) -> uint8;
 [[nodiscard]] auto compute_corner_convexity(const vw::asset::model& mdl, int x, int y, int z, int face) -> uint8;
-[[nodiscard]] auto compute_corner_sky(const vw::asset::model& mdl, int x, int y, int z, int face) -> uint16;
+[[nodiscard]] auto compute_corner_light(const vw::asset::model& mdl, int x, int y, int z, int face) -> corner_light;
 
 // The one face convexity is computed for. A side face already reads its own
 // shape off the normal and a bottom face is never the surface anyone is trying
@@ -215,7 +227,7 @@ void add_quad(
     uint8 palette_index,
     uint8 corner_ao,
     uint8 corner_convex,
-    uint16 corner_sky
+    corner_light light
 );
 
 // Takes the mask cell rather than just the block id: the mask already holds the
@@ -238,8 +250,9 @@ struct layer_rows {
     bool front_outside = false;
 };
 
-[[nodiscard]] auto sky_from_rows(const vw::asset::model& mdl, const layer_rows& rows, int32 u_at,
-                                 int32 v_at, int x, int y, int z, int face) -> uint16;
+[[nodiscard]] auto light_from_rows(const vw::asset::model& mdl, const layer_rows& rows,
+                                   int32 u_at, int32 v_at, int x, int y, int z,
+                                   int face) -> corner_light;
 
 [[nodiscard]] auto build_layer_rows(
     const vw::asset::model& mdl,

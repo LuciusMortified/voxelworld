@@ -171,6 +171,7 @@ model::model(model&& other) noexcept
     , identity_(other.identity_)
     , boundary_(std::move(other.boundary_))
     , light_(std::move(other.light_))
+    , block_light_(std::move(other.block_light_))
     , fill_(other.fill_)
     , fill_known_(other.fill_known_) {
     other.identity_pool_ = nullptr;
@@ -199,6 +200,7 @@ auto model::operator=(model&& other) noexcept -> model& {
         identity_            = other.identity_;
         boundary_            = std::move(other.boundary_);
         light_               = std::move(other.light_);
+        block_light_         = std::move(other.block_light_);
         fill_                = other.fill_;
         fill_known_          = other.fill_known_;
         other.identity_pool_ = nullptr;
@@ -361,6 +363,19 @@ auto model::build_x_rows(
     }
 
     return true;
+}
+
+auto build_emission_table(
+    const block_registry& registry
+) -> emission_table {
+    const auto& all = registry.blocks();
+
+    emission_table table{};
+    for (std::size_t i = 0; i < table.size(); ++i) {
+        table[i] = all[i].light;
+    }
+
+    return table;
 }
 
 namespace {
@@ -772,8 +787,25 @@ void model::release_boundary() {
     boundary_.reset();
 }
 
-void model::set_sky_light(sky_light_field light) {
-    light_ = std::make_unique<sky_light_field>(std::move(light));
+// Both bump the generation, and that is not bookkeeping -- the mesh is a
+// function of the light as much as of the voxels, because the levels are baked
+// into the quad corners. mesh_pool keys on model_identity and drops a request
+// for one it already has, so a light that arrives without a new identity is a
+// light that never reaches the screen: the chunk keeps the mesh it was given
+// moments earlier, built against the light this call is replacing.
+//
+// The symptom is a one-edit lag. Place a lamp and nothing lights up; place
+// anything at all next to it and the first lamp comes on, because that edit
+// bumped the generation for its own reasons and the mesh was rebuilt with the
+// light that had been sitting on the model all along.
+void model::set_sky_light(light_field light) {
+    light_ = std::make_unique<light_field>(std::move(light));
+    increment_generation_();
+}
+
+void model::set_block_light(light_field light) {
+    block_light_ = std::make_unique<light_field>(std::move(light));
+    increment_generation_();
 }
 
 auto model::is_boundary_solid(int32 face_direction, int32 x, int32 y, int32 z) const -> bool {

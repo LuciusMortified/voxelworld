@@ -8,7 +8,7 @@ export import :serial;
 export import :index;
 export import :components;
 export import :terrain;
-export import :sky_light;
+export import :light;
 export import :grid;
 export import :systems;
 

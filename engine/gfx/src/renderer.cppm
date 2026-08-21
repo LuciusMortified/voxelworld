@@ -106,6 +106,22 @@ enum class debug_view : uint32 {
     normals,
     sky_light,
     convexity,
+    block_light,
+};
+
+// What a baked light block puts out. One colour for every one of them in the
+// world, which is what Minecraft does and what a single nibble a corner allows:
+// the level says how much light arrived, this says what it looks like. Per-source
+// colour would want three nibbles a corner and there is one spare.
+struct block_light_settings {
+    vec3f color{1.0f, 0.86f, 0.62f};
+    float32 intensity{1.0f};
+
+    // The curve the baked level travels from dark to full. Well above one on
+    // purpose: fifteen even steps read as a ramp painted on the wall rather
+    // than as light falling off from a lamp. Two is close to the curve
+    // Minecraft's own lightmap uses, which is f / (4 - 3f).
+    float32 curve{2.0f};
 };
 
 // Настройки тумана (для CPU)
@@ -173,6 +189,12 @@ struct uniform_buffer_object {
     // x: the curve sky visibility travels from sealed to open, for the ambient.
     // y: the same for the sun, which needs a steeper one -- see ambient_settings.
     alignas(16) vec4f sky_params;
+
+    // rgb: lamp colour times strength, w: the curve the baked level travels.
+    // Sits between sky_params and tonemap_params in both this struct and
+    // voxel.frag, and the two have to agree -- std140 gives no warning for a
+    // block that disagrees, only wrong pixels.
+    alignas(16) vec4f lamp_params;
 
     // x: exposure, applied before the curve. y: the light level that maps to
     // exactly one. See tonemap_settings.
@@ -290,6 +312,7 @@ public:
     [[nodiscard]] auto get_fog_settings() -> fog_settings&;
     [[nodiscard]] auto get_ambient_settings() -> ambient_settings&;
     [[nodiscard]] auto get_tonemap_settings() -> tonemap_settings&;
+    [[nodiscard]] auto get_block_light_settings() -> block_light_settings&;
     [[nodiscard]] auto get_shadow_settings() -> shadow_settings&;
 
     void set_debug_view(debug_view view);
@@ -515,6 +538,7 @@ private:
     fog_settings fog_settings_;
     ambient_settings ambient_settings_;
     tonemap_settings tonemap_settings_;
+    block_light_settings block_light_settings_;
     debug_view debug_view_ = debug_view::off;
 
     // Статистика

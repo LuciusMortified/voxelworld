@@ -66,6 +66,15 @@ auto unpack_sky(const gfx::quad& q) -> std::array<uint8, 4> {
     };
 }
 
+auto unpack_lamp(const gfx::quad& q) -> std::array<uint8, 4> {
+    return {
+        static_cast<uint8>((q.data2 >> 16) & 0xFU),
+        static_cast<uint8>((q.data2 >> 20) & 0xFU),
+        static_cast<uint8>((q.data2 >> 24) & 0xFU),
+        static_cast<uint8>((q.data2 >> 28) & 0xFU),
+    };
+}
+
 auto unpack_ao(const gfx::quad& q) -> std::array<uint8, 4> {
     const uint32 packed = (q.data0 >> 24) & 0xFFU;
     return {
@@ -114,11 +123,11 @@ constexpr int32 face_verts[6][4][3] = {
 // The levels come from the flooded column rather than from the field on the
 // model, so this checks the whole chain -- bake, boundary planes, mesher --
 // against the thing all three are meant to reproduce.
-auto expected_corner_sky(
-    const asset::model& mdl, const asset::sky_light_column& column, vec3i cell, int32 face,
-    vec3i corner
+auto expected_corner_light(
+    const asset::model& mdl, const asset::light_column& column, vec3i cell, int32 face,
+    vec3i corner, asset::light_channel channel
 ) -> uint8 {
-    constexpr int32 side = asset::sky_light_field::side;
+    constexpr int32 side = asset::light_field::side;
 
     const vec3i n     = face_normal[face];
     const vec3i front = cell + n;
@@ -132,7 +141,7 @@ auto expected_corner_sky(
                p.z < mdl.depth() && !mdl.is_empty(p.x, p.y, p.z);
     };
 
-    const auto level = [&column](vec3i p) -> int32 {
+    const auto level = [&column, channel](vec3i p) -> int32 {
         // A cell outside on two axes at once is at the very edge of the chunk,
         // and the field only keeps one plane a face -- so the mesher clamps the
         // other axes into it, first out of x, y, z wins. Pinned here rather
@@ -150,9 +159,13 @@ auto expected_corner_sky(
             return 0;
         }
         if (p.y >= column.height()) {
-            return asset::sky_light_column::max_level;
+            // Open sky above the column, and nothing else -- no lamp hangs
+            // over the world, so the other channel reads dark up there.
+            return channel == asset::light_channel::sky
+                       ? int32{asset::light_column::max_level}
+                       : 0;
         }
-        return column.level_at(p.x, p.y, p.z);
+        return column.level_at(p.x, p.y, p.z, channel);
     };
 
     const auto at = [&](int32 i, int32 j) {
@@ -814,10 +827,10 @@ TEST_CASE("packed sky light matches the field at every corner", "[mesh]") {
     REQUIRE(mdl.build_occupancy(occupancy));
 
     const asset::chunk_occupancy* stack[1] = {&occupancy};
-    const asset::sky_light_column column{
+    const asset::light_column column{
         std::span<const asset::chunk_occupancy* const>{stack, 1}
     };
-    mdl.set_sky_light(column.bake(0));
+    mdl.set_sky_light(column.bake(0, asset::light_channel::sky));
 
     const auto check = [&mdl, &column](const gfx::mesh& m, std::string_view what) {
         std::size_t checked = 0;
@@ -839,7 +852,9 @@ TEST_CASE("packed sky light matches the field at every corner", "[mesh]") {
                     cell[i]         = high ? hi[i] - 1 : lo[i];
                 }
 
-                const uint8 want = expected_corner_sky(mdl, column, cell, face, corner);
+                const uint8 want = expected_corner_light(
+                    mdl, column, cell, face, corner, asset::light_channel::sky
+                );
                 if (sky[slot] != want) {
                     INFO(
                         what << ": face " << face << " cell " << cell.x << "," << cell.y << ","
@@ -875,6 +890,123 @@ TEST_CASE("packed sky light matches the field at every corner", "[mesh]") {
 
     REQUIRE(check(fixture.greedy(), "greedy") > 1000);
     REQUIRE(check(fixture.simple(), "simple") > 1000);
+}
+
+// The other channel, the same way through. A lamp underground rather than a
+// shaft to the surface, because block light has to be checked where sky light
+// is flatly zero -- if the two ever bled into one another this is where it
+// would show.
+TEST_CASE("packed block light matches the field at every corner", "[mesh]") {
+    model_fixture fixture{64};
+    auto& mdl = *fixture.get();
+
+    for (int32 y = 0; y < 64; ++y) {
+        for (int32 z = 0; z < 64; ++z) {
+            for (int32 x = 0; x < 64; ++x) {
+                mdl.set_voxel_raw(x, y, z, voxel{blocks::gray_5});
+            }
+        }
+    }
+
+    // A room with a corridor off it. The corridor is what makes the test say
+    // anything: the light falls a level a voxel along it, so most corners have
+    // four different numbers around them.
+    for (int32 y = 20; y < 28; ++y) {
+        for (int32 z = 20; z < 28; ++z) {
+            for (int32 x = 20; x < 28; ++x) {
+                mdl.set_voxel_raw(x, y, z, voxel{});
+            }
+        }
+    }
+    for (int32 y = 20; y < 24; ++y) {
+        for (int32 z = 23; z < 25; ++z) {
+            for (int32 x = 28; x < 50; ++x) {
+                mdl.set_voxel_raw(x, y, z, voxel{});
+            }
+        }
+    }
+
+    mdl.set_voxel_raw(24, 20, 24, voxel{blocks::lamp});
+    mdl.set_voxel_raw(21, 26, 21, voxel{blocks::lava});
+
+    mdl.invalidate();
+
+    asset::chunk_occupancy occupancy;
+    REQUIRE(mdl.build_occupancy(occupancy));
+
+    const asset::chunk_occupancy* stack[1] = {&occupancy};
+    const asset::model* models[1]          = {&mdl};
+
+    asset::light_column::neighbourhood around{};
+    around[4] = asset::light_column::column_slice{
+        .occupancy = std::span<const asset::chunk_occupancy* const>{stack, 1},
+        .models    = std::span<const asset::model* const>{models, 1},
+    };
+
+    const asset::light_column column{
+        around, asset::build_emission_table(block_registry{}), {}
+    };
+
+    mdl.set_sky_light(column.bake(0, asset::light_channel::sky));
+    mdl.set_block_light(column.bake(0, asset::light_channel::block));
+
+    const auto check = [&mdl, &column](const gfx::mesh& m, std::string_view what) {
+        std::size_t checked = 0;
+        std::set<uint8> levels;
+
+        for (const auto& q : m.quads) {
+            const int32 face = unpack_normal(q);
+            const auto lo    = unpack_min(q);
+            const auto hi    = unpack_max(q);
+            const auto lamp  = unpack_lamp(q);
+            const auto sky   = unpack_sky(q);
+
+            for (int32 slot = 0; slot < 4; ++slot) {
+                vec3i corner{};
+                vec3i cell{};
+                for (std::size_t i = 0; i < 3; ++i) {
+                    const bool high = face_verts[face][slot][i] != 0;
+                    corner[i]       = high ? hi[i] : lo[i];
+                    cell[i]         = high ? hi[i] - 1 : lo[i];
+                }
+
+                const uint8 want = expected_corner_light(
+                    mdl, column, cell, face, corner, asset::light_channel::block
+                );
+
+                if (lamp[slot] != want) {
+                    INFO(
+                        what << ": face " << face << " cell " << cell.x << "," << cell.y << ","
+                             << cell.z << " slot " << slot << " packed " << int32{lamp[slot]}
+                             << " expected " << int32{want}
+                    );
+                    FAIL();
+                }
+
+                // The chunk is sealed rock, so nothing in it sees the sky. Any
+                // sky level at all here would mean the two halves of data2 had
+                // run into each other.
+                if (sky[slot] != 0) {
+                    INFO(what << ": sky leaked into a sealed chunk, " << int32{sky[slot]});
+                    FAIL();
+                }
+
+                levels.insert(lamp[slot]);
+                ++checked;
+            }
+        }
+
+        // Not a vacuous run: a field of one value would pass every comparison
+        // above and mean nothing.
+        INFO(what << ": " << levels.size() << " distinct levels");
+        REQUIRE(levels.size() > 4);
+        REQUIRE(levels.contains(0));
+
+        return checked;
+    };
+
+    REQUIRE(check(fixture.greedy(), "greedy") > 500);
+    REQUIRE(check(fixture.simple(), "simple") > 500);
 }
 
 // Occlusion samples reach one cell past the face, so a face on the edge of a
