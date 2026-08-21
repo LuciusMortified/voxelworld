@@ -173,8 +173,6 @@ public:
         auto set_color(const vec3f& color) -> light_modifier&;
         auto set_intensity(float32 intensity) -> light_modifier&;
         auto set_range(float32 range) -> light_modifier&;
-        auto set_attenuation(float32 constant, float32 linear, float32 quadratic)
-            -> light_modifier&;
 
     private:
         friend class light_system;

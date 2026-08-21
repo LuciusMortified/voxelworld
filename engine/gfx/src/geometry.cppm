@@ -48,15 +48,13 @@ export namespace vw::gfx {
 
 class vulkan_context;
 
-// Для point lights (в SSBO)
+// Для point lights (в SSBO). Two numbers and not five: the falloff is the one
+// the baked channel uses, and it wants a peak and a reach. See light_component.
 struct point_light_data {
     alignas(16) vec4f position;
     alignas(16) vec4f color;
     alignas(4) float32 intensity;
     alignas(4) float32 range;
-    alignas(4) float32 attenuation_constant;
-    alignas(4) float32 attenuation_linear;
-    alignas(4) float32 attenuation_quadratic;
 };
 
 class light_buffer {
@@ -71,7 +69,15 @@ public:
     );
     ~light_buffer();
 
-    void update(world_type& world);
+    // Rebuilt every frame rather than when the component changes. It used to
+    // be the latter and that was wrong: moving an entity does not touch its
+    // light_component, so a torch carried by a player uploaded its position
+    // once and then lit the spot it started from for ever. Sixty-four lights
+    // are two kilobytes; the early-out was saving nothing worth a bug.
+    //
+    // Culled here against the frustum, because the fragment shader walks every
+    // light in the buffer for every pixel and has no way to skip one.
+    void update(world_type& world, const spatial::frustum& frustum, const vec3f& eye);
 
     [[nodiscard]] vk::DescriptorSet get_descriptor_set() const;
     [[nodiscard]] bool is_empty() const;
@@ -82,6 +88,11 @@ private:
     void update_descriptor_set();
 
     static constexpr uint32 default_capacity_ = 64;
+
+    // Where the per-pixel loop stops being free. Two dozen visible sources
+    // is the number docs/lighting.md names as the point past which this
+    // wants clustering rather than a longer list.
+    static constexpr std::size_t max_visible_ = 24;
 
     vulkan_context* context_;
     deletion_queue* deletion_;

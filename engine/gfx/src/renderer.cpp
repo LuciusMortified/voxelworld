@@ -1465,7 +1465,7 @@ void renderer::render_world(
     world_type& world, const camera& camera
 ) {
     // Обновить light buffer
-    light_buffer_->update(world);
+    light_buffer_->update(world, camera.get_frustum(), camera.get_position());
 
     vk::Pipeline current_pipeline =
         (current_render_mode_ == render_mode::lit) ? graphics_pipeline_ : wireframe_pipeline_;

@@ -170,40 +170,41 @@ private:
     bool dirty_               = true;
 };
 
+// A light that moves, and so is not baked. Two numbers describe its falloff and
+// they are the two the baked channel already has, in disguise: a block of
+// emission L in a world of voxel size s reaches L * s and peaks at L / 15, so
+// intensity is that peak and range is that reach. Written this way the shader
+// runs the same function for both, which is what keeps a thrown torch from
+// changing brightness the instant it lands as a block.
+//
+// The three attenuation coefficients that used to live here are gone. They
+// described a 1/(c + ld + qd^2) curve multiplied by a second smooth window,
+// which agreed with the baked falloff at no distance at all and gave three
+// knobs to disagree with it by.
 struct light_component final {
     [[nodiscard]] auto get_color() const -> const vec3f& {
         return color_;
     }
 
+    // Brightness where the light stands, 0 to 1. For something that will land
+    // as a block, its emission over fifteen.
     [[nodiscard]] auto get_intensity() const -> float32 {
         return intensity_;
     }
 
+    // How far it carries, in world units, and it is a hard edge: the falloff
+    // is linear in the level and reaches zero exactly here. For something that
+    // will land as a block, its emission times the world's voxel size.
     [[nodiscard]] auto get_range() const -> float32 {
         return range_;
-    }
-
-    [[nodiscard]] auto get_attenuation_constant() const -> float32 {
-        return attenuation_constant_;
-    }
-
-    [[nodiscard]] auto get_attenuation_linear() const -> float32 {
-        return attenuation_linear_;
-    }
-
-    [[nodiscard]] auto get_attenuation_quadratic() const -> float32 {
-        return attenuation_quadratic_;
     }
 
 private:
     friend class light_system;
 
     vec3f color_{1.0F, 1.0F, 1.0F};
-    float32 intensity_             = 1.0F;
-    float32 range_                 = 10.0F;
-    float32 attenuation_constant_  = 1.0F;
-    float32 attenuation_linear_    = 0.09F;
-    float32 attenuation_quadratic_ = 0.032F;
+    float32 intensity_ = 1.0F;
+    float32 range_     = 10.0F;
 };
 
 struct box_collider_component final {

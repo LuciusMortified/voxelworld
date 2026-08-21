@@ -13,6 +13,11 @@ void light_system::on_add(entity e) {
     world_->registry().request_change<light_component>(e);
 }
 
+// Nothing consumes the notification any more: gfx::light_buffer rebuilds from
+// the world every frame instead, because a light that moves does not touch its
+// own component and the change set never mentioned it. The drain still has to
+// happen -- the modifiers keep filling the requested set, and a set nobody
+// empties only grows.
 void light_system::update(float32 /*dt*/) {
     auto& reg       = world_->registry();
     auto& requested = reg.requested<light_component>();
@@ -71,21 +76,6 @@ auto light_system::light_modifier::set_range(
     }
     auto& comp = reg.get<light_component>(entity_);
     comp.range_ = range;
-    reg.request_change<light_component>(entity_);
-    return *this;
-}
-
-auto light_system::light_modifier::set_attenuation(
-    float32 constant, float32 linear, float32 quadratic
-) -> light_modifier& {
-    auto& reg = system_->world_->registry();
-    if (!reg.has<light_component>(entity_)) {
-        return *this;
-    }
-    auto& comp = reg.get<light_component>(entity_);
-    comp.attenuation_constant_ = constant;
-    comp.attenuation_linear_ = linear;
-    comp.attenuation_quadratic_ = quadratic;
     reg.request_change<light_component>(entity_);
     return *this;
 }

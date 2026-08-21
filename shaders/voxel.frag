@@ -116,11 +116,12 @@ layout(set = 2, binding = 0) uniform sampler2DArrayShadow shadowMapArray;
 struct PointLightData {
     vec4 position;
     vec4 color;
+
+    // Peak at the source, 0..1, and how far it carries in world units. Two
+    // numbers and not five, because the falloff below is the one the baked
+    // channel uses and that is all it needs. See ecs::light_component.
     float intensity;
     float range;
-    float attenuation_constant;
-    float attenuation_linear;
-    float attenuation_quadratic;
 };
 
 layout(set = 3, binding = 0, std430) readonly buffer PointLights {
@@ -278,38 +279,44 @@ vec3 calculateDirectionalLight(vec3 normal, float shadow) {
     return diff * shadow * (sunColor * dayFactor + twilightColor * twilightFactor);
 }
 
-vec3 calculatePointLight(uint lightIndex, vec3 normal, vec3 fragPos, vec3 viewDir) {
+// The same falloff the baked channel has, so that a torch thrown to the ground
+// and turned into a block does not change brightness at the moment it lands.
+// That is a requirement of the stage, not a nicety, and the only way to meet it
+// is to run one function rather than to tune two into agreement.
+//
+// The baked level at distance d from a source of emission L is (L - d) / 15,
+// which is intensity * (1 - d / range) once intensity is L / 15 and range is
+// L times the world's voxel size. Then the same curve on top.
+vec3 calculatePointLight(uint lightIndex, vec3 fragPos) {
     PointLightData light = pointLights.lights[lightIndex];
 
-    // Направление к свету
-    vec3 lightDir = normalize(light.position.xyz - fragPos);
-    float distance = length(light.position.xyz - fragPos);
+    vec3 offset = light.position.xyz - fragPos;
 
-    if (distance > light.range) {
+    // Manhattan, not Euclidean, and this is the other half of the stitch. The
+    // flood steps to six neighbours one level at a time, so what it measures is
+    // |dx|+|dy|+|dz| and its pools of light are diamonds, not spheres -- the
+    // same shape Minecraft's are, for the same reason. A torch that lit a
+    // sphere in the air and a diamond on the ground would visibly change shape
+    // on landing: along the body diagonal the two differ by a factor of 1.73.
+    float reach = abs(offset.x) + abs(offset.y) + abs(offset.z);
+
+    float raw = light.intensity * max(1.0 - (reach / max(light.range, 0.001)), 0.0);
+    if (raw <= 0.0) {
         return vec3(0.0);
     }
 
-    float attenuation = light.attenuation_constant +
-        light.attenuation_linear * distance +
-        light.attenuation_quadratic * distance * distance;
-    attenuation = 1.0 / max(attenuation, 0.001);
-
-    float ratio = distance / light.range;
-    float smoothFalloff = clamp(1.0 - ratio * ratio, 0.0, 1.0);
-    smoothFalloff *= smoothFalloff;
-    attenuation *= smoothFalloff;
-
-    // Diffuse
-    float diff = max(dot(normal, lightDir), 0.0);
-
-    // Specular
-    vec3 reflectDir = reflect(-lightDir, normal);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 64.0);
-
-    vec3 diffuse = diff * light.color.xyz * light.intensity * attenuation;
-    vec3 specular = spec * light.color.xyz * light.intensity * attenuation * 0.5;
-
-    return diffuse + specular;
+    // No cosine, and that is not an oversight. A Lambert term was tried here on
+    // the theory that it stands in for the geometry a dynamic light cannot
+    // walk around; it does not, and it broke the very match this function
+    // exists for. The baked channel has no directional term at all -- its shape
+    // comes entirely from how far the flood had to travel -- so a flat floor
+    // beside a lamp block is evenly lit, and a flat floor under a torch has to
+    // be evenly lit too. With the cosine in, a torch two voxels up lit the
+    // floor eight voxels out at 0.017 where the block gave 0.160.
+    //
+    // No specular either. On a flat-coloured cube pow(dot, 64) reads as grease
+    // rather than as shine, which is why it left the directional term as well.
+    return light.color.xyz * pow(raw, ubo.lamp_params.w);
 }
 
 // Everything that is not a light: sky from above, ground bounce from below.
@@ -328,7 +335,6 @@ layout(location = 0) out vec4 outColor;
 
 void main() {
     vec3 normal = normalize(fragNormal);
-    vec3 viewDir = normalize(ubo.viewPos - fragPos);
 
 #if SHADOW_ENABLED
     float sunElevation = -ubo.directional_light.direction.y;
@@ -472,7 +478,7 @@ void main() {
     // Point lights
     vec3 pointLighting = vec3(0.0);
     for (uint i = 0; i < ubo.point_lights_count; i++) {
-        pointLighting += calculatePointLight(i, normal, fragPos, viewDir);
+        pointLighting += calculatePointLight(i, fragPos);
     }
 
     // No rim term and no edge term. Both sat at 0.01, which is invisible, and

@@ -143,6 +143,7 @@ public:
     }
 
     ~world_grid_app() override {
+        set_torch_(false);
         report_dig_();
         report_light_();
         if (viewer_.is_valid()) {
@@ -201,6 +202,8 @@ public:
         auto& world            = get_engine().get_world();
         auto& transform_sys = world.system<ecs::transform_system>();
         transform_sys.modify(viewer_).set_position(cam_pos);
+
+        tick_torch_(cam_pos);
 
         auto& renderer = get_engine().get_renderer();
         renderer.draw_line(vec3f{0, 0, 0}, vec3f{100, 0, 0}, colors::red);
@@ -450,6 +453,58 @@ private:
     // rather than dug: model::set_voxel bumps the generation whatever it wrote,
     // so writing air onto air would order a remesh for nothing and flatter the
     // per-edit average.
+    // A lamp block's own numbers on something that moves: emission fourteen
+    // over fifteen, and fourteen voxels of reach at this world's scale. Walk it
+    // up to a lamp that has been placed and the two should be one light -- that
+    // comparison is the whole acceptance test for the stitch between the baked
+    // half of this stage and the dynamic one.
+    void set_torch_(bool on) {
+        auto& world = get_engine().get_world();
+
+        if (!on) {
+            if (torch_.is_valid()) {
+                world.destroy(torch_);
+                torch_ = ecs::invalid_entity;
+            }
+            return;
+        }
+
+        if (torch_.is_valid()) {
+            return;
+        }
+
+        torch_ = world.create()
+                     .with<ecs::transform_component>()
+                     .with<ecs::light_component>()
+                     .get_entity();
+    }
+
+    void tick_torch_(const vec3f& at) {
+        if (!torch_.is_valid()) {
+            return;
+        }
+
+        auto& world = get_engine().get_world();
+        world.system<ecs::transform_system>().modify(torch_).set_position(at);
+
+        // Colour and strength re-read every frame rather than set once, so the
+        // lamp sliders move the carried torch and the placed block together.
+        // Two lights that are meant to be the same light must not have two
+        // places to be set from.
+        const auto& lamp = get_engine().get_renderer().get_block_light_settings();
+        const auto scale = static_cast<float32>(generator_params_.voxel_scale);
+
+        world.system<ecs::light_system>()
+            .modify(torch_)
+            .set_color(vec3f{
+                lamp.color.x * lamp.intensity,
+                lamp.color.y * lamp.intensity,
+                lamp.color.z * lamp.intensity,
+            })
+            .set_intensity(14.0f / 15.0f)
+            .set_range(14.0f * scale);
+    }
+
     // Amanatides and Woo, in voxel space so the walk is the plain one: step to
     // whichever axis boundary is nearest, one voxel a step, and stop at the
     // first that is not air. Reach is in voxels, so at a scale of eight a reach
@@ -1136,6 +1191,14 @@ private:
             // it the tone curve starts taking the difference back.
             ImGui::SliderFloat("Glow", &lamp.glow, 0.0f, 3.0f, "%.2f");
 
+            // The dynamic half of the same light. Light it, place a lamp, and
+            // walk one onto the other: if the falloffs have drifted apart this
+            // is where it shows.
+            bool torch = torch_.is_valid();
+            if (ImGui::Checkbox("Carry a torch", &torch)) {
+                set_torch_(torch);
+            }
+
             // Nothing in the terrain emits, so without these there is nothing
             // to look at. Both write through world_grid::set_voxel, which is
             // the same path an edit takes -- the column goes dirty, the baker
@@ -1302,6 +1365,8 @@ private:
     float64 light_quads_per_chunk_base_ = 0.0;
 
     std::string drop_status_;
+
+    ecs::entity torch_ = ecs::invalid_entity;
 
     edit_tool tool_             = edit_tool::none;
     int32 place_choice_         = 0;
