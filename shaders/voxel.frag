@@ -52,6 +52,15 @@ struct DirectionalLightData {
     float wrap;
 };
 
+// Matches gfx::blob_data. Eight of them ride in the frame uniform; see there
+// for why they are not a storage buffer.
+struct BlobData {
+    vec4 position_radius;
+    vec4 params;
+};
+
+const int MAX_BLOBS = 8;
+
 struct FogData {
     vec3 color;
     float near_distance;
@@ -103,10 +112,15 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     uint point_lights_count;
 
     // 0 normal, 1 ambient occlusion alone on white, 2 normals, 3 sky light,
-    // 4 convexity, 5 block light.
+    // 4 convexity, 5 block light, 6 blob shadows.
     uint debug_view;
 
     FogData fog;
+
+    // Appended after the fog, so nothing above it moved when they arrived.
+    BlobData blobs[MAX_BLOBS];
+    uint blob_count;
+    float blob_strength;
 } ubo;
 
 #if SHADOW_ENABLED
@@ -319,6 +333,73 @@ vec3 calculatePointLight(uint lightIndex, vec3 fragPos) {
     return light.color.xyz * pow(raw, ubo.lamp_params.w);
 }
 
+// How much of the light from above a body standing here is keeping off the
+// ground. Returns a multiplier, one where nothing is over the ground.
+//
+// Straight down and nothing else: no ray to the floor, so nothing to break on a
+// staircase or a slope, and at the edge of a cliff it stops by itself because
+// the ground it would have darkened is not there to darken.
+float blobShadow(vec3 fragPos, vec3 normal) {
+    // Only the floor. max(n.y, 0) keeps the patch off the walls, which is what
+    // separates this from a decal projected down a wall it never touched.
+    float facing = max(normal.y, 0.0);
+    if (facing <= 0.0 || ubo.blob_count == 0u) {
+        return 1.0;
+    }
+
+    float darkest = 0.0;
+
+    for (uint i = 0u; i < ubo.blob_count; ++i) {
+        vec4 body = ubo.blobs[i].position_radius;
+
+        float fall = max(ubo.blobs[i].params.x, 0.001);
+
+        // What a sphere the size of the body looks like from this piece of
+        // ground. It narrows as one over one plus the height, and darkens as
+        // the square of that -- the solid angle a thing of fixed size covers as
+        // it climbs away, which is why the two are not independent knobs.
+        //
+        // It shrinks rather than fades out. A disc that simply dissolved left
+        // the body unanchored the moment it jumped; one that pulls in towards a
+        // point reads as height, and it never has to reach zero to stop being
+        // noticed -- at ten fall heights it is a tenth as wide and a hundredth
+        // as dark, which is nothing on screen without ever being a hard edge in
+        // the arithmetic.
+        float rise   = max(body.y - fragPos.y, 0.0);
+        float shrink = 1.0 / (1.0 + (rise / fall));
+
+        float d = length(fragPos.xz - body.xz) / max(body.w * shrink, 0.001);
+
+        // Everything under the body, and the body itself spared. The ramp
+        // hangs off the head rather than the feet, because the ground a body
+        // stands on is often not level with its feet -- it straddles two
+        // columns of terrain, one of them a voxel or two higher, and against a
+        // rule measured from the feet that higher one lost its patch. On a
+        // bobbing body it lost and regained it every jump, which is what the
+        // flicker was.
+        //
+        // Ground up to two thirds of the way up the body keeps the whole patch.
+        // Above that it tapers out, so the body's own top face -- which points
+        // up like the ground does and is inside the disc -- gets none of it.
+        // Anything horizontal in between, a shoulder or an outstretched arm,
+        // takes part of the taper; that is the price of the rule, and it is
+        // cheaper than the flicker.
+        float height = max(ubo.blobs[i].params.z, 0.001);
+        float band   = 0.35 * height;
+        float over   = clamp((fragPos.y - (body.y + height - band)) / band, 0.0, 1.0);
+
+        float a = (1.0 - smoothstep(0.6, 1.0, d)) * shrink * shrink * (1.0 - over) *
+            ubo.blobs[i].params.y;
+
+        // The darkest wins rather than the sum. Two bodies shoulder to shoulder
+        // should stand on one patch of shade, not bore a hole through the floor
+        // between them.
+        darkest = max(darkest, a);
+    }
+
+    return 1.0 - clamp(darkest * facing * ubo.blob_strength, 0.0, 1.0);
+}
+
 // Everything that is not a light: sky from above, ground bounce from below.
 // With no textures this is all that separates one face of a block from another
 // wherever the sun does not reach, so it has to be a hemisphere -- a flat
@@ -441,6 +522,11 @@ void main() {
         return;
     }
 
+    if (ubo.debug_view == 6u) {
+        outColor = vec4(vec3(blobShadow(fragPos, normal)), 1.0);
+        return;
+    }
+
     // AO belongs to the ambient term alone. It is a measure of how much of the
     // surroundings a point can see, so it dims the light that arrives from the
     // surroundings; laying it over the sun as well counts the same occlusion
@@ -460,14 +546,26 @@ void main() {
     // cascades out was for. Turning SHADOW_ENABLED back on would put two
     // occluders on one light and darken every overhang twice; whichever of the
     // two is kept, it has to be one.
+    // On the sky and on the sun, and on nothing else. The patch is a stand-in
+    // for the shadow a body casts in daylight, so it belongs to the light that
+    // comes from above. Laying it over the point lights as well would have a
+    // character dimming the torch in its own hand; over the block channel it
+    // would put a dark ring round every lamp somebody walked past; over
+    // emissive it would shade a light source by standing near it.
+    //
+    // cave_ambient rides along inside sky, which is right enough: a body in a
+    // cave should not float either, and there is so little of that term that
+    // the patch is barely visible in one.
+    float blob = blobShadow(fragPos, normal);
+
     vec3 sky = mix(ubo.cave_ambient.rgb, calculateHemisphereAmbient(normal), skyReach);
-    vec3 ambient = sky * aoFactor;
+    vec3 ambient = sky * aoFactor * blob;
 
     // AO is deliberately not here. It measures how much of the surroundings a
     // point can see, so it belongs to the light that arrives from the
     // surroundings; over the sun it counts the same occlusion twice and grimes
     // up every corner the sun shines straight into.
-    vec3 directional = calculateDirectionalLight(normal, shadow) * sunReach;
+    vec3 directional = calculateDirectionalLight(normal, shadow) * sunReach * blob;
 
     // AO is here, and belongs here: a baked lamp is light arriving from the
     // surroundings exactly as the sky is, and the corner it cannot reach into

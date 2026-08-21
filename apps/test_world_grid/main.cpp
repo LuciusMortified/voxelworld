@@ -54,6 +54,12 @@ enum class bench_scene {
     // geometry whose merge key is carrying block-light gradients everywhere.
     torches,
 
+    // A ring of bodies round the camera, each one bobbing to a different
+    // height, for looking at the patch under them. One of them never leaves the
+    // ground on purpose: judging whether a shadow pales as its owner rises is
+    // guesswork from memory unless the grounded case is in the same frame.
+    blobs,
+
     flythrough,
     crowd,
 };
@@ -100,7 +106,8 @@ public:
         gfx::engine& eng, bench_scene scene = bench_scene::off, uint32 crowd_size = 0,
         bool chunk_cull = true, bool sun_in_bench = false, int32 dig_per_frame = 1,
         int32 lamps_per_frame = 1, bool light_inert = false, int32 static_lights = 400,
-        int32 dynamic_lights = 64, bool free_storm = false
+        int32 dynamic_lights = 64, bool free_storm = false, bool free_blobs = false,
+        int32 blob_bodies = 8
     )
         : app{eng},
           bench_scene_{scene},
@@ -111,7 +118,9 @@ public:
           light_inert_{light_inert},
           static_lights_{static_lights},
           dynamic_lights_{dynamic_lights},
-          free_storm_{free_storm} {
+          free_storm_{free_storm},
+          free_blobs_{free_blobs},
+          blob_bodies_{blob_bodies} {
         get_engine().get_renderer().set_chunk_cull_enabled(chunk_cull);
         auto& window = get_engine().get_window();
         auto& camera = get_engine().get_camera();
@@ -216,6 +225,7 @@ public:
         tick_light_();
         tick_torches_();
         drive_storm_lights_();
+        tick_blob_bodies_();
         tick_crowd_settle_();
         tick_day_night_(delta_time);
 
@@ -271,6 +281,15 @@ private:
         if (bench_scene_ == bench_scene::crowd) {
             camera.set_position({0.0f, bench_altitude_ + 60.0f, 260.0f});
             camera.set_rotation(-15.0f, 180.0f);
+            return;
+        }
+
+        // Slowly round, so all of the ring passes through the view.
+        if (bench_scene_ == bench_scene::blobs) {
+            camera.set_position({0.0f, bench_altitude_, 0.0f});
+            camera.set_rotation(
+                -25.0f, static_cast<float32>(bench_frame_++) * bench_degrees_per_frame_ * 0.25f
+            );
             return;
         }
 
@@ -375,6 +394,7 @@ private:
         if (crowd_size_ > 0) {
             spawn_crowd(cam_y);
         }
+
     }
 
     // The sun rides an arc and the world dims with it. Off in the bench scenes
@@ -845,6 +865,134 @@ private:
     // over the disc, deterministic to the voxel, and no two emitters landing on
     // the same column by accident. A benchmark that lays its lights out
     // differently on every run is not one.
+    // A ring of plain pillars, because what is being looked at is the ground
+    // under them and not the body. Eight by default, which is what the frame
+    // uniform holds: at that count every one of them has a patch, and none is
+    // missing one because the nearest-eight rule dropped it.
+    void spawn_blob_bodies_() {
+        if (world_grid_ == nullptr || !bob_bodies_.empty()) {
+            return;
+        }
+
+        // Late, and it has to be late. Called at camera placement the ring
+        // reaches into columns that have not arrived yet, get_surface_y has
+        // nothing to say about them, and the bodies standing there are quietly
+        // skipped -- the first run of this put up five of eight.
+        if (!camera_placed_ || !streaming_settled_()) {
+            return;
+        }
+
+        auto& world     = get_engine().get_world();
+        auto& registry  = world.resource<asset::model_registry>();
+        auto& transform_sys = world.system<ecs::transform_system>();
+        auto& model_sys = world.system<ecs::model_system>();
+
+        const auto scale = static_cast<float32>(generator_params_.voxel_scale);
+        const auto count = std::max(blob_bodies_, 1);
+
+        // One model for all of them. A model voxel is one world unit and a
+        // terrain voxel is eight, so a body the size of a person is sixteen
+        // across and forty tall -- built to the terrain's numbers it stands one
+        // voxel high and reads as a speck, which is how this scene started.
+        auto body = registry.create("blob_body", 16, 40, 16);
+        body->fill(voxel{blocks::red_4});
+
+        for (int32 i = 0; i < count; ++i) {
+            const float32 angle =
+                (static_cast<float32>(i) / static_cast<float32>(count)) * 2.0f * math::pi;
+
+            const auto vx = static_cast<int32>(std::lround(
+                static_cast<float32>(blob_ring) * std::cos(angle)
+            ));
+            const auto vz = static_cast<int32>(std::lround(
+                static_cast<float32>(blob_ring) * std::sin(angle)
+            ));
+
+            // The body is sixteen units across and a terrain voxel is eight,
+            // so it stands on four columns and not on one. Settled on the one
+            // it was measured over, the other three can be a voxel higher and
+            // leave it a quarter buried -- a poor thing to ask a shadow bench
+            // to judge shadows on.
+            std::optional<int32> surface;
+            for (int32 dz = 0; dz <= 1; ++dz) {
+                for (int32 dx = 0; dx <= 1; ++dx) {
+                    const auto column = world_grid_->get_surface_y(vx + dx, vz + dz);
+                    if (column && (!surface || *column > *surface)) {
+                        surface = column;
+                    }
+                }
+            }
+
+            if (!surface) {
+                continue;
+            }
+
+            const auto ent = world.create()
+                                 .with<ecs::transform_component>()
+                                 .with<ecs::spatial_component>()
+                                 .with<ecs::model_component>()
+                                 // A disc a little broader than the body, which is sixteen
+                                 // wide and so eight from the middle.
+                                 .with(ecs::blob_shadow_component{20.0f, 48.0f, 0.6f})
+                                 .get_entity();
+
+            model_sys.modify(ent).set_model(body);
+
+            const float32 ground = static_cast<float32>(*surface + 1) * scale;
+
+            transform_sys.modify(ent).set_position({
+                static_cast<float32>(vx) * scale, ground, static_cast<float32>(vz) * scale
+            });
+
+            bob_bodies_.push_back(bob{
+                .ent    = ent,
+                .x      = static_cast<float32>(vx) * scale,
+                .z      = static_cast<float32>(vz) * scale,
+                .ground = ground,
+
+                // Nought to a little over the fall height, spread across the
+                // ring. The first never leaves the ground and is the control,
+                // the last goes a good way past it, so the widest patch and the
+                // tightest are in the frame together.
+                .amplitude = (static_cast<float32>(i) / static_cast<float32>(count)) * 1.3f *
+                    48.0f,
+
+                // Different speeds, or they rise and fall as one and the frame
+                // only ever shows a single height.
+                .speed = 0.012f + (0.004f * static_cast<float32>(i % 4)),
+                .phase = static_cast<float32>(i) * 0.9f,
+            });
+        }
+
+        log::info(
+            "blobs: {} bodies of {} asked on a ring of {} voxels", bob_bodies_.size(),
+            blob_bodies_, blob_ring
+        );
+    }
+
+    // A raised cosine off the frame index: starts on the ground, comes back to
+    // it, and never dips below. Off the frame index and not the clock, for the
+    // reason every other motion here is.
+    void tick_blob_bodies_() {
+        if (bench_scene_ == bench_scene::blobs || free_blobs_) {
+            spawn_blob_bodies_();
+        }
+
+        if (bob_bodies_.empty()) {
+            return;
+        }
+
+        auto& transform_sys = get_engine().get_world().system<ecs::transform_system>();
+        const auto frame    = static_cast<float32>(bob_frame_++);
+
+        for (const bob& b : bob_bodies_) {
+            const float32 rise =
+                b.amplitude * 0.5f * (1.0f - std::cos((frame * b.speed) + b.phase));
+
+            transform_sys.modify(b.ent).set_position({b.x, b.ground + rise, b.z});
+        }
+    }
+
     [[nodiscard]] auto streaming_settled_() const -> bool {
         const auto& wgs = get_engine().get_world().system<ecs::world_grid_system>();
         return wgs.get_stats().pending_count == 0 && wgs.get_stats().lighting_count == 0 &&
@@ -1148,6 +1296,10 @@ private:
                 .with<ecs::rigid_body_component>()
                 .with<ecs::box_collider_component>()
                 .with<ecs::animation_player_component>()
+                .with(ecs::blob_shadow_component{8.0f, 48.0f, 0.55f})
+                // Radius off the body's own girth: the collider is twelve wide,
+                // so a disc a little broader than the feet. Fall height is one
+                // body: a jump that clears it halves the patch.
                 .get_entity();
 
             // Dropped from just above the ground and given time to land before
@@ -1394,6 +1546,13 @@ private:
                 set_torch_(torch);
             }
 
+            // Zero is the honest comparison: the crowd with nothing under it,
+            // which is what the patch is meant to fix.
+            ImGui::SliderFloat(
+                "Blob shadow", &get_engine().get_renderer().get_blob_strength(), 0.0f, 1.0f,
+                "%.2f"
+            );
+
             // Nothing in the terrain emits, so without these there is nothing
             // to look at. Both write through world_grid::set_voxel, which is
             // the same path an edit takes -- the column goes dirty, the baker
@@ -1420,8 +1579,9 @@ private:
             // Judging occlusion off the finished frame means judging a product
             // of the block's colour and everything falling on it. These show
             // one factor with the others taken away.
-            static constexpr std::array<const char*, 6> view_names{
-                "off", "ambient occlusion", "normals", "sky light", "convexity", "block light"
+            static constexpr std::array<const char*, 7> view_names{
+                "off",       "ambient occlusion", "normals",     "sky light",
+                "convexity", "block light",       "blob shadow"
             };
             auto view = static_cast<int32>(renderer.get_debug_view());
             if (ImGui::Combo("Debug view", &view, view_names.data(), view_names.size())) {
@@ -1563,6 +1723,26 @@ private:
 
     ecs::entity torch_ = ecs::invalid_entity;
 
+    struct bob {
+        ecs::entity ent;
+        float32 x         = 0.0f;
+        float32 z         = 0.0f;
+        float32 ground    = 0.0f;
+        float32 amplitude = 0.0f;
+        float32 speed     = 0.0f;
+        float32 phase     = 0.0f;
+    };
+
+    // Twenty-four voxels out, which is a couple of hundred world units: near
+    // enough that the patch on the ground is worth looking at, far enough that
+    // the whole ring is on screen from the middle of it.
+    static constexpr int32 blob_ring = 24;
+
+    int32 blob_bodies_ = 8;
+    bool free_blobs_   = false;
+    uint32 bob_frame_  = 0;
+    std::vector<bob> bob_bodies_;
+
     // Ninety-six voxels is a little under two columns out, which at this scale
     // covers most of what the camera can see before the fog takes over.
     static constexpr int32 storm_radius = 96;
@@ -1647,6 +1827,8 @@ auto main(int argc, char** argv) -> int {
     int32 static_lights   = 400;
     int32 dynamic_lights  = 64;
     bool free_storm       = false;
+    bool free_blobs       = false;
+    int32 blob_bodies     = 8;
 
     for (int32 i = 1; i < argc; ++i) {
         if (const auto value = option_value(std::string_view{argv[i]}, "--bench")) {
@@ -1667,6 +1849,8 @@ auto main(int argc, char** argv) -> int {
                 scene = bench_scene::light;
             } else if (*value == "torches") {
                 scene = bench_scene::torches;
+            } else if (*value == "blobs") {
+                scene = bench_scene::blobs;
             } else {
                 scene = bench_scene::flythrough;
             }
@@ -1695,6 +1879,12 @@ auto main(int argc, char** argv) -> int {
             static_lights = static_cast<int32>(parse_uint(*value, 400));
         } else if (const auto value = option_value(arg, "--bench-dynamic")) {
             dynamic_lights = static_cast<int32>(parse_uint(*value, 64));
+        } else if (arg == "--blobs") {
+            // The blob scene with nobody driving: the ring stands up, the
+            // bodies bob, the camera is yours.
+            free_blobs = true;
+        } else if (const auto value = option_value(arg, "--bench-bodies")) {
+            blob_bodies = static_cast<int32>(parse_uint(*value, 8));
         } else if (arg == "--lights") {
             // The torches scene with nobody driving: same four hundred emitters
             // and sixty-four moving lights, free camera, no exit after a frame
@@ -1720,7 +1910,8 @@ auto main(int argc, char** argv) -> int {
         std::make_unique<gfx::engine>(1280, 720, "Voxel World - World Grid Test", std::move(bench))
             ->run<world_grid_app>(
                 scene, crowd_size, chunk_cull, sun_in_bench, dig_per_frame, lamps_per_frame,
-                light_inert, static_lights, dynamic_lights, free_storm
+                light_inert, static_lights, dynamic_lights, free_storm, free_blobs,
+                blob_bodies
             );
     } catch (const std::exception& e) {
         log::error("Error: {}", e.what());

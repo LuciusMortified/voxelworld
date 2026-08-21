@@ -251,6 +251,83 @@ auto renderer::get_block_light_settings() -> block_light_settings& {
     return block_light_settings_;
 }
 
+// Nearest first and no more than the block holds. A body far enough away that
+// its patch is a couple of pixels is not worth a slot, and which eight are kept
+// has to be the eight nearest rather than the eight the ECS happened to list.
+void renderer::gather_blobs_(
+    world_type& world, const camera& camera, uniform_buffer_object& ubo
+) const {
+    struct candidate {
+        blob_data data;
+        float32 distance_sq;
+    };
+
+    std::vector<candidate> found;
+
+    const vec3f eye = camera.get_position();
+
+    auto view = world.template view<ecs::blob_shadow_component, ecs::transform_component>();
+    for (const auto& [ent, blob, transform] : view) {
+        // Under the middle of the body and level with its feet, which the
+        // transform is not: a model's origin is the corner its voxels start
+        // from, so a body sixteen wide had its patch eight units off in both x
+        // and z. The bounds are where the geometry actually is.
+        //
+        // They are only there for an entity the spatial system tracks, and it
+        // tracks the ones carrying a model. A hierarchy root holding nothing
+        // itself keeps a bounding box of no size, and for those the transform
+        // is all there is.
+        vec3f pos = transform.get_position();
+
+        // And how tall it is, which the shader needs to tell the ground under
+        // the body from the body itself. With no bounds to read, the fall
+        // height stands in: it is already set to about one body everywhere it
+        // is used, and being roughly right beats a cut at the feet.
+        float32 height = blob.get_fall();
+
+        if (world.template has<ecs::spatial_component>(ent)) {
+            const auto& bounds = world.template get<ecs::spatial_component>(ent).get_bounds();
+            const auto size    = bounds.size();
+            if (size.x > 0.0f && size.z > 0.0f) {
+                pos    = vec3f{bounds.center().x, bounds.min.y, bounds.center().z};
+                height = size.y;
+            }
+        }
+
+        const float32 dx = pos.x - eye.x;
+        const float32 dy = pos.y - eye.y;
+        const float32 dz = pos.z - eye.z;
+
+        found.push_back(candidate{
+            .data =
+                blob_data{
+                    .position_radius = vec4f{pos.x, pos.y, pos.z, blob.get_radius()},
+                    .params = vec4f{blob.get_fall(), blob.get_strength(), height, 0.0f},
+                },
+            .distance_sq = (dx * dx) + (dy * dy) + (dz * dz),
+        });
+    }
+
+    if (found.size() > max_blobs) {
+        const auto nth = found.begin() + static_cast<std::ptrdiff_t>(max_blobs);
+        std::nth_element(
+            found.begin(), nth, found.end(),
+            [](const candidate& a, const candidate& b) -> bool {
+                return a.distance_sq < b.distance_sq;
+            }
+        );
+        found.resize(max_blobs);
+    }
+
+    for (std::size_t i = 0; i < found.size(); ++i) {
+        ubo.blobs[i] = found[i].data;
+    }
+
+    ubo.blob_count    = static_cast<uint32>(found.size());
+    ubo.blob_strength = blob_strength_;
+
+}
+
 auto renderer::get_visible_light_count() const -> uint32 {
     return light_buffer_ ? light_buffer_->get_lights_count() : 0;
 }
@@ -1405,7 +1482,8 @@ void renderer::recreate_swapchain() {
 void renderer::render_world_pass(
     world_type& world, const camera& camera
 ) {
-    stats_.timing.world_pass_uniform_ms = measure_ms([&] { update_uniform_buffer(camera); });
+    stats_.timing.world_pass_uniform_ms =
+        measure_ms([&] { update_uniform_buffer(world, camera); });
 
     vk::RenderPassBeginInfo render_pass_info{};
     render_pass_info.renderPass        = render_pass_;
@@ -1554,7 +1632,7 @@ void renderer::render_world(
 }
 
 void renderer::update_uniform_buffer(
-    const camera& camera
+    world_type& world, const camera& camera
 ) const {
     uniform_buffer_object ubo{};
 
@@ -1637,6 +1715,8 @@ void renderer::update_uniform_buffer(
     ubo.debug_view = static_cast<uint32>(debug_view_);
 
     // Point lights count
+    gather_blobs_(world, camera, ubo);
+
     ubo.point_lights_count = light_buffer_->get_lights_count();
 
     // Fog

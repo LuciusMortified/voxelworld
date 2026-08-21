@@ -1,3 +1,9 @@
+module;
+
+// For offsetof, which the layout guard below needs and which import std does
+// not bring: it is a macro.
+#include <cstddef>
+
 export module vw.gfx:renderer;
 
 import std;
@@ -107,6 +113,7 @@ enum class debug_view : uint32 {
     sky_light,
     convexity,
     block_light,
+    blob_shadow,
 };
 
 // What a baked light block puts out. One colour for every one of them in the
@@ -128,6 +135,23 @@ struct block_light_settings {
     // lights it -- the only setting of this that has a meaning rather than a
     // taste, and the one worth going back to when the picture drifts.
     float32 glow{1.0f};
+};
+
+// One patch of ground darkened under one body. Eight of them live in the frame
+// uniform rather than in a storage buffer of their own: the whole set is 256
+// bytes, and a descriptor set, a buffer class and a binding for that would be
+// more machinery than the thing it carries.
+// Eight is what docs/lighting.md budgeted for the effect.
+constexpr uint32 max_blobs = 8;
+
+struct blob_data {
+    // xyz where the body is, w the radius of the disc under it.
+    alignas(16) vec4f position_radius;
+
+    // x the height over which rising tells, y how dark the middle is, z how
+    // tall the body is -- which is what says where the ground under it stops
+    // and the body itself starts.
+    alignas(16) vec4f params;
 };
 
 // Настройки тумана (для CPU)
@@ -219,7 +243,44 @@ struct uniform_buffer_object {
 
     // Fog
     alignas(16) fog_data fog;
+
+    // After the fog, and it has to be exactly here: voxel.frag declares the
+    // same block and std140 gives no diagnostic for two that disagree, only
+    // wrong pixels -- or, when what lands in the wrong place is a loop bound,
+    // a hung device. This block went in before point_lights_count once, while
+    // the shader had it after the fog, and the fragment read its loop count
+    // from past the end of the struct.
+    //
+    // Eight is what docs/lighting.md budgeted and it is a real limit: past it
+    // the nearest eight are kept.
+    alignas(16) std::array<blob_data, max_blobs> blobs{};
+    alignas(4) uint32 blob_count{0};
+
+    // One global scale over all of them, for turning the whole effect down
+    // without touching every body in the world.
+    alignas(4) float32 blob_strength{1.0f};
 };
+
+// voxel.frag declares this block a second time and the two have to agree
+// field for field. Nothing checks that -- std140 has no diagnostic for a
+// mismatch, and what it produces is not a warning but wrong pixels, or a
+// hung device when the thing landing in the wrong place is a loop bound.
+//
+// These offsets cannot see the shader, so they do not prove the two agree.
+// What they do is make one half of the disagreement loud: move a field here
+// and the build stops, which is the moment to go and move it there too.
+// The numbers came from the std140 rules by hand and from a compiled probe.
+static_assert(offsetof(uniform_buffer_object, sky_params) == 672);
+static_assert(offsetof(uniform_buffer_object, lamp_params) == 688);
+static_assert(offsetof(uniform_buffer_object, glow_params) == 704);
+static_assert(offsetof(uniform_buffer_object, tonemap_params) == 720);
+static_assert(offsetof(uniform_buffer_object, point_lights_count) == 736);
+static_assert(offsetof(uniform_buffer_object, debug_view) == 740);
+static_assert(offsetof(uniform_buffer_object, fog) == 752);
+static_assert(offsetof(uniform_buffer_object, blobs) == 784);
+static_assert(offsetof(uniform_buffer_object, blob_count) == 1040);
+static_assert(offsetof(uniform_buffer_object, blob_strength) == 1044);
+static_assert(sizeof(uniform_buffer_object) == 1056);
 
 struct shadow_push_constant_data {
     alignas(4) uint32 cascade_index = 0;
@@ -325,6 +386,12 @@ public:
     [[nodiscard]] auto get_ambient_settings() -> ambient_settings&;
     [[nodiscard]] auto get_tonemap_settings() -> tonemap_settings&;
     [[nodiscard]] auto get_block_light_settings() -> block_light_settings&;
+
+    // One scale over every blob shadow in the frame. Zero switches the whole
+    // effect off, which is how it gets judged against nothing.
+    [[nodiscard]] auto get_blob_strength() -> float32& {
+        return blob_strength_;
+    }
     [[nodiscard]] auto get_shadow_settings() -> shadow_settings&;
 
     void set_debug_view(debug_view view);
@@ -401,7 +468,11 @@ private:
     void update_shadow_uniform_buffer() const;
     void render_shadow_pass(world_type& world, const camera& camera);
 
-    void update_uniform_buffer(const camera& camera) const;
+    void update_uniform_buffer(world_type& world, const camera& camera) const;
+
+    // The nearest few blob shadows, gathered into the frame uniform.
+    void gather_blobs_(world_type& world, const camera& camera,
+                       uniform_buffer_object& ubo) const;
     void render_world_pass(world_type& world, const camera& camera);
     void render_world(world_type& world, const camera& camera);
 
@@ -557,6 +628,7 @@ private:
     ambient_settings ambient_settings_;
     tonemap_settings tonemap_settings_;
     block_light_settings block_light_settings_;
+    float32 blob_strength_ = 1.0f;
     debug_view debug_view_ = debug_view::off;
 
     // Статистика

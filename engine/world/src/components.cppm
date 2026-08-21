@@ -207,6 +207,53 @@ private:
     float32 range_     = 10.0F;
 };
 
+// A soft dark disc on the ground under a body, so it does not read as
+// floating. Not a shadow and deliberately not one: it does not know where the
+// sun is, which is what lets it stay put as the day turns. A real shadow that
+// followed the sun is what the cascades were for, and they are switched off:
+// past the first one the edge staircased and the staircase crawled with the
+// camera. The code is still in the tree behind shadow_settings::enabled and
+// SHADOW_ENABLED -- see docs/lighting.md.
+//
+// Not a decal either. It is a term in the fragment shader, so there is no
+// raycast down to the floor, nothing to break on a staircase or a slope, no
+// draw call, and it stops of its own accord at the edge of a cliff -- the
+// ground it would have fallen on is simply not there to be darkened.
+//
+// Set once, at construction: nothing moves these numbers after a body exists,
+// and a modifier for them would be three setters nobody calls.
+struct blob_shadow_component final {
+    blob_shadow_component() = default;
+
+    blob_shadow_component(float32 radius, float32 fall, float32 strength)
+        : radius_{radius}, fall_{fall}, strength_{strength} {}
+
+    // How wide the disc is, in world units. From the body's own girth.
+    [[nodiscard]] auto get_radius() const -> float32 {
+        return radius_;
+    }
+
+    // The height at which the disc is half as wide and a quarter as dark: the
+    // scale over which rising off the ground tells. It is what makes a jump
+    // read as a jump -- the patch draws in towards a point as the feet leave,
+    // the way anything of a fixed size does on the way up. There is no height
+    // at which it switches off; past a few of these it is too small and too
+    // faint to find.
+    [[nodiscard]] auto get_fall() const -> float32 {
+        return fall_;
+    }
+
+    // How dark the middle goes, 0 to 1.
+    [[nodiscard]] auto get_strength() const -> float32 {
+        return strength_;
+    }
+
+private:
+    float32 radius_   = 12.0F;
+    float32 fall_     = 48.0F;
+    float32 strength_ = 0.55F;
+};
+
 struct box_collider_component final {
     [[nodiscard]] auto get_extents() const -> const vec3f& {
         return extents_;
