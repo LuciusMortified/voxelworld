@@ -1,0 +1,679 @@
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
+
+import std;
+import vw.core;
+
+using namespace vw;
+using Catch::Approx;
+using spatial::cluster_grid;
+using spatial::cluster_lights;
+using spatial::view_sphere;
+
+namespace {
+
+// The frame the bench measures: 1280x720, 32-pixel tiles, 24 slices, and a far
+// bound at the fog rather than at the camera's fifty thousand.
+auto bench_grid() -> cluster_grid {
+    const float32 fov_scale = 1.0F / std::tan(math::radians(60.0F * 0.5F));
+
+    return cluster_grid{
+        .screen_width  = 1280,
+        .screen_height = 720,
+        .tile_size     = 32,
+        .slices        = 24,
+        .near_depth    = 0.1F,
+        .far_depth     = 4096.0F,
+        .proj_x        = fov_scale / (1280.0F / 720.0F),
+        .proj_y        = -fov_scale,
+    };
+}
+
+// The reader's half of the deal, and the reason the property below can be
+// stated at all: what the fragment shader works out from gl_FragCoord and its
+// own depth. Nothing outside this test needs it -- the shader arrives at the
+// pixel already in pixels and never projects anything.
+auto cluster_of(const cluster_grid& grid, const vec3f& point) -> std::optional<uint32> {
+    if (point.z < grid.near_depth || point.z > grid.far_depth) {
+        return std::nullopt;
+    }
+
+    const float32 pixel_x =
+        (((grid.proj_x * point.x / point.z) * 0.5F) + 0.5F) * static_cast<float32>(grid.screen_width);
+    const float32 pixel_y =
+        (((grid.proj_y * point.y / point.z) * 0.5F) + 0.5F) * static_cast<float32>(grid.screen_height);
+
+    if (pixel_x < 0.0F || pixel_x >= static_cast<float32>(grid.screen_width) ||
+        pixel_y < 0.0F || pixel_y >= static_cast<float32>(grid.screen_height)) {
+        return std::nullopt;
+    }
+
+    return grid.cluster_index(
+        static_cast<uint32>(pixel_x) / grid.tile_size,
+        static_cast<uint32>(pixel_y) / grid.tile_size,
+        grid.slice_of(point.z)
+    );
+}
+
+// Euclidean, because the falloff is: raw > 0 is exactly length(offset) < range.
+auto reaches(const view_sphere& light, const vec3f& point) -> bool {
+    const float32 across = point.x - light.center.x;
+    const float32 down   = point.y - light.center.y;
+    const float32 depth  = point.z - light.center.z;
+
+    return ((across * across) + (down * down) + (depth * depth)) <
+           (light.radius * light.radius);
+}
+
+auto random_light(const cluster_grid& grid, std::mt19937& rng) -> view_sphere {
+    std::uniform_real_distribution<float32> across{-1.2F, 1.2F};
+    std::uniform_real_distribution<float32> log_depth{std::log(0.5F), std::log(2000.0F)};
+    std::uniform_real_distribution<float32> reach{0.05F, 0.8F};
+
+    const float32 depth = std::exp(log_depth(rng));
+
+    return view_sphere{
+        .center = vec3f{
+            across(rng) * depth / grid.proj_x,
+            across(rng) * depth / std::abs(grid.proj_y),
+            depth,
+        },
+        .radius = depth * reach(rng),
+    };
+}
+
+}  // namespace
+
+TEST_CASE("slices tile the depth range with no hole and no overlap", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    REQUIRE(grid.z_range_of(0).near_depth == Approx(grid.near_depth));
+    REQUIRE(grid.z_range_of(grid.slices - 1).far_depth == Approx(grid.far_depth));
+
+    for (uint32 slice = 0; slice + 1 < grid.slices; ++slice) {
+        REQUIRE(grid.z_range_of(slice).far_depth == Approx(grid.z_range_of(slice + 1).near_depth));
+    }
+}
+
+TEST_CASE("slice_of and z_range_of invert each other", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    for (uint32 slice = 0; slice < grid.slices; ++slice) {
+        const auto range = grid.z_range_of(slice);
+
+        REQUIRE(grid.slice_of(std::sqrt(range.near_depth * range.far_depth)) == slice);
+    }
+}
+
+// Up to float slop at the walls: the two directions of the mapping are a log
+// and a pow of the same numbers, and a depth sitting exactly on a boundary can
+// land either side of it.
+TEST_CASE("every depth lands in the slab its slice names", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    constexpr int32 samples  = 2000;
+    constexpr float32 margin = 1.0001F;
+
+    for (int32 i = 0; i < samples; ++i) {
+        const float32 t = static_cast<float32>(i) / static_cast<float32>(samples - 1);
+        const float32 depth =
+            grid.near_depth * std::pow(grid.far_depth / grid.near_depth, t);
+
+        const auto range = grid.z_range_of(grid.slice_of(depth));
+
+        REQUIRE(depth >= range.near_depth / margin);
+        REQUIRE(depth <= range.far_depth * margin);
+    }
+}
+
+TEST_CASE("slice_of never goes backwards and stops at both ends", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    REQUIRE(grid.slice_of(-100.0F) == 0);
+    REQUIRE(grid.slice_of(0.0F) == 0);
+    REQUIRE(grid.slice_of(grid.near_depth * 0.5F) == 0);
+    REQUIRE(grid.slice_of(grid.far_depth * 100.0F) == grid.slices - 1);
+
+    uint32 previous = 0;
+
+    for (int32 i = 0; i < 5000; ++i) {
+        const float32 depth = 0.05F + (static_cast<float32>(i) * 1.5F);
+        const uint32 slice  = grid.slice_of(depth);
+
+        REQUIRE(slice >= previous);
+        previous = slice;
+    }
+}
+
+// The claim the plan rests on when it says the price of cutting by depth can be
+// measured in one build: one slice has to be the flat-tile case exactly, not
+// approximately.
+TEST_CASE("one slice is exactly flat tiles", "[cluster]") {
+    cluster_grid grid = bench_grid();
+    grid.slices       = 1;
+
+    REQUIRE(grid.cluster_count() == grid.tiles_x() * grid.tiles_y());
+    REQUIRE(grid.z_range_of(0).near_depth == Approx(grid.near_depth));
+    REQUIRE(grid.z_range_of(0).far_depth == Approx(grid.far_depth));
+    REQUIRE(grid.slice_of(grid.near_depth) == 0);
+    REQUIRE(grid.slice_of(grid.far_depth) == 0);
+    REQUIRE(grid.slice_of(37.0F) == 0);
+}
+
+// The property the whole pass exists to hold: a pixel a source can light finds
+// that source in its own cluster. Everything else here is a border case of it.
+TEST_CASE("a source is listed in every cluster it can light", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    cluster_lights clusters{grid, 8};
+    std::mt19937 rng{20260822};
+    std::uniform_real_distribution<float32> offset{-1.0F, 1.0F};
+
+    uint32 checked = 0;
+    uint32 missed  = 0;
+
+    // Points come out of the cube around the source and the reach is the ball
+    // inside it, so a little under half of them are thrown away before
+    // anything is asked. The counts leave tens of thousands of real checks.
+    for (int32 light_n = 0; light_n < 160; ++light_n) {
+        const view_sphere light = random_light(grid, rng);
+
+        clusters.clear();
+        clusters.add(0, light);
+
+        for (int32 sample = 0; sample < 768; ++sample) {
+            const vec3f point{
+                light.center.x + (offset(rng) * light.radius),
+                light.center.y + (offset(rng) * light.radius),
+                light.center.z + (offset(rng) * light.radius),
+            };
+
+            if (!reaches(light, point)) {
+                continue;
+            }
+
+            const auto cluster = cluster_of(grid, point);
+            if (!cluster) {
+                continue;
+            }
+
+            ++checked;
+
+            const auto listed = clusters.lights_of(*cluster);
+            if (std::ranges::find(listed, 0U) == listed.end()) {
+                ++missed;
+            }
+        }
+    }
+
+    REQUIRE(checked > 10000);
+    REQUIRE(missed == 0);
+}
+
+TEST_CASE("a source behind the camera reaches nothing", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    cluster_lights clusters{grid, 8};
+    clusters.add(0, view_sphere{.center = vec3f{0.0F, 0.0F, -50.0F}, .radius = 1.0F});
+
+    REQUIRE(clusters.get_assignment_count() == 0);
+
+    // Wholly in front and still wholly nearer than the grid begins.
+    clusters.add(1, view_sphere{.center = vec3f{0.0F, 0.0F, 0.01F}, .radius = 0.02F});
+
+    REQUIRE(clusters.get_assignment_count() == 0);
+}
+
+// The one that divides by a depth on its way to a tile, so the one where a
+// clamp missing at the near wall shows up as an infinity.
+TEST_CASE("a source across the near plane keeps to the frame", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    cluster_lights clusters{grid, 8};
+    clusters.add(0, view_sphere{.center = vec3f{0.0F, 0.0F, 0.05F}, .radius = 10.0F});
+
+    REQUIRE(clusters.get_assignment_count() > 0);
+    REQUIRE(clusters.get_assignment_count() <= grid.cluster_count());
+
+    const auto cluster = cluster_of(grid, vec3f{0.0F, 0.0F, 1.0F});
+    REQUIRE(cluster.has_value());
+
+    const auto listed = clusters.lights_of(*cluster);
+    REQUIRE(std::ranges::find(listed, 0U) != listed.end());
+}
+
+TEST_CASE("a source with no reach is listed nowhere", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    cluster_lights clusters{grid, 8};
+    clusters.add(0, view_sphere{.center = vec3f{0.0F, 0.0F, 12.0F}, .radius = 0.0F});
+
+    REQUIRE(clusters.get_assignment_count() == 0);
+}
+
+TEST_CASE("a source larger than the scene is listed everywhere", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    cluster_lights clusters{grid, 8};
+    clusters.add(0, view_sphere{.center = vec3f{0.0F, 0.0F, 10.0F}, .radius = 1.0e6F});
+
+    REQUIRE(clusters.get_assignment_count() == grid.cluster_count());
+
+    for (uint32 cluster = 0; cluster < grid.cluster_count(); ++cluster) {
+        REQUIRE(clusters.count_of(cluster) == 1);
+    }
+}
+
+// Two tiles, one slice, and a source that fits inside one of them: small enough
+// to say exactly where every assignment went.
+TEST_CASE("a cluster past its cap counts the rest and stays out of its neighbour", "[cluster]") {
+    const cluster_grid grid{
+        .screen_width  = 64,
+        .screen_height = 32,
+        .tile_size     = 32,
+        .slices        = 1,
+        .near_depth    = 1.0F,
+        .far_depth     = 100.0F,
+        .proj_x        = 1.0F,
+        .proj_y        = 1.0F,
+    };
+
+    REQUIRE(grid.cluster_count() == 2);
+
+    const view_sphere left{.center = vec3f{-5.0F, 0.0F, 10.0F}, .radius = 0.5F};
+    const view_sphere right{.center = vec3f{5.0F, 0.0F, 10.0F}, .radius = 0.5F};
+
+    cluster_lights probe{grid, 4};
+    probe.add(0, left);
+    probe.add(1, right);
+
+    REQUIRE(probe.count_of(0) == 1);
+    REQUIRE(probe.count_of(1) == 1);
+    REQUIRE(probe.lights_of(0)[0] == 0);
+    REQUIRE(probe.lights_of(1)[0] == 1);
+
+    cluster_lights clusters{grid, 2};
+    clusters.add(0, left);
+    clusters.add(1, left);
+    clusters.add(2, left);
+    clusters.add(3, right);
+
+    REQUIRE(clusters.count_of(0) == 3);
+    REQUIRE(clusters.lights_of(0).size() == 2);
+    REQUIRE(clusters.lights_of(0)[0] == 0);
+    REQUIRE(clusters.lights_of(0)[1] == 1);
+    REQUIRE(clusters.get_overflow_count() == 1);
+    REQUIRE(clusters.get_assignment_count() == 4);
+
+    REQUIRE(clusters.count_of(1) == 1);
+    REQUIRE(clusters.lights_of(1).size() == 1);
+    REQUIRE(clusters.lights_of(1)[0] == 3);
+}
+
+TEST_CASE("clear puts the grid back where it started", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    cluster_lights clusters{grid, 2};
+    clusters.add(0, view_sphere{.center = vec3f{0.0F, 0.0F, 10.0F}, .radius = 1.0e6F});
+    clusters.add(1, view_sphere{.center = vec3f{0.0F, 0.0F, 10.0F}, .radius = 1.0e6F});
+    clusters.add(2, view_sphere{.center = vec3f{0.0F, 0.0F, 10.0F}, .radius = 1.0e6F});
+
+    REQUIRE(clusters.get_overflow_count() == grid.cluster_count());
+
+    clusters.clear();
+
+    REQUIRE(clusters.get_assignment_count() == 0);
+    REQUIRE(clusters.get_overflow_count() == 0);
+
+    for (uint32 cluster = 0; cluster < grid.cluster_count(); ++cluster) {
+        REQUIRE(clusters.count_of(cluster) == 0);
+        REQUIRE(clusters.lights_of(cluster).empty());
+    }
+}
+
+namespace {
+
+// A cull that agreed with the reference on everything: the buffers the GPU
+// would have written if the translation is faithful. Every test below starts
+// from these and then breaks exactly one thing.
+struct gpu_buffers {
+    std::vector<uint32> counts;
+    std::vector<uint32> indices;
+};
+
+auto as_gpu_wrote(const cluster_lights& reference) -> gpu_buffers {
+    const uint32 clusters = reference.get_grid().cluster_count();
+    const uint32 cap      = reference.get_cap();
+
+    gpu_buffers out{
+        .counts  = std::vector<uint32>(static_cast<std::size_t>(clusters) + 1, 0),
+        .indices = std::vector<uint32>(static_cast<std::size_t>(clusters) * cap, 0),
+    };
+
+    for (uint32 cluster = 0; cluster < clusters; ++cluster) {
+        out.counts[cluster] = reference.count_of(cluster);
+
+        const auto list = reference.lights_of(cluster);
+        std::ranges::copy(
+            list, out.indices.begin() + (static_cast<std::ptrdiff_t>(cluster) * cap)
+        );
+    }
+
+    out.counts[clusters] = static_cast<uint32>(reference.get_overflow_count());
+
+    return out;
+}
+
+// Four sources at different depths and offsets, enough that a few hundred
+// clusters carry a list and a few carry more than one.
+auto lit_reference(const cluster_grid& grid, uint32 cap) -> cluster_lights {
+    cluster_lights clusters{grid, cap};
+
+    clusters.add(0, view_sphere{.center = vec3f{0.0F, 0.0F, 12.0F}, .radius = 6.0F});
+    clusters.add(1, view_sphere{.center = vec3f{3.0F, 1.0F, 14.0F}, .radius = 8.0F});
+    clusters.add(2, view_sphere{.center = vec3f{-4.0F, -2.0F, 9.0F}, .radius = 5.0F});
+    clusters.add(3, view_sphere{.center = vec3f{0.5F, 0.0F, 40.0F}, .radius = 25.0F});
+
+    return clusters;
+}
+
+auto first_cluster_with_two(const gpu_buffers& gpu, uint32 clusters) -> uint32 {
+    for (uint32 cluster = 0; cluster < clusters; ++cluster) {
+        if (gpu.counts[cluster] >= 2) {
+            return cluster;
+        }
+    }
+    return 0;
+}
+
+}  // namespace
+
+TEST_CASE("the comparator agrees with a cull that did the same thing", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+    const cluster_lights reference = lit_reference(grid, 8);
+    const gpu_buffers gpu          = as_gpu_wrote(reference);
+
+    const auto check = spatial::check_clusters(reference, gpu.counts, gpu.indices);
+
+    REQUIRE(check.ok());
+    REQUIRE(check.clusters_compared == grid.cluster_count());
+    REQUIRE(check.count_mismatches == 0);
+    REQUIRE(check.set_mismatches == 0);
+    REQUIRE(check.overflow_matches);
+}
+
+TEST_CASE("the order inside a cluster is not something to agree on", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+    const cluster_lights reference = lit_reference(grid, 8);
+    gpu_buffers gpu                = as_gpu_wrote(reference);
+
+    const uint32 cap     = reference.get_cap();
+    const uint32 cluster = first_cluster_with_two(gpu, grid.cluster_count());
+    REQUIRE(gpu.counts[cluster] >= 2);
+
+    const auto at = static_cast<std::size_t>(cluster) * cap;
+    std::swap(gpu.indices[at], gpu.indices[at + 1]);
+
+    REQUIRE(spatial::check_clusters(reference, gpu.counts, gpu.indices).ok());
+}
+
+TEST_CASE("a count off by one is caught and located", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+    const cluster_lights reference = lit_reference(grid, 8);
+    gpu_buffers gpu                = as_gpu_wrote(reference);
+
+    const uint32 cluster = first_cluster_with_two(gpu, grid.cluster_count());
+    const uint32 was     = gpu.counts[cluster];
+    gpu.counts[cluster]  = was - 1;
+
+    const auto check = spatial::check_clusters(reference, gpu.counts, gpu.indices);
+
+    REQUIRE_FALSE(check.ok());
+    REQUIRE(check.count_mismatches == 1);
+    REQUIRE(check.first_bad == cluster);
+    REQUIRE(check.reference_count == was);
+    REQUIRE(check.actual_count == was - 1);
+}
+
+TEST_CASE("a different source with the same count is caught", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+    const cluster_lights reference = lit_reference(grid, 8);
+    gpu_buffers gpu                = as_gpu_wrote(reference);
+
+    const uint32 cap     = reference.get_cap();
+    const uint32 cluster = first_cluster_with_two(gpu, grid.cluster_count());
+
+    // A source index nothing in this scene ever assigns.
+    gpu.indices[static_cast<std::size_t>(cluster) * cap] = 99;
+
+    const auto check = spatial::check_clusters(reference, gpu.counts, gpu.indices);
+
+    REQUIRE_FALSE(check.ok());
+    REQUIRE(check.count_mismatches == 0);
+    REQUIRE(check.set_mismatches == 1);
+    REQUIRE(check.first_bad == cluster);
+}
+
+TEST_CASE("past the cap only the count is compared", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    // Three sources over every cluster with room for one: every cluster counts
+    // three and stores whichever one got there first.
+    cluster_lights reference{grid, 1};
+    for (uint32 light = 0; light < 3; ++light) {
+        reference.add(light, view_sphere{.center = vec3f{0.0F, 0.0F, 10.0F}, .radius = 1.0e6F});
+    }
+
+    gpu_buffers gpu = as_gpu_wrote(reference);
+
+    // The GPU's atomics let a different source win. Which one is a race, and
+    // the check must not have an opinion about it.
+    std::ranges::fill(gpu.indices, 2U);
+
+    const auto check = spatial::check_clusters(reference, gpu.counts, gpu.indices);
+
+    REQUIRE(reference.count_of(0) == 3);
+    REQUIRE(check.ok());
+}
+
+TEST_CASE("a wrong overflow tally is caught on its own", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    cluster_lights reference{grid, 1};
+    reference.add(0, view_sphere{.center = vec3f{0.0F, 0.0F, 10.0F}, .radius = 1.0e6F});
+    reference.add(1, view_sphere{.center = vec3f{0.0F, 0.0F, 10.0F}, .radius = 1.0e6F});
+
+    gpu_buffers gpu = as_gpu_wrote(reference);
+
+    REQUIRE(spatial::check_clusters(reference, gpu.counts, gpu.indices).ok());
+
+    gpu.counts[grid.cluster_count()] = 0;
+
+    const auto check = spatial::check_clusters(reference, gpu.counts, gpu.indices);
+
+    REQUIRE_FALSE(check.ok());
+    REQUIRE(check.count_mismatches == 0);
+    REQUIRE(check.set_mismatches == 0);
+    REQUIRE_FALSE(check.overflow_matches);
+}
+
+TEST_CASE("buffers too short to hold the grid are not silently agreed with", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+    const cluster_lights reference = lit_reference(grid, 8);
+    const gpu_buffers gpu          = as_gpu_wrote(reference);
+
+    const auto short_counts = std::span<const uint32>{gpu.counts}.first(gpu.counts.size() - 1);
+
+    REQUIRE_FALSE(spatial::check_clusters(reference, short_counts, gpu.indices).ok());
+}
+
+namespace {
+
+using spatial::view_capsule;
+
+auto distance_to_segment(const view_capsule& shape, const vec3f& point) -> float32 {
+    const vec3f along{
+        shape.end_b.x - shape.end_a.x,
+        shape.end_b.y - shape.end_a.y,
+        shape.end_b.z - shape.end_a.z,
+    };
+    const vec3f from{
+        point.x - shape.end_a.x,
+        point.y - shape.end_a.y,
+        point.z - shape.end_a.z,
+    };
+
+    const float32 length_sq = math::dot(along, along);
+    const float32 t =
+        length_sq > 0.0F ? std::clamp(math::dot(from, along) / length_sq, 0.0F, 1.0F) : 0.0F;
+
+    return math::length(vec3f{
+        from.x - (t * along.x),
+        from.y - (t * along.y),
+        from.z - (t * along.z),
+    });
+}
+
+auto listed_clusters(const cluster_lights& clusters) -> uint32 {
+    uint32 total = 0;
+    for (uint32 cluster = 0; cluster < clusters.get_grid().cluster_count(); ++cluster) {
+        total += (clusters.count_of(cluster) > 0) ? 1U : 0U;
+    }
+    return total;
+}
+
+}  // namespace
+
+TEST_CASE("a capsule with both ends together is the ball it came from", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    const view_sphere ball{.center = vec3f{2.0F, -1.0F, 18.0F}, .radius = 7.0F};
+
+    for (uint32 slice = 0; slice < grid.slices; ++slice) {
+        const auto from_ball    = spatial::scatter_slice(grid, ball, slice);
+        const auto from_capsule = spatial::scatter_slice(grid, spatial::as_capsule(ball), slice);
+
+        REQUIRE(from_ball.min_x == from_capsule.min_x);
+        REQUIRE(from_ball.max_x == from_capsule.max_x);
+        REQUIRE(from_ball.min_y == from_capsule.min_y);
+        REQUIRE(from_ball.max_y == from_capsule.max_y);
+    }
+}
+
+TEST_CASE("a column is listed in every cluster it can reach", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    cluster_lights clusters{grid, 64};
+
+    // Tall and thin, standing across the slabs the way the ground under a body
+    // does: this is the case a ball around it gets wrong by a factor of five.
+    const std::array<view_capsule, 4> columns{
+        view_capsule{
+            .end_a = vec3f{0.0F, 20.0F, 30.0F}, .end_b = vec3f{0.0F, -140.0F, 30.0F},
+            .radius = 8.0F
+        },
+        view_capsule{
+            .end_a = vec3f{25.0F, 10.0F, 60.0F}, .end_b = vec3f{25.0F, -150.0F, 62.0F},
+            .radius = 12.0F
+        },
+        view_capsule{
+            .end_a = vec3f{-18.0F, 40.0F, 12.0F}, .end_b = vec3f{-18.0F, -60.0F, 14.0F},
+            .radius = 6.0F
+        },
+        // Leaning, so the clamp along the spine is exercised rather than the
+        // straight-down case where every depth is the same.
+        view_capsule{
+            .end_a = vec3f{5.0F, 30.0F, 20.0F}, .end_b = vec3f{-40.0F, -90.0F, 220.0F},
+            .radius = 10.0F
+        },
+    };
+
+    for (uint32 i = 0; i < columns.size(); ++i) {
+        clusters.add(i, columns[i]);
+    }
+
+    std::mt19937 rng{20260822};
+    std::uniform_real_distribution<float32> along{-0.1F, 1.1F};
+    std::uniform_real_distribution<float32> offset{-1.4F, 1.4F};
+
+    uint32 checked = 0;
+
+    for (uint32 i = 0; i < columns.size(); ++i) {
+        const view_capsule& shape = columns[i];
+
+        for (uint32 sample = 0; sample < 12000; ++sample) {
+            const float32 t = along(rng);
+
+            const vec3f point{
+                shape.end_a.x + (t * (shape.end_b.x - shape.end_a.x)) +
+                    (offset(rng) * shape.radius),
+                shape.end_a.y + (t * (shape.end_b.y - shape.end_a.y)) +
+                    (offset(rng) * shape.radius),
+                shape.end_a.z + (t * (shape.end_b.z - shape.end_a.z)) +
+                    (offset(rng) * shape.radius),
+            };
+
+            if (distance_to_segment(shape, point) > shape.radius) {
+                continue;
+            }
+
+            const auto cluster = cluster_of(grid, point);
+            if (!cluster) {
+                continue;
+            }
+
+            ++checked;
+
+            const auto listed = clusters.lights_of(*cluster);
+            REQUIRE(std::ranges::find(listed, i) != listed.end());
+        }
+    }
+
+    REQUIRE(checked > 4000);
+}
+
+TEST_CASE("a column costs far fewer clusters than the ball around it", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    // The ground under a body: sixteen wide, two hundred tall. This is the
+    // whole reason the shape exists, so it is the thing to pin down.
+    const view_capsule column{
+        .end_a  = vec3f{0.0F, 24.0F, 260.0F},
+        .end_b  = vec3f{0.0F, -144.0F, 260.0F},
+        .radius = 8.0F,
+    };
+
+    const float32 half = (column.end_a.y - column.end_b.y) * 0.5F;
+
+    const view_sphere around{
+        .center = vec3f{0.0F, (column.end_a.y + column.end_b.y) * 0.5F, 260.0F},
+        .radius = std::sqrt((column.radius * column.radius) + (half * half)),
+    };
+
+    cluster_lights as_column{grid, 8};
+    as_column.add(0, column);
+
+    cluster_lights as_ball{grid, 8};
+    as_ball.add(0, around);
+
+    const uint32 column_clusters = listed_clusters(as_column);
+    const uint32 ball_clusters   = listed_clusters(as_ball);
+
+    REQUIRE(column_clusters > 0);
+    REQUIRE(ball_clusters > (column_clusters * 3));
+}
+
+TEST_CASE("a column behind the camera reaches nothing", "[cluster]") {
+    const cluster_grid grid = bench_grid();
+
+    cluster_lights clusters{grid, 4};
+    clusters.add(
+        0,
+        view_capsule{
+            .end_a = vec3f{0.0F, 20.0F, -40.0F}, .end_b = vec3f{0.0F, -20.0F, -10.0F},
+            .radius = 5.0F
+        }
+    );
+
+    REQUIRE(clusters.get_assignment_count() == 0);
+}

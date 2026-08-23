@@ -103,6 +103,226 @@ struct frustum {
         const frustum& other, float32 angle_threshold, float32 distance_threshold) const -> bool;
 };
 
+// ---- froxel clustering
+
+// Depth bounds of one slice. Both positive and both measured along the forward
+// axis, which is not what view space stores -- see view_sphere.
+struct depth_range {
+    float32 near_depth;
+    float32 far_depth;
+};
+
+// A grid of screen tiles cut into depth slices, so that a pixel can find the
+// sources reaching it by reading one cell instead of walking every source in
+// the frame.
+//
+// The far bound is the fog's and not the camera's: with near 0.1 and far 50000
+// a logarithmic mapping spends most of its slices out past the fog, on air
+// nothing is drawn in.
+//
+// slices = 1 is exactly flat tiles. The price of cutting by depth is therefore
+// measured in one build rather than by comparing two.
+struct cluster_grid {
+    uint32 screen_width  = 1280;
+    uint32 screen_height = 720;
+    uint32 tile_size     = 32;
+    uint32 slices        = 24;
+
+    float32 near_depth = 0.1F;
+    float32 far_depth  = 4096.0F;
+
+    // proj[0,0] and proj[1,1] of the projection in use, signs and all: a view
+    // position reaches ndc as proj * xy / depth. Two floats and not the matrix,
+    // because this pair has to travel in the frame uniform and a mat4 there is
+    // the mistake frame-time-baseline.md names as the most expensive one made
+    // in this code.
+    float32 proj_x = 1.0F;
+    float32 proj_y = -1.0F;
+
+    [[nodiscard]] auto operator==(const cluster_grid&) const -> bool = default;
+
+    [[nodiscard]] auto tiles_x() const -> uint32 {
+        return (screen_width + tile_size - 1) / tile_size;
+    }
+
+    [[nodiscard]] auto tiles_y() const -> uint32 {
+        return (screen_height + tile_size - 1) / tile_size;
+    }
+
+    [[nodiscard]] auto cluster_count() const -> uint32 {
+        return tiles_x() * tiles_y() * slices;
+    }
+
+    // Every slice covers the same ratio of depths rather than the same depth:
+    // a slab a metre deep is most of the near half of the frame and a rounding
+    // error at the far end.
+    [[nodiscard]] auto z_scale() const -> float32 {
+        return static_cast<float32>(slices) / std::log(far_depth / near_depth);
+    }
+
+    [[nodiscard]] auto z_bias() const -> float32 {
+        return -z_scale() * std::log(near_depth);
+    }
+
+    [[nodiscard]] auto slice_of(float32 depth) const -> uint32 {
+        const float32 held = std::clamp(depth, near_depth, far_depth);
+        const auto raw =
+            static_cast<int32>(std::floor(std::log(held) * z_scale() + z_bias()));
+
+        return static_cast<uint32>(std::clamp(raw, 0, static_cast<int32>(slices) - 1));
+    }
+
+    [[nodiscard]] auto z_range_of(uint32 slice) const -> depth_range {
+        const float32 ratio = far_depth / near_depth;
+        const auto count    = static_cast<float32>(slices);
+
+        return {
+            .near_depth = near_depth * std::pow(ratio, static_cast<float32>(slice) / count),
+            .far_depth  = near_depth * std::pow(ratio, static_cast<float32>(slice + 1) / count),
+        };
+    }
+
+    [[nodiscard]] auto cluster_index(uint32 tile_x, uint32 tile_y, uint32 slice) const -> uint32 {
+        return ((slice * tiles_y()) + tile_y) * tiles_x() + tile_x;
+    }
+};
+
+// A round reach as the cull sees it: everything within radius of a point. Both
+// things culled here have that shape: a body's patch of shade, and a source,
+// whose falloff runs on plain distance and so reaches a ball.
+struct view_sphere {
+    // x and y in view space; z the depth along the forward axis, positive in
+    // front of the camera. The shader arrives there with -(view * world).z --
+    // the sign is turned once, here, instead of in every comparison below.
+    vec3f center;
+    float32 radius;
+};
+
+// The same reach swept along a segment. end_a == end_b is a plain ball, which
+// is what a point source is; the ground a body shades is a tall thin column,
+// and a ball around that is mostly empty -- 27308 assignments a frame against
+// under six thousand, measured on two hundred bodies.
+//
+// One shape and not two, so that the compute pass, this reference and the tests
+// have one path between them rather than three that have to agree.
+struct view_capsule {
+    vec3f end_a;
+    vec3f end_b;
+    float32 radius;
+};
+
+[[nodiscard]] constexpr auto as_capsule(const view_sphere& ball) -> view_capsule {
+    return {.end_a = ball.center, .end_b = ball.center, .radius = ball.radius};
+}
+
+// Inclusive tile bounds. min past max is what a slab the shape misses gives.
+struct tile_rect {
+    uint32 min_x = 1;
+    uint32 min_y = 1;
+    uint32 max_x = 0;
+    uint32 max_y = 0;
+
+    [[nodiscard]] auto is_empty() const -> bool {
+        return min_x > max_x || min_y > max_y;
+    }
+};
+
+// One invocation of the compute pass: the tiles one source touches in one
+// slice. This is the reference the GLSL will be a translation of, and when the
+// two disagree this one is right.
+[[nodiscard]] auto scatter_slice(
+    const cluster_grid& grid, const view_capsule& shape, uint32 slice
+) -> tile_rect;
+
+[[nodiscard]] inline auto scatter_slice(
+    const cluster_grid& grid, const view_sphere& light, uint32 slice
+) -> tile_rect {
+    return scatter_slice(grid, as_capsule(light), slice);
+}
+
+// counts and indices, and nothing else: no bounding volumes, no prefix sum, no
+// separate pass to build the grid.
+//
+// A count runs past the cap and is left to; indices keeps the first cap of
+// them. That is what an atomic add and a bounds check do on the GPU, and a
+// reference that clamped the count instead would disagree with the thing it
+// exists to check exactly where it matters.
+class cluster_lights {
+public:
+    cluster_lights(const cluster_grid& grid, uint32 cap);
+
+    auto clear() -> void;
+    auto add(uint32 index, const view_capsule& shape) -> void;
+
+    auto add(uint32 index, const view_sphere& light) -> void {
+        add(index, as_capsule(light));
+    }
+
+    [[nodiscard]] auto get_grid() const -> const cluster_grid& {
+        return grid_;
+    }
+
+    [[nodiscard]] auto get_cap() const -> uint32 {
+        return cap_;
+    }
+
+    [[nodiscard]] auto count_of(uint32 cluster) const -> uint32 {
+        return counts_[cluster];
+    }
+
+    [[nodiscard]] auto lights_of(uint32 cluster) const -> std::span<const uint32>;
+
+    [[nodiscard]] auto get_assignment_count() const -> uint64 {
+        return assignments_;
+    }
+
+    [[nodiscard]] auto get_overflow_count() const -> uint64 {
+        return overflow_;
+    }
+
+private:
+    auto place_(uint32 index, uint32 slice, const tile_rect& rect) -> void;
+
+    cluster_grid grid_;
+    uint32 cap_;
+    std::vector<uint32> counts_;
+    std::vector<uint32> indices_;
+    uint64 assignments_ = 0;
+    uint64 overflow_    = 0;
+};
+
+// What a GPU cull actually wrote, against what the reference says it should
+// have. Its own type rather than a bool because the useful answer is where and
+// how far off, and because a comparator that silently agrees with everything is
+// the one failure this whole check exists to rule out.
+struct cluster_check {
+    uint64 clusters_compared = 0;
+    uint64 count_mismatches  = 0;
+    uint64 set_mismatches    = 0;
+    bool overflow_matches    = true;
+
+    // The first cluster that disagreed, and what the two sides said about it.
+    uint32 first_bad       = 0;
+    uint32 reference_count = 0;
+    uint32 actual_count    = 0;
+
+    [[nodiscard]] auto ok() const -> bool {
+        return count_mismatches == 0 && set_mismatches == 0 && overflow_matches;
+    }
+};
+
+// counts is cluster_count + 1 long, the last entry being the overflow tally.
+//
+// The lists are compared as sets: which of two sources reached a cluster first
+// is an atomic race and not a property worth agreeing on. Past the cap they are
+// not compared at all -- which subset survived is the same race -- and only the
+// count is, which is exactly the number that stays defined.
+[[nodiscard]] auto check_clusters(
+    const cluster_lights& reference,
+    std::span<const uint32> counts,
+    std::span<const uint32> indices
+) -> cluster_check;
+
 // Culling and picking call these per tree node, so the bodies stay in the
 // interface where an importer can still inline them; only the cold matrix
 // decomposition and the comparison live in the implementation unit.
