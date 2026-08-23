@@ -115,7 +115,7 @@ auto spatial_system::expand_aabb_for_fat(
 }
 
 auto spatial_system::calculate_aabb_from_model(
-    entity ent, const model_component& model_comp, const transform_component& transform_comp
+    entity, const model_component& model_comp, const transform_component& transform_comp
 ) const -> spatial::aabb {
     if (!model_comp.has_model()) {
         return spatial::aabb{.min={0.0f, 0.0f, 0.0f}, .max={0.0f, 0.0f, 0.0f}};

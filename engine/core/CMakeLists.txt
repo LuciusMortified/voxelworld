@@ -27,3 +27,4 @@ target_sources(vw_core
 target_compile_definitions(vw_core PRIVATE VW_LOG_MIN_LEVEL=${VW_LOG_MIN_LEVEL})
 target_compile_features(vw_core PUBLIC cxx_std_23)
 vw_use_std_module(vw_core)
+vw_set_warnings(vw_core)

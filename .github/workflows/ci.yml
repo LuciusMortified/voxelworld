@@ -1,11 +1,9 @@
 name: CI
 
-on:
-  push:
-  pull_request:
+# Только push: pull_request на том же коммите заводит второй, точно такой же
+# прогон — у него свой ref, и concurrency их не схлопывает.
+on: push
 
-# Пуш в ветку с открытым PR запускает оба триггера; держать оба прогона смысла
-# нет, как и прогон предыдущего пуша.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -100,11 +98,16 @@ jobs:
 
       # No Vulkan SDK on purpose: vw.core, vw.ecs and vw.world must build and
       # test on a machine that has never seen a GPU.
+      #
+      # Ядро собирается без единого предупреждения, поэтому здесь они ошибки:
+      # регрессия не пройдёт. У vw.gfx и приложений долг ещё не выплачен, и в
+      # остальных джобах предупреждения остаются предупреждениями.
       - name: Configure without a GPU
         run: >
           cmake -B build-headless -S . -G Ninja
           -DCMAKE_BUILD_TYPE=Release
           -DVW_BUILD_GFX=OFF -DVW_BUILD_APPS=OFF
+          -DVW_WARNINGS_AS_ERRORS=ON
           -DVCPKG_MANIFEST_NO_DEFAULT_FEATURES=ON
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 

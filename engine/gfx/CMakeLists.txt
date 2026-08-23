@@ -80,3 +80,4 @@ target_link_libraries(vw_gfx
     PRIVATE glfw imgui::imgui)
 target_compile_features(vw_gfx PUBLIC cxx_std_23)
 vw_use_std_module(vw_gfx)
+vw_set_warnings(vw_gfx)

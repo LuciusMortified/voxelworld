@@ -385,9 +385,9 @@ namespace {
 auto build_cell_links(
     const chunk_occupancy& occupancy, vec3i origin, int32 size, chunk_link_scratch& scratch
 ) -> cell_links {
-    const int32 rows       = size * size;
-    const int32 face_span  = chunk_pocket::face_span;
-    const int32 face_block = std::max(1, size / face_span);
+    const int32 rows           = size * size;
+    constexpr int32 face_span  = chunk_pocket::face_span;
+    const int32 face_block     = std::max(1, size / face_span);
 
     auto& masks     = scratch.masks;
     auto& row_begin = scratch.row_begin;
@@ -446,7 +446,7 @@ auto build_cell_links(
     };
 
     const auto add_faces = [&](chunk_pocket& pocket, int32 y, int32 z, uint64 run) {
-        const auto block_bit = [face_block, face_span](int32 a, int32 b) -> uint64 {
+        const auto block_bit = [face_block](int32 a, int32 b) -> uint64 {
             return uint64{1} << (((b / face_block) * face_span) + (a / face_block));
         };
 
@@ -485,9 +485,6 @@ auto build_cell_links(
     };
 
     for (int32 row = 0; row < rows; ++row) {
-        const int32 y = row / size;
-        const int32 z = row % size;
-
         for (int32 r = row_begin[row]; r < row_begin[row + 1]; ++r) {
             if (seen[r] != 0) {
                 continue;
@@ -773,8 +770,9 @@ void model::set_boundary_slice(int32 face_direction, const model& neighbor) {
             break;
         case model_fill::mixed:
             // Сосед лежит отсюда по `face_direction`, поэтому обращённая к этой
-            // модели его сторона — противоположная.
-            neighbor.extract_face(face_direction ^ 1, face);
+            // модели его сторона — противоположная. Отказать extract_face может
+            // только на несовпадении размеров, а его проверили на входе.
+            static_cast<void>(neighbor.extract_face(face_direction ^ 1, face));
             break;
     }
 

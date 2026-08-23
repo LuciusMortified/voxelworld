@@ -580,7 +580,7 @@ auto gather_boundary(
 auto light_column::bake(int32 y_base, light_channel channel) const -> light_field {
     constexpr int32 pages_side = light_field::pages_side;
     constexpr int32 page_count = light_field::page_count;
-    constexpr int32 page       = light_field::page;
+    constexpr int32 page_side  = light_field::page;
 
     if (y_base < 0 || y_base + s > height_) {
         return light_field{};
@@ -605,16 +605,16 @@ auto light_column::bake(int32 y_base, light_channel channel) const -> light_fiel
     std::array<uint8, page_count> mixed{};
 
     for (int32 py = 0; py < pages_side; ++py) {
-        for (int32 ly = 0; ly < page; ++ly) {
-            const int32 y = y_base + (py * page) + ly;
+        for (int32 ly = 0; ly < page_side; ++ly) {
+            const int32 y = y_base + (py * page_side) + ly;
 
             for (int32 z = 0; z < s; ++z) {
                 const uint8* row = row_(y, z);
-                const int32 pz   = z / page;
+                const int32 pz   = z / page_side;
 
                 for (int32 px = 0; px < pages_side; ++px) {
                     uint64 run = 0;
-                    std::memcpy(&run, row + (px * page), sizeof(run));
+                    std::memcpy(&run, row + (px * page_side), sizeof(run));
 
                     // По полубайту на воксель из байта, который делят два канала,
                     // по восемь вокселей за раз, до всякого сравнения: проверка
@@ -625,7 +625,7 @@ auto light_column::bake(int32 y_base, light_channel channel) const -> light_fiel
                     const auto first = static_cast<uint8>(run & 0xFFU);
                     const auto slot  = static_cast<std::size_t>(light_field::page_index(px, py, pz));
 
-                    if (ly == 0 && (z % page) == 0) {
+                    if (ly == 0 && (z % page_side) == 0) {
                         level[slot] = first;
                     }
 
@@ -660,18 +660,18 @@ auto light_column::bake(int32 y_base, light_channel channel) const -> light_fiel
                 }
 
                 light_field::page_type packed{};
-                for (int32 lz = 0; lz < page; ++lz) {
-                    for (int32 ly = 0; ly < page; ++ly) {
+                for (int32 lz = 0; lz < page_side; ++lz) {
+                    for (int32 ly = 0; ly < page_side; ++ly) {
                         const uint8* row =
-                            row_(y_base + (py * page) + ly, (pz * page) + lz) +
-                            (px * page);
+                            row_(y_base + (py * page_side) + ly, (pz * page_side) + lz) +
+                            (px * page_side);
 
-                        for (int32 lx = 0; lx < page; ++lx) {
-                            const int32 at = lx + (ly * page) + (lz * page * page);
-                            const auto level =
+                        for (int32 lx = 0; lx < page_side; ++lx) {
+                            const int32 at = lx + (ly * page_side) + (lz * page_side * page_side);
+                            const auto nibble =
                                 static_cast<uint8>((row[lx] >> shift) & 0x0FU);
                             packed[static_cast<std::size_t>(at / 2)] |= static_cast<uint8>(
-                                (at % 2) == 0 ? level : (level << 4)
+                                (at % 2) == 0 ? nibble : (nibble << 4)
                             );
                         }
                     }

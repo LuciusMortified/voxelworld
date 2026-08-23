@@ -126,12 +126,12 @@ auto fract(const vec4f& v) -> vec4f;
 auto sign(const vec4f& v) -> vec4f;
 auto clamp(const vec4f& v, const vec4f& min_v, const vec4f& max_v) -> vec4f;
 
-auto approx_equal(float a, float b, float epsilon = 1e-5f) -> bool;
-auto approx_equal(const vec2f& a, const vec2f& b, float epsilon = 1e-5f) -> bool;
-auto approx_equal(const vec3f& a, const vec3f& b, float epsilon = 1e-5f) -> bool;
-auto approx_equal(const vec4f& a, const vec4f& b, float epsilon = 1e-5f) -> bool;
-auto approx_equal(const mat4f& a, const mat4f& b, float epsilon = 1e-5f) -> bool;
-auto approx_equal(const quat& a, const quat& b, float epsilon = 1e-5f) -> bool;
+auto approx_equal(float a, float b, float tolerance = 1e-5f) -> bool;
+auto approx_equal(const vec2f& a, const vec2f& b, float tolerance = 1e-5f) -> bool;
+auto approx_equal(const vec3f& a, const vec3f& b, float tolerance = 1e-5f) -> bool;
+auto approx_equal(const vec4f& a, const vec4f& b, float tolerance = 1e-5f) -> bool;
+auto approx_equal(const mat4f& a, const mat4f& b, float tolerance = 1e-5f) -> bool;
+auto approx_equal(const quat& a, const quat& b, float tolerance = 1e-5f) -> bool;
 
 auto lerp(float a, float b, float t) -> float;
 auto lerp(const transform& a, const transform& b, float t) -> transform;
@@ -173,7 +173,7 @@ auto interpolate(
 auto quat_look_y(const vec3f& direction) -> quat;
 
 auto perpendicular(const vec3f& eye, const vec3f& target) -> vec3f;
-auto is_safe_zero(float a, float epsilon = 1e-5f) -> bool;
+auto is_safe_zero(float a, float tolerance = 1e-5f) -> bool;
 
 auto smoothstep(float edge0, float edge1, float x) -> float;
 auto smoothstep(const vec2f& edge0, const vec2f& edge1, const vec2f& x) -> vec2f;

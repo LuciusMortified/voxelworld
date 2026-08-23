@@ -21,9 +21,9 @@ auto normalized_plane(float32 x, float32 y, float32 z, float32 w) -> plane {
 auto frustum::from_view_projection_matrix(const mat4f& view_proj) -> frustum {
     frustum f{};
 
-    for (std::size_t row = 0; row < 3; ++row) {
-        const std::size_t left  = row * 2;
-        const std::size_t right = left + 1;
+    for (int32 row = 0; row < 3; ++row) {
+        const int32 left  = row * 2;
+        const int32 right = left + 1;
 
         f.planes[left] = normalized_plane(
             view_proj[3, 0] + view_proj[row, 0], view_proj[3, 1] + view_proj[row, 1],

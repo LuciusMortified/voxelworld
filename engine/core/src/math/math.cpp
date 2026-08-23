@@ -5,36 +5,36 @@ import std;
 namespace vw::math {
 
 auto approx_equal(
-    float a, float b, float epsilon
+    float a, float b, float tolerance
 ) -> bool {
-    return std::abs(a - b) < epsilon;
+    return std::abs(a - b) < tolerance;
 }
 
 auto approx_equal(
-    const vec2f& a, const vec2f& b, float epsilon
+    const vec2f& a, const vec2f& b, float tolerance
 ) -> bool {
-    return approx_equal(a.x, b.x, epsilon) && approx_equal(a.y, b.y, epsilon);
+    return approx_equal(a.x, b.x, tolerance) && approx_equal(a.y, b.y, tolerance);
 }
 
 auto approx_equal(
-    const vec3f& a, const vec3f& b, float epsilon
+    const vec3f& a, const vec3f& b, float tolerance
 ) -> bool {
-    return approx_equal(a.x, b.x, epsilon) && approx_equal(a.y, b.y, epsilon) &&
-        approx_equal(a.z, b.z, epsilon);
+    return approx_equal(a.x, b.x, tolerance) && approx_equal(a.y, b.y, tolerance) &&
+        approx_equal(a.z, b.z, tolerance);
 }
 
 auto approx_equal(
-    const vec4f& a, const vec4f& b, float epsilon
+    const vec4f& a, const vec4f& b, float tolerance
 ) -> bool {
-    return approx_equal(a.x, b.x, epsilon) && approx_equal(a.y, b.y, epsilon) &&
-        approx_equal(a.z, b.z, epsilon) && approx_equal(a.w, b.w, epsilon);
+    return approx_equal(a.x, b.x, tolerance) && approx_equal(a.y, b.y, tolerance) &&
+        approx_equal(a.z, b.z, tolerance) && approx_equal(a.w, b.w, tolerance);
 }
 
 auto approx_equal(
-    const mat4f& a, const mat4f& b, float epsilon
+    const mat4f& a, const mat4f& b, float tolerance
 ) -> bool {
     for (int i = 0; i < 16; ++i) {
-        if (!approx_equal(a[i], b[i], epsilon)) {
+        if (!approx_equal(a[i], b[i], tolerance)) {
             return false;
         }
     }
@@ -42,10 +42,10 @@ auto approx_equal(
 }
 
 auto approx_equal(
-    const quat& a, const quat& b, float epsilon
+    const quat& a, const quat& b, float tolerance
 ) -> bool {
-    return approx_equal(a.x, b.x, epsilon) && approx_equal(a.y, b.y, epsilon) &&
-        approx_equal(a.z, b.z, epsilon) && approx_equal(a.w, b.w, epsilon);
+    return approx_equal(a.x, b.x, tolerance) && approx_equal(a.y, b.y, tolerance) &&
+        approx_equal(a.z, b.z, tolerance) && approx_equal(a.w, b.w, tolerance);
 }
 
 auto length(
@@ -977,9 +977,9 @@ auto perpendicular(
 }
 
 auto is_safe_zero(
-    float a, float epsilon
+    float a, float tolerance
 ) -> bool {
-    return std::abs(a) < epsilon;
+    return std::abs(a) < tolerance;
 }
 
 auto inverse_matrix(

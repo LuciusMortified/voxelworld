@@ -82,3 +82,4 @@ target_sources(vw_world
 target_link_libraries(vw_world PUBLIC vw_core vw_ecs)
 target_compile_features(vw_world PUBLIC cxx_std_23)
 vw_use_std_module(vw_world)
+vw_set_warnings(vw_world)

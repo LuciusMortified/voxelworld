@@ -36,6 +36,7 @@ if(NOT CMAKE_GENERATOR MATCHES "Ninja")
 endif()
 
 include(vw_std_module)
+include(vw_warnings)
 include(vw_vulkan_module)
 
 option(VW_BUILD_GFX "Build the Vulkan renderer and everything that needs a GPU" ON)

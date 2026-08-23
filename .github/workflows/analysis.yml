@@ -1,8 +1,6 @@
 name: Analysis
 
-on:
-  push:
-  pull_request:
+on: push
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -112,6 +110,12 @@ jobs:
       # RelWithDebInfo, а не Debug: ASan от MSVC не уживается с /RTC1, который
       # CMake кладёт в отладочную конфигурацию, и требует неинкрементальной
       # линковки.
+      #
+      # Catch2 берётся не из vcpkg, а собирается из исходников (см.
+      # tests/CMakeLists.txt): ASan меняет раскладку строк и векторов, и
+      # предсобранная библиотека не линкуется с инструментированными объектами —
+      # LNK2038 про annotate_string. Остальные зависимости остаются из vcpkg,
+      # поэтому под санитайзер попадает и мешер из vw.gfx.
       - name: Configure
         env:
           VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
@@ -119,6 +123,7 @@ jobs:
           cmake -B build-asan -S . -G Ninja
           -DCMAKE_BUILD_TYPE=RelWithDebInfo
           -DVW_BUILD_APPS=OFF
+          -DCMAKE_DISABLE_FIND_PACKAGE_Catch2=ON
           -DCMAKE_CXX_FLAGS="/fsanitize=address"
           -DCMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO"
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
