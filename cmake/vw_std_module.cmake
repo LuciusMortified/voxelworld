@@ -1,12 +1,20 @@
-# Provides `import std` for both target compilers.
+# Provides `import std` for every toolchain the project builds on.
 #
-# CMake ships built-in support only for MSVC (via std.ixx) and Clang paired with
-# libc++/libstdc++. Clang targeting the MSVC ABI uses MS STL, which CMake
-# refuses, so its `std` module is built here from the very same std.ixx.
+# CMake knows how to build the std module itself for MSVC and for Clang paired
+# with libc++ or libstdc++. The one case it refuses is Clang targeting the MSVC
+# ABI: that combination uses MS STL, and CMake has no recipe for it. Only there
+# do we build the module ourselves, from the very same std.ixx that MSVC uses.
 
 add_library(vw_std INTERFACE)
 
-if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+# Clang, но с ABI от MSVC — единственная конфигурация, где std-модуль приходится
+# собирать вручную. На Linux тот же Clang идёт штатным путём CMake.
+set(VW_STD_NEEDS_MSVC_SOURCES OFF)
+if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
+    set(VW_STD_NEEDS_MSVC_SOURCES ON)
+endif()
+
+if(VW_STD_NEEDS_MSVC_SOURCES)
     if(NOT DEFINED ENV{VCToolsInstallDir})
         message(FATAL_ERROR
             "VCToolsInstallDir is not set: run from a Visual Studio developer shell "
@@ -39,9 +47,9 @@ if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 endif()
 
 function(vw_use_std_module target)
-    if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-        set_target_properties(${target} PROPERTIES CXX_MODULE_STD ON)
-    else()
+    if(VW_STD_NEEDS_MSVC_SOURCES)
         target_link_libraries(${target} PUBLIC vw_std)
+    else()
+        set_target_properties(${target} PROPERTIES CXX_MODULE_STD ON)
     endif()
 endfunction()

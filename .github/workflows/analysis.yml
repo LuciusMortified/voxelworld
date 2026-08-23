@@ -1,29 +1,95 @@
 name: Analysis
 
-on: push
+on:
+  push:
+  pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  VW_CMAKE_VERSION: 4.4.0
+  VW_LLVM_VERSION: 20
+
+# Динамические проверки идут на Linux не из любви к нему, а по необходимости:
+# на Windows нет ни UBSan, ни LeakSanitizer, ни TSan — MSVC умеет только ASan.
+# Ровно поэтому здесь собирается headless-половина движка (core, ecs, world),
+# которая ни при чём с GPU и переносима: Clang с libc++ даёт свой std-модуль,
+# и `import std` работает штатным путём CMake, без std.ixx от MSVC.
 jobs:
-  asan-ubsan:
+  sanitizers:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ASan на Linux включает LeakSanitizer по умолчанию — отсюда и утечки.
+          - name: address-undefined
+            flags: '-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer'
+          # TSan несовместим с ASan, поэтому отдельный прогон. Гонки искать есть
+          # где: chunk_loader и light_baker держат пулы потоков.
+          - name: thread
+            flags: '-fsanitize=thread -fno-omit-frame-pointer'
+
+    name: sanitizers (${{ matrix.name }})
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install gcc 13
+      - name: Install Clang and libc++
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-13 g++-13
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
-          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
-
-      - name: Install X11 and GLFW dependencies
-        run: |
+          wget -qO llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh ${{ env.VW_LLVM_VERSION }}
           sudo apt-get install -y \
-            libx11-dev \
-            libxrandr-dev \
-            libxinerama-dev \
-            libxcursor-dev \
-            libxi-dev \
-            libgl1-mesa-dev
+            libc++-${{ env.VW_LLVM_VERSION }}-dev \
+            libc++abi-${{ env.VW_LLVM_VERSION }}-dev
+
+      - name: Setup CMake and Ninja
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: ${{ env.VW_CMAKE_VERSION }}
+          ninjaVersion: latest
+
+      # Без vcpkg: единственная зависимость здесь — Catch2, и его нужно собрать
+      # теми же флагами, что и остальное (см. tests/CMakeLists.txt).
+      - name: Configure
+        run: >
+          cmake -B build -S . -G Ninja
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_CXX_COMPILER=clang++-${{ env.VW_LLVM_VERSION }}
+          -DCMAKE_C_COMPILER=clang-${{ env.VW_LLVM_VERSION }}
+          -DCMAKE_CXX_FLAGS="-stdlib=libc++ ${{ matrix.flags }}"
+          -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ ${{ matrix.flags }}"
+          -DVW_BUILD_GFX=OFF -DVW_BUILD_APPS=OFF
+
+      - name: Build
+        run: cmake --build build
+
+      - name: Test
+        env:
+          ASAN_OPTIONS: detect_leaks=1:detect_stack_use_after_return=1:check_initialization_order=1:strict_string_checks=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+          TSAN_OPTIONS: halt_on_error=1:second_deadlock_stack=1
+          LSAN_OPTIONS: report_objects=1
+        run: ctest --test-dir build --output-on-failure
+
+  # ASan ещё раз, но уже на той сборке, которой пользуются на самом деле:
+  # у MSVC своя раскладка объектов и свой аллокатор, и промахи по границам
+  # буферов там свои. Заодно это единственное место, где под санитайзер
+  # попадает мешер из vw.gfx — он на CPU и устройство не открывает.
+  asan-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Export cache tokens for vcpkg
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
 
       - name: Install Vulkan SDK
         uses: humbletim/install-vulkan-sdk@v1.2
@@ -31,24 +97,34 @@ jobs:
           version: latest
           cache: true
 
-      - name: Setup cmake
+      - name: Setup CMake and Ninja
         uses: lukka/get-cmake@latest
-
-      - name: Setup and run vcpkg
-        uses: lukka/run-vcpkg@v11
         with:
-          runVcpkgInstall: true
+          cmakeVersion: ${{ env.VW_CMAKE_VERSION }}
+          ninjaVersion: latest
 
-      - name: Configure CMake
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+
+      # RelWithDebInfo, а не Debug: ASan от MSVC не уживается с /RTC1, который
+      # CMake кладёт в отладочную конфигурацию, и требует неинкрементальной
+      # линковки.
+      - name: Configure
+        env:
+          VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
         run: >
-          cmake -B build -S .
+          cmake -B build-asan -S . -G Ninja
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DVW_BUILD_APPS=OFF
+          -DCMAKE_CXX_FLAGS="/fsanitize=address"
+          -DCMAKE_EXE_LINKER_FLAGS="/INCREMENTAL:NO"
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
-          -DCMAKE_BUILD_TYPE=Debug
-          -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer"
-          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
 
-      - name: Build tests
-        run: cmake --build build --target core_tests ecs_tests
+      - name: Build
+        run: cmake --build build-asan
 
-      - name: Run tests with ASan + UBSan
-        run: ctest --test-dir build --output-on-failure
+      - name: Test
+        run: ctest --test-dir build-asan --output-on-failure

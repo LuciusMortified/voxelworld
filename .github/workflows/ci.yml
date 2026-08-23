@@ -1,10 +1,27 @@
 name: CI
 
-on: push
+on:
+  push:
+  pull_request:
+
+# Пуш в ветку с открытым PR запускает оба триггера; держать оба прогона смысла
+# нет, как и прогон предыдущего пуша.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Версия прибита намеренно: `import std` открывается точным UUID, который
+  # меняется в каждом релизе CMake (таблица — в корневом CMakeLists.txt).
+  # Раннер обновляется сам, и без этой строки очередной CMake молча закрывает
+  # гейт, роняя сборку на генерации.
+  VW_CMAKE_VERSION: 4.4.0
+  VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
 
 # The build is Windows-only by construction: `import std` needs a std module,
-# and the Clang half of the matrix builds it from MSVC's own std.ixx (see
-# cmake/vw_std_module.cmake). A Linux or macOS job cannot configure at all.
+# and Clang targeting the MSVC ABI builds it from MSVC's own std.ixx (see
+# cmake/vw_std_module.cmake). The sanitizer workflow covers the headless half
+# of the engine on Linux, where Clang and libc++ bring a std module of their own.
 jobs:
   build:
     runs-on: windows-latest
@@ -17,14 +34,25 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
+      - name: Export cache tokens for vcpkg
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
       - name: Install Vulkan SDK
         uses: humbletim/install-vulkan-sdk@v1.2
         with:
           version: latest
           cache: true
 
-      - name: Setup Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v5
+      - name: Setup CMake and Ninja
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: ${{ env.VW_CMAKE_VERSION }}
+          ninjaVersion: latest
 
       - name: Setup MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -50,8 +78,19 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Setup Ninja
-        uses: seanmiddleditch/gha-setup-ninja@v5
+      - name: Export cache tokens for vcpkg
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Setup CMake and Ninja
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: ${{ env.VW_CMAKE_VERSION }}
+          ninjaVersion: latest
 
       - name: Setup MSVC environment
         uses: ilammy/msvc-dev-cmd@v1
