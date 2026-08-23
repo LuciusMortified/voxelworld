@@ -33,25 +33,30 @@ function(vw_compile_shaders)
     add_custom_target(vw_compile_shaders ALL DEPENDS ${SHADER_SPV_OUTPUTS})
 endfunction()
 
+# Stages every compiled shader next to the executable, before the executable is
+# considered built.
+#
+# Two traps live here and both have cost a day. The staging used to be a
+# POST_BUILD command, which runs only when the target relinks -- so a change to
+# a shader alone recompiled the .spv and never delivered it, and the application
+# went on running the previous one. And the list of shaders used to be a glob of
+# the build directory taken at configure time, so a newly added shader was
+# missing until somebody reconfigured after building it once.
+#
+# A custom target the executable depends on has neither problem: it runs
+# whenever the executable is built, by any target name, and it copies whatever
+# the compile step produced rather than whatever configure happened to see.
 function(vw_setup_shaders TARGET)
     vw_compile_shaders()
 
-    add_custom_command(TARGET ${TARGET} POST_BUILD
+    add_custom_target(${TARGET}_shaders
             COMMAND ${CMAKE_COMMAND} -E make_directory $<TARGET_FILE_DIR:${TARGET}>/shaders
+            COMMAND ${CMAKE_COMMAND} -E copy_directory_if_different
+                    ${VW_SHADERS_BIN_DIR} $<TARGET_FILE_DIR:${TARGET}>/shaders
             VERBATIM
+            COMMENT "Staging shaders for ${TARGET}"
     )
 
-    file(GLOB SHADER_SPVS CONFIGURE_DEPENDS ${VW_SHADERS_BIN_DIR}/*.spv)
-    set(ALL_SHADERS ${SHADER_SPVS})
-
-    foreach(SHADER ${ALL_SHADERS})
-        get_filename_component(SHADER_NAME ${SHADER} NAME)
-        add_custom_command(TARGET ${TARGET} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E echo "Copying shader ${SHADER_NAME}"
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different ${SHADER} $<TARGET_FILE_DIR:${TARGET}>/shaders/${SHADER_NAME}
-                VERBATIM
-        )
-    endforeach()
-
-    add_dependencies(${TARGET} vw_compile_shaders)
+    add_dependencies(${TARGET}_shaders vw_compile_shaders)
+    add_dependencies(${TARGET} ${TARGET}_shaders)
 endfunction()
