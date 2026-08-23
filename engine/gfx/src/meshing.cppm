@@ -48,7 +48,7 @@ export namespace vw::gfx {
 // three bits a corner, four bits cheaper than two masks. The merge that was
 // meant to pay for it recovered 0.46% of the quad count and no more. Two masks
 // keep both strengths and both curves adjustable without a remesh, so two masks
-// it is. docs/lighting.md records the run.
+// it is.
 //
 // Convexity was here once before, as one bit a corner, and was taken out on the
 // grounds that it stood in for sky light. It does not: under open sky the light

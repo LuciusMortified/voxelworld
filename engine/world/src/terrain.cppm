@@ -114,8 +114,9 @@ struct column_gen_stats {
 
 class chunk_loader {
 public:
-    // Zero asks for the default, which is what the curve in
-    // docs/frame-time-baseline.md settled on.
+    // Zero asks for the default, which is where the measured curve of workers
+    // against throughput has its knee: past four the end-to-end time stands
+    // still and the price of one column keeps climbing.
     explicit chunk_loader(std::unique_ptr<terrain_generator> generator, uint32 workers = 0);
     ~chunk_loader();
 
@@ -197,8 +198,8 @@ public:
         // fields the rock is solid. Dungeons will be the connected underground
         // -- caves are places, and a place has edges.
         //
-        // Two earlier shapes are in docs/frame-time-baseline.md and both were
-        // measured: a lattice of tunnels made one network of even calibre over
+        // Two earlier shapes were built and measured before this one:
+        // a lattice of tunnels made one network of even calibre over
         // the whole world, and chains of hand-placed chambers read as rooms but
         // could never fill the depth. This keeps the clustering of the second
         // and gets its shapes from noise like the first.

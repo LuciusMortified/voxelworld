@@ -190,7 +190,7 @@ struct shadow_settings {
     // go away. Everything here stays as it was so the decision can be undone,
     // but nothing runs: no depth pass, no cascade culling, no filtering. The
     // matching switch is SHADOW_ENABLED in voxel.frag, and both have to agree.
-    // What takes over the job is sky light -- docs/lighting.md.
+    // What takes over the job is baked sky light.
     bool enabled = false;
 
     // Where the first cascade ends. Not the reach of the sharp zone -- the

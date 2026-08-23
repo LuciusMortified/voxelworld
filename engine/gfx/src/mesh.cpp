@@ -222,7 +222,7 @@ auto is_solid_at(
 // the quad count to the greedy merge, two thirds of a second of streaming, and
 // the crispness of every corner. Three samples is also what lets the whole face
 // come out of three shifted occupancy rows below, which is where most of that
-// streaming time went. docs/lighting.md records the experiment.
+// streaming time went.
 [[nodiscard]] auto corner_level(bool edge_a, bool edge_b, bool diagonal) -> uint8 {
     if (edge_a && edge_b) {
         return 3;

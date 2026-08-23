@@ -668,8 +668,8 @@ TEST_CASE("a bent trench has no point lighter than its surroundings", "[mesh]") 
 // rediscovered from a screenshot. One cell, and then nothing: the column beside
 // the wall is shaded, the next one is open ground. That is why the middle of a
 // trench three voxels wide reads exactly as bright as a field, and it is the
-// known price of three samples -- docs/lighting.md records what a two-cell
-// kernel bought instead, and what it charged.
+// known price of three samples -- a two-cell kernel does see across a trench
+// three voxels wide, and charges ten percent of the quad count for it.
 TEST_CASE("occlusion reaches exactly one cell from a wall", "[mesh]") {
     model_fixture fixture{16};
 

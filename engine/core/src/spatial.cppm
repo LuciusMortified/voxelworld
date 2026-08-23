@@ -134,8 +134,8 @@ struct cluster_grid {
     // proj[0,0] and proj[1,1] of the projection in use, signs and all: a view
     // position reaches ndc as proj * xy / depth. Two floats and not the matrix,
     // because this pair has to travel in the frame uniform and a mat4 there is
-    // the mistake frame-time-baseline.md names as the most expensive one made
-    // in this code.
+    // the most expensive mistake made in this code: the whole block moves under
+    // it, the shader reads its own counters as rubbish, and nothing says so.
     float32 proj_x = 1.0F;
     float32 proj_y = -1.0F;
 

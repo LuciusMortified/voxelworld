@@ -666,9 +666,10 @@ public:
     [[nodiscard]] auto get_stats() const -> const combined_buffer_pool_stats&;
 
     // Off by default: on the current world the walk hides nothing and costs
-    // milliseconds. See docs/frame-time-baseline.md -- a single false opening
-    // floods a cave network that is connected almost everywhere, and the cell
-    // size needed to avoid that grows with the size of the world.
+    // milliseconds. A single false opening floods a cave network that is
+    // connected almost everywhere, and the cell size needed to avoid that grows
+    // with the size of the world. Kept for sound, navigation and streaming,
+    // where the answer wanted is exact rather than conservative.
     void set_chunk_cull_enabled(bool enabled) {
         chunk_cull_enabled_ = enabled;
     }

@@ -266,7 +266,7 @@ void shadow_map::update(
     // spends everything on the first metre and its uniform half flattens the
     // rest, so at lambda 0.9 the ratios came out 2.3, 2.8 and 6.1 -- the last
     // cascade started with a twelve-pixel staircase against two pixels on the
-    // other side of the seam. Measured in docs/frame-time-baseline.md.
+    // other side of the seam.
     //
     // The first split is a distance, not a fraction: it is set by how close the
     // nearest thing worth a sharp shadow is, and everything else follows from

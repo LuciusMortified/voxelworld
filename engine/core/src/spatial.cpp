@@ -90,7 +90,8 @@ auto tile_of(float32 pixel, float32 tile_size, int32 last) -> uint32 {
 
 // x/depth and y/depth to the tiles that span holds. Both shapes end here, and
 // the last bit of every number in it is why the two implementations of this
-// disagree twice in a million clusters -- see the FMA note in forward-plus.md.
+// disagree twice in a million clusters: the same product, ordered differently,
+// lands one ulp apart and a tile boundary falls on the other side of it.
 auto rect_of_span(
     const cluster_grid& grid, float32 x_min, float32 x_max, float32 y_min, float32 y_max
 ) -> tile_rect {

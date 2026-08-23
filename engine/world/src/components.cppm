@@ -215,7 +215,7 @@ private:
 // followed the sun is what the cascades were for, and they are switched off:
 // past the first one the edge staircased and the staircase crawled with the
 // camera. The code is still in the tree behind shadow_settings::enabled and
-// SHADOW_ENABLED -- see docs/lighting.md.
+// SHADOW_ENABLED, and both have to agree.
 //
 // Not a decal either. It is a term in the fragment shader, so there is no
 // raycast down to the floor, nothing to break on a staircase or a slope, no

@@ -147,7 +147,7 @@ struct bench_config {
     std::string report_path;
 
     // Zero leaves each queue on its own default. They are here so the curve can
-    // be swept without a rebuild -- see P11.6 in docs/optimization-plan.md.
+    // be swept without a rebuild; it was, and four is its knee.
     uint32 mesh_workers    = 0;
     uint32 terrain_workers = 0;
 
