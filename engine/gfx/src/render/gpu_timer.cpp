@@ -47,7 +47,7 @@ gpu_timer::gpu_timer(
     );
 
     frame_recorded_.assign(frames_in_flight_, 0);
-    scratch_.resize(static_cast<size_t>(queries_per_frame) * 2);
+    scratch_.resize(static_cast<std::size_t>(queries_per_frame) * 2);
     supported_       = true;
     stats_.supported = true;
 
@@ -129,8 +129,8 @@ auto gpu_timer::resolve(
     }
 
     for (uint32 stage = 0; stage < gpu_stage_count; ++stage) {
-        const size_t begin_slot = static_cast<size_t>(stage) * 4;
-        const size_t end_slot   = begin_slot + 2;
+        const std::size_t begin_slot = static_cast<std::size_t>(stage) * 4;
+        const std::size_t end_slot   = begin_slot + 2;
 
         if (scratch_[begin_slot + 1] == 0 || scratch_[end_slot + 1] == 0) {
             stats_.ms[stage] = 0.0f;

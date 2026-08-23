@@ -245,7 +245,7 @@ void clip_service::stop_all_layers() {
 
     const auto& player = world.get<ecs::animation_player_component>(root);
     auto& anim_sys     = world.system<ecs::animation_system>();
-    for (size_t i = 0; i < player.layer_count(); ++i) {
+    for (std::size_t i = 0; i < player.layer_count(); ++i) {
         if (player.has_layer(i)) {
             anim_sys.modify_player(root).layer(i).clear();
         }

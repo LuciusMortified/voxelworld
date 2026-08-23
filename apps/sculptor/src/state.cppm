@@ -90,14 +90,14 @@ struct animation_state {
     bool need_apply_pose      = false;
 
     std::unordered_map<std::string, bool> unsaved_clips;
-    std::unordered_map<std::string, size_t> clip_to_layer;
+    std::unordered_map<std::string, std::size_t> clip_to_layer;
     std::unordered_map<std::string, clip_settings> clip_settings_map;
     std::unordered_map<std::string, transform> saved_transforms;
     bool has_saved_transforms = false;
 
     [[nodiscard]] auto has_unsaved_clip(const std::string& name) const -> bool;
     [[nodiscard]] auto has_any_unsaved_clip() const -> bool;
-    [[nodiscard]] auto get_layer_for_clip(const std::string& name) const -> size_t;
+    [[nodiscard]] auto get_layer_for_clip(const std::string& name) const -> std::size_t;
     [[nodiscard]] auto get_clip_settings(const std::string& name) const -> clip_settings;
     [[nodiscard]] auto get_clip_settings_mut(const std::string& name) -> clip_settings&;
 };
@@ -153,7 +153,7 @@ template <>
 struct std::hash<vw::sculptor::tools> {
     auto operator()(
         vw::sculptor::tools t
-    ) const noexcept -> size_t {
+    ) const noexcept -> std::size_t {
         return std::hash<vw::uint32>()(static_cast<vw::uint32>(t));
     }
 };

@@ -44,7 +44,7 @@ void dynamic_aabb_tree::free_node(uint32 index) {
     free_nodes_.push_back(index);
 }
 
-auto dynamic_aabb_tree::size() const -> size_t {
+auto dynamic_aabb_tree::size() const -> std::size_t {
     return entity_to_node_.size();
 }
 

@@ -182,7 +182,7 @@ void clip_manager_panel::render(
             if (i > 0) {
                 ImGui::SameLine();
             }
-            bool is_active = (current_layer == static_cast<size_t>(i));
+            bool is_active = (current_layer == static_cast<std::size_t>(i));
             if (is_active) {
                 ImGui::PushStyleColor(
                     ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive)
@@ -191,7 +191,7 @@ void clip_manager_panel::render(
             auto btn_id = std::format("{}##layer_btn", i);
             if (ImGui::SmallButton(btn_id.c_str())) {
                 clip_service_->stop_layer_for_clip(state_->anim.selected_clip_name);
-                state_->anim.clip_to_layer[state_->anim.selected_clip_name] = static_cast<size_t>(i);
+                state_->anim.clip_to_layer[state_->anim.selected_clip_name] = static_cast<std::size_t>(i);
             }
             if (is_active) {
                 ImGui::PopStyleColor();

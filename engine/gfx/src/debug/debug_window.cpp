@@ -112,7 +112,7 @@ void debug_window::render_fps_window() {
         {
             float32 window_min = FLT_MAX;
             float32 window_max = 0.0f;
-            for (size_t i = 0; i < fps_bucket_filled_count_; ++i) {
+            for (std::size_t i = 0; i < fps_bucket_filled_count_; ++i) {
                 window_min = std::min(window_min, fps_bucket_min_[i]);
                 window_max = std::max(window_max, fps_bucket_max_[i]);
             }
@@ -201,7 +201,7 @@ void debug_window::render_combined_buffers_detail() {
         const auto& rend_stats        = engine_->get_renderer().get_stats();
         const auto& buffers           = rend_stats.combined_buffers.buffers;
 
-        for (size_t i = 0; i < buffers.size(); ++i) {
+        for (std::size_t i = 0; i < buffers.size(); ++i) {
             const auto& buffer = buffers[i];
             ImGui::Text("Buffer %zu:", i);
             ImGui::Indent();

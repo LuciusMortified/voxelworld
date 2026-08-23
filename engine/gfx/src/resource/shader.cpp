@@ -60,7 +60,7 @@ auto shader::read_file(const std::string& filename) -> std::vector<char> {
     }
 
     const std::streamsize file_size = file.tellg();
-    std::vector<char> buffer(static_cast<size_t>(file_size));
+    std::vector<char> buffer(static_cast<std::size_t>(file_size));
 
     file.seekg(0);
     file.read(buffer.data(), file_size);

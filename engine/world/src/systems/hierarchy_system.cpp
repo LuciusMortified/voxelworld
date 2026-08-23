@@ -52,7 +52,7 @@ auto hierarchy_system::modify(entity ent) -> hierarchy_modifier {
 
 auto hierarchy_system::get_hierarchy_depth(
     entity ent
-) const -> size_t {
+) const -> std::size_t {
     constexpr int MAX_HIERARCHY_DEPTH = 64;
 
     int depth      = 0;

@@ -656,7 +656,7 @@ void renderer::create_swapchain() {
 void renderer::create_image_views() {
     swapchain_image_views_.resize(swapchain_images_.size());
 
-    for (size_t i = 0; i < swapchain_images_.size(); i++) {
+    for (std::size_t i = 0; i < swapchain_images_.size(); i++) {
         vk::ImageViewCreateInfo view_info{};
         view_info.image                           = swapchain_images_[i];
         view_info.viewType                        = vk::ImageViewType::e2D;
@@ -1126,7 +1126,7 @@ void renderer::create_debug_pipeline() {
 void renderer::create_framebuffers() {
     framebuffers_.resize(swapchain_image_views_.size());
 
-    for (size_t i = 0; i < swapchain_image_views_.size(); i++) {
+    for (std::size_t i = 0; i < swapchain_image_views_.size(); i++) {
         vk::ImageView attachments[] = {
             swapchain_image_views_[i],
             depth_image_view_,
@@ -1171,17 +1171,17 @@ void renderer::create_sync_objects() {
     fence_info.flags = vk::FenceCreateFlagBits::eSignaled;
 
     // Создаем семафоры для каждого кадра в полете
-    for (size_t i = 0; i < max_frames_in_flight_; i++) {
+    for (std::size_t i = 0; i < max_frames_in_flight_; i++) {
         image_available_semaphores_[i] = vk_must(context_->get_device().createSemaphore(semaphore_info), "failed to create synchronization objects for a frame");
     }
 
     // Создаем семафоры для каждого изображения swapchain
-    for (size_t i = 0; i < swapchain_images_.size(); i++) {
+    for (std::size_t i = 0; i < swapchain_images_.size(); i++) {
         render_finished_semaphores_[i] = vk_must(context_->get_device().createSemaphore(semaphore_info), "failed to create synchronization objects for a frame");
     }
 
     // Создаем fences для каждого кадра в полете
-    for (size_t i = 0; i < max_frames_in_flight_; i++) {
+    for (std::size_t i = 0; i < max_frames_in_flight_; i++) {
         in_flight_fences_[i] = vk_must(context_->get_device().createFence(fence_info), "failed to create synchronization objects for a frame");
     }
 }
@@ -1190,7 +1190,7 @@ void renderer::create_uniform_buffers() {
     vk::DeviceSize buffer_size = sizeof(uniform_buffer_object);
     uniform_buffers_.resize(max_frames_in_flight_);
 
-    for (size_t i = 0; i < max_frames_in_flight_; i++) {
+    for (std::size_t i = 0; i < max_frames_in_flight_; i++) {
         uniform_buffers_[i] = std::make_unique<uniform_buffer>(*context_, buffer_size);
     }
 }
@@ -1236,7 +1236,7 @@ void renderer::create_descriptor_sets() {
     descriptor_sets_ =
         vk_must(context_->get_device().allocateDescriptorSets(alloc_info), "allocate descriptor sets");
 
-    for (size_t i = 0; i < max_frames_in_flight_; i++) {
+    for (std::size_t i = 0; i < max_frames_in_flight_; i++) {
         vk::DescriptorBufferInfo ubo_buffer_info{};
         ubo_buffer_info.buffer = uniform_buffers_[i]->get_buffer();
         ubo_buffer_info.offset = 0;
@@ -2020,7 +2020,7 @@ void renderer::create_shadow_uniform_buffers() {
     vk::DeviceSize buffer_size = sizeof(shadow_uniform_buffer_object);
     shadow_uniform_buffers_.resize(max_frames_in_flight_);
 
-    for (size_t i = 0; i < max_frames_in_flight_; i++) {
+    for (std::size_t i = 0; i < max_frames_in_flight_; i++) {
         shadow_uniform_buffers_[i] = std::make_unique<uniform_buffer>(*context_, buffer_size);
     }
 }
@@ -2035,7 +2035,7 @@ void renderer::create_shadow_descriptor_sets() {
     shadow_descriptor_sets_ =
         vk_must(context_->get_device().allocateDescriptorSets(alloc_info), "allocate shadow descriptor sets");
 
-    for (size_t i = 0; i < max_frames_in_flight_; i++) {
+    for (std::size_t i = 0; i < max_frames_in_flight_; i++) {
         vk::DescriptorBufferInfo ubo_buffer_info{};
         ubo_buffer_info.buffer = shadow_uniform_buffers_[i]->get_buffer();
         ubo_buffer_info.offset = 0;
@@ -2063,7 +2063,7 @@ void renderer::create_shadow_map_descriptor_sets() {
     shadow_map_descriptor_sets_ =
         vk_must(context_->get_device().allocateDescriptorSets(alloc_info), "allocate shadow map descriptor sets");
 
-    for (size_t i = 0; i < max_frames_in_flight_; i++) {
+    for (std::size_t i = 0; i < max_frames_in_flight_; i++) {
         vk::DescriptorImageInfo image_info{};
         image_info.imageLayout = vk::ImageLayout::eDepthStencilReadOnlyOptimal;
         image_info.imageView   = shadow_map_->get_array_image_view();

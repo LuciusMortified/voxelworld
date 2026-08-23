@@ -235,7 +235,7 @@ void combined_buffer_pool::update_meshes_(
     merge_buffer_.reserve(entities_to_process_.size());
     uploaded_models_.clear();
 
-    for (size_t i = 0; i < entities_to_process_.size(); ++i) {
+    for (std::size_t i = 0; i < entities_to_process_.size(); ++i) {
         entity ent = entities_to_process_[i];
 
         if (mesh_writes >= max_mesh_writes) {
@@ -614,7 +614,7 @@ void combined_buffer_pool::update_transforms_(
     merge_buffer_.clear();
     merge_buffer_.reserve(entities_to_process_.size());
 
-    for (size_t i = 0; i < entities_to_process_.size(); ++i) {
+    for (std::size_t i = 0; i < entities_to_process_.size(); ++i) {
         entity ent = entities_to_process_[i];
 
         if (!entity_buffer_infos_.contains(ent)) {

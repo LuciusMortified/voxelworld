@@ -15,7 +15,7 @@ void animation_fsm_system::update(float32 /*dt*/) {
 
     for (auto [ent, fsm_comp, player_comp] : view) {
         auto& triggers = fsm_comp.triggers_;
-        for (size_t i = 0; i < fsm_comp.machine_count(); ++i) {
+        for (std::size_t i = 0; i < fsm_comp.machine_count(); ++i) {
             auto pm = world_->system<animation_system>().modify_player(ent);
             if (!player_comp.has_layer(i)) {
                 pm.add_layer(i);
@@ -70,7 +70,7 @@ animation_fsm_system::modifier::modifier(
     : component_(component) {}
 
 void animation_fsm_system::modifier::add_machine(
-    size_t index, asset::animation_fsm machine
+    std::size_t index, asset::animation_fsm machine
 ) const {
     if (index >= component_->machines_.size()) {
         component_->machines_.resize(index + 1);

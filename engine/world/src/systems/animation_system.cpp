@@ -280,7 +280,7 @@ auto animation_system::compute_layer_transform(
 void animation_system::process_animation(
     entity ent, animation_player_component& anim_comp, float32 delta_time
 ) {
-    for (size_t i = 0; i < anim_comp.layers_.size(); ++i) {
+    for (std::size_t i = 0; i < anim_comp.layers_.size(); ++i) {
         process_layer(anim_comp.layers_[i], delta_time, i == 0);
     }
 
@@ -357,7 +357,7 @@ void animation_system::apply_animation(
         }
     }
 
-    for (size_t i = 1; i < anim_comp.layers_.size(); ++i) {
+    for (std::size_t i = 1; i < anim_comp.layers_.size(); ++i) {
         const auto& layer = anim_comp.layers_[i];
         if (!layer.clip || layer.fade_influence <= 0.0f) {
             continue;
@@ -408,7 +408,7 @@ auto animation_system::modify_player(
 }
 
 void animation_system::player_modifier::add_layer(
-    size_t index
+    std::size_t index
 ) const {
     if (index >= component_->layers_.size()) {
         component_->layers_.resize(index + 1);
@@ -416,7 +416,7 @@ void animation_system::player_modifier::add_layer(
 }
 
 auto animation_system::player_modifier::layer(
-    size_t index
+    std::size_t index
 ) -> layer_modifier {
     add_layer(index);
     return layer_modifier(system_, entity_, &component_->layers_[index]);

@@ -533,8 +533,8 @@ void build_face_mask(
 ) {
     constexpr int ps = vw::asset::model::page_size;
 
-    auto idx = [&](int u, int v) -> size_t {
-        return (static_cast<size_t>(u) * static_cast<size_t>(axes.height)) + static_cast<size_t>(v);
+    auto idx = [&](int u, int v) -> std::size_t {
+        return (static_cast<std::size_t>(u) * static_cast<std::size_t>(axes.height)) + static_cast<std::size_t>(v);
     };
 
     constexpr face_mask_cell empty_cell{blocks::air, 0};
@@ -912,7 +912,7 @@ auto strip_mesh_generator::generate_mesh_data(
     storage.clear();
 
     auto total    = mdl.width() * mdl.height() * mdl.depth();
-    auto estimate = static_cast<size_t>(total / 4);
+    auto estimate = static_cast<std::size_t>(total / 4);
 
     if (storage.quads.capacity() < estimate) {
         storage.quads.reserve(estimate);
@@ -942,8 +942,8 @@ void strip_mesh_generator::merge_and_emit_strips(
     const block_registry& registry,
     mesh_options opts
 ) {
-    auto idx = [&](int u, int v) -> size_t {
-        return static_cast<size_t>(u) * static_cast<size_t>(axes.height) + static_cast<size_t>(v);
+    auto idx = [&](int u, int v) -> std::size_t {
+        return static_cast<std::size_t>(u) * static_cast<std::size_t>(axes.height) + static_cast<std::size_t>(v);
     };
 
     for (int v = 0; v < axes.height; v++) {
@@ -977,7 +977,7 @@ void strip_mesh_generator::generate_face_quads(
     detail::face_axis_mapping axes(mdl, face_direction);
     constexpr int ps = vw::asset::model::page_size;
 
-    auto mask_size = static_cast<size_t>(axes.width) * static_cast<size_t>(axes.height);
+    auto mask_size = static_cast<std::size_t>(axes.width) * static_cast<std::size_t>(axes.height);
     storage.mask.resize(mask_size);
 
     const int depth_pages = (axes.depth + ps - 1) / ps;
@@ -1006,7 +1006,7 @@ void strip_mesh_generator::generate_face_quads(
         detail::build_face_mask(storage, mdl, axes, face_direction, layer, opts);
 
         bool has_faces = false;
-        for (size_t i = 0; i < mask_size && !has_faces; i++) {
+        for (std::size_t i = 0; i < mask_size && !has_faces; i++) {
             has_faces = !storage.mask[i].is_empty();
         }
         if (!has_faces)
@@ -1031,7 +1031,7 @@ auto greedy_mesh_generator::generate_mesh_data(
     // одного-двух удвоений и по замерам быстрее. Оценка по предыдущему чанку
     // пробовалась и хуже: один поверхностный чанк ставит высокую планку, которую
     // наследует каждый пустой чанк за ним.
-    constexpr size_t estimate = 4096;
+    constexpr std::size_t estimate = 4096;
 
     if (storage.quads.capacity() < estimate) {
         storage.quads.reserve(estimate);
@@ -1081,9 +1081,9 @@ void greedy_mesh_generator::merge_and_emit_rects_bits(
     detail::layer_rows& rows
 ) {
     // Построчно по u, поэтому расширение серии идёт по непрерывной памяти.
-    auto idx = [&](int u, int v) -> size_t {
-        return (static_cast<size_t>(v) * static_cast<size_t>(axes.width)) +
-               static_cast<size_t>(u);
+    auto idx = [&](int u, int v) -> std::size_t {
+        return (static_cast<std::size_t>(v) * static_cast<std::size_t>(axes.width)) +
+               static_cast<std::size_t>(u);
     };
 
     const auto keys_match = [&](int v, int u, int w, const face_mask_cell& key) -> bool {
@@ -1135,8 +1135,8 @@ void greedy_mesh_generator::merge_and_emit_rects(
     const block_registry& registry,
     mesh_options opts
 ) {
-    auto idx = [&](int u, int v) -> size_t {
-        return static_cast<size_t>(u) * static_cast<size_t>(axes.height) + static_cast<size_t>(v);
+    auto idx = [&](int u, int v) -> std::size_t {
+        return static_cast<std::size_t>(u) * static_cast<std::size_t>(axes.height) + static_cast<std::size_t>(v);
     };
 
     face_mask_cell empty_cell{blocks::air, 0};
@@ -1187,7 +1187,7 @@ void greedy_mesh_generator::generate_face_quads(
     detail::face_axis_mapping axes(mdl, face_direction);
     constexpr int ps = vw::asset::model::page_size;
 
-    auto mask_size = static_cast<size_t>(axes.width) * static_cast<size_t>(axes.height);
+    auto mask_size = static_cast<std::size_t>(axes.width) * static_cast<std::size_t>(axes.height);
     storage.mask.resize(mask_size);
 
     int depth_pages = (axes.depth + ps - 1) / ps;
@@ -1207,9 +1207,9 @@ void greedy_mesh_generator::generate_face_quads(
         }
     }
 
-    auto idx = [&](int u, int v) -> size_t {
-        return (static_cast<size_t>(v) * static_cast<size_t>(axes.width)) +
-               static_cast<size_t>(u);
+    auto idx = [&](int u, int v) -> std::size_t {
+        return (static_cast<std::size_t>(v) * static_cast<std::size_t>(axes.width)) +
+               static_cast<std::size_t>(u);
     };
 
     detail::layer_rows rows;
@@ -1299,7 +1299,7 @@ void greedy_mesh_generator::generate_face_quads(
         detail::build_face_mask(storage, mdl, axes, face_direction, layer, opts);
 
         bool has_faces = false;
-        for (size_t i = 0; i < mask_size && !has_faces; i++) {
+        for (std::size_t i = 0; i < mask_size && !has_faces; i++) {
             has_faces = !storage.mask[i].is_empty();
         }
         if (!has_faces)

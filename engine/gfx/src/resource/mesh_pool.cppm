@@ -36,7 +36,7 @@ struct mesh_gen_worker_stats {
     uint64 quads  = 0;
     std::vector<uint32> micros;
 
-    auto record(uint64 elapsed_ns, size_t quad_count) -> void {
+    auto record(uint64 elapsed_ns, std::size_t quad_count) -> void {
         ++chunks;
         nanos += elapsed_ns;
         quads += quad_count;

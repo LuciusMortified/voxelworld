@@ -23,7 +23,7 @@ class vulkan_context;
 
 struct entity_buffer_info {
     buffer_chunk_size chunk_size;
-    size_t buffer_index;
+    std::size_t buffer_index;
     vw::spatial::aabb bounds{};
 };
 
@@ -144,7 +144,7 @@ private:
     std::unique_ptr<index_buffer> index_upload_;
     uint32 index_quads_ = 0;
     std::unordered_map<entity, entity_buffer_info> entity_buffer_infos_;
-    std::map<buffer_chunk_size, size_t> chunk_size_to_buffer_index_;
+    std::map<buffer_chunk_size, std::size_t> chunk_size_to_buffer_index_;
 
     vk::DescriptorPool descriptor_pool_                     = nullptr;
     vk::DescriptorSetLayout descriptor_set_layout_          = nullptr;
