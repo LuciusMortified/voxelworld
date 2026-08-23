@@ -54,6 +54,15 @@ enum class bench_scene {
     // geometry whose merge key is carrying block-light gradients everywhere.
     torches,
 
+    // The same steady state as torches, and the same camera, with the sources
+    // standing in two dozen dense groups instead of spread evenly over the
+    // disc. Spread out, a froxel holds one source and a flat tile holds one
+    // source, and the depth slices buy nothing; packed into a hamlet, a tile
+    // covers the whole hamlet at every depth behind it and a froxel covers only
+    // the part of it at that depth. This scene is where slices=24 and slices=1
+    // are allowed to differ.
+    village,
+
     // A ring of bodies round the camera, each one bobbing to a different
     // height, for looking at the patch under them. One of them never leaves the
     // ground on purpose: judging whether a shadow pales as its owner rises is
@@ -92,6 +101,14 @@ constexpr std::array<block_choice, 8> block_menu{{
     {"white", blocks::white},
 }};
 
+// A carried source is round where a placed block's pool is a diamond, so the
+// two cannot share a reach and cover the same floor. The diamond's cut through
+// the light is a square of area 2r^2 and the ball's a circle of pi*r^2, which
+// meet at r * sqrt(2/pi). Emission fourteen therefore carries eleven voxels
+// rather than fourteen, and the pool that lands on the ground is the size the
+// block would have made.
+constexpr float32 round_reach = 0.8f;
+
 // The voxel the crosshair is on and the empty one just before it, in voxel
 // coordinates -- not world units. Which of the two a tool writes to is the
 // whole difference between placing and removing.
@@ -100,28 +117,84 @@ struct voxel_pick {
     vec3i empty;
 };
 
+// Everything the command line can say about a run, in one place. A struct
+// rather than a row of positional parameters: the fourteenth of those was
+// already impossible to read at the call site, and F3 wanted six more.
+struct scene_options {
+    bench_scene scene     = bench_scene::off;
+    uint32 crowd_size     = 0;
+    bool chunk_cull       = false;
+    bool sun_in_bench     = false;
+    int32 dig_per_frame   = 1;
+    int32 lamps_per_frame = 1;
+    bool light_inert      = false;
+    int32 static_lights   = 400;
+    int32 dynamic_lights  = 64;
+    bool free_storm       = false;
+    bool free_blobs       = false;
+    int32 blob_bodies     = 8;
+    int32 village_groups  = 24;
+    float32 light_speed   = 1.0F;
+
+    // 0 leaves the engine's own default in place, for all four of these.
+    uint32 visible_lights = 0;
+    uint32 cluster_tile   = 0;
+    uint32 cluster_slices = 0;
+    uint32 cluster_cap    = 0;
+
+    bool clustered_lights = true;
+
+    // Reading the grid back. Stats is the cheap half; verify is the whole
+    // thing plus the reference, every verify_every frames.
+    bool cluster_stats  = false;
+    uint32 verify_every = 0;
+};
+
 class world_grid_app final : public gfx::app {
 public:
     explicit world_grid_app(
-        gfx::engine& eng, bench_scene scene = bench_scene::off, uint32 crowd_size = 0,
-        bool chunk_cull = true, bool sun_in_bench = false, int32 dig_per_frame = 1,
-        int32 lamps_per_frame = 1, bool light_inert = false, int32 static_lights = 400,
-        int32 dynamic_lights = 64, bool free_storm = false, bool free_blobs = false,
-        int32 blob_bodies = 8
+        gfx::engine& eng, scene_options opts = {}
     )
         : app{eng},
-          bench_scene_{scene},
-          crowd_size_{crowd_size},
-          sun_in_bench_{sun_in_bench},
-          dig_per_frame_{dig_per_frame},
-          lamps_per_frame_{lamps_per_frame},
-          light_inert_{light_inert},
-          static_lights_{static_lights},
-          dynamic_lights_{dynamic_lights},
-          free_storm_{free_storm},
-          free_blobs_{free_blobs},
-          blob_bodies_{blob_bodies} {
-        get_engine().get_renderer().set_chunk_cull_enabled(chunk_cull);
+          bench_scene_{opts.scene},
+          crowd_size_{opts.crowd_size},
+          sun_in_bench_{opts.sun_in_bench},
+          dig_per_frame_{opts.dig_per_frame},
+          lamps_per_frame_{opts.lamps_per_frame},
+          light_inert_{opts.light_inert},
+          static_lights_{opts.static_lights},
+          dynamic_lights_{opts.dynamic_lights},
+          free_storm_{opts.free_storm},
+          free_blobs_{opts.free_blobs},
+          blob_bodies_{opts.blob_bodies},
+          village_groups_{std::max(opts.village_groups, 1)},
+          light_speed_{opts.light_speed},
+          verify_every_{opts.verify_every} {
+        auto& renderer = get_engine().get_renderer();
+
+        renderer.set_chunk_cull_enabled(opts.chunk_cull);
+        renderer.get_cluster_settings().enabled = opts.clustered_lights;
+
+        if (opts.visible_lights > 0) {
+            renderer.get_max_visible_lights() = opts.visible_lights;
+        }
+        if (opts.cluster_tile > 0) {
+            renderer.get_cluster_settings().tile_size = opts.cluster_tile;
+        }
+        if (opts.cluster_slices > 0) {
+            renderer.get_cluster_settings().slices = opts.cluster_slices;
+        }
+        if (opts.cluster_cap > 0) {
+            renderer.get_cluster_settings().cap = opts.cluster_cap;
+        }
+
+        // Verifying implies the lists; asking for stats alone spares the
+        // megabytes the lists cost every frame.
+        if (verify_every_ > 0) {
+            renderer.set_cluster_readback(gfx::cluster_readback_level::full);
+        } else if (opts.cluster_stats) {
+            renderer.set_cluster_readback(gfx::cluster_readback_level::counts);
+        }
         auto& window = get_engine().get_window();
         auto& camera = get_engine().get_camera();
 
@@ -170,6 +243,7 @@ public:
         report_dig_();
         report_light_();
         report_torches_();
+        report_clusters_();
         if (viewer_.is_valid()) {
             get_engine().get_world().destroy(viewer_);
         }
@@ -195,8 +269,16 @@ public:
         // The storm has to be standing and quiet before anything is measured.
         // Four hundred edits worth of relighting inside the measured window
         // would drown the thing the scene is there to price.
-        if (bench_scene_ == bench_scene::torches) {
+        if (is_torch_scene_()) {
             bench_ready_ = streamed && storm_standing_ && wgs.get_stats().relight_backlog == 0;
+            return bench_ready_;
+        }
+
+        // The ring goes up column by column now, so the last body can stand
+        // after the last column does. Measuring a ring that is still filling
+        // in counts patches that are not all there yet.
+        if (bench_scene_ == bench_scene::blobs) {
+            bench_ready_ = streamed && blob_seeded_ && blob_pending_.empty();
             return bench_ready_;
         }
 
@@ -224,7 +306,8 @@ public:
         tick_dig_();
         tick_light_();
         tick_torches_();
-        drive_storm_lights_();
+        drive_storm_lights_(delta_time);
+        tick_cluster_readback_();
         tick_blob_bodies_();
         tick_crowd_settle_();
         tick_day_night_(delta_time);
@@ -295,7 +378,7 @@ private:
 
         // Turning, and not parked, because a cull that is never asked to drop
         // anything is a cull that is not being measured.
-        if (bench_scene_ == bench_scene::torches) {
+        if (is_torch_scene_()) {
             camera.set_position({0.0f, bench_altitude_, 0.0f});
             camera.set_rotation(
                 -20.0f, static_cast<float32>(bench_frame_++) * bench_degrees_per_frame_
@@ -555,7 +638,7 @@ private:
                 lamp.color.z * lamp.intensity,
             })
             .set_intensity(14.0f / 15.0f)
-            .set_range(14.0f * scale);
+            .set_range(14.0f * round_reach * scale);
     }
 
     // Amanatides and Woo, in voxel space so the walk is the plain one: step to
@@ -870,15 +953,7 @@ private:
     // uniform holds: at that count every one of them has a patch, and none is
     // missing one because the nearest-eight rule dropped it.
     void spawn_blob_bodies_() {
-        if (world_grid_ == nullptr || !bob_bodies_.empty()) {
-            return;
-        }
-
-        // Late, and it has to be late. Called at camera placement the ring
-        // reaches into columns that have not arrived yet, get_surface_y has
-        // nothing to say about them, and the bodies standing there are quietly
-        // skipped -- the first run of this put up five of eight.
-        if (!camera_placed_ || !streaming_settled_()) {
+        if (world_grid_ == nullptr || (blob_seeded_ && blob_pending_.empty())) {
             return;
         }
 
@@ -890,14 +965,33 @@ private:
         const auto scale = static_cast<float32>(generator_params_.voxel_scale);
         const auto count = std::max(blob_bodies_, 1);
 
-        // One model for all of them. A model voxel is one world unit and a
-        // terrain voxel is eight, so a body the size of a person is sixteen
-        // across and forty tall -- built to the terrain's numbers it stands one
-        // voxel high and reads as a speck, which is how this scene started.
-        auto body = registry.create("blob_body", 16, 40, 16);
-        body->fill(voxel{blocks::red_4});
+        if (!blob_seeded_) {
+            // One model for all of them. A model voxel is one world unit and a
+            // terrain voxel is eight, so a body the size of a person is sixteen
+            // across and forty tall -- built to the terrain's numbers it stands
+            // one voxel high and reads as a speck, which is how this scene
+            // started.
+            blob_model_ = registry.create("blob_body", 16, 40, 16);
+            blob_model_->fill(voxel{blocks::red_4});
 
-        for (int32 i = 0; i < count; ++i) {
+            blob_pending_.reserve(static_cast<std::size_t>(count));
+            for (int32 i = 0; i < count; ++i) {
+                blob_pending_.push_back(i);
+            }
+
+            blob_seeded_ = true;
+        }
+
+        // A body whose columns have not arrived waits for them instead of being
+        // dropped. Skipping it is what made this wait for the whole world: the
+        // ring went up in one pass, and the first run of it put up five of
+        // eight. Every number below reads the ring index, not the order the
+        // ground turned up in, so the ring is the same one either way.
+        std::size_t keep = 0;
+
+        for (std::size_t pending = 0; pending < blob_pending_.size(); ++pending) {
+            const int32 i = blob_pending_[pending];
+
             const float32 angle =
                 (static_cast<float32>(i) / static_cast<float32>(count)) * 2.0f * math::pi;
 
@@ -924,6 +1018,7 @@ private:
             }
 
             if (!surface) {
+                blob_pending_[keep++] = i;
                 continue;
             }
 
@@ -936,7 +1031,7 @@ private:
                                  .with(ecs::blob_shadow_component{20.0f, 48.0f, 0.6f})
                                  .get_entity();
 
-            model_sys.modify(ent).set_model(body);
+            model_sys.modify(ent).set_model(blob_model_);
 
             const float32 ground = static_cast<float32>(*surface + 1) * scale;
 
@@ -964,10 +1059,14 @@ private:
             });
         }
 
-        log::info(
-            "blobs: {} bodies of {} asked on a ring of {} voxels", bob_bodies_.size(),
-            blob_bodies_, blob_ring
-        );
+        blob_pending_.resize(keep);
+
+        if (blob_pending_.empty()) {
+            log::info(
+                "blobs: {} bodies of {} asked on a ring of {} voxels", bob_bodies_.size(),
+                blob_bodies_, blob_ring
+            );
+        }
     }
 
     // A raised cosine off the frame index: starts on the ground, comes back to
@@ -999,17 +1098,53 @@ private:
             get_engine().get_renderer().get_mesh_pool().get_pending_count() == 0;
     }
 
-    [[nodiscard]] auto storm_site_(int32 i) const -> vec2i {
+    [[nodiscard]] auto is_torch_scene_() const -> bool {
+        return bench_scene_ == bench_scene::torches || bench_scene_ == bench_scene::village;
+    }
+
+    // Golden angle over a disc: even coverage, deterministic to the voxel, and
+    // no two sites landing on each other.
+    [[nodiscard]] static auto spiral_point_(int32 i, int32 count, float32 radius) -> vec2f {
         constexpr float32 golden = 2.39996323f;
 
-        const auto n     = static_cast<float32>(std::max(static_lights_, 1));
-        const float32 t  = static_cast<float32>(i) / n;
-        const float32 r  = static_cast<float32>(storm_radius) * std::sqrt(t);
-        const float32 a  = static_cast<float32>(i) * golden;
+        const auto n    = static_cast<float32>(std::max(count, 1));
+        const float32 t = static_cast<float32>(i) / n;
+        const float32 r = radius * std::sqrt(t);
+        const float32 a = static_cast<float32>(i) * golden;
+
+        return vec2f{r * std::cos(a), r * std::sin(a)};
+    }
+
+    [[nodiscard]] auto village_centre_(int32 group) const -> vec2f {
+        return spiral_point_(group, village_groups_, static_cast<float32>(storm_radius));
+    }
+
+    [[nodiscard]] auto storm_site_(int32 i) const -> vec2i {
+        const auto radius = static_cast<float32>(storm_radius);
+
+        if (bench_scene_ != bench_scene::village) {
+            const vec2f at = spiral_point_(i, std::max(static_lights_, 1), radius);
+
+            return vec2i{
+                static_cast<int32>(std::lround(at.x)),
+                static_cast<int32>(std::lround(at.y)),
+            };
+        }
+
+        // Group first and member second, so a run that places only half the
+        // emitters has every hamlet started rather than the first few finished.
+        const int32 group  = i % village_groups_;
+        const int32 member = i / village_groups_;
+        const int32 per =
+            (std::max(static_lights_, 1) + village_groups_ - 1) / village_groups_;
+
+        const vec2f centre = village_centre_(group);
+        const vec2f offset =
+            spiral_point_(member, per, static_cast<float32>(village_spread));
 
         return vec2i{
-            static_cast<int32>(std::lround(r * std::cos(a))),
-            static_cast<int32>(std::lround(r * std::sin(a))),
+            static_cast<int32>(std::lround(centre.x + offset.x)),
+            static_cast<int32>(std::lround(centre.y + offset.y)),
         };
     }
 
@@ -1017,41 +1152,69 @@ private:
         // Also without a bench, because the scene is worth walking around in
         // and a camera on rails that exits after nine hundred frames is not a
         // way to look at anything.
-        const bool wanted = bench_scene_ == bench_scene::torches || free_storm_;
+        const bool wanted = is_torch_scene_() || free_storm_;
         if (!wanted || world_grid_ == nullptr || storm_standing_) {
             return;
         }
 
-        // Placing before the world has finished arriving would put emitters
-        // into columns that are about to be generated again.
-        if (!camera_placed_ || !streaming_settled_()) {
-            return;
+        // Before the first emitter and before the world has finished arriving.
+        // A moving light needs no ground under it, and a scene that only has
+        // lights once the last column has landed measures a world built in the
+        // dark and lit afterwards -- which is not the world it claims to price.
+        spawn_storm_lights_();
+
+        if (!storm_seeded_) {
+            storm_pending_.reserve(static_cast<std::size_t>(std::max(static_lights_, 0)));
+            for (int32 i = 0; i < static_lights_; ++i) {
+                storm_pending_.push_back(i);
+            }
+            storm_seeded_ = true;
         }
 
         const int32 scale = generator_params_.voxel_scale;
 
-        for (int32 done = 0; done < lamps_per_frame_ && storm_cursor_ < static_lights_;
-             ++storm_cursor_) {
-            const vec2i at       = storm_site_(storm_cursor_);
-            const auto surface   = world_grid_->get_surface_y(at.x, at.y);
-            if (!surface) {
-                continue;
+        // A site whose column has not arrived yet is kept for a later frame,
+        // not skipped. A cursor walking past it lost that emitter for the rest
+        // of the run, and hiding that behind a wait for the whole world is what
+        // kept the lights out of every loading frame.
+        int32 done       = 0;
+        std::size_t keep = 0;
+
+        for (std::size_t i = 0; i < storm_pending_.size(); ++i) {
+            const int32 site = storm_pending_[i];
+
+            if (done < lamps_per_frame_) {
+                const vec2i at = storm_site_(site);
+                if (const auto surface = world_grid_->get_surface_y(at.x, at.y)) {
+                    world_grid_->set_voxel(
+                        {at.x * scale, (*surface + 1) * scale, at.y * scale}, voxel{blocks::lamp}
+                    );
+
+                    ++storm_placed_;
+                    ++done;
+                    continue;
+                }
             }
 
-            world_grid_->set_voxel(
-                {at.x * scale, (*surface + 1) * scale, at.y * scale}, voxel{blocks::lamp}
-            );
-
-            ++storm_placed_;
-            ++done;
+            storm_pending_[keep++] = site;
         }
 
-        if (storm_cursor_ < static_lights_) {
+        storm_pending_.resize(keep);
+
+        if (!storm_pending_.empty()) {
             return;
         }
 
-        // Everything static is down; hang the moving ones on the world and let
-        // is_bench_ready wait out the relighting they did not cause.
+        storm_standing_ = true;
+
+        log::info(
+            "{}: {} emitters standing, {} moving lights",
+            bench_scene_ == bench_scene::village ? "village" : "torches", storm_placed_,
+            storm_lights_.size()
+        );
+    }
+
+    auto spawn_storm_lights_() -> void {
         auto& world = get_engine().get_world();
 
         while (static_cast<int32>(storm_lights_.size()) < dynamic_lights_) {
@@ -1060,26 +1223,30 @@ private:
                                         .with<ecs::light_component>()
                                         .get_entity());
         }
-
-        storm_standing_ = true;
     }
 
     // Orbits are a function of the frame index and never of elapsed time, for
     // the same reason the camera path is: a benchmark steered by wall clock
     // measures a different scene on every machine.
-    void drive_storm_lights_() {
-        if (!storm_standing_ || world_grid_ == nullptr) {
+    void drive_storm_lights_(
+        float32 delta_time
+    ) {
+        if (storm_lights_.empty() || world_grid_ == nullptr) {
             return;
         }
 
-        const uint32 visible = get_engine().get_renderer().get_visible_light_count();
-        visible_peak_        = std::max(visible_peak_, visible);
-        visible_sum_ += visible;
-        ++visible_frames_;
-        capped_frames_ += (visible >= storm_cap) ? 1 : 0;
-
-        if (storm_lights_.empty()) {
-            return;
+        // Over the measured window alone. The lights orbit from the frame they
+        // are created, and the frames spent waiting for columns are not the
+        // steady state the report describes.
+        if (bench_ready_) {
+            const uint32 visible = get_engine().get_renderer().get_visible_light_count();
+            visible_peak_        = std::max(visible_peak_, visible);
+            visible_sum_ += visible;
+            ++visible_frames_;
+            // Asked of the renderer rather than kept alongside it: how often the
+        // scene is pressed against the cap says nothing unless it is the cap
+        // the frame actually used.
+        capped_frames_ += (visible >= get_engine().get_renderer().get_max_visible_lights()) ? 1 : 0;
         }
 
         auto& world          = get_engine().get_world();
@@ -1088,7 +1255,11 @@ private:
 
         const auto& lamp = get_engine().get_renderer().get_block_light_settings();
         const auto scale = static_cast<float32>(generator_params_.voxel_scale);
-        const auto frame = static_cast<float32>(storm_frame_++);
+        const auto phase = static_cast<float32>(storm_phase_);
+
+        storm_phase_ += (bench_scene_ == bench_scene::off)
+            ? static_cast<float64>(delta_time * storm_steps_per_second * light_speed_)
+            : static_cast<float64>(light_speed_);
 
         for (std::size_t i = 0; i < storm_lights_.size(); ++i) {
             const auto k = static_cast<float32>(i);
@@ -1099,17 +1270,42 @@ private:
             const float32 radius = static_cast<float32>(storm_radius) *
                 (0.2f + (0.8f * (k / static_cast<float32>(storm_lights_.size()))));
             const float32 speed = 0.004f + (0.002f * std::fmod(k, 5.0f));
-            const float32 angle = (k * 1.7f) + (frame * speed);
+            const float32 angle = (k * 1.7f) + (phase * speed);
 
-            const auto vx = static_cast<int32>(std::lround(radius * std::cos(angle)));
-            const auto vz = static_cast<int32>(std::lround(radius * std::sin(angle)));
+            // In the village the moving sources belong to a hamlet and orbit
+            // inside it. Sent round the whole disc they would spend most of the
+            // run over empty ground, and the scene would stop being the dense
+            // one it exists to be.
+            const bool in_village = bench_scene_ == bench_scene::village;
+
+            const vec2f home = in_village
+                ? village_centre_(static_cast<int32>(i) % village_groups_)
+                : vec2f{0.0f, 0.0f};
+
+            const float32 orbit = in_village
+                ? static_cast<float32>(village_spread) *
+                      (0.3f + (0.7f * (k / static_cast<float32>(storm_lights_.size()))))
+                : radius;
+
+            const float32 at_x = home.x + (orbit * std::cos(angle));
+            const float32 at_z = home.y + (orbit * std::sin(angle));
+
+            // Rounded to ask the grid how high the ground is, and nowhere else.
+            // The source itself stands where the orbit put it: a light on whole
+            // voxels hops a whole voxel at a time, and its falloff lands on the
+            // voxel boundaries every frame, so the ground under it reads as
+            // rings of flat-lit blocks rather than as a pool of light. Nothing
+            // downstream wants an integer -- the buffer carries floats and the
+            // shader works per pixel.
+            const auto vx = static_cast<int32>(std::lround(at_x));
+            const auto vz = static_cast<int32>(std::lround(at_z));
 
             const auto surface = world_grid_->get_surface_y(vx, vz);
             const float32 y =
                 surface ? (static_cast<float32>(*surface + 3) * scale) : bench_altitude_;
 
             transform_sys.modify(storm_lights_[i])
-                .set_position({static_cast<float32>(vx) * scale, y, static_cast<float32>(vz) * scale});
+                .set_position({at_x * scale, y, at_z * scale});
 
             light_sys.modify(storm_lights_[i])
                 .set_color(vec3f{
@@ -1118,28 +1314,225 @@ private:
                     lamp.color.z * lamp.intensity,
                 })
                 .set_intensity(14.0f / 15.0f)
-                .set_range(14.0f * scale);
+                .set_range(14.0f * round_reach * scale);
         }
     }
 
-    void report_torches_() const {
-        if (bench_scene_ != bench_scene::torches || visible_frames_ == 0) {
+    // A frame's grid comes back a full ring later, so this is always a frame
+    // that has certainly finished and never the one being recorded. Both lists
+    // separately: a mean taken over sources and bodies together describes
+    // neither.
+    auto tick_cluster_readback_() -> void {
+        for (const gfx::cull_list kind : {gfx::cull_list::sources, gfx::cull_list::blobs}) {
+            auto frame = get_engine().get_renderer().take_cluster_readback(kind);
+
+            if (frame) {
+                account_(kind, *frame);
+            }
+        }
+    }
+
+    auto account_(gfx::cull_list kind, const gfx::cluster_readback& frame) -> void {
+        // Streaming frames light a world that is still arriving, and averaging
+        // those into the steady state is how a scene reports a grid it never
+        // actually ran.
+        if (bench_scene_ != bench_scene::off && !bench_ready_) {
+            return;
+        }
+
+        const uint32 clusters = frame.grid.cluster_count();
+
+        if (frame.counts.size() < static_cast<std::size_t>(clusters) + 1) {
+            return;
+        }
+
+        cluster_tally& tally = tally_[static_cast<std::size_t>(kind)];
+
+        ++tally.frames;
+        tally.grid = frame.grid;
+        tally.cap  = frame.cap;
+
+        uint64 assignments = 0;
+        uint64 lit         = 0;
+        uint32 peak        = 0;
+
+        for (uint32 cluster = 0; cluster < clusters; ++cluster) {
+            const uint32 listed = frame.counts[cluster];
+
+            assignments += listed;
+            lit += (listed > 0) ? 1 : 0;
+            peak = std::max(peak, listed);
+        }
+
+        tally.assignments += assignments;
+        tally.lit += lit;
+        tally.peak = std::max(tally.peak, peak);
+
+        const uint32 overflow = frame.counts[clusters];
+
+        tally.overflow += overflow;
+        tally.overflow_frames += (overflow > 0) ? 1 : 0;
+
+        if (verify_every_ == 0 || frame.indices.empty() ||
+            (tally.frames % verify_every_) != 0) {
+            return;
+        }
+
+        verify_frame_(kind, frame);
+    }
+
+    // The reference is the same code the unit tests pin down, fed the same
+    // view-space spheres the compute pass built for itself. What it costs is a
+    // frame of stutter every verify_every frames, which is why nothing does
+    // this unless asked.
+    auto verify_frame_(gfx::cull_list kind, const gfx::cluster_readback& frame) -> void {
+        const auto slot = static_cast<std::size_t>(kind);
+
+        auto& reference = verify_reference_[slot];
+
+        if (!reference || reference->get_grid() != frame.grid ||
+            reference->get_cap() != frame.cap) {
+            reference = std::make_unique<spatial::cluster_lights>(frame.grid, frame.cap);
+        } else {
+            reference->clear();
+        }
+
+        for (std::size_t i = 0; i < frame.columns.size(); ++i) {
+            reference->add(static_cast<uint32>(i), frame.columns[i]);
+        }
+
+        const auto check = spatial::check_clusters(*reference, frame.counts, frame.indices);
+
+        cluster_tally& tally = tally_[slot];
+
+        ++tally.verified;
+        tally.clusters += check.clusters_compared;
+        tally.bad_counts += check.count_mismatches;
+        tally.bad_sets += check.set_mismatches;
+
+        if (check.ok()) {
+            return;
+        }
+
+        ++tally.bad_frames;
+
+        if (tally.bad_frames > 1) {
+            return;
+        }
+
+        tally.worst = check;
+
+        log::warn(
+            "verify-lights ({}): {} counts and {} lists disagree with the reference, "
+            "overflow tally {}; first at cluster {}, {} on the GPU and {} expected",
+            kind == gfx::cull_list::sources ? "sources" : "bodies",
+            check.count_mismatches, check.set_mismatches,
+            check.overflow_matches ? "matches" : "does not match", check.first_bad,
+            check.actual_count, check.reference_count
+        );
+    }
+
+    void report_clusters_() const {
+        report_list_(gfx::cull_list::sources, "sources");
+        report_list_(gfx::cull_list::blobs, "bodies");
+    }
+
+    void report_list_(gfx::cull_list kind, std::string_view what) const {
+        const cluster_tally& tally = tally_[static_cast<std::size_t>(kind)];
+
+        if (tally.frames == 0) {
+            return;
+        }
+
+        const auto frames = static_cast<float64>(tally.frames);
+        const auto lit    = static_cast<float64>(tally.lit);
+        const auto total  = static_cast<float64>(tally.grid.cluster_count());
+
+        std::print(
+            "\nclusters ({}): {}x{} tiles of {} px over {} slices, cap {}, {} clusters\n"
+            "  per frame: {:.0f} assignments, {:.1f}% of clusters lit, "
+            "{:.1f} mean list, {} peak\n"
+            "  overflow: {:.1f} dropped a frame, {} frames of {} touched the cap\n",
+            what,
+            tally.grid.tiles_x(),
+            tally.grid.tiles_y(),
+            tally.grid.tile_size,
+            tally.grid.slices,
+            tally.cap,
+            tally.grid.cluster_count(),
+            static_cast<float64>(tally.assignments) / frames,
+            total > 0.0 ? 100.0 * lit / (frames * total) : 0.0,
+            lit > 0.0 ? static_cast<float64>(tally.assignments) / lit : 0.0,
+            tally.peak,
+            static_cast<float64>(tally.overflow) / frames,
+            tally.overflow_frames,
+            tally.frames
+        );
+
+        if (verify_every_ == 0) {
             return;
         }
 
         std::print(
-            "\ntorches: {} emitters placed of {} asked, {} moving lights\n"
-            "  spiral of radius {} voxels round the origin, camera turning\n"
-            "  visible after the cull: {:.1f} mean, {} peak, {} frames at the cap of {}\n",
+            "  verify: {} frames checked against vw::spatial, {} disagreed;\n"
+            "    {} counts and {} lists off out of {} clusters compared\n",
+            tally.verified,
+            tally.bad_frames,
+            tally.bad_counts,
+            tally.bad_sets,
+            tally.clusters
+        );
+
+        if (tally.bad_frames > 0) {
+            std::print(
+                "    first at cluster {}: {} on the GPU, {} in the reference; "
+                "{} counts and {} lists off, overflow tally {}\n",
+                tally.worst.first_bad,
+                tally.worst.actual_count,
+                tally.worst.reference_count,
+                tally.worst.count_mismatches,
+                tally.worst.set_mismatches,
+                tally.worst.overflow_matches ? "matches" : "does not match"
+            );
+        }
+    }
+
+    void report_torches_() const {
+        if (!is_torch_scene_() || visible_frames_ == 0) {
+            return;
+        }
+
+        const bool village = bench_scene_ == bench_scene::village;
+        const uint32 cap   = get_engine().get_renderer().get_max_visible_lights();
+
+        const std::string layout =
+            village ? std::format(
+                          "{} hamlets {} voxels across, spread over a spiral",
+                          village_groups_, village_spread * 2
+                      )
+                    : std::string{"a spiral"};
+
+        std::print(
+            "\n{}: {} emitters placed of {} asked, {} moving lights\n"
+            "  {} of radius {} voxels round the origin, camera turning\n"
+            "  visible after the cull: {:.1f} mean, {} peak\n",
+            village ? "village" : "torches",
             storm_placed_,
             static_lights_,
             storm_lights_.size(),
+            layout,
             storm_radius,
             static_cast<float64>(visible_sum_) / static_cast<float64>(visible_frames_),
-            visible_peak_,
-            capped_frames_,
-            storm_cap
+            visible_peak_
         );
+
+        // Only when there is a cap to be at: with none, "0 frames at the cap
+        // of 4294967295" is a line that says nothing.
+        if (cap != gfx::light_buffer::no_cap) {
+            std::print(
+                "  {} frames of {} at the cap of {}\n", capped_frames_, visible_frames_, cap
+            );
+        }
     }
 
     void report_light_() const {
@@ -1579,14 +1972,25 @@ private:
             // Judging occlusion off the finished frame means judging a product
             // of the block's colour and everything falling on it. These show
             // one factor with the others taken away.
-            static constexpr std::array<const char*, 7> view_names{
-                "off",       "ambient occlusion", "normals",     "sky light",
-                "convexity", "block light",       "blob shadow"
+            static constexpr std::array<const char*, 9> view_names{
+                "off",         "ambient occlusion", "normals",
+                "sky light",   "convexity",         "block light",
+                "blob shadow", "light complexity",  "blob complexity"
             };
             auto view = static_cast<int32>(renderer.get_debug_view());
             if (ImGui::Combo("Debug view", &view, view_names.data(), view_names.size())) {
                 renderer.set_debug_view(static_cast<gfx::debug_view>(view));
             }
+
+            // The switch the acceptance of the froxel pass rests on: the same
+            // frame lit both ways, with nothing else moving between the two.
+            auto& clusters = renderer.get_cluster_settings();
+            ImGui::Checkbox("Clustered lights", &clusters.enabled);
+            ImGui::SameLine();
+            ImGui::Text("%u x %u x %u, cap %u",
+                renderer.get_cluster_grid(get_engine().get_camera()).tiles_x(),
+                renderer.get_cluster_grid(get_engine().get_camera()).tiles_y(),
+                clusters.slices, clusters.cap);
 
             ImGui::Text(
                 "sky   %.3f %.3f %.3f", ambient.sky.x, ambient.sky.y, ambient.sky.z
@@ -1743,28 +2147,77 @@ private:
     uint32 bob_frame_  = 0;
     std::vector<bob> bob_bodies_;
 
+    // Ring indices still waiting for the ground under them, and the one model
+    // they all share. The ring goes up column by column, so both outlive the
+    // frame that started it.
+    bool blob_seeded_ = false;
+    std::vector<int32> blob_pending_;
+    std::shared_ptr<asset::model> blob_model_;
+
     // Ninety-six voxels is a little under two columns out, which at this scale
     // covers most of what the camera can see before the fog takes over.
     static constexpr int32 storm_radius = 96;
 
-    // Matches light_buffer's own cap. Kept here only to report how often the
-    // scene is pressed against it -- if that number is not high, the scene is
-    // not stressing what it says it is.
-    static constexpr uint32 storm_cap = 24;
-
     int32 static_lights_  = 400;
     int32 dynamic_lights_ = 64;
-    int32 storm_cursor_   = 0;
     uint64 storm_placed_  = 0;
-    uint32 storm_frame_   = 0;
+    // Steps, not frames, and float64 because it only ever grows: at sixty a
+    // second a long look at the scene would start losing the step itself in
+    // float32 somewhere in the tenth hour.
+    float64 storm_phase_ = 0.0;
+
+    float32 light_speed_ = 1.0F;
+    bool storm_seeded_    = false;
     bool storm_standing_  = false;
     bool free_storm_      = false;
+    std::vector<int32> storm_pending_;
     std::vector<ecs::entity> storm_lights_;
 
     uint32 visible_peak_   = 0;
     uint64 visible_sum_    = 0;
     uint64 visible_frames_ = 0;
     uint32 capped_frames_  = 0;
+
+    int32 village_groups_ = 24;
+
+    // A hamlet is a handful of voxels across, not a hundred: the point of the
+    // scene is a knot of sources close enough that one tile holds all of them.
+    static constexpr int32 village_spread = 10;
+
+    // What a step is worth outside a bench. The orbits below step with the
+    // frame, which is the only thing a measured scene may do, and exactly the
+    // wrong thing for a scene being looked at: at six hundred frames a second
+    // the sources crossed the whole disc in under a second and there was
+    // nothing to make out. Sixty a second is the same scene at the speed a
+    // monitor would have shown it.
+    static constexpr float32 storm_steps_per_second = 60.0F;
+
+    uint32 verify_every_ = 0;
+
+    // One list's worth of what the grid did. Two of them, because a mean taken
+    // over the sources and the bodies together describes neither.
+    struct cluster_tally {
+        spatial::cluster_grid grid{};
+        uint32 cap = 0;
+
+        uint64 frames          = 0;
+        uint64 assignments     = 0;
+        uint64 lit             = 0;
+        uint32 peak            = 0;
+        uint64 overflow        = 0;
+        uint64 overflow_frames = 0;
+
+        uint64 verified   = 0;
+        uint64 bad_frames = 0;
+        uint64 clusters   = 0;
+        uint64 bad_counts = 0;
+        uint64 bad_sets   = 0;
+        spatial::cluster_check worst{};
+    };
+
+    std::array<cluster_tally, gfx::cull_list_count> tally_{};
+    std::array<std::unique_ptr<spatial::cluster_lights>, gfx::cull_list_count>
+        verify_reference_;
 
     edit_tool tool_             = edit_tool::none;
     int32 place_choice_         = 0;
@@ -1813,46 +2266,46 @@ auto parse_uint(std::string_view text, uint32 fallback) -> uint32 {
     return value;
 }
 
+auto parse_float(std::string_view text, float32 fallback) -> float32 {
+    float32 value = 0.0F;
+    const auto* end = text.data() + text.size();
+    if (std::from_chars(text.data(), end, value).ec != std::errc{}) {
+        return fallback;
+    }
+    return value;
+}
+
 }  // namespace
 
 auto main(int argc, char** argv) -> int {
     gfx::bench_config bench;
-    auto scene        = bench_scene::off;
-    uint32 crowd_size = 0;
-    bool chunk_cull    = false;
-    bool sun_in_bench  = false;
-    int32 dig_per_frame = 1;
-    int32 lamps_per_frame = 1;
-    bool light_inert      = false;
-    int32 static_lights   = 400;
-    int32 dynamic_lights  = 64;
-    bool free_storm       = false;
-    bool free_blobs       = false;
-    int32 blob_bodies     = 8;
+    scene_options opts;
 
     for (int32 i = 1; i < argc; ++i) {
         if (const auto value = option_value(std::string_view{argv[i]}, "--bench")) {
-            if (*value == "crowd" && crowd_size == 0) {
-                crowd_size = 50;
+            if (*value == "crowd" && opts.crowd_size == 0) {
+                opts.crowd_size = 50;
             }
             if (*value == "parked") {
-                scene = bench_scene::parked;
+                opts.scene = bench_scene::parked;
             } else if (*value == "spin") {
-                scene = bench_scene::spin;
+                opts.scene = bench_scene::spin;
             } else if (*value == "advance") {
-                scene = bench_scene::advance;
+                opts.scene = bench_scene::advance;
             } else if (*value == "crowd") {
-                scene = bench_scene::crowd;
+                opts.scene = bench_scene::crowd;
             } else if (*value == "dig") {
-                scene = bench_scene::dig;
+                opts.scene = bench_scene::dig;
             } else if (*value == "light") {
-                scene = bench_scene::light;
+                opts.scene = bench_scene::light;
             } else if (*value == "torches") {
-                scene = bench_scene::torches;
+                opts.scene = bench_scene::torches;
+            } else if (*value == "village") {
+                opts.scene = bench_scene::village;
             } else if (*value == "blobs") {
-                scene = bench_scene::blobs;
+                opts.scene = bench_scene::blobs;
             } else {
-                scene = bench_scene::flythrough;
+                opts.scene = bench_scene::flythrough;
             }
             bench.measure_frames      = 2000;
             bench.warmup_frames       = 200;
@@ -1870,49 +2323,74 @@ auto main(int argc, char** argv) -> int {
         } else if (const auto value = option_value(arg, "--bench-out")) {
             bench.report_path = std::string{*value};
         } else if (const auto value = option_value(arg, "--bench-crowd")) {
-            crowd_size = parse_uint(*value, 50);
+            opts.crowd_size = parse_uint(*value, 50);
         } else if (const auto value = option_value(arg, "--bench-dig")) {
-            dig_per_frame = static_cast<int32>(parse_uint(*value, 1));
+            opts.dig_per_frame = static_cast<int32>(parse_uint(*value, 1));
         } else if (const auto value = option_value(arg, "--bench-lamps")) {
-            lamps_per_frame = static_cast<int32>(parse_uint(*value, 1));
+            opts.lamps_per_frame = static_cast<int32>(parse_uint(*value, 1));
         } else if (const auto value = option_value(arg, "--bench-static")) {
-            static_lights = static_cast<int32>(parse_uint(*value, 400));
+            opts.static_lights = static_cast<int32>(parse_uint(*value, 400));
         } else if (const auto value = option_value(arg, "--bench-dynamic")) {
-            dynamic_lights = static_cast<int32>(parse_uint(*value, 64));
+            opts.dynamic_lights = static_cast<int32>(parse_uint(*value, 64));
+        } else if (const auto value = option_value(arg, "--bench-visible")) {
+            opts.visible_lights = parse_uint(*value, 0);
+        } else if (const auto value = option_value(arg, "--bench-groups")) {
+            opts.village_groups = static_cast<int32>(parse_uint(*value, 24));
+        } else if (const auto value = option_value(arg, "--cluster-tile")) {
+            opts.cluster_tile = parse_uint(*value, 0);
+        } else if (const auto value = option_value(arg, "--cluster-slices")) {
+            // One slice is exactly flat tiles, which is the only honest way to
+            // price what cutting by depth buys.
+            opts.cluster_slices = parse_uint(*value, 0);
+        } else if (const auto value = option_value(arg, "--cluster-cap")) {
+            opts.cluster_cap = parse_uint(*value, 0);
+        } else if (arg == "--cluster-stats") {
+            // The cheap half of the readback: how full the grid runs and how
+            // much of it overflowed, without the lists themselves.
+            opts.cluster_stats = true;
+        } else if (const auto value = option_value(arg, "--verify-lights")) {
+            opts.verify_every = parse_uint(*value, 60);
+        } else if (arg == "--verify-lights") {
+            opts.verify_every = 60;
+        } else if (arg == "--no-clusters") {
+            // The other path: every source in the frame walked per pixel. The
+            // froxel list is only worth a number next to this one.
+            opts.clustered_lights = false;
         } else if (arg == "--blobs") {
             // The blob scene with nobody driving: the ring stands up, the
             // bodies bob, the camera is yours.
-            free_blobs = true;
+            opts.free_blobs = true;
+        } else if (const auto value = option_value(arg, "--light-speed")) {
+            // How fast the moving sources go round, one being what the bench
+            // uses. Below one to study a single source crossing a tile
+            // boundary; a bench run that sets it is measuring another scene.
+            opts.light_speed = std::max(parse_float(*value, 1.0F), 0.0F);
         } else if (const auto value = option_value(arg, "--bench-bodies")) {
-            blob_bodies = static_cast<int32>(parse_uint(*value, 8));
+            opts.blob_bodies = static_cast<int32>(parse_uint(*value, 8));
         } else if (arg == "--lights") {
             // The torches scene with nobody driving: same four hundred emitters
             // and sixty-four moving lights, free camera, no exit after a frame
             // count. --bench-static and --bench-dynamic still size it.
-            free_storm = true;
+            opts.free_storm = true;
         } else if (arg == "--bench-inert") {
             // The control run: the same edits, the same geometry, a block that
             // does not emit. What the two runs differ by is the light.
-            light_inert = true;
+            opts.light_inert = true;
         } else if (const auto value = option_value(arg, "--mesh-workers")) {
             bench.mesh_workers = parse_uint(*value, 0);
         } else if (const auto value = option_value(arg, "--terrain-workers")) {
             bench.terrain_workers = parse_uint(*value, 0);
         } else if (arg == "--chunk-cull") {
-            chunk_cull = true;
+            opts.chunk_cull = true;
         } else if (arg == "--sun") {
-            sun_in_bench = true;
+            opts.sun_in_bench = true;
         }
     }
 
     try {
         log::add_file_sink("test_world_grid.log");
         std::make_unique<gfx::engine>(1280, 720, "Voxel World - World Grid Test", std::move(bench))
-            ->run<world_grid_app>(
-                scene, crowd_size, chunk_cull, sun_in_bench, dig_per_frame, lamps_per_frame,
-                light_inert, static_lights, dynamic_lights, free_storm, free_blobs,
-                blob_bodies
-            );
+            ->run<world_grid_app>(opts);
     } catch (const std::exception& e) {
         log::error("Error: {}", e.what());
         return 1;
