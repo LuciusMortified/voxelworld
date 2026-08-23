@@ -33,6 +33,7 @@ vcpkg_installed/
 *.tmp
 *.swp
 *~
+bench/
 
 # Генерируемые файлы
 *.generated.*
