@@ -83,6 +83,18 @@ renderer::renderer(
         *context_, deletion_queue_, descriptor_pool_, point_lights_descriptor_set_layout_
     );
 
+    std::array<vk::DescriptorSet, MAX_FRAMES_IN_FLIGHT> light_sets{};
+    for (uint32 frame = 0; frame < MAX_FRAMES_IN_FLIGHT; ++frame) {
+        light_sets[frame] = light_buffer_->get_descriptor_set(frame);
+    }
+
+    blob_buffer_ = std::make_unique<blob_buffer>(*context_, deletion_queue_, light_sets);
+
+    light_grid_ = std::make_unique<light_grid>(
+        *context_, deletion_queue_, descriptor_pool_, point_lights_descriptor_set_layout_,
+        light_sets
+    );
+
     palette_buffer_ = std::make_unique<palette_buffer>(
         *context_, descriptor_pool_, palette_descriptor_set_layout_, *block_registry_
     );
@@ -96,6 +108,8 @@ renderer::~renderer() {
     cull_pipeline_.reset();
     gpu_timer_.reset();
     palette_buffer_.reset();
+    light_grid_.reset();
+    blob_buffer_.reset();
     light_buffer_.reset();
     shadow_map_.reset();
 
@@ -251,81 +265,44 @@ auto renderer::get_block_light_settings() -> block_light_settings& {
     return block_light_settings_;
 }
 
-// Nearest first and no more than the block holds. A body far enough away that
-// its patch is a couple of pixels is not worth a slot, and which eight are kept
-// has to be the eight nearest rather than the eight the ECS happened to list.
-void renderer::gather_blobs_(
-    world_type& world, const camera& camera, uniform_buffer_object& ubo
-) const {
-    struct candidate {
-        blob_data data;
-        float32 distance_sq;
+auto renderer::get_max_visible_lights() -> uint32& {
+    return light_buffer_->get_max_visible();
+}
+
+auto renderer::get_cluster_settings() -> cluster_settings& {
+    return cluster_settings_;
+}
+
+auto renderer::set_cluster_readback(cluster_readback_level level) -> void {
+    light_grid_->set_readback(level);
+}
+
+auto renderer::take_cluster_readback(cull_list kind) -> std::optional<cluster_readback> {
+    return light_grid_->take_readback(kind);
+}
+
+auto renderer::get_cluster_grid(
+    const camera& camera
+) const -> spatial::cluster_grid {
+    const mat4f projection = camera.get_projection_matrix();
+
+    // The fog's distance and not the camera's: a logarithmic mapping over
+    // 0.1 to 50000 spends most of its slices past the fog, on air nothing is
+    // drawn in.
+    const float32 far_depth = fog_settings_.enabled
+                                  ? fog_settings_.far_distance
+                                  : camera.get_far();
+
+    return spatial::cluster_grid{
+        .screen_width  = swapchain_extent_.width,
+        .screen_height = swapchain_extent_.height,
+        .tile_size     = cluster_settings_.tile_size,
+        .slices        = cluster_settings_.slices,
+        .near_depth    = camera.get_near(),
+        .far_depth     = std::max(far_depth, camera.get_near() * 2.0f),
+        .proj_x        = projection[0, 0],
+        .proj_y        = projection[1, 1],
     };
-
-    std::vector<candidate> found;
-
-    const vec3f eye = camera.get_position();
-
-    auto view = world.template view<ecs::blob_shadow_component, ecs::transform_component>();
-    for (const auto& [ent, blob, transform] : view) {
-        // Under the middle of the body and level with its feet, which the
-        // transform is not: a model's origin is the corner its voxels start
-        // from, so a body sixteen wide had its patch eight units off in both x
-        // and z. The bounds are where the geometry actually is.
-        //
-        // They are only there for an entity the spatial system tracks, and it
-        // tracks the ones carrying a model. A hierarchy root holding nothing
-        // itself keeps a bounding box of no size, and for those the transform
-        // is all there is.
-        vec3f pos = transform.get_position();
-
-        // And how tall it is, which the shader needs to tell the ground under
-        // the body from the body itself. With no bounds to read, the fall
-        // height stands in: it is already set to about one body everywhere it
-        // is used, and being roughly right beats a cut at the feet.
-        float32 height = blob.get_fall();
-
-        if (world.template has<ecs::spatial_component>(ent)) {
-            const auto& bounds = world.template get<ecs::spatial_component>(ent).get_bounds();
-            const auto size    = bounds.size();
-            if (size.x > 0.0f && size.z > 0.0f) {
-                pos    = vec3f{bounds.center().x, bounds.min.y, bounds.center().z};
-                height = size.y;
-            }
-        }
-
-        const float32 dx = pos.x - eye.x;
-        const float32 dy = pos.y - eye.y;
-        const float32 dz = pos.z - eye.z;
-
-        found.push_back(candidate{
-            .data =
-                blob_data{
-                    .position_radius = vec4f{pos.x, pos.y, pos.z, blob.get_radius()},
-                    .params = vec4f{blob.get_fall(), blob.get_strength(), height, 0.0f},
-                },
-            .distance_sq = (dx * dx) + (dy * dy) + (dz * dz),
-        });
-    }
-
-    if (found.size() > max_blobs) {
-        const auto nth = found.begin() + static_cast<std::ptrdiff_t>(max_blobs);
-        std::nth_element(
-            found.begin(), nth, found.end(),
-            [](const candidate& a, const candidate& b) -> bool {
-                return a.distance_sq < b.distance_sq;
-            }
-        );
-        found.resize(max_blobs);
-    }
-
-    for (std::size_t i = 0; i < found.size(); ++i) {
-        ubo.blobs[i] = found[i].data;
-    }
-
-    ubo.blob_count    = static_cast<uint32>(found.size());
-    ubo.blob_strength = blob_strength_;
-
 }
 
 auto renderer::get_visible_light_count() const -> uint32 {
@@ -481,6 +458,30 @@ void renderer::render(
     });
 
     const auto& cascade_frustums = shadow_map_->get_cascade_frustums();
+
+    // Above the render pass, and it has to be above it. The frame uniform reads
+    // the count this publishes, and a compute pass -- which is where the light
+    // grid is heading -- cannot be recorded inside a render pass at all.
+    stats_.timing.light_gather_ms = measure_ms([&] {
+        light_buffer_->update(
+            world, camera.get_frustum(), camera.get_position(), current_frame_
+        );
+        blob_buffer_->update(world, current_frame_);
+    });
+
+    stats_.timing.light_cull_ms = measure_ms([&] {
+        gpu_timer_->begin(cmd, gpu_stage::light_cull);
+
+        light_grid_->set_grid(
+            get_cluster_grid(camera), cluster_settings_.cap, cluster_settings_.blob_cap
+        );
+        light_grid_->dispatch(
+            cmd, light_buffer_->get_descriptor_set(current_frame_), camera.get_view_matrix(),
+            light_buffer_->get_lights(), blob_buffer_->get_blobs(), current_frame_
+        );
+
+        gpu_timer_->end(cmd, gpu_stage::light_cull);
+    });
 
     stats_.timing.compute_cull_ms = measure_ms([&] {
         gpu_timer_->begin(cmd, gpu_stage::compute_cull);
@@ -1224,8 +1225,13 @@ void renderer::create_descriptor_pool() {
 
     std::array pool_sizes = {
         vk::DescriptorPoolSize{
+            // Frame uniforms, shadow uniforms, the chunk cull's frustums and
+            // the cull's grid -- which is one ring per list, and there are two.
+            // Eight rings and not the five that are used: an exact fit throws
+            // at startup the day somebody adds a sixth, and the throw names the
+            // pool rather than the ring that overflowed it.
             vk::DescriptorType::eUniformBuffer,
-            static_cast<uint32>(MAX_FRAMES_IN_FLIGHT * 2 + MAX_FRAMES_IN_FLIGHT)
+            static_cast<uint32>(MAX_FRAMES_IN_FLIGHT * 8)
         },
         vk::DescriptorPoolSize{vk::DescriptorType::eStorageBuffer, STORAGE_BUFFER_COUNT},
         vk::DescriptorPoolSize{
@@ -1546,9 +1552,6 @@ void renderer::render_world_pass(
 void renderer::render_world(
     world_type& world, const camera& camera
 ) {
-    // Обновить light buffer
-    light_buffer_->update(world, camera.get_frustum(), camera.get_position());
-
     vk::Pipeline current_pipeline =
         (current_render_mode_ == render_mode::lit) ? graphics_pipeline_ : wireframe_pipeline_;
     command_buffers_[current_image_index_].bindPipeline(vk::PipelineBindPoint::eGraphics, current_pipeline);
@@ -1572,7 +1575,8 @@ void renderer::render_world(
         nullptr);
 
     // Биндим point lights descriptor set (set 3)
-    vk::DescriptorSet point_lights_descriptor_set = light_buffer_->get_descriptor_set();
+    vk::DescriptorSet point_lights_descriptor_set =
+        light_buffer_->get_descriptor_set(current_frame_);
     command_buffers_[current_image_index_].bindDescriptorSets(vk::PipelineBindPoint::eGraphics,
         pipeline_layout_,
         3,  // Set index 3 (point lights descriptor set layout)
@@ -1715,9 +1719,28 @@ void renderer::update_uniform_buffer(
     ubo.debug_view = static_cast<uint32>(debug_view_);
 
     // Point lights count
-    gather_blobs_(world, camera, ubo);
 
     ubo.point_lights_count = light_buffer_->get_lights_count();
+    ubo.blob_strength      = blob_strength_;
+    ubo.blob_dims          = vec4<uint32>{
+        cluster_settings_.blob_cap, blob_buffer_->get_count(), 0, 0
+    };
+
+    const spatial::cluster_grid grid = get_cluster_grid(camera);
+
+    ubo.cluster_params = vec4f{
+        grid.z_scale(),
+        grid.z_bias(),
+        static_cast<float32>(grid.tile_size),
+        static_cast<float32>(grid.slices),
+    };
+
+    ubo.cluster_dims = vec4<uint32>{
+        grid.tiles_x(),
+        grid.tiles_y(),
+        cluster_settings_.cap,
+        cluster_settings_.enabled ? 1u : 0u,
+    };
 
     // Fog
     ubo.fog.color         = fog_settings_.color;
@@ -1989,19 +2012,30 @@ void renderer::cleanup_palette_resources() {
 namespace vw::gfx {
 
 void renderer::create_point_lights_descriptor_set_layout() {
-    // Point lights storage buffer descriptor set layout (set 3, binding 0)
-    vk::DescriptorSetLayoutBinding point_lights_layout_binding{};
-    point_lights_layout_binding.binding            = 0;
-    point_lights_layout_binding.descriptorType     = vk::DescriptorType::eStorageBuffer;
-    point_lights_layout_binding.descriptorCount    = 1;
-    point_lights_layout_binding.stageFlags         = vk::ShaderStageFlagBits::eFragment;
-    point_lights_layout_binding.pImmutableSamplers = nullptr;
+    // Set 3, and no further set was opened for what the froxel grid brought:
+    // binding 0 is the source list, 1 the count per cluster and 2 the indices;
+    // 3 is the list of patches under the bodies, 4 and 5 their own counts and
+    // indices. Compute writes the four, the fragment reads all six, and one
+    // bind reaches the lot.
+    std::array<vk::DescriptorSetLayoutBinding, 6> bindings{};
 
-    vk::DescriptorSetLayoutCreateInfo point_lights_layout_info{};
-    point_lights_layout_info.bindingCount = 1;
-    point_lights_layout_info.pBindings    = &point_lights_layout_binding;
+    for (uint32 i = 0; i < bindings.size(); ++i) {
+        bindings[i] = {
+            .binding         = i,
+            .descriptorType  = vk::DescriptorType::eStorageBuffer,
+            .descriptorCount = 1,
+            .stageFlags =
+                vk::ShaderStageFlagBits::eFragment | vk::ShaderStageFlagBits::eCompute,
+        };
+    }
 
-    point_lights_descriptor_set_layout_ = vk_must(context_->get_device().createDescriptorSetLayout(point_lights_layout_info), "failed to create point lights descriptor set layout");
+    point_lights_descriptor_set_layout_ = vk_must(
+        context_->get_device().createDescriptorSetLayout({
+            .bindingCount = bindings.size(),
+            .pBindings    = bindings.data(),
+        }),
+        "failed to create point lights descriptor set layout"
+    );
 }
 
 void renderer::cleanup_point_lights_resources() {

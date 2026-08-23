@@ -114,6 +114,16 @@ enum class debug_view : uint32 {
     convexity,
     block_light,
     blob_shadow,
+
+    // How many sources the froxel grid put in each cluster. An instrument for
+    // taking the pass apart, not an ornament: without it "the light got
+    // cheaper" can only be read off frame time, which mixes everything.
+    light_complexity,
+
+    // The same for the bodies. White is a cluster whose list filled up, which
+    // is the only way a patch goes missing now that there is no cap on how many
+    // bodies a frame may hold.
+    blob_complexity,
 };
 
 // What a baked light block puts out. One colour for every one of them in the
@@ -137,21 +147,22 @@ struct block_light_settings {
     float32 glow{1.0f};
 };
 
-// One patch of ground darkened under one body. Eight of them live in the frame
-// uniform rather than in a storage buffer of their own: the whole set is 256
-// bytes, and a descriptor set, a buffer class and a binding for that would be
-// more machinery than the thing it carries.
-// Eight is what docs/lighting.md budgeted for the effect.
-constexpr uint32 max_blobs = 8;
+// The froxel grid the lighting reads from. slices = 1 is exactly flat tiles,
+// which is how the price of cutting by depth gets measured in one build rather
+// than by comparing two.
+//
+// enabled is not a taste: with it off the fragment walks every source in the
+// frame, which is the only way "the picture did not change" stays a thing that
+// can be checked rather than asserted.
+struct cluster_settings {
+    uint32 tile_size = 32;
+    uint32 slices    = 24;
+    uint32 cap       = 32;
 
-struct blob_data {
-    // xyz where the body is, w the radius of the disc under it.
-    alignas(16) vec4f position_radius;
-
-    // x the height over which rising tells, y how dark the middle is, z how
-    // tall the body is -- which is what says where the ground under it stops
-    // and the body itself starts.
-    alignas(16) vec4f params;
+    // The patches under the bodies share the grid but not the cap: a cluster
+    // holding sixteen of them is a crowd standing on one another.
+    uint32 blob_cap = 16;
+    bool enabled    = true;
 };
 
 // Настройки тумана (для CPU)
@@ -251,14 +262,25 @@ struct uniform_buffer_object {
     // the shader had it after the fog, and the fragment read its loop count
     // from past the end of the struct.
     //
-    // Eight is what docs/lighting.md budgeted and it is a real limit: past it
-    // the nearest eight are kept.
-    alignas(16) std::array<blob_data, max_blobs> blobs{};
-    alignas(4) uint32 blob_count{0};
-
-    // One global scale over all of them, for turning the whole effect down
-    // without touching every body in the world.
+    // The patches themselves left for a storage buffer of their own and a list
+    // per cluster: eight in the uniform meant the ninth body in a crowd stood
+    // on nothing, and 256 bytes of uniform went with them.
+    //
+    // One global scale over all of them stays, for turning the whole effect
+    // down without touching every body in the world.
     alignas(4) float32 blob_strength{1.0f};
+
+    // The froxel grid, and at the end of the block for the reason the note
+    // below gives. x: z_scale, y: z_bias, z: tile size in pixels, w: slices.
+    alignas(16) vec4f cluster_params{};
+
+    // x: tiles across, y: tiles down, z: the cap on one cluster's list, w: 1
+    // when the fragment reads that list and 0 when it walks every source.
+    alignas(16) vec4<uint32> cluster_dims{};
+
+    // x: the cap on one cluster's list of bodies, y: how many are in the buffer
+    // at all, which is what the unclustered path walks.
+    alignas(16) vec4<uint32> blob_dims{};
 };
 
 // voxel.frag declares this block a second time and the two have to agree
@@ -277,10 +299,11 @@ static_assert(offsetof(uniform_buffer_object, tonemap_params) == 720);
 static_assert(offsetof(uniform_buffer_object, point_lights_count) == 736);
 static_assert(offsetof(uniform_buffer_object, debug_view) == 740);
 static_assert(offsetof(uniform_buffer_object, fog) == 752);
-static_assert(offsetof(uniform_buffer_object, blobs) == 784);
-static_assert(offsetof(uniform_buffer_object, blob_count) == 1040);
-static_assert(offsetof(uniform_buffer_object, blob_strength) == 1044);
-static_assert(sizeof(uniform_buffer_object) == 1056);
+static_assert(offsetof(uniform_buffer_object, blob_strength) == 784);
+static_assert(offsetof(uniform_buffer_object, cluster_params) == 800);
+static_assert(offsetof(uniform_buffer_object, cluster_dims) == 816);
+static_assert(offsetof(uniform_buffer_object, blob_dims) == 832);
+static_assert(sizeof(uniform_buffer_object) == 848);
 
 struct shadow_push_constant_data {
     alignas(4) uint32 cascade_index = 0;
@@ -305,6 +328,14 @@ struct render_timing_stats {
     float32 shadow_map_update_ms    = 0.0f;
     float32 buffer_pool_update_ms   = 0.0f;
     float32 compute_cull_ms         = 0.0f;
+
+    // Building the visible light list on the CPU, and the dispatch that will
+    // take its place. Both are named before either is worth anything: a stage
+    // that appears together with the change it is meant to price has nothing
+    // to be compared against.
+    float32 light_gather_ms         = 0.0f;
+    float32 light_cull_ms           = 0.0f;
+
     float32 shadow_pass_ms          = 0.0f;
     float32 world_pass_ms           = 0.0f;
     float32 world_pass_uniform_ms   = 0.0f;
@@ -392,6 +423,21 @@ public:
     [[nodiscard]] auto get_blob_strength() -> float32& {
         return blob_strength_;
     }
+
+    // How many sources survive the cull and reach the per-pixel loop.
+    [[nodiscard]] auto get_max_visible_lights() -> uint32&;
+
+    [[nodiscard]] auto get_cluster_settings() -> cluster_settings&;
+
+    // What the cull did, a ring of frames later. Off by default because the
+    // cheap half is a buffer copy a frame and the full one is megabytes.
+    auto set_cluster_readback(cluster_readback_level level) -> void;
+    [[nodiscard]] auto take_cluster_readback(cull_list kind) -> std::optional<cluster_readback>;
+
+    // The grid as this frame's camera and fog shape it. What the compute pass
+    // scatters into and what the fragment reads out of, and the one place the
+    // two are told the same numbers.
+    [[nodiscard]] auto get_cluster_grid(const camera& camera) const -> spatial::cluster_grid;
     [[nodiscard]] auto get_shadow_settings() -> shadow_settings&;
 
     void set_debug_view(debug_view view);
@@ -470,9 +516,7 @@ private:
 
     void update_uniform_buffer(world_type& world, const camera& camera) const;
 
-    // The nearest few blob shadows, gathered into the frame uniform.
-    void gather_blobs_(world_type& world, const camera& camera,
-                       uniform_buffer_object& ubo) const;
+
     void render_world_pass(world_type& world, const camera& camera);
     void render_world(world_type& world, const camera& camera);
 
@@ -606,6 +650,8 @@ private:
 
     // Light buffer для point lights
     std::unique_ptr<light_buffer_type> light_buffer_;
+    std::unique_ptr<light_grid> light_grid_;
+    std::unique_ptr<blob_buffer> blob_buffer_;
 
     // Palette buffer для block colors
     const block_registry* block_registry_;
@@ -628,6 +674,7 @@ private:
     ambient_settings ambient_settings_;
     tonemap_settings tonemap_settings_;
     block_light_settings block_light_settings_;
+    cluster_settings cluster_settings_;
     float32 blob_strength_ = 1.0f;
     debug_view debug_view_ = debug_view::off;
 

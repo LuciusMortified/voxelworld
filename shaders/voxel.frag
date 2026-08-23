@@ -52,14 +52,13 @@ struct DirectionalLightData {
     float wrap;
 };
 
-// Matches gfx::blob_data. Eight of them ride in the frame uniform; see there
-// for why they are not a storage buffer.
+// Matches gfx::blob_data.
 struct BlobData {
     vec4 position_radius;
     vec4 params;
+    vec4 cull_a;
+    vec4 cull_b;
 };
-
-const int MAX_BLOBS = 8;
 
 struct FogData {
     vec3 color;
@@ -112,15 +111,29 @@ layout(set = 0, binding = 0) uniform UniformBufferObject {
     uint point_lights_count;
 
     // 0 normal, 1 ambient occlusion alone on white, 2 normals, 3 sky light,
-    // 4 convexity, 5 block light, 6 blob shadows.
+    // 4 convexity, 5 block light, 6 blob shadows, 7 source lists, 8 body lists.
     uint debug_view;
 
     FogData fog;
 
-    // Appended after the fog, so nothing above it moved when they arrived.
-    BlobData blobs[MAX_BLOBS];
-    uint blob_count;
+    // Appended after the fog, so nothing above it moved when it arrived. The
+    // patches themselves live in a storage buffer with a list per cluster; this
+    // is only the one scale over all of them.
     float blob_strength;
+
+    // The froxel grid, appended for the same reason.
+    // x: z_scale, y: z_bias, z: tile size in pixels, w: slices.
+    vec4 cluster_params;
+
+    // x: tiles across, y: tiles down, z: the cap on one cluster's list, w: 1
+    // when this shader reads that list and 0 when it walks every source in the
+    // frame. Both paths stay, because "the picture did not change" has to be a
+    // thing that can be checked.
+    uvec4 cluster_dims;
+
+    // x: the cap on one cluster's list of bodies, y: how many are in the buffer
+    // at all, which is what the unclustered path walks.
+    uvec4 blob_dims;
 } ubo;
 
 #if SHADOW_ENABLED
@@ -141,6 +154,28 @@ struct PointLightData {
 layout(set = 3, binding = 0, std430) readonly buffer PointLights {
     PointLightData lights[];
 } pointLights;
+
+// What light_cull.comp scattered this frame. One past the clusters is the tally
+// of assignments that did not fit; nothing here reads it.
+layout(set = 3, binding = 1, std430) readonly buffer ClusterCounts {
+    uint counts[];
+} clusterCounts;
+
+layout(set = 3, binding = 2, std430) readonly buffer ClusterIndices {
+    uint indices[];
+} clusterIndices;
+
+layout(set = 3, binding = 3, std430) readonly buffer Blobs {
+    BlobData items[];
+} blobs;
+
+layout(set = 3, binding = 4, std430) readonly buffer BlobCounts {
+    uint counts[];
+} blobCounts;
+
+layout(set = 3, binding = 5, std430) readonly buffer BlobIndices {
+    uint indices[];
+} blobIndices;
 
 #if SHADOW_ENABLED
 int selectCascade(float viewDepth) {
@@ -301,18 +336,65 @@ vec3 calculateDirectionalLight(vec3 normal, float shadow) {
 // The baked level at distance d from a source of emission L is (L - d) / 15,
 // which is intensity * (1 - d / range) once intensity is L / 15 and range is
 // L times the world's voxel size. Then the same curve on top.
+// The reader's half of the froxel grid: the tile out of the pixel, the slice
+// out of the depth the vertex stage already handed over. Clamping the slice
+// rather than the depth is the same mapping -- log is monotone -- and saves
+// carrying the two bounds down here.
+uint clusterOf(vec2 pixel, float depth) {
+    float raw   = (log(max(depth, 1e-6)) * ubo.cluster_params.x) + ubo.cluster_params.y;
+    uint slices = uint(ubo.cluster_params.w);
+    uint slice  = uint(clamp(int(floor(raw)), 0, int(slices) - 1));
+
+    uint tile_x = min(uint(pixel.x / ubo.cluster_params.z), ubo.cluster_dims.x - 1u);
+    uint tile_y = min(uint(pixel.y / ubo.cluster_params.z), ubo.cluster_dims.y - 1u);
+
+    return (((slice * ubo.cluster_dims.y) + tile_y) * ubo.cluster_dims.x) + tile_x;
+}
+
+// Black where nothing reaches, then blue to red up to the cap, and white past
+// it. White is the one worth looking for: a cluster whose list filled up and
+// dropped a source. Bands across the whole frame instead of pools under the
+// lamps would mean the depth slices had collapsed into flat tiles.
+vec3 clusterHeat(uint count, uint cap) {
+    if (count == 0u) {
+        return vec3(0.0);
+    }
+    if (count > cap) {
+        return vec3(1.0);
+    }
+
+    float t = clamp(float(count) / float(max(cap, 1u)), 0.0, 1.0);
+
+    vec3 cold = vec3(0.10, 0.20, 0.80);
+    vec3 mid  = vec3(0.10, 0.80, 0.20);
+    vec3 warm = vec3(0.90, 0.80, 0.10);
+    vec3 hot  = vec3(0.90, 0.10, 0.10);
+
+    if (t < 0.33) {
+        return mix(cold, mid, t / 0.33);
+    }
+    if (t < 0.66) {
+        return mix(mid, warm, (t - 0.33) / 0.33);
+    }
+    return mix(warm, hot, (t - 0.66) / 0.34);
+}
+
 vec3 calculatePointLight(uint lightIndex, vec3 fragPos) {
     PointLightData light = pointLights.lights[lightIndex];
 
     vec3 offset = light.position.xyz - fragPos;
 
-    // Manhattan, not Euclidean, and this is the other half of the stitch. The
-    // flood steps to six neighbours one level at a time, so what it measures is
-    // |dx|+|dy|+|dz| and its pools of light are diamonds, not spheres -- the
-    // same shape Minecraft's are, for the same reason. A torch that lit a
-    // sphere in the air and a diamond on the ground would visibly change shape
-    // on landing: along the body diagonal the two differ by a factor of 1.73.
-    float reach = abs(offset.x) + abs(offset.y) + abs(offset.z);
+    // Euclidean, and it costs the stitch with the baked channel on purpose.
+    // The flood steps to six neighbours one level at a time, so a torch that
+    // has landed as a block lights a diamond and goes on doing so; one carried
+    // through the air lights a sphere, and along the body diagonal the two
+    // differ by a factor of 1.73. That visible change on landing is the
+    // cheaper of the two prices. A diamond is square to the world axes, so a
+    // source crossing a floor slides a lattice-aligned outline over it and its
+    // lines of equal brightness settle on the voxel boundaries: what the eye
+    // reads is the grid, not a lamp. Range shrank to four fifths with the
+    // metric, which is where a round pool covers the floor the diamond did.
+    float reach = length(offset);
 
     float raw = light.intensity * max(1.0 - (reach / max(light.range, 0.001)), 0.0);
     if (raw <= 0.0) {
@@ -343,16 +425,35 @@ float blobShadow(vec3 fragPos, vec3 normal) {
     // Only the floor. max(n.y, 0) keeps the patch off the walls, which is what
     // separates this from a decal projected down a wall it never touched.
     float facing = max(normal.y, 0.0);
-    if (facing <= 0.0 || ubo.blob_count == 0u) {
+    if (facing <= 0.0) {
+        return 1.0;
+    }
+
+    // The same two paths the sources have, and for the same reason: the list is
+    // only worth what it can be compared against.
+    bool clustered = ubo.cluster_dims.w == 1u;
+    uint cap       = max(ubo.blob_dims.x, 1u);
+    uint cluster   = 0u;
+    uint count     = ubo.blob_dims.y;
+
+    if (clustered) {
+        cluster = clusterOf(gl_FragCoord.xy, viewDepth);
+        count   = min(blobCounts.counts[cluster], cap);
+    }
+
+    if (count == 0u) {
         return 1.0;
     }
 
     float darkest = 0.0;
 
-    for (uint i = 0u; i < ubo.blob_count; ++i) {
-        vec4 body = ubo.blobs[i].position_radius;
+    for (uint n = 0u; n < count; ++n) {
+        uint i = clustered ? blobIndices.indices[(cluster * cap) + n] : n;
 
-        float fall = max(ubo.blobs[i].params.x, 0.001);
+        vec4 body = blobs.items[i].position_radius;
+        vec4 p    = blobs.items[i].params;
+
+        float fall = max(p.x, 0.001);
 
         // What a sphere the size of the body looks like from this piece of
         // ground. It narrows as one over one plus the height, and darkens as
@@ -384,12 +485,19 @@ float blobShadow(vec3 fragPos, vec3 normal) {
         // Anything horizontal in between, a shoulder or an outstretched arm,
         // takes part of the taper; that is the price of the rule, and it is
         // cheaper than the flicker.
-        float height = max(ubo.blobs[i].params.z, 0.001);
+        float height = max(p.z, 0.001);
         float band   = 0.35 * height;
         float over   = clamp((fragPos.y - (body.y + height - band)) / band, 0.0, 1.0);
 
-        float a = (1.0 - smoothstep(0.6, 1.0, d)) * shrink * shrink * (1.0 - over) *
-            ubo.blobs[i].params.y;
+        // And the end of the reach. The falloff above never reaches zero, and
+        // nothing unbounded can be put in a list of the clusters it touches --
+        // so the last quarter of the reach is faded out, where the patch is
+        // already under a third of a voxel across and a sixteenth as dark. A
+        // fade and not an edge, because an edge is the one thing an eye finds.
+        float reach = max(p.w, 0.001);
+        float tail  = 1.0 - smoothstep(0.75, 1.0, rise / reach);
+
+        float a = (1.0 - smoothstep(0.6, 1.0, d)) * shrink * shrink * (1.0 - over) * tail * p.y;
 
         // The darkest wins rather than the sum. Two bodies shoulder to shoulder
         // should stand on one patch of shade, not bore a hole through the floor
@@ -527,6 +635,18 @@ void main() {
         return;
     }
 
+    if (ubo.debug_view == 7u) {
+        uint cluster = clusterOf(gl_FragCoord.xy, viewDepth);
+        outColor = vec4(clusterHeat(clusterCounts.counts[cluster], ubo.cluster_dims.z), 1.0);
+        return;
+    }
+
+    if (ubo.debug_view == 8u) {
+        uint cluster = clusterOf(gl_FragCoord.xy, viewDepth);
+        outColor = vec4(clusterHeat(blobCounts.counts[cluster], ubo.blob_dims.x), 1.0);
+        return;
+    }
+
     // AO belongs to the ambient term alone. It is a measure of how much of the
     // surroundings a point can see, so it dims the light that arrives from the
     // surroundings; laying it over the sun as well counts the same occlusion
@@ -573,10 +693,24 @@ void main() {
     // whole of why the channel is kept apart.
     vec3 lamp = ubo.lamp_params.rgb * lampReach * aoFactor;
 
-    // Point lights
+    // Point lights. Two paths on purpose: the froxel list is the one that
+    // scales, and the walk over every source in the frame is what says whether
+    // the two agree. Removing the second would make "the picture did not
+    // change" an assertion rather than a check.
     vec3 pointLighting = vec3(0.0);
-    for (uint i = 0; i < ubo.point_lights_count; i++) {
-        pointLighting += calculatePointLight(i, fragPos);
+
+    if (ubo.cluster_dims.w == 0u) {
+        for (uint i = 0; i < ubo.point_lights_count; i++) {
+            pointLighting += calculatePointLight(i, fragPos);
+        }
+    } else {
+        uint cluster = clusterOf(gl_FragCoord.xy, viewDepth);
+        uint cap     = ubo.cluster_dims.z;
+        uint count   = min(clusterCounts.counts[cluster], cap);
+
+        for (uint i = 0; i < count; i++) {
+            pointLighting += calculatePointLight(clusterIndices.indices[(cluster * cap) + i], fragPos);
+        }
     }
 
     // No rim term and no edge term. Both sat at 0.01, which is invisible, and

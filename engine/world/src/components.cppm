@@ -193,8 +193,10 @@ struct light_component final {
     }
 
     // How far it carries, in world units, and it is a hard edge: the falloff
-    // is linear in the level and reaches zero exactly here. For something that
-    // will land as a block, its emission times the world's voxel size.
+    // is linear in the distance and reaches zero exactly here. A source is
+    // round where a block's baked pool is a diamond, so the two match on the
+    // floor at four fifths of a reach: emission times the world's voxel size
+    // times sqrt(2/pi), the ratio of a circle to the square of equal width.
     [[nodiscard]] auto get_range() const -> float32 {
         return range_;
     }
@@ -236,9 +238,15 @@ struct blob_shadow_component final {
     // The height at which the disc is half as wide and a quarter as dark: the
     // scale over which rising off the ground tells. It is what makes a jump
     // read as a jump -- the patch draws in towards a point as the feet leave,
-    // the way anything of a fixed size does on the way up. There is no height
-    // at which it switches off; past a few of these it is too small and too
-    // faint to find.
+    // the way anything of a fixed size does on the way up.
+    //
+    // It also sets how far down the patch reaches at all: a few of these and
+    // then a fade to nothing. There used to be no such bound -- the disc
+    // narrows for ever and never quite vanishes -- and that was fine while
+    // eight patches rode in the frame uniform and every ground pixel walked
+    // all eight. It stopped being fine when the patches went into a list per
+    // cluster: nothing unbounded can be put in a list of the places it reaches.
+    // The renderer owns the number; see gfx::blob_reach_falls.
     [[nodiscard]] auto get_fall() const -> float32 {
         return fall_;
     }

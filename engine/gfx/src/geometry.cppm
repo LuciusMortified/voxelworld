@@ -57,9 +57,53 @@ struct point_light_data {
     alignas(4) float32 range;
 };
 
+// How far under a body its patch is still worth drawing, in fall heights.
+//
+// The disc used to have no such number at all -- it narrows as one over one
+// plus the height and never reaches zero. That was fine while eight of them
+// rode in the frame uniform and every ground pixel walked all eight; it is not
+// fine for a cull, because nothing unbounded can be put in a list of the places
+// it reaches.
+//
+// Three, because by then the disc is a quarter as wide and a sixteenth as dark:
+// for the bodies in the tree that is under a third of a voxel across and about
+// nine levels of an eight-bit channel. The last quarter of the reach is faded
+// out in the shader so the end is a fade and not an edge.
+constexpr float32 blob_reach_falls = 3.0F;
+
+// One patch of ground darkened under one body.
+struct blob_data {
+    // xyz where the body's feet are, w the radius of the disc under it.
+    alignas(16) vec4f position_radius;
+
+    // x the height over which rising tells, y how dark the middle is, z how
+    // tall the body is -- which is what says where the ground under it stops
+    // and the body itself starts -- w how far down it still reaches.
+    alignas(16) vec4f params;
+
+    // The column of ground this darkens, as the two ends of a capsule: xyz the
+    // top, w the radius, then xyz the bottom. Worked out on the CPU and carried
+    // rather than derived twice -- the cull and the reference have to agree on
+    // it exactly, and the cheapest way to agree is to be handed the same
+    // numbers.
+    //
+    // A capsule and not a ball because the column is tall and thin: measured on
+    // two hundred bodies, a ball around it claimed 27308 clusters a frame where
+    // the column itself claims under six thousand.
+    alignas(16) vec4f cull_a;
+    alignas(16) vec4f cull_b;
+};
+
 class light_buffer {
 public:
     using world_type = world;
+
+    // One buffer per frame in flight, the same ring the frame uniforms use.
+    // A single host-visible buffer was rewritten by the CPU while the frame
+    // before it could still be reading -- invisible while a fragment shader is
+    // the only reader, and not harmless at all once a list of indices points
+    // into it.
+    static constexpr uint32 max_frames_in_flight = 2;
 
     explicit light_buffer(
         vulkan_context& context,
@@ -77,33 +121,270 @@ public:
     //
     // Culled here against the frustum, because the fragment shader walks every
     // light in the buffer for every pixel and has no way to skip one.
-    void update(world_type& world, const spatial::frustum& frustum, const vec3f& eye);
+    auto update(
+        world_type& world, const spatial::frustum& frustum, const vec3f& eye, uint32 frame_index
+    ) -> void;
 
-    [[nodiscard]] vk::DescriptorSet get_descriptor_set() const;
-    [[nodiscard]] bool is_empty() const;
-    [[nodiscard]] uint32 get_lights_count() const;
+    [[nodiscard]] auto get_descriptor_set(uint32 frame_index) const -> vk::DescriptorSet;
+    [[nodiscard]] auto is_empty() const -> bool;
+    [[nodiscard]] auto get_lights_count() const -> uint32;
+
+    // What went into the buffer this frame, in the order the shader indexes it.
+    // The cull needs it to say what it was asked, and keeping it costs the one
+    // allocation the vector was making anyway.
+    [[nodiscard]] auto get_lights() const -> std::span<const point_light_data> {
+        return lights_;
+    }
+
+    // A cap that keeps the nearest and drops the rest. no_cap is the default:
+    // with the froxel lists the fragment no longer walks the buffer, so the
+    // number that used to protect the per-pixel loop protects nothing and only
+    // drops sources. --bench-visible puts one back to price the naive path.
+    static constexpr uint32 no_cap = std::numeric_limits<uint32>::max();
+
+    [[nodiscard]] auto get_max_visible() -> uint32& {
+        return max_visible_;
+    }
 
 private:
-    void expand_buffer_if_needed(uint32 required_count);
-    void update_descriptor_set();
+    auto expand_buffer_if_needed_(uint32 frame_index, uint32 required_count) -> void;
+    auto update_descriptor_set_(uint32 frame_index) -> void;
 
     static constexpr uint32 default_capacity_ = 64;
 
-    // Where the per-pixel loop stops being free. Two dozen visible sources
-    // is the number docs/lighting.md names as the point past which this
-    // wants clustering rather than a longer list.
-    static constexpr std::size_t max_visible_ = 24;
+    uint32 max_visible_ = no_cap;
 
     vulkan_context* context_;
     deletion_queue* deletion_;
-    uint32 capacity_;
-    std::unique_ptr<storage_buffer> lights_buffer_;
+    std::vector<point_light_data> lights_;
+    std::array<uint32, max_frames_in_flight> capacities_{};
+    std::array<std::unique_ptr<storage_buffer>, max_frames_in_flight> lights_buffers_;
+    std::array<vk::DescriptorSet, max_frames_in_flight> descriptor_sets_{};
 
-    vk::DescriptorSet descriptor_set_              = nullptr;
     vk::DescriptorPool descriptor_pool_            = nullptr;
     vk::DescriptorSetLayout descriptor_set_layout_ = nullptr;
 
     uint32 lights_count_ = 0;
+};
+
+struct light_cull_ubo {
+    alignas(16) float32 view[16]{};
+    alignas(16) vec4f cluster_params{};
+    alignas(16) vec4f cluster_extent{};
+    alignas(16) vec4f screen_dims{};
+    alignas(16) vec4<uint32> cull_dims{};
+};
+
+// What the compute pass writes and the fragment reads: counts and indices, and
+// nothing else. No bounding volumes, no prefix sum, no separate pass to build
+// the grid.
+//
+// vw::spatial::cluster_grid is the geometry and scatter_slice the reference
+// that shaders/light_cull.comp translates; this is the Vulkan around them.
+// The patches under the bodies, in the same descriptor set as the sources and
+// on the same ring. Binding 3 of set 3; the sets belong to light_buffer, which
+// is why they arrive from outside rather than being allocated here.
+class blob_buffer {
+public:
+    using world_type = world;
+
+    static constexpr uint32 max_frames_in_flight = 2;
+
+    blob_buffer(
+        vulkan_context& context,
+        deletion_queue& deletion,
+        std::span<const vk::DescriptorSet> sets
+    );
+
+    // No cap and no nearest-first. There used to be eight slots and an
+    // nth_element deciding which eight, which meant the ninth body in a crowd
+    // stood on nothing at all; with a list per cluster the ground pixel walks
+    // the two or three patches over it rather than every body in the frame.
+    auto update(world_type& world, uint32 frame_index) -> void;
+
+    [[nodiscard]] auto get_blobs() const -> std::span<const blob_data> {
+        return blobs_;
+    }
+
+    [[nodiscard]] auto get_count() const -> uint32 {
+        return static_cast<uint32>(blobs_.size());
+    }
+
+private:
+    auto expand_buffer_if_needed_(uint32 frame_index, uint32 required_count) -> void;
+    auto write_binding_(uint32 frame_index) -> void;
+
+    static constexpr uint32 default_capacity_ = 32;
+
+    vulkan_context* context_;
+    deletion_queue* deletion_;
+    std::vector<blob_data> blobs_;
+    std::array<uint32, max_frames_in_flight> capacities_{};
+    std::array<std::unique_ptr<storage_buffer>, max_frames_in_flight> buffers_;
+    std::array<vk::DescriptorSet, max_frames_in_flight> sets_{};
+};
+
+// off costs nothing and is what a normal frame runs. counts is the cheap half:
+// enough for how full the grid is and how much overflowed. full adds the lists
+// themselves, which is megabytes a frame and only worth it under --verify-lights.
+enum class cluster_readback_level : uint8 {
+    off,
+    counts,
+    full,
+};
+
+// Two lists over one grid: the sources that light a cluster and the bodies that
+// shade it. The same pass builds both, from the same code, because the question
+// -- which clusters does this ball touch -- is the same one twice.
+enum class cull_list : uint32 {
+    sources = 0,
+    blobs   = 1,
+};
+
+inline constexpr uint32 cull_list_count = 2;
+
+// What one frame's cull was asked and what it answered. Carried back a whole
+// ring later, when the fence for that frame has already been waited on, so that
+// reading it never stalls anything and never races the GPU writing it.
+struct cluster_readback {
+    cull_list kind = cull_list::sources;
+    spatial::cluster_grid grid{};
+    uint32 cap = 0;
+
+    // The shader's input and not the scene's: view space, depth positive
+    // forwards, exactly what the compute pass built for itself. A source is a
+    // ball and a body's patch of shade a column, and both are capsules, so
+    // `kind` says what the entries mean rather than which list holds them.
+    std::vector<spatial::view_capsule> columns;
+
+    // cluster_count + 1 long, the last entry being the overflow tally.
+    std::vector<uint32> counts;
+
+    // Empty at the counts level. cluster_count * cap long at the full one.
+    std::vector<uint32> indices;
+};
+
+class light_grid {
+public:
+    static constexpr uint32 max_frames_in_flight = 2;
+
+    // The sets are light_buffer's. Bindings 1, 2, 4 and 5 of set 3 belong here;
+    // 0 is light_buffer's own and 3 is blob_buffer's, all written into the same
+    // set so that the compute pass and the fragment reach all six with one bind.
+    light_grid(
+        vulkan_context& context,
+        deletion_queue& deletion,
+        vk::DescriptorPool descriptor_pool,
+        vk::DescriptorSetLayout light_set_layout,
+        std::span<const vk::DescriptorSet> light_sets
+    );
+    ~light_grid();
+
+    light_grid(const light_grid&)                    = delete;
+    auto operator=(const light_grid&) -> light_grid& = delete;
+    light_grid(light_grid&&)                         = delete;
+    auto operator=(light_grid&&) -> light_grid&      = delete;
+
+    // Held rather than acted on. Buffers are rebuilt inside dispatch, for the
+    // frame being recorded, whose fence begin_frame has already waited on --
+    // rewriting a descriptor set another frame is still reading is the one way
+    // to get this wrong.
+    auto set_grid(const spatial::cluster_grid& grid, uint32 cap, uint32 blob_cap) -> void;
+
+    auto dispatch(
+        vk::CommandBuffer cmd,
+        vk::DescriptorSet light_set,
+        const mat4f& view,
+        std::span<const point_light_data> lights,
+        std::span<const blob_data> blobs,
+        uint32 frame_index
+    ) -> void;
+
+    auto set_readback(cluster_readback_level level) -> void;
+
+    // The frame that finished, or nothing. Whatever is not taken is dropped
+    // when the next one lands: a checker that fell behind should check a recent
+    // frame rather than a queue of old ones.
+    [[nodiscard]] auto take_readback(cull_list kind) -> std::optional<cluster_readback>;
+
+    [[nodiscard]] auto get_cluster_count() const -> uint32;
+    [[nodiscard]] auto get_cap() const -> uint32;
+
+private:
+    // One list's buffers for one frame in flight, plus what that frame was
+    // asked, waiting for its answer to come back.
+    struct list_frame {
+        std::unique_ptr<device_storage_buffer> counts;
+        std::unique_ptr<device_storage_buffer> indices;
+        std::unique_ptr<storage_buffer> counts_host;
+        std::unique_ptr<storage_buffer> indices_host;
+        cluster_readback pending{};
+        bool pending_valid = false;
+    };
+
+    auto create_pipeline_() -> void;
+    auto create_params_ubos_() -> void;
+    auto rebuild_frame_(uint32 frame_index) -> void;
+    auto rebuild_list_(cull_list kind, uint32 frame_index) -> void;
+    auto rebuild_mirrors_(cull_list kind, uint32 frame_index) -> void;
+    auto harvest_(cull_list kind, uint32 frame_index) -> void;
+    auto record_(
+        vk::CommandBuffer cmd, vk::DescriptorSet light_set, cull_list kind, uint32 sphere_count,
+        uint32 frame_index
+    ) -> void;
+    auto write_params_(cull_list kind, const mat4f& view, uint32 sphere_count, uint32 frame_index)
+        -> void;
+    auto snapshot_(cull_list kind, uint32 frame_index) -> cluster_readback&;
+
+    [[nodiscard]] auto cap_of(cull_list kind) const -> uint32;
+
+    [[nodiscard]] auto list_(cull_list kind, uint32 frame_index) -> list_frame& {
+        return lists_[static_cast<uint32>(kind)][frame_index];
+    }
+
+    [[nodiscard]] static auto params_slot_(cull_list kind, uint32 frame_index) -> uint32 {
+        return (frame_index * cull_list_count) + static_cast<uint32>(kind);
+    }
+
+    // Counts, plus one past them for the tally of assignments that did not fit.
+    [[nodiscard]] auto counts_size_() const -> vk::DeviceSize;
+    [[nodiscard]] auto indices_size_(cull_list kind) const -> vk::DeviceSize;
+
+    vulkan_context* context_;
+    deletion_queue* deletion_;
+    vk::DescriptorPool descriptor_pool_ = nullptr;
+
+    std::unique_ptr<shader> compute_shader_;
+    vk::Pipeline compute_pipeline_                        = nullptr;
+    vk::PipelineLayout compute_pipeline_layout_           = nullptr;
+    vk::DescriptorSetLayout params_descriptor_set_layout_ = nullptr;
+    vk::DescriptorSetLayout light_set_layout_             = nullptr;
+
+    static constexpr uint32 params_slots_ = max_frames_in_flight * cull_list_count;
+
+    std::array<std::unique_ptr<uniform_buffer>, params_slots_> params_ubos_;
+    std::array<vk::DescriptorSet, params_slots_> params_descriptor_sets_{};
+
+    std::array<vk::DescriptorSet, max_frames_in_flight> light_sets_{};
+    std::array<std::array<list_frame, max_frames_in_flight>, cull_list_count> lists_{};
+
+    cluster_readback_level readback_ = cluster_readback_level::off;
+    std::array<std::optional<cluster_readback>, cull_list_count> ready_{};
+
+    // Bumped whenever the grid changes shape; a frame whose buffers carry an
+    // older one rebuilds them the next time it is recorded.
+    std::array<uint64, max_frames_in_flight> built_{};
+    uint64 generation_ = 1;
+
+    spatial::cluster_grid grid_{};
+    uint32 cap_ = 32;
+
+    // A cluster holding more than a few bodies is a crowd standing on one
+    // another, and the sixteenth patch over a pixel is not one anybody can
+    // pick out. Half a megabyte a frame rather than the sources' two and a
+    // half.
+    uint32 blob_cap_      = 16;
+    uint32 cluster_count_ = 0;
 };
 
 }  // namespace vw::gfx

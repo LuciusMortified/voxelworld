@@ -31,6 +31,8 @@ target_sources(vw_gfx
         src/mesh_pool.cpp
         src/palette_buffer.cpp
         src/light_buffer.cpp
+        src/blob_buffer.cpp
+        src/light_grid.cpp
         src/combined_buffer.cpp
         src/combined_buffer_pool.cpp
         src/debug_primitive.cpp
