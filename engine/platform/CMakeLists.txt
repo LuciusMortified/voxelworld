@@ -7,11 +7,11 @@ target_sources(vw_platform
     PUBLIC
         FILE_SET CXX_MODULES BASE_DIRS src FILES
             src/platform.cppm
-            src/input.cppm
-            src/event.cppm
-            src/window.cppm
+            src/input/input.cppm
+            src/input/event.cppm
+            src/window/window.cppm
     PRIVATE
-        src/window.cpp
+        src/window/window.cpp
 )
 
 target_include_directories(vw_platform SYSTEM PRIVATE ${Vulkan_INCLUDE_DIRS})

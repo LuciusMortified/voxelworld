@@ -1,0 +1,197 @@
+export module vw.gfx:resource.combined_buffer;
+
+import std;
+
+import vw.core;
+import vw.ecs;
+import vw.world;
+import :gpu_buffers;
+import :meshing;
+import :mesh_pool;
+import vulkan;
+
+namespace vw::gfx {
+using namespace ::vw::ecs;
+}
+
+export namespace vw::gfx {
+
+
+
+
+class vulkan_context;
+
+// Индексируется одним индексным буфером, общим на весь пул, чьё содержимое для
+// каждого меша одно и то же: 0,1,2,2,3,0 на квад. vertex_offset наводит
+// gl_VertexIndex на этот меш, поэтому шейдер находит свою запись по
+// gl_VertexIndex / 4, а угол — по gl_VertexIndex % 4.
+//
+// Шесть вершин, развёрнутых из gl_VertexIndex без индексного буфера, пробовались
+// первыми и дают на треть больше вершинной работы: четыре вызова на квад
+// становятся шестью, без переиспользования после трансформации. Это стоило 38%
+// мирового прохода. Общий буфер — полтора мегабайта на весь движок против 24 байт
+// на квад, во сколько обходились индексные буферы на каждый меш.
+struct draw_command {
+    uint32 index_count;
+    uint32 instance_count;
+    uint32 first_index;
+    int32 vertex_offset;
+    uint32 first_instance;
+};
+
+struct buffer_chunk_size {
+    uint32 quad_count;
+
+    bool operator==(
+        const buffer_chunk_size& rhs
+    ) const {
+        return quad_count == rhs.quad_count;
+    }
+
+    bool operator<(
+        const buffer_chunk_size& rhs
+    ) const {
+        return quad_count < rhs.quad_count;
+    }
+};
+
+struct free_slot {
+    uint32 quad_offset;
+};
+
+struct entity_allocation {
+    uint32 instance_index;
+    uint32 model_index;
+};
+
+struct mesh_allocation {
+    uint32 quad_offset;
+    uint32 quad_count;
+    uint32 generation;
+    uint32 ref_count;
+
+    // Квады каждого направления грани в том порядке, в каком их выдаёт мешер. По
+    // одной команде отрисовки на направление, чтобы шейдер отсева мог выбросить
+    // те, что смотрят от наблюдателя.
+    std::array<uint32, 6> face_counts{};
+};
+
+struct combined_buffer_stats {
+    buffer_chunk_size chunk_size{};
+    float32 quad_load_min    = 0.0f;
+    float32 quad_load_max    = 0.0f;
+    float32 quad_load_avg    = 0.0f;
+    uint32 mesh_capacity     = 0;
+    uint32 mesh_count        = 0;
+    uint32 instance_capacity = 0;
+    uint32 instance_count    = 0;
+};
+
+class combined_buffer {
+public:
+    // Камера и все каскады теней отсеиваются одним диспатчем, и по этому числу
+    // размеряются заполняемые им буферы. Оно обязано равняться числу каскадов плюс
+    // один; партиции ресурсов не видят партиций рендера, не замкнув цикл в графе
+    // импортов, поэтому согласие этих двух чисел проверяет cull_pipeline.cpp.
+    static constexpr uint32 cull_pass_count = 6;
+
+    // По команде отрисовки на каждое направление грани меша.
+    static constexpr uint32 faces_per_mesh = 6;
+
+    explicit combined_buffer(
+        vulkan_context& context,
+        const buffer_chunk_size& chunk_size,
+        vk::DescriptorPool descriptor_pool,
+        vk::DescriptorSetLayout descriptor_set_layout,
+        vk::DescriptorSetLayout compute_descriptor_set_layout,
+        staging_buffer& staging,
+        deletion_queue& deletion
+    );
+    ~combined_buffer();
+
+    combined_buffer(const combined_buffer&)            = delete;
+    combined_buffer& operator=(const combined_buffer&) = delete;
+
+    combined_buffer(combined_buffer&&) noexcept            = default;
+    combined_buffer& operator=(combined_buffer&&) noexcept = default;
+
+    void allocate(
+        entity e, vw::asset::model_identity model_id, const mesh& mesh_data,
+        const mat4f& transform_matrix, const vw::spatial::aabb& bounds
+    );
+    void allocate_mesh(vw::asset::model_identity model_id, const mesh& mesh_data);
+    void write_mesh(vw::asset::model_identity model_id, const mesh& mesh_data);
+    void write_transform(entity ent, const mat4f& transform_matrix, const vw::spatial::aabb& bounds);
+    auto free(entity ent) -> std::optional<entity>;
+
+    // По флагу на инстанс; шейдер отсева читает их до проверки фрустумом. Span
+    // покрывает инстансы с нуля, а всё за его концом считается видимым, поэтому
+    // буфер, о котором ни у кого нет мнения, рисуется целиком.
+    auto write_visibility(std::span<const uint32> flags) -> void;
+
+    [[nodiscard]] auto get_entity_allocation(entity ent) -> const entity_allocation&;
+    [[nodiscard]] auto get_quad_buffer() const -> vk::Buffer;
+    [[nodiscard]] vk::Buffer get_instance_index_buffer() const;
+    [[nodiscard]] vk::Buffer get_indirect_draw_buffer() const;
+    [[nodiscard]] vk::Buffer get_aabb_buffer() const;
+    [[nodiscard]] vk::Buffer get_model_matrix_buffer() const;
+    [[nodiscard]] vk::Buffer get_normal_matrix_buffer() const;
+    // Инстансов в буфере и потолок на число команд, которые проход отсева может из
+    // них произвести: по шесть на меш, по одной на направление грани.
+    [[nodiscard]] uint32 get_instance_count() const;
+    [[nodiscard]] uint32 get_draw_command_count() const;
+    [[nodiscard]] vk::Buffer get_culled_indirect_buffer() const;
+    [[nodiscard]] vk::Buffer get_count_buffer() const;
+    [[nodiscard]] bool is_empty() const;
+    [[nodiscard]] const combined_buffer_stats& get_stats() const;
+    [[nodiscard]] vk::DescriptorSet get_descriptor_set() const {
+        return descriptor_set_;
+    }
+    [[nodiscard]] vk::DescriptorSet get_compute_descriptor_set() const {
+        return compute_descriptor_set_;
+    }
+
+private:
+    void write_draw_command_(uint32 instance_index, const mesh_allocation& mesh_alloc);
+    void expand_mesh_buffers_();
+    void expand_instance_buffers_();
+    void update_descriptor_set_();
+    void update_compute_descriptor_set_();
+
+    static constexpr uint32 default_mesh_capacity_     = 32;
+    static constexpr uint32 default_instance_capacity_ = 64;
+
+    vulkan_context* context_;
+    staging_buffer* staging_;
+    deletion_queue* deletion_;
+    buffer_chunk_size chunk_size_;
+
+    uint32 mesh_capacity_{default_mesh_capacity_};
+    std::unique_ptr<device_storage_buffer> quad_buffer_;
+    std::unique_ptr<device_storage_buffer> instance_index_buffer_;
+
+    uint32 instance_capacity_{default_instance_capacity_};
+    std::unique_ptr<device_storage_buffer> model_matrix_buffer_;
+    std::unique_ptr<device_storage_buffer> normal_matrix_buffer_;
+    std::unique_ptr<device_storage_buffer> indirect_draw_buffer_;
+    std::unique_ptr<device_storage_buffer> aabb_buffer_;
+    std::unique_ptr<device_storage_buffer> culled_indirect_buffer_;
+    std::unique_ptr<device_storage_buffer> count_buffer_;
+    std::unique_ptr<device_storage_buffer> visibility_buffer_;
+
+    std::unordered_map<entity, entity_allocation> entity_allocations_;
+    std::unordered_map<uint32, mesh_allocation> mesh_allocations_;
+    std::unordered_map<uint32, entity> instance_indexes_;
+    std::vector<free_slot> free_slots_;
+    uint32 quad_used_{0};
+
+    vk::DescriptorSet descriptor_set_                       = nullptr;
+    vk::DescriptorPool descriptor_pool_                     = nullptr;
+    vk::DescriptorSetLayout descriptor_set_layout_          = nullptr;
+    vk::DescriptorSet compute_descriptor_set_               = nullptr;
+    vk::DescriptorSetLayout compute_descriptor_set_layout_  = nullptr;
+
+    mutable combined_buffer_stats stats_;
+};
+
+}  // namespace vw::gfx

@@ -1,0 +1,339 @@
+export module vw.gfx:meshing;
+
+import std;
+
+import vw.core;
+import vw.world;
+import vulkan;
+
+export namespace vw::gfx {
+
+// Один жадный прямоугольник, двенадцать байт. Ни вершинного, ни индексного
+// буфера нет: отрисовка просит шесть вершин на квад, а вершинный шейдер достаёт
+// угол из этой записи по gl_VertexIndex. Четыре вершины по восемь байт плюс
+// шесть индексов по четыре выходили в пятьдесят шесть.
+//
+// data0: min.x[6:0] | min.y[13:7] | min.z[20:14] | normal_id[23:21]
+//      | corners_ao[31:24]
+// data1: span_u[6:0] | span_v[13:7] | palette_index[21:14]
+//      | corners_convex[29:22]
+// data2: corners_sky[15:0]
+//
+// Третье слово — цена небесного света. Четыре бита на угол не влезают в три
+// оставшихся в data1, а урезать уровни до двух бит на угол значило бы выкинуть
+// градиент, ради которого заливка и существует. Верхняя половина data2 отдана
+// свету от блоков.
+//
+// Хранятся протяжённости по двум касательным осям, на единицу меньше числа
+// ячеек, а не дальний угол: прямоугольник шириной 128 ячеек имеет дальний угол
+// в 128, семь бит кончаются на 127, и старая упаковка заворачивала его в ноль на
+// внешней грани модели. Протяжённость в 128 ячеек хранится как 127 и влезает
+// ровно. Освободившиеся восемь бит заняла выпуклость.
+//
+// corners_ao: два бита на угол в порядке обхода, от 0 (открыт) до 3 (закрыт).
+// corners_convex: два бита на угол в том же порядке, от 0 (вровень с соседями)
+// до 3 (шип без обоих рёберных соседей). Только верхние грани.
+// corners_sky: четыре бита на угол в том же порядке, от 0 (запечатан) до 15
+// (под открытым небом).
+//
+// Затенение и выпуклость отвечают на две половины одного вопроса — сколько
+// окружения видит угол — и пробовались одним знаковым числом по три бита на
+// угол. Слияние, ради которого всё затевалось, отыграло 0,46% квадов и не
+// больше. Две маски сохраняют обе силы и обе кривые настраиваемыми без
+// перестроения меша, поэтому масок две.
+//
+// Выпуклость уже была здесь одним битом на угол и была убрана как дублирующая
+// небесный свет. Она его не дублирует: под открытым небом свет всюду ровно
+// пятнадцать, поэтому два плато на разной высоте выходят одного цвета и ступень
+// между ними пропадает. Затенение тоже не покажет её — оно смотрит на слой перед
+// гранью, а над верхней гранью этот слой по определению воздух.
+struct quad {
+    uint32 data0 = 0;
+    uint32 data1 = 0;
+    uint32 data2 = 0;
+
+    quad() = default;
+
+    [[nodiscard]] static auto pack(
+        vec3i min_pos, vec3i max_pos, uint8 normal_id, block_id block_id, uint8 corners_ao,
+        uint8 corners_convex, uint16 corners_sky, uint16 corners_block
+    ) -> quad;
+
+    // Через вершинный вход идёт только индекс инстанса; геометрия приходит из
+    // storage-буфера.
+    [[nodiscard]] static auto get_binding_descriptions()
+        -> std::vector<vk::VertexInputBindingDescription>;
+
+    [[nodiscard]] static auto get_attribute_descriptions()
+        -> std::vector<vk::VertexInputAttributeDescription>;
+};
+
+struct mesh {
+    std::vector<quad> quads;
+
+    // Квады сгруппированы по направлению грани в порядке +X, -X, +Y, -Y, +Z, -Z,
+    // потому что в этом порядке идёт мешер. Шесть длин ничего не стоят, а шейдер
+    // отсева бросает по ним три отвёрнутых направления до всякой закраски.
+    std::array<uint32, 6> face_counts{};
+
+    // Какие грани чанка просматриваются в какие; снято с той же занятости, по
+    // которой работает мешер. Переживает release_data: обход видимости нужен
+    // долго после того, как геометрия ушла на устройство.
+    vw::asset::chunk_links links;
+
+    auto release_data() -> void {
+        quads = {};
+    }
+};
+
+struct mesh_options {
+    // Связность читает только обход видимости, а он по умолчанию выключен.
+    // Безусловное построение стоило десятой части всего мешинга.
+    bool build_links = false;
+};
+
+class simple_mesh_generator {
+public:
+    [[nodiscard]]
+    static auto generate_mesh_data(
+        const std::shared_ptr<vw::asset::model>& mdl,
+        const block_registry& registry,
+        mesh_options opts = {}
+    ) -> mesh;
+
+private:
+    static auto add_cube_face(
+        std::vector<quad>& quads,
+        const std::shared_ptr<vw::asset::model>& mdl,
+        int32 x,
+        int32 y,
+        int32 z,
+        int32 face_direction,
+        block_id voxel_id,
+        const block_registry& registry,
+        mesh_options opts
+    ) -> void;
+
+    [[nodiscard]]
+    static auto is_face_visible(
+        const std::shared_ptr<vw::asset::model>& mdl, int32 x, int32 y, int32 z,
+        int32 face_direction
+    ) -> bool;
+};
+
+// Два запечённых канала в четырёх углах одной грани, по четыре бита, в том же
+// порядке, что corner_ao. Берутся вместе, потому что это одна и та же выборка:
+// девять ячеек, одни и те же, различается только читаемое в них поле.
+struct corner_light {
+    uint16 sky   = 0;
+    uint16 block = 0;
+
+    [[nodiscard]] auto operator==(const corner_light&) const -> bool = default;
+};
+
+struct face_mask_cell {
+    block_id voxel_id;
+    uint8 corner_ao;
+
+    // Часть ключа слияния: две ячейки сливаются, только если свет совпал по всему
+    // кругу — из-за этого градиент и стоит квадов. Оба канала, и оба должны
+    // совпасть: стена наполовину под дневным светом и наполовину под факелом
+    // несёт два градиента, а не один.
+    corner_light light{};
+
+    // Снова два бита на угол, и тоже в ключе слияния: ячейки сливаются, только
+    // если форма вокруг них согласна. Столько это и стоит — 6,6% квадов, против
+    // 13,2% когда выпуклость считалась для всех шести граней, а не для верхней.
+    uint8 corner_convex = 0;
+
+    [[nodiscard]]
+    auto operator==(const face_mask_cell&) const -> bool = default;
+
+    [[nodiscard]]
+    auto is_empty() const -> bool {
+        return voxel_id == blocks::air;
+    }
+};
+
+struct mesh_generation_storage {
+    std::vector<quad> quads;
+    std::vector<face_mask_cell> mask;
+    std::vector<bool> depth_has_pages;
+
+    // 64 КБ битового объёма; воркер переиспользует его между чанками и строит
+    // один раз на меш. В куче, а не полем, чтобы стек воркера остался маленьким.
+    std::unique_ptr<vw::asset::chunk_occupancy> occupancy;
+    bool occupancy_valid = false;
+
+    // Переиспользуется между чанками, поэтому заливка связности не аллоцирует.
+    vw::asset::chunk_link_scratch link_scratch;
+
+    auto clear() -> void {
+        quads.clear();
+    }
+};
+
+namespace detail {
+struct face_axis_mapping {
+    int32 width, height, depth;
+    int32 face_direction;
+    int32 voxel_scale;
+
+    face_axis_mapping(const vw::asset::model& mdl, int32 face_dir);
+
+    [[nodiscard]] auto to_model_coords(int32 u, int32 v, int32 layer) const
+        -> std::tuple<int32, int32, int32>;
+
+    [[nodiscard]] auto to_local_min_max(int32 u, int32 v, int32 w, int32 h, int32 layer) const
+        -> std::pair<vec3i, vec3i>;
+};
+
+[[nodiscard]] auto compute_corner_darkness(const vw::asset::model& mdl, int32 x, int32 y, int32 z,
+                                           int32 face) -> uint8;
+[[nodiscard]] auto compute_corner_convexity(const vw::asset::model& mdl, int32 x, int32 y, int32 z,
+                                            int32 face) -> uint8;
+[[nodiscard]] auto compute_corner_light(const vw::asset::model& mdl, int32 x, int32 y, int32 z,
+                                        int32 face) -> corner_light;
+
+// Единственная грань, для которой считается выпуклость. Боковая грань и так
+// читает свою форму по нормали, а нижняя никогда не та поверхность, по которой
+// смотрят, — остальные пять платили бы ключом слияния и ничего не показывали.
+inline constexpr int32 convex_face = 2;
+
+[[nodiscard]] auto is_face_visible(const vw::asset::model& mdl, int32 x, int32 y, int32 z,
+                                   int32 face_direction) -> bool;
+
+auto build_face_mask(
+    mesh_generation_storage& storage,
+    const vw::asset::model& mdl,
+    const face_axis_mapping& axes,
+    int32 face_direction,
+    int32 layer,
+    mesh_options opts
+) -> void;
+
+auto add_quad(
+    std::vector<quad>& quads,
+    int32 face_direction,
+    vec3i min_pos,
+    vec3i max_pos,
+    uint8 palette_index,
+    uint8 corner_ao,
+    uint8 corner_convex,
+    corner_light light
+) -> void;
+
+// Один слой, сведённый к битовым строкам: что видно и что стоит перед гранью —
+// это и есть плоскость, по которой берётся затенение. Пустой слой означает, что
+// граней в нём нет вовсе, и это заменяет линейный проход по всей маске.
+struct layer_rows {
+    std::array<uint64, 64> visible{};
+    std::array<uint64, 64> front{};
+
+    // Слой, в котором стоят сами грани. Выпуклость выбирает его так же, как
+    // затенение выбирает плоскость перед гранью, и он всё равно уже читался ради
+    // видимости — просто не сохранялся.
+    std::array<uint64, 64> own{};
+
+    // Плоскость перед гранью лежит вне чанка, поэтому каждая выборка затенения
+    // вокруг неё уходит за чанк по двум осям и читается как пустая.
+    bool front_outside = false;
+};
+
+[[nodiscard]] auto light_from_rows(const vw::asset::model& mdl, const layer_rows& rows,
+                                   int32 u_at, int32 v_at, int32 x, int32 y, int32 z,
+                                   int32 face) -> corner_light;
+
+[[nodiscard]] auto build_layer_rows(
+    const vw::asset::model& mdl,
+    const vw::asset::chunk_occupancy& occupancy,
+    const face_axis_mapping& axes,
+    int32 face_direction,
+    int32 layer,
+    layer_rows& out
+) -> bool;
+
+auto emit_rect(
+    mesh_generation_storage& storage,
+    const face_axis_mapping& axes,
+    int32 face_direction,
+    int32 layer,
+    int32 u_start,
+    int32 v_start,
+    int32 w,
+    int32 h,
+    const face_mask_cell& cell
+) -> void;
+}  // namespace detail
+
+class strip_mesh_generator {
+public:
+    [[nodiscard]]
+    static auto generate_mesh_data(
+        mesh_generation_storage& storage,
+        const vw::asset::model& mdl,
+        const block_registry& registry,
+        mesh_options opts = {}
+    ) -> mesh;
+
+private:
+    static auto merge_and_emit_strips(
+        mesh_generation_storage& storage,
+        const vw::asset::model& mdl,
+        const detail::face_axis_mapping& axes,
+        int32 face_direction,
+        int32 layer,
+        const block_registry& registry,
+        mesh_options opts
+    ) -> void;
+
+    static auto generate_face_quads(
+        mesh_generation_storage& storage,
+        const vw::asset::model& mdl,
+        int32 face_direction,
+        const block_registry& registry,
+        mesh_options opts
+    ) -> void;
+};
+
+class greedy_mesh_generator {
+public:
+    [[nodiscard]]
+    static auto generate_mesh_data(
+        mesh_generation_storage& storage,
+        const vw::asset::model& mdl,
+        const block_registry& registry,
+        mesh_options opts = {}
+    ) -> mesh;
+
+private:
+    // Идёт по битам видимости вместо прохода по маске: серия начинается с
+    // countr_zero, прямоугольник гасится одним and-not на строку, а маска нужна
+    // только чтобы сравнить ключи заведомо выставленных ячеек.
+    static auto merge_and_emit_rects_bits(
+        mesh_generation_storage& storage,
+        const detail::face_axis_mapping& axes,
+        int32 face_direction,
+        int32 layer,
+        detail::layer_rows& rows
+    ) -> void;
+
+    static auto merge_and_emit_rects(
+        mesh_generation_storage& storage,
+        const vw::asset::model& mdl,
+        const detail::face_axis_mapping& axes,
+        int32 face_direction,
+        int32 layer,
+        const block_registry& registry,
+        mesh_options opts
+    ) -> void;
+
+    static auto generate_face_quads(
+        mesh_generation_storage& storage,
+        const vw::asset::model& mdl,
+        int32 face_direction,
+        const block_registry& registry,
+        mesh_options opts
+    ) -> void;
+};
+}  // namespace vw::gfx

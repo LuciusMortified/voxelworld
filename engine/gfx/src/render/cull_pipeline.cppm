@@ -1,0 +1,97 @@
+export module vw.gfx:render.cull_pipeline;
+
+import std;
+
+import vw.core;
+import vw.ecs;
+import vw.world;
+import :camera;
+import :resource;
+import :render.vulkan_context;
+import :render.shadow_map;
+import vulkan;
+
+namespace vw::gfx {
+using namespace ::vw::ecs;
+}
+
+export namespace vw::gfx {
+
+
+class vulkan_context;
+
+// Камера и все каскады теней отсеиваются одним диспатчем, и по этому числу
+// размеряется каждый заполняемый им буфер: блок плоскостей, буфер отсеянных команд,
+// счётчики отрисовок по проходам.
+//
+// Раньше копий этого числа было две, обе записанные литералами, и пятый каскад по
+// очереди уходил за конец каждой: заполнение плоскостей вышло на шесть vec4 за
+// пределы стековой структуры и умерло на stack cookie, а буфер счётчиков затем
+// выдал последнему каскаду смещение на один uint за своим концом.
+inline constexpr uint32 cull_plane_count = (shadow_map::cascade_count + 1) * 6;
+
+struct cull_frustum_ubo {
+    vec4f planes[cull_plane_count];
+
+    // Где стоит камера — чтобы выбрасывать направления граней, смотрящие от неё.
+    // Используется только проходом камеры.
+    vec4f eye;
+
+    uint32 pass_count;
+    uint32 pad[3];
+};
+
+class cull_pipeline {
+public:
+    static constexpr uint32 max_frames_in_flight = 2;
+
+    explicit cull_pipeline(
+        vulkan_context& context,
+        vk::DescriptorPool descriptor_pool
+    );
+    ~cull_pipeline();
+
+    cull_pipeline(const cull_pipeline&)            = delete;
+    auto operator=(const cull_pipeline&) -> cull_pipeline& = delete;
+    cull_pipeline(cull_pipeline&&)                 = delete;
+    auto operator=(cull_pipeline&&) -> cull_pipeline&      = delete;
+
+    void update_frustums(
+        uint32 frame_index,
+        const vw::spatial::frustum& view_frustum,
+        std::span<const vw::spatial::frustum> shadow_frustums,
+        const vec3f& eye
+    );
+
+    // Все буферы разом. Один барьер накрывает все счётчики вместо барьера на
+    // каждый: барьер — это остановка конвейера, а пул вырос с девяти буферов до
+    // пятнадцати, когда классы размеров стали мельче.
+    auto dispatch(
+        vk::CommandBuffer cmd,
+        const std::vector<std::unique_ptr<combined_buffer>>& buffers,
+        uint32 frame_index
+    ) -> void;
+
+    [[nodiscard]] auto get_buffer_descriptor_set_layout() const -> vk::DescriptorSetLayout {
+        return buffer_descriptor_set_layout_;
+    }
+
+private:
+    void create_descriptor_set_layouts_();
+    void create_pipeline_();
+    void create_frustum_ubos_();
+
+    vulkan_context* context_;
+    vk::DescriptorPool descriptor_pool_ = nullptr;
+
+    std::unique_ptr<shader> compute_shader_;
+    vk::Pipeline compute_pipeline_                      = nullptr;
+    vk::PipelineLayout compute_pipeline_layout_         = nullptr;
+    vk::DescriptorSetLayout frustum_descriptor_set_layout_ = nullptr;
+    vk::DescriptorSetLayout buffer_descriptor_set_layout_  = nullptr;
+
+    std::array<std::unique_ptr<uniform_buffer>, max_frames_in_flight> frustum_ubos_;
+    std::array<vk::DescriptorSet, max_frames_in_flight> frustum_descriptor_sets_{};
+};
+
+}  // namespace vw::gfx

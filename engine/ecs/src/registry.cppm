@@ -12,9 +12,9 @@ auto next_component_id() -> uint32;
 
 export namespace vw::ecs {
 
-// Component ids are handed out lazily on first use, so a type never mentioned
-// at compile time (a script-registered component) can join through the untyped
-// surface of the registry with an id obtained the same way.
+// Идентификаторы компонентов выдаются лениво, при первом обращении, поэтому тип,
+// ни разу не названный на этапе компиляции (компонент из скрипта), может войти
+// через нетипизированную часть реестра с идентификатором, полученным так же.
 template <typename T>
 auto component_id_of() -> uint32 {
     static const uint32 id = detail::next_component_id();
@@ -167,12 +167,13 @@ private:
     std::vector<entity> destroyed_set_;
 };
 
-// Iterates the smallest of the requested pools and skips entities missing any
-// of the others. Pool pointers are resolved once per view, not per element.
+// Идёт по наименьшему из запрошенных пулов и пропускает сущности, у которых нет
+// какого-то из остальных. Указатели на пулы разрешаются один раз на представление,
+// а не на элемент.
 template <typename... Cs>
 class component_view {
-    // Resolved once when the view is built, so iteration is plain indexing into
-    // a dense array with a compile time element stride.
+    // Разрешается один раз при построении представления, поэтому обход — это
+    // обычная индексация плотного массива с известным на компиляции шагом.
     template <typename C>
     struct cursor {
         C* dense                = nullptr;
@@ -211,9 +212,9 @@ public:
         pick_entities_();
     }
 
-    // Scanning for the next matching entity already resolves its dense slot in
-    // every pool, so the iterator keeps those slots instead of looking them up
-    // a second time on dereference.
+    // Поиск следующей подходящей сущности и так находит её плотный слот в каждом
+    // пуле, поэтому итератор хранит эти слоты, а не ищет их второй раз при
+    // разыменовании.
     struct iterator {
         const component_view* view = nullptr;
         std::size_t index          = 0;
@@ -267,9 +268,9 @@ public:
         return iterator{this, count_};
     }
 
-    // The callback form keeps the whole traversal in one loop body, which is
-    // measurably tighter than driving it through an iterator. Prefer it in
-    // systems that run every frame.
+    // Форма с колбэком держит весь обход в одном теле цикла, что измеримо плотнее,
+    // чем гонять его через итератор. В системах, работающих каждый кадр, лучше
+    // использовать её.
     template <typename Fn>
     void for_each(Fn&& fn) const {
         for_each_(std::forward<Fn>(fn), std::index_sequence_for<Cs...>{});

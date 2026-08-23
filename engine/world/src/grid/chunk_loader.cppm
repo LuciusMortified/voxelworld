@@ -1,0 +1,54 @@
+export module vw.world:terrain.loader;
+import :terrain.generator;
+import :terrain.column;
+
+import std;
+
+import vw.core;
+import :model;
+
+export namespace vw::ecs {
+
+// Генерирует колонки на потоках-воркерах и отдаёт готовые главному потоку через
+// очередь.
+class chunk_loader {
+public:
+    // Ноль просит умолчание — то, на котором остановились по снятой кривой.
+    explicit chunk_loader(std::unique_ptr<terrain_generator> generator, uint32 workers = 0);
+    ~chunk_loader();
+
+    chunk_loader(const chunk_loader&)                    = delete;
+    auto operator=(const chunk_loader&) -> chunk_loader& = delete;
+    chunk_loader(chunk_loader&&)                         = delete;
+    auto operator=(chunk_loader&&) -> chunk_loader&      = delete;
+
+    auto request(vec2i coord) -> bool;
+
+    [[nodiscard]] auto try_pop_completed() -> std::unique_ptr<gen_column>;
+    [[nodiscard]] auto is_pending(vec2i coord) const -> bool;
+    [[nodiscard]] auto pending_count() const -> uint32;
+    [[nodiscard]] auto get_gen_stats() const -> column_gen_stats;
+
+private:
+    void gen_thread_function_();
+    void merge_worker_stats_(column_gen_worker_stats& worker);
+
+    struct gen_task {
+        vec2i coord;
+    };
+
+    std::unique_ptr<terrain_generator> generator_;
+    std::vector<std::thread> gen_threads_;
+    std::queue<gen_task> gen_queue_;
+    std::queue<std::unique_ptr<gen_column>> completed_queue_;
+    mutable std::mutex gen_mutex_;
+    mutable std::mutex completed_mutex_;
+    std::condition_variable gen_cv_;
+    bool gen_running_ = true;
+    std::unordered_set<vec2i> pending_columns_;
+
+    column_gen_worker_stats gen_totals_;
+    uint32 gen_queue_peak_ = 0;
+};
+
+}  // namespace vw::ecs

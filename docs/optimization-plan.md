@@ -82,7 +82,7 @@ GPU. Собственная CPU-сторона кадра — порядка 0,2
 
 ### P0.1 GPU-таймстемпы (закрывает всю GPU-часть) — **сделано**
 
-Реализовано: `gpu_timer` (`engine/gfx/src/gpu_timer.cpp`, объявление в
+Реализовано: `gpu_timer` (`engine/gfx/src/render/gpu_timer.cpp`, объявление в
 `render.cppm`), 8 стадий, пул запросов на кадр в полёте. Числа и проверки —
 в `docs/frame-time-baseline.md`, раздел «GPU-время».
 
@@ -104,7 +104,7 @@ GPU. Собственная CPU-сторона кадра — порядка 0,2
   `waitForFences` — фенс этого кадра уже сигнален, `getQueryPoolResults` без
   `eWait`;
 - поля `gpu_*` в `render_timing_stats` (`renderer.cppm:85-95`) и новые стадии в
-  `frame_recorder` (`engine/gfx/src/frame_recorder.cpp`, сейчас 16 стадий).
+  `frame_recorder` (`engine/gfx/src/engine/frame_recorder.cpp`, сейчас 16 стадий).
 
 **Подтверждение.**
 - Сумма GPU-стадий в `parked` должна быть того же порядка, что `begin_frame` — иначе
@@ -682,7 +682,7 @@ prepass, если он понадобится.
 **Тип:** рефакторинг; предусловие фазы 4 и всякой работы внутри мешера.
 
 **Проблема.**
-`engine/gfx/src/resource.cppm` — 1073 строки, механическая склейка девяти бывших
+`engine/gfx/src/resource/` — 1073 строки, механическая склейка девяти бывших
 заголовков; границы так и остались комментариями `// ---- from vw/gfx/resource/…`.
 В одной партиции лежат: `shader`, `buffer` и шесть его наследников,
 `deletion_queue`, `staging_buffer`, весь мешер (`vertex`, `mesh`, `face_mask_cell`,

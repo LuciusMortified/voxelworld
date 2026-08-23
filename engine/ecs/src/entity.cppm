@@ -31,8 +31,8 @@ struct entity final {
 
 inline constexpr entity invalid_entity = entity{};
 
-// Generation-stamped entity handles: an index is reused only with a bumped
-// generation, so stale handles stay detectable.
+// Дескрипторы сущностей с меткой поколения: индекс переиспользуется только с
+// увеличенным поколением, поэтому устаревший дескриптор остаётся распознаваемым.
 class entity_pool final {
 public:
     static constexpr uint32 default_capacity = 1024;

@@ -1,0 +1,97 @@
+export module vw.world:systems.physics;
+
+import std;
+
+import vw.core;
+import vw.ecs;
+import :anim;
+import :components;
+import :grid;
+import :index;
+import :model;
+import :light;
+import :terrain;
+
+export namespace vw::ecs {
+
+class world;
+
+struct physics_stats {
+    float32 step_ms             = 0.0F;
+    float32 voxel_collision_ms  = 0.0F;
+    float32 entity_collision_ms = 0.0F;
+    float32 entity_query_ms     = 0.0F;
+    float32 entity_resolve_ms   = 0.0F;
+    int32 step_count            = 0;
+    int32 entity_query_results  = 0;
+};
+
+class physics_system final {
+public:
+    static constexpr int32 max_collision_iterations = 4;
+    static constexpr float32 fixed_dt               = 1.0F / 60.0F;
+    static constexpr int32 max_steps_per_frame      = 5;
+
+    explicit physics_system(world& w);
+
+    void set_gravity(float32 g);
+    [[nodiscard]] auto get_gravity() const -> float32;
+
+    void update(float32 delta_time);
+    [[nodiscard]] auto get_stats() const -> const physics_stats&;
+
+    class rigid_body_modifier {
+    public:
+        auto set_velocity(const vec3f& vel) -> rigid_body_modifier&;
+        auto set_gravity_scale(float32 scale) -> rigid_body_modifier&;
+        auto add_impulse(const vec3f& impulse) -> rigid_body_modifier&;
+        auto add_external_impulse(const vec3f& impulse) -> rigid_body_modifier&;
+        auto set_drag(float32 drag) -> rigid_body_modifier&;
+
+    private:
+        friend class physics_system;
+        rigid_body_modifier(physics_system* system, entity ent);
+
+        physics_system* system_;
+        entity entity_;
+    };
+
+    class collider_modifier {
+    public:
+        auto set_extents(const vec3f& ext) -> collider_modifier&;
+        auto set_offset(const vec3f& offset) -> collider_modifier&;
+
+    private:
+        friend class physics_system;
+        collider_modifier(physics_system* system, entity ent);
+
+        physics_system* system_;
+        entity entity_;
+    };
+
+    auto modify(entity ent) -> rigid_body_modifier;
+    auto modify_collider(entity ent) -> collider_modifier;
+
+private:
+    void step(float32 dt);
+    [[nodiscard]] auto are_chunks_loaded(const vec3f& position, const vec3f& extents) const -> bool;
+
+    struct collision_result {
+        vec3f resolved_position;
+        bool grounded = false;
+    };
+
+    [[nodiscard]] auto resolve_box_voxel(vec3f center, const vec3f& half_extents,
+                                         vec3f& velocity) const -> collision_result;
+
+    void resolve_entity_collisions(entity ent, vec3f& position, vec3f& velocity,
+                                   const vec3f& half_extents, const vec3f& offset);
+
+    world* world_;
+    float32 gravity_          = -300.0F;
+    float32 accumulated_time_ = 0.0F;
+    physics_stats stats_;
+    std::vector<entity> entity_query_cache_;
+};
+
+}  // namespace vw::ecs

@@ -14,13 +14,13 @@
 
 | Место | Состояние |
 |---|---|
-| `engine/gfx/src/geometry.cppm:112` | `max_visible_ = 24` — предел видимых источников; с F0.4 настройка, не константа |
-| `engine/gfx/src/light_buffer.cpp:100` | `nth_element` по всем `light_component`: цена растёт с **общим** числом, не с видимым |
+| `engine/gfx/src/resource/light_buffer.cppm:112` | `max_visible_ = 24` — предел видимых источников; с F0.4 настройка, не константа |
+| `engine/gfx/src/resource/light_buffer.cpp:100` | `nth_element` по всем `light_component`: цена растёт с **общим** числом, не с видимым |
 | `shaders/voxel.frag:578` | два пути: список кластера и, под флагом, старый линейный цикл по всем источникам |
 | ~~`light_buffer_->update()` внутри render pass~~ | закрыто в F0.2: вызов в `renderer.cpp:493`, до рендер-прохода |
 | ~~`storage_buffer` один на рендерер~~ | закрыто в F0.1: кольцо на `max_frames_in_flight` |
-| `engine/gfx/src/cull_pipeline.cpp`, `shaders/cull.comp` | готовый образец компьютного прохода |
-| `engine/gfx/src/renderer.cppm:273` | `static_assert(offsetof(...))` — сторож раскладки кадрового uniform |
+| `engine/gfx/src/render/cull_pipeline.cpp`, `shaders/cull.comp` | готовый образец компьютного прохода |
+| `engine/gfx/src/render/render_uniforms.cppm:273` | `static_assert(offsetof(...))` — сторож раскладки кадрового uniform |
 
 Дескрипторные наборы 0–4 заняты. Глубина: D32, reversed-Z, без MSAA,
 `storeOp = eDontCare`.
@@ -289,7 +289,7 @@ lights` в `test_world_grid.log`.
 
 ### F1. Геометрия сетки — на CPU, под тестами
 
-`vw::spatial::cluster_grid` в `engine/core/src/spatial.cppm`: логарифмическая
+`vw::spatial::cluster_grid` в `engine/core/src/spatial/spatial.cppm`: логарифмическая
 раскладка `slice_of(view_z)` и `z_range_of(slice)`, тайловая сетка,
 `scatter(light, grid)` — список кластеров, которые источник задевает.
 
