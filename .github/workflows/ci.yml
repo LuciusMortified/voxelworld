@@ -16,10 +16,10 @@ env:
   VW_CMAKE_VERSION: 4.4.0
   VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
 
-# The build is Windows-only by construction: `import std` needs a std module,
-# and Clang targeting the MSVC ABI builds it from MSVC's own std.ixx (see
-# cmake/vw_std_module.cmake). The sanitizer workflow covers the headless half
-# of the engine on Linux, where Clang and libc++ bring a std module of their own.
+# Полная конфигурация собирается только на Windows — не из-за `import std`, а
+# из-за зависимостей: glfw3, imgui и Vulkan приезжают из vcpkg, и на Linux их
+# пришлось бы собирать той же стандартной библиотекой, что и движок. Ядро там
+# собирается прекрасно — этим занят workflow Analysis.
 jobs:
   build:
     runs-on: windows-latest

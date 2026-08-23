@@ -107,9 +107,16 @@ ImGui и GLFW остаются заголовочными и живут толь
 
 ## Сборка
 
-Только генератор Ninja и только из окружения `vcvars64.bat` — `import std`
-требует модуля стандартной библиотеки, а Clang здесь берёт его из `std.ixx` от
-MSVC. Отсюда же следует, что сборка возможна только на Windows.
+Только генератор Ninja. На Windows — из окружения `vcvars64.bat`: `import std`
+требует модуля стандартной библиотеки, а Clang, целящийся в MSVC-ABI, берёт его
+из `std.ixx` от MSVC.
+
+Полная конфигурация — с `vw.platform`, `vw.gfx` и приложениями — собирается
+только на Windows. Headless-ядро (`vw.core`, `vw.ecs`, `vw.world` и тесты)
+собирается и на Linux: Clang с libc++ приносит собственный std-модуль, и
+`import std` работает штатным путём CMake, без `std.ixx`. Так устроены
+санитайзерные джобы (`docs/quality.md`). Полная сборка на Linux не проверена:
+зависимости из vcpkg собираются другой стандартной библиотекой, и ABI разъедется.
 
 ```
 cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
