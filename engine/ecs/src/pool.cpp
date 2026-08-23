@@ -1,6 +1,7 @@
 module vw.ecs;
 
 import std;
+import vw.core;
 
 namespace vw::ecs {
 namespace {

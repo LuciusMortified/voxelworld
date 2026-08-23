@@ -1,7 +1,8 @@
 # Voxel World
 
 Воксельный движок на C++23/Vulkan. Движок + ECS + приложение Sculptor (редактор
-вокселей). Описание движка — `docs/ENGINE.md`, продукт — `docs/PRD.md`.
+вокселей). Описание движка — `docs/ENGINE.md`, продукт — `docs/PRD.md`, проверки
+качества и то, что гоняет CI, — `docs/quality.md`.
 
 ## Architecture
 

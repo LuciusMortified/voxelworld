@@ -8,6 +8,7 @@ module;
 module vw.platform;
 
 import std;
+import vw.core;
 
 namespace vw::plat {
 namespace {
