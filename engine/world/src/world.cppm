@@ -217,8 +217,11 @@ private:
     void detach_components_(entity ent) noexcept;
 
     ecs::registry registry_;
-    systems systems_;
+    // Resources come before the systems on purpose: a system may hold models
+    // whose pages belong to the model_registry, so the registry has to outlive
+    // every system that borrowed from it.
     resources resources_;
+    systems systems_;
     std::vector<void (*)(world&, entity)> remove_hooks_;
 };
 
