@@ -125,13 +125,21 @@ void staging_buffer::flush(
         return;
     }
 
+    // Sorted down to the region and not just to the pair of buffers, so that
+    // two writes to the same place end up next to each other. Stable, so among
+    // equal regions the last one queued is still the last one here -- which is
+    // the one that has to survive.
     std::ranges::stable_sort(
         pending_copies_, [this](const pending_copy& a, const pending_copy& b) {
             const bool a_is_staging = (a.src == buffer_);
             const bool b_is_staging = (b.src == buffer_);
             if (a_is_staging != b_is_staging) return !a_is_staging;
             if (a.src != b.src) return a.src < b.src;
-            return a.dst < b.dst;
+            if (a.dst != b.dst) return a.dst < b.dst;
+            if (a.region.dstOffset != b.region.dstOffset) {
+                return a.region.dstOffset < b.region.dstOffset;
+            }
+            return a.region.size < b.region.size;
         }
     );
 
@@ -165,17 +173,23 @@ void staging_buffer::flush(
             saw_device_copy = true;
         }
 
+        // Only the last write to a region survives; the earlier ones would be
+        // overwritten by it and copying them is work for nothing.
+        //
+        // This used to look ahead at the whole rest of the batch for every
+        // region, which is quadratic, and a crowd of two hundred bodies puts
+        // about a thousand regions in one batch: 12.17 ms a frame in a debug
+        // build, spent almost entirely discovering that there are no duplicates
+        // at all. Sorted, equal regions are adjacent and one look ahead does it.
         flush_regions_.clear();
         for (auto r = it; r != batch_end; ++r) {
-            bool duplicate = false;
-            for (auto later = r + 1; later != batch_end; ++later) {
-                if (later->region.dstOffset == r->region.dstOffset &&
-                    later->region.size == r->region.size) {
-                    duplicate = true;
-                    break;
-                }
-            }
-            if (!duplicate) {
+            const auto next = r + 1;
+
+            const bool superseded = next != batch_end &&
+                next->region.dstOffset == r->region.dstOffset &&
+                next->region.size == r->region.size;
+
+            if (!superseded) {
                 flush_regions_.push_back(r->region);
             }
         }

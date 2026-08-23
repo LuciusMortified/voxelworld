@@ -335,6 +335,14 @@ struct combined_buffer_pool_stats {
     uint32 mesh_count        = 0;
     uint32 instance_capacity = 0;
     uint32 instance_count    = 0;
+
+    // Entities whose upload did not fit the frame's staging budget and were put
+    // off to the next one. Stuck above zero means the ring is being eaten faster
+    // than it refills, and a mesh waiting there is geometry that is not on
+    // screen yet -- which reads as a hole in the world rather than as a stall.
+    uint32 mesh_pending     = 0;
+    uint32 transform_pending = 0;
+
     std::vector<combined_buffer_stats> buffers;
     buffer_pool_timing_stats timing;
     chunk_cull_stats chunk_cull;

@@ -364,6 +364,7 @@ void combined_buffer_pool::update_meshes_(
 
     std::sort(merge_buffer_.begin(), merge_buffer_.end());
     mesh_pending_entities_.swap(merge_buffer_);
+    stats_.mesh_pending = static_cast<uint32>(mesh_pending_entities_.size());
 
     evict_uploaded_(world, pool);
 }
@@ -649,6 +650,7 @@ void combined_buffer_pool::update_transforms_(
 
     std::sort(merge_buffer_.begin(), merge_buffer_.end());
     transform_pending_entities_.swap(merge_buffer_);
+    stats_.transform_pending = static_cast<uint32>(transform_pending_entities_.size());
 }
 
 const combined_buffer_pool_stats& combined_buffer_pool::get_stats() const {

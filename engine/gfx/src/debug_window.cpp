@@ -268,6 +268,13 @@ void debug_window::render_render_detail() {
         row("meshes", bp.meshes_ms);
         row("transforms", bp.transforms_ms);
         row("staging", bp.staging_flush_ms);
+
+        // Not a time. What did not fit the frame's staging budget and is
+        // waiting for the next one -- meshes waiting here are chunks that are
+        // not drawn yet.
+        const auto& cb = engine_->get_renderer().get_stats().combined_buffers;
+        ImGui::Text("%-16s %6u mesh  %6u transform", "pending", cb.mesh_pending,
+                    cb.transform_pending);
         ImGui::Unindent();
 
         row("compute_cull", t.compute_cull_ms);
