@@ -18,14 +18,6 @@ import vw.platform;
 import :vk;
 import :engine;
 
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-
-
-#endif
-
 namespace vw::gfx {
 
 namespace {
