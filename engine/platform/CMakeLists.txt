@@ -11,6 +11,7 @@ target_sources(vw_platform
             src/input/event.cppm
             src/window/window.cppm
     PRIVATE
+        src/input/event.cpp
         src/window/window.cpp
 )
 

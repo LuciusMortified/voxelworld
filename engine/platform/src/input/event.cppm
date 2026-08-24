@@ -96,8 +96,30 @@ concept event_callback_type =
 
 template <event_type>
 struct event_sub {
-    std::size_t value = 0;
+    uint32 value = 0;
 };
+
+namespace detail {
+
+auto next_event_id() -> uint32;
+
+struct event_sink_base {
+    event_sink_base()                                              = default;
+    virtual ~event_sink_base()                                     = default;
+    event_sink_base(const event_sink_base&)                        = delete;
+    auto operator=(const event_sink_base&) -> event_sink_base&     = delete;
+    event_sink_base(event_sink_base&&)                             = delete;
+    auto operator=(event_sink_base&&) -> event_sink_base&          = delete;
+};
+
+}  // namespace detail
+
+// Идентификатор типа события выдаётся лениво, при первой подписке или отправке.
+template <event_type E>
+auto event_id_of() -> uint32 {
+    static const uint32 id = detail::next_event_id();
+    return id;
+}
 
 // Колбэки хранятся по типу события, поэтому диспетчер никогда не смотрит на
 // события, на которые никто не подписан.
@@ -105,21 +127,32 @@ class event_dispatcher {
 public:
     template <event_type E, event_callback_type<E> F>
     auto sub(F&& callback) -> event_sub<E> {
-        auto& callbacks     = get_callbacks<E>();
-        event_sub<E> id     = {.value = next_id_++};
-        callbacks[id.value] = std::forward<F>(callback);
+        const event_sub<E> id{.value = next_id_++};
+        sink_<E>().entries.emplace_back(id.value, std::forward<F>(callback));
         return id;
     }
 
     template <event_type E>
-    void unsub(event_sub<E> id) {
-        get_callbacks<E>().erase(id.value);
+    auto unsub(event_sub<E> id) -> void {
+        auto* sink = find_sink_<E>();
+        if (sink == nullptr) {
+            return;
+        }
+        // Стирание со сдвигом, а не обмен с последним: порядок вектора — это
+        // порядок подписки, и он же порядок вызова.
+        std::erase_if(sink->entries, [id](const auto& entry) { return entry.id == id.value; });
     }
 
     template <event_type E>
-    void dispatch(E& event) {
-        for (auto& [id, callback] : get_callbacks<E>()) {
-            if (callback(event)) {
+    auto dispatch(E& event) -> void {
+        auto* sink = find_sink_<E>();
+        if (sink == nullptr) {
+            return;
+        }
+        // По индексу, а не итератором: колбэк вправе подписаться прямо отсюда, а
+        // это перевыделяет вектор.
+        for (std::size_t i = 0; i < sink->entries.size(); ++i) {
+            if (sink->entries[i].callback(event)) {
                 event.handled = true;
             }
         }
@@ -127,12 +160,39 @@ public:
 
 private:
     template <event_type E>
-    static auto get_callbacks() -> auto& {
-        static std::map<std::size_t, std::function<bool(E&)>> callbacks;
-        return callbacks;
+    struct sink final : detail::event_sink_base {
+        struct entry {
+            uint32 id;
+            std::function<bool(E&)> callback;
+        };
+
+        std::vector<entry> entries;
+    };
+
+    template <event_type E>
+    auto sink_() -> sink<E>& {
+        const uint32 id = event_id_of<E>();
+        if (id >= sinks_.size()) {
+            sinks_.resize(id + 1);
+        }
+        if (sinks_[id] == nullptr) {
+            sinks_[id] = std::make_unique<sink<E>>();
+        }
+        return static_cast<sink<E>&>(*sinks_[id]);
     }
 
-    std::size_t next_id_ = 1;
+    template <event_type E>
+    auto find_sink_() -> sink<E>* {
+        const uint32 id = event_id_of<E>();
+        return id < sinks_.size() && sinks_[id] != nullptr
+            ? static_cast<sink<E>*>(sinks_[id].get())
+            : nullptr;
+    }
+
+    // Индекс — event_id_of<E>(), поэтому приведение обратно к sink<E> однозначно.
+    // Хранилище принадлежит экземпляру: два окна не делят подписки.
+    std::vector<std::unique_ptr<detail::event_sink_base>> sinks_;
+    uint32 next_id_ = 1;
 };
 
 }  // namespace vw::plat
