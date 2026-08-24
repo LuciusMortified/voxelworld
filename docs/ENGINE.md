@@ -23,19 +23,45 @@
 Модуль не равен пространству имён: `vw.world` экспортирует и `vw::asset`
 (данные ассетов), и `vw::ecs` (мир, компоненты, системы).
 
+## Раскладка исходников
+
+Исходники каждой библиотеки разложены по смысловым каталогам внутри `src/`;
+корень каталога держит только первичный интерфейс модуля.
+
+| Модуль | Каталоги |
+|---|---|
+| `vw.core` | `types/`, `math/`, `spatial/`, `blocks/`, `log/` |
+| `vw.ecs` | плоско: четыре юнита |
+| `vw.world` | `asset/`, `components/`, `systems/`, `grid/`, `light/`, `spatial/` |
+| `vw.platform` | `input/`, `window/` |
+| `vw.gfx` | `camera/`, `resource/`, `render/`, `debug/`, `engine/` |
+
 ## Партиции
 
 Партиция — один `.cppm`. Взаимно зависимые сущности обязаны лежать в одной
-партиции: циклы между партициями запрещены.
+партиции: циклы между партициями запрещены. Имя партиции повторяет каталог:
+`:systems.transform`, `:render.shadow_map`, `:model.occupancy`.
+
+Крупные партиции — агрегаторы: они только реэкспортируют части (`:systems`,
+`:components`, `:model`, `:anim`, `:light`, `:grid`, `:terrain`, `:serial`,
+`:resource`, `:render`, `:renderer`, `:debug`, `:gpu_buffers`).
 
 - **`vw.core`**: `:types`, `:vector`, `:matrix`, `:math`, `:color`, `:blocks`,
   `:timing`, `:log`, `:spatial` (aabb, plane, ray, frustum — они взаимно
   зависимы).
-- **`vw.world`**: `:model`, `:anim`, `:serial`, `:index`, `:components`,
-  `:terrain`, `:grid`, `:systems`; класс `world` и оба ECS-сериализатора — в
-  первичном юните `world.cppm`.
+- **`vw.world`**: `:model.*` (identity, occupancy, links, light_field),
+  `:anim.*` (keyframe, channel, clip, fsm), `:serial.*` (vox, voxa, storage,
+  writer, scene), `:index`, `:components.*` (по группам компонентов),
+  `:terrain.*` (generator, column, loader, perlin), `:light.*` (column, baker),
+  `:grid.*` (visibility, chunk, world_grid), `:systems.*` (hooks плюс партиция
+  на каждую систему); класс `world` — в первичном юните `world.cppm`.
 - **`vw.platform`**: `:input`, `:event`, `:window`.
-- **`vw.gfx`**: `:camera`, `:resource`, `:render`, `:renderer`, `:engine` плюс
+- **`vw.gfx`**: `:camera` и `:camera.*` (контроллеры), `:resource.*` (shader,
+  buffer, deletion_queue, staging_buffer, palette/light/blob-буферы,
+  light_grid, combined_buffer и его пул), `:meshing`, `:mesh_pool`,
+  `:render.*` (vulkan_context, gpu_timer, shadow_map, cull_pipeline),
+  `:renderer` с `:renderer.settings|uniforms|stats`, `:debug.*` (window,
+  primitive), `:engine` с `:engine.app|stats|frame_recorder`, плюс
   неэкспортируемая `:vk` (хелперы ошибок и единственное упоминание
   `vk::detail`).
 - **`vw.sculptor`**: `:state`, `:operations`, `:services`, `:tools`, `:ui`,
@@ -68,11 +94,11 @@ initializers), без smart handles, динамический диспетчер
 
 Три места, где C API легален, и все три проверяет линт:
 
-- `engine/platform/src/window.cpp` — GLFW создаёт `VkSurfaceKHR`; наружу сюрфейс
-  уходит как `uint64`, чтобы Vulkan не попал в интерфейс платформы.
-- `engine/gfx/src/renderer.cpp` — бэкенд `imgui_impl_vulkan` принимает только
-  C-хэндлы, на границе стоят четыре `static_cast`.
-- `engine/gfx/src/vulkan_context.cpp` — единственный файл, называющий
+- `engine/platform/src/window/window.cpp` — GLFW создаёт `VkSurfaceKHR`; наружу
+  сюрфейс уходит как `uint64`, чтобы Vulkan не попал в интерфейс платформы.
+- `engine/gfx/src/render/renderer.cpp` — бэкенд `imgui_impl_vulkan` принимает
+  только C-хэндлы, на границе стоят четыре `static_cast`.
+- `engine/gfx/src/render/vulkan_context.cpp` — единственный файл, называющий
   `vk::detail`, за собственным аксессором `dispatcher()`.
 
 ImGui и GLFW остаются заголовочными и живут только в global module fragment
@@ -81,9 +107,28 @@ ImGui и GLFW остаются заголовочными и живут толь
 
 ## Сборка
 
-Только генератор Ninja и только из окружения `vcvars64.bat` — `import std`
-требует модуля стандартной библиотеки, а Clang здесь берёт его из `std.ixx` от
-MSVC. Отсюда же следует, что сборка возможна только на Windows.
+Только генератор Ninja. На Windows — из окружения `vcvars64.bat`: `import std`
+требует модуля стандартной библиотеки, а Clang, целящийся в MSVC-ABI, берёт его
+из `std.ixx` от MSVC.
+
+На Linux `import std` работает штатным путём CMake, без `std.ixx`: Clang с
+libc++ приносит собственный std-модуль. Там собирается и headless-ядро — так
+устроены санитайзерные джобы, — и полная конфигурация с `vw.platform`, `vw.gfx`
+и приложениями. Последней нужен overlay-триплет `x64-linux-libcxx`
+(`cmake/triplets/`), иначе зависимости приедут из vcpkg собранными libstdc++ и
+ABI разъедется:
+
+```
+export CC=clang CXX=clang++          # тот же компилятор соберёт порты vcpkg
+cmake -S . -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_CXX_FLAGS=-stdlib=libc++ -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++ \
+      -DVCPKG_TARGET_TRIPLET=x64-linux-libcxx \
+      -DVCPKG_OVERLAY_TRIPLETS=$PWD/cmake/triplets \
+      -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+```
+
+Собирается — не значит проверена на ходу: GPU в CI нет, и `sculptor` под Linux
+никто не запускал. Что там гоняется на каждый коммит — `docs/quality.md`.
 
 ```
 cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release

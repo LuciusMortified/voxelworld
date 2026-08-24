@@ -1708,7 +1708,7 @@ private:
                 ecs::spatial_layer::character
             );
 
-            for (size_t part = 0; part < parts.size(); ++part) {
+            for (std::size_t part = 0; part < parts.size(); ++part) {
                 const auto ent = world.create()
                     .with<ecs::hierarchy_component>()
                     .with<ecs::transform_component>()
@@ -1749,7 +1749,7 @@ private:
         auto& clips = world.resource<asset::animation_clip_registry>();
         auto clip   = clips.create("crowd_wave");
 
-        for (size_t part = 0; part < crowd_target_names_.size(); ++part) {
+        for (std::size_t part = 0; part < crowd_target_names_.size(); ++part) {
             asset::animation_track track{std::string{crowd_target_names_[part]}, 60.0f};
 
             asset::animation_channel<vec3f> channel{asset::animation_property::position};

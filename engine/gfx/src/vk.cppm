@@ -4,16 +4,17 @@ import std;
 import vulkan;
 import vw.core;
 
-// An implementation partition: `import vulkan` stops here and never reaches an
-// importer of vw.gfx. Holds the fatal half of the error policy, so every
-// fallible vk:: call goes through it instead of a hand-written result check.
+// Имплементационная партиция: `import vulkan` останавливается здесь и до
+// импортирующего vw.gfx не доходит. Держит фатальную половину политики ошибок,
+// поэтому каждый способный отказать вызов vk:: идёт через неё, а не через
+// написанную от руки проверку результата.
 //
-// Only the fatal half: the calls that the engine can survive -- acquire and
-// present -- have several legal codes and handle them where they are made, so
-// an expected-returning helper would have no callers yet.
+// Именно фатальную половину: вызовы, которые движок переживает — acquire и
+// present, — имеют по несколько законных кодов и разбираются там же, где сделаны,
+// поэтому у возвращающего expected помощника пока не было бы вызывающих.
 //
-// The binding is configured with VULKAN_HPP_USE_STD_EXPECTED, so a fallible
-// call returns std::expected<T, vk::Result> rather than vk::ResultValue.
+// Привязка собрана с VULKAN_HPP_USE_STD_EXPECTED, поэтому способный отказать вызов
+// возвращает std::expected<T, vk::Result>, а не vk::ResultValue.
 namespace vw::gfx {
 
 [[noreturn]]
@@ -43,9 +44,9 @@ inline auto vk_must(vk::Result result, std::string_view what) -> void {
     }
 }
 
-// Calls with more than one success code keep the result alongside the value
-// instead of collapsing into expected -- pipeline creation, for one. Matched
-// structurally so the binding's own result type is never named here.
+// Вызовы с несколькими кодами успеха держат результат рядом со значением, а не
+// сворачиваются в expected — например, создание конвейера. Сопоставление
+// структурное, поэтому собственный тип результата привязки здесь не называется.
 template <typename T>
     requires requires(T rv) {
         rv.result;

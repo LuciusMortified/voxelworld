@@ -18,7 +18,7 @@ namespace vw::sculptor {
 void imgui_input_text_string(
     std::string_view label, std::string& value
 ) {
-    constexpr size_t max_length = 64;
+    constexpr std::size_t max_length = 64;
     std::array<char, max_length> buffer{};
 
 #ifdef _WIN32

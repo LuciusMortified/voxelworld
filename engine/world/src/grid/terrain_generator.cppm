@@ -1,0 +1,32 @@
+export module vw.world:terrain.generator;
+
+import std;
+
+import vw.core;
+import :model;
+
+export namespace vw::ecs {
+
+struct chunk_data {
+    vec3i coord;
+    std::shared_ptr<asset::model> chunk_model;
+};
+
+struct chunk_y_range {
+    int32 min_y = 0;
+    int32 max_y = 0;
+};
+
+struct terrain_context {
+    int32 cx;
+    int32 cz;
+    std::function<auto(int32 y) -> chunk_data&> create_chunk;
+};
+
+class terrain_generator {
+public:
+    virtual ~terrain_generator()                       = default;
+    virtual auto generate(terrain_context& ctx) -> void = 0;
+};
+
+}  // namespace vw::ecs

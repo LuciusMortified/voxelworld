@@ -17,9 +17,10 @@ import vw.ecs;
 
 export namespace vw::ecs {
 
-// Owns the registry, the systems and the shared asset registries, and keeps
-// them in step: adding or removing a component notifies every system that
-// cares about that type.
+
+// Владеет реестром, системами и общими реестрами ассетов и держит их в согласии:
+// добавление или удаление компонента извещает каждую систему, которой этот тип
+// небезразличен.
 class world final {
 public:
     using systems = std::tuple<hierarchy_system, character_controller_system, animation_fsm_system,
@@ -200,9 +201,10 @@ private:
         registry_.batch_remove<T>(entities);
     }
 
-    // Destroying an entity has to notify the systems about every component it
-    // still holds, and by then the type is only known through its id — so each
-    // component type leaves behind a typed remover the first time it is added.
+    // Уничтожение сущности обязано известить системы о каждом компоненте, который
+    // она ещё держит, а тип к тому моменту известен только по идентификатору —
+    // поэтому каждый тип компонента при первом добавлении оставляет за собой
+    // типизированный удалитель.
     template <typename T>
     void remember_remove_hook_() {
         const uint32 id = component_id_of<T>();
@@ -217,68 +219,11 @@ private:
     void detach_components_(entity ent) noexcept;
 
     ecs::registry registry_;
-    // Resources come before the systems on purpose: a system may hold models
-    // whose pages belong to the model_registry, so the registry has to outlive
-    // every system that borrowed from it.
+    // Ресурсы стоят перед системами намеренно: система может держать модели, чьи
+    // страницы принадлежат model_registry, поэтому реестр обязан пережить каждую
+    // систему, которая у него занимала.
     resources resources_;
     systems systems_;
     std::vector<void (*)(world&, entity)> remove_hooks_;
 };
-
-class vox_serializer final {
-public:
-    using entity_names_type = std::unordered_map<entity, std::string>;
-    using error_type        = vox_writer::error_type;
-
-    struct options {
-        std::optional<entity_names_type> entity_names;
-        std::unordered_set<entity> excluded;
-    };
-
-    vox_serializer(world& world, vox_writer& writer, entity root, options opts = {});
-
-    auto serialize(const std::filesystem::path& filepath) -> std::expected<void, error_type>;
-
-    [[nodiscard]] auto extract() const -> asset::vox_prefab_data;
-
-private:
-    void generate_entity_names_();
-    [[nodiscard]] auto extract_entity_(entity ent) const -> asset::vox_entity_data;
-
-    world* world_;
-    vox_writer* writer_;
-    entity root_;
-    entity_names_type entity_names_;
-    std::unordered_set<entity> excluded_;
-};
-
-class vox_deserializer final {
-public:
-    using error_type = asset::vox_parser::error_type;
-
-    struct options {
-        bool skip_sockets = false;
-        bool skip_targets = false;
-    };
-
-    struct result {
-        std::string root_name;
-        std::unordered_map<std::string, entity> name_to_entity;
-        std::unordered_map<entity, std::string> entity_to_name;
-        std::vector<entity> entities;
-    };
-
-    vox_deserializer(world& world, asset::vox_parser& parser);
-
-    auto deserialize(const std::filesystem::path& filepath) -> std::expected<result, error_type>;
-    auto deserialize(const std::filesystem::path& filepath, const options& opts)
-        -> std::expected<result, error_type>;
-
-private:
-    void apply_entity_(const asset::vox_entity_data& data, result& res, const options& opts);
-
-    world* world_;
-    asset::vox_parser* parser_;
-};
-
 }  // namespace vw::ecs

@@ -7,7 +7,7 @@ import :entity;
 
 export namespace vw::ecs {
 
-// Everything component_pool needs to know about a type whose identity it erased.
+// Всё, что component_pool должен знать о типе, чью принадлежность он стёр.
 struct component_ops {
     uint32 size;
     uint32 align;
@@ -30,9 +30,10 @@ constexpr auto ops_of() -> component_ops {
     };
 }
 
-// Sparse set over type-erased storage: components stay in one dense array,
-// entity -> dense index goes through the sparse table. Removal swaps with the
-// last element, so dense order is unspecified but iteration stays contiguous.
+// Разреженное множество поверх хранилища со стёртым типом: компоненты лежат в
+// одном плотном массиве, а путь «сущность -> плотный индекс» идёт через
+// разреженную таблицу. Удаление меняет элемент местами с последним, поэтому
+// порядок в плотном массиве не определён, зато обход остаётся непрерывным.
 class component_pool final {
 public:
     explicit component_pool(component_ops ops);
@@ -48,8 +49,8 @@ public:
     void batch_remove(const std::vector<entity>& entities);
     void clear();
 
-    // Everything below sits on the iteration hot path, so it stays in the
-    // interface where importers can inline it.
+    // Всё ниже лежит на горячем пути обхода, поэтому остаётся в интерфейсе, где
+    // импортирующий может это встроить.
     [[nodiscard]] auto has(entity e) const -> bool {
         return e.index != entity::invalid_index && e.index < sparse_indices_.size() &&
             sparse_indices_[e.index] != entity::invalid_index &&
@@ -64,8 +65,8 @@ public:
         return has(e) ? at(sparse_indices_[e.index]) : nullptr;
     }
 
-    // Callers that already established presence (a view, for one) skip the
-    // second lookup.
+    // Вызывающие, уже убедившиеся в наличии (например, представление), пропускают
+    // второй поиск.
     [[nodiscard]] auto get_unchecked(entity e) -> void* {
         return at(sparse_indices_[e.index]);
     }

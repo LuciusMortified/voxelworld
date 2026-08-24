@@ -4,6 +4,16 @@ on:
   push:
     tags: ['v*']
 
+env:
+  VW_CMAKE_VERSION: 4.4.0
+  VW_LLVM_VERSION: 20
+
+# Релизная платформа по PRD одна — Windows, и Linux-архив её не догоняет: он
+# собирается, но ни разу не запускался, потому что GPU у раннера нет. Кладётся
+# он в релиз затем же, зачем в CI стоит вторая сборка: непереносимость иначе
+# копится молча, а замечается в тот день, когда её починка стоит дороже всего.
+# Прежний linux-джоб был на gcc-13 и не мог собраться в принципе; этот идёт на
+# Clang с libc++ — той же паре, что и вся динамика в Analysis.
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -16,25 +26,39 @@ jobs:
           version: latest
           cache: true
 
+      - name: Setup CMake and Ninja
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: ${{ env.VW_CMAKE_VERSION }}
+          ninjaVersion: latest
+
+      # Без окружения Visual Studio не найти std.ixx, из которого собирается
+      # std-модуль.
+      - name: Setup MSVC environment
+        uses: ilammy/msvc-dev-cmd@v1
+
       - name: Setup vcpkg
         uses: lukka/run-vcpkg@v11
 
-      - name: Configure CMake
+      - name: Configure
         run: >
-          cmake -B build -S .
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          cmake -B build -S . -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
           -DVW_BUILD_TESTS=OFF
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
       - name: Build sculptor
-        run: cmake --build build --config Release --target sculptor
+        run: cmake --build build --target sculptor
 
+      # Ninja — одноконфигурационный генератор: бинарь и шейдеры лежат прямо в
+      # каталоге таргета, без подкаталога конфигурации.
       - name: Package
+        shell: bash
         run: |
           mkdir package
-          cp build/apps/sculptor/Release/sculptor.exe package/
-          cp build/apps/sculptor/Release/*.dll package/ 2>/dev/null || true
-          cp -r build/apps/sculptor/Release/shaders package/
-        shell: bash
+          cp build/apps/sculptor/sculptor.exe package/
+          cp build/apps/sculptor/*.dll package/ 2>/dev/null || true
+          cp -r build/apps/sculptor/shaders package/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -43,63 +67,78 @@ jobs:
           path: package/
 
   build-linux:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
 
-      - name: Install gcc 13
+      - name: Install Clang and libc++
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-13 g++-13
-          sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-13 100
-          sudo update-alternatives --install /usr/bin/g++ g++ /usr/bin/g++-13 100
+          wget -qO llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh ${{ env.VW_LLVM_VERSION }}
+          sudo apt-get install -y \
+            libc++-${{ env.VW_LLVM_VERSION }}-dev \
+            libc++abi-${{ env.VW_LLVM_VERSION }}-dev
+          echo "CC=clang-${{ env.VW_LLVM_VERSION }}" >> "$GITHUB_ENV"
+          echo "CXX=clang++-${{ env.VW_LLVM_VERSION }}" >> "$GITHUB_ENV"
 
-      - name: Install X11 and GLFW dependencies
+      - name: Install windowing dependencies
         run: |
           sudo apt-get install -y \
-            libx11-dev \
-            libxrandr-dev \
-            libxinerama-dev \
-            libxcursor-dev \
-            libxi-dev \
-            libgl1-mesa-dev
+            xorg-dev libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev \
+            libglu1-mesa-dev libxkbcommon-dev libwayland-dev wayland-protocols \
+            extra-cmake-modules pkg-config
 
       - name: Install Vulkan SDK
-        uses: humbletim/install-vulkan-sdk@v1.2
-        with:
-          version: latest
-          cache: true
+        run: |
+          wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc \
+            | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc > /dev/null
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-noble.list \
+            https://packages.lunarg.com/vulkan/lunarg-vulkan-noble.list
+          sudo apt-get update
+          sudo apt-get install -y vulkan-sdk
+          echo "VULKAN_SDK=/usr" >> "$GITHUB_ENV"
 
-      - name: Setup cmake
+      - name: Setup CMake and Ninja
         uses: lukka/get-cmake@latest
-
-      - name: Setup and run vcpkg
-        uses: lukka/run-vcpkg@v11
         with:
-          runVcpkgInstall: true
+          cmakeVersion: ${{ env.VW_CMAKE_VERSION }}
+          ninjaVersion: latest
 
-      - name: Configure CMake
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+
+      - name: Configure
         run: >
-          cmake -B build -S .
-          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+          cmake -B build -S . -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++"
           -DVW_BUILD_TESTS=OFF
+          -DCMAKE_C_COMPILER=clang-${{ env.VW_LLVM_VERSION }}
+          -DCMAKE_CXX_COMPILER=clang++-${{ env.VW_LLVM_VERSION }}
+          -DCMAKE_CXX_FLAGS=-stdlib=libc++
+          -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++
+          -DVCPKG_TARGET_TRIPLET=x64-linux-libcxx
+          -DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/cmake/triplets
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
       - name: Build sculptor
         run: cmake --build build --target sculptor
 
+      # Архив собирается здесь, а не в джобе релиза: upload-artifact кладёт файлы
+      # в zip, который прав доступа не хранит, и на той стороне бинарь приехал бы
+      # без бита исполнения. Внутри tar он его сохраняет.
       - name: Package
         run: |
           mkdir package
           cp build/apps/sculptor/sculptor package/
           cp -r build/apps/sculptor/shaders package/
+          tar -czf sculptor-${{ github.ref_name }}-linux.tar.gz -C package .
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: sculptor-linux
-          path: package/
+          path: sculptor-${{ github.ref_name }}-linux.tar.gz
 
   release:
     needs: [build-windows, build-linux]
@@ -110,15 +149,14 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
 
-      - name: Create zip archives
-        run: |
-          cd sculptor-windows && zip -r ../sculptor-${{ github.ref_name }}-windows.zip . && cd ..
-          cd sculptor-linux && zip -r ../sculptor-${{ github.ref_name }}-linux.zip . && cd ..
+      # Linux-архив приезжает уже собранным, ему упаковка не нужна.
+      - name: Create zip archive
+        run: cd sculptor-windows && zip -r ../sculptor-${{ github.ref_name }}-windows.zip .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             sculptor-${{ github.ref_name }}-windows.zip
-            sculptor-${{ github.ref_name }}-linux.zip
+            sculptor-linux/sculptor-${{ github.ref_name }}-linux.tar.gz
           generate_release_notes: true

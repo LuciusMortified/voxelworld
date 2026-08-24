@@ -8,26 +8,23 @@ target_sources(vw_core
     PUBLIC
         FILE_SET CXX_MODULES BASE_DIRS src FILES
             src/core.cppm
-            src/types.cppm
-            src/timing.cppm
-            src/log.cppm
-            src/vector.cppm
-            src/matrix.cppm
-            src/color.cppm
-            src/math.cppm
-            src/spatial.cppm
-            src/blocks.cppm
+            src/types/types.cppm
+            src/types/timing.cppm
+            src/types/color.cppm
+            src/math/vector.cppm
+            src/math/matrix.cppm
+            src/math/math.cppm
+            src/spatial/spatial.cppm
+            src/blocks/blocks.cppm
+            src/log/log.cppm
     PRIVATE
-        src/log.cpp
-        src/math.cpp
-        src/spatial.cpp
-        src/blocks.cpp
+        src/math/math.cpp
+        src/spatial/spatial.cpp
+        src/blocks/blocks.cpp
+        src/log/log.cpp
 )
 
 target_compile_definitions(vw_core PRIVATE VW_LOG_MIN_LEVEL=${VW_LOG_MIN_LEVEL})
 target_compile_features(vw_core PUBLIC cxx_std_23)
 vw_use_std_module(vw_core)
-
-# `import std` waits for M6: while consumers still include standard headers
-# textually, importing the std module into the same TU collides with them.
-# Until then module units take the standard library via global module fragment.
+vw_set_warnings(vw_core)

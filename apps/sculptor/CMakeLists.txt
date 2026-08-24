@@ -77,6 +77,7 @@ target_sources(${PROJECT_NAME}
 
 target_link_libraries(${PROJECT_NAME} PRIVATE vwengine imgui::imgui)
 vw_use_std_module(${PROJECT_NAME})
+vw_set_warnings(${PROJECT_NAME})
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
 
 if (MSVC)

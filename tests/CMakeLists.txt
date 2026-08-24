@@ -1,7 +1,22 @@
 cmake_minimum_required(VERSION 4.0)
 project(voxelworld_tests)
 
-find_package(Catch2 3 CONFIG REQUIRED)
+# На Windows Catch2 приходит из vcpkg. Санитайзерные сборки на Linux идут без
+# vcpkg и собирают его сами: предсобранная библиотека линкуется с другой
+# стандартной библиотекой и без инструментации, а смешивать это с
+# санитайзерным рантаймом нельзя.
+find_package(Catch2 3 CONFIG QUIET)
+
+if(NOT Catch2_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG v3.15.3
+        GIT_SHALLOW TRUE
+    )
+    FetchContent_MakeAvailable(Catch2)
+    list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
+endif()
 
 include(CTest)
 include(Catch)

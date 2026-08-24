@@ -16,3 +16,4 @@ target_sources(vw_ecs
 target_link_libraries(vw_ecs PUBLIC vw_core)
 target_compile_features(vw_ecs PUBLIC cxx_std_23)
 vw_use_std_module(vw_ecs)
+vw_set_warnings(vw_ecs)

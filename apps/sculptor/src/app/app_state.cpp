@@ -84,7 +84,7 @@ auto animation_state::has_any_unsaved_clip() const -> bool {
 
 auto animation_state::get_layer_for_clip(
     const std::string& name
-) const -> size_t {
+) const -> std::size_t {
     const auto it = clip_to_layer.find(name);
     return it != clip_to_layer.end() ? it->second : 0;
 }

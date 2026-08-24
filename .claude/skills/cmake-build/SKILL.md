@@ -74,12 +74,16 @@ target_sources(vw_world
     PUBLIC
         FILE_SET CXX_MODULES BASE_DIRS src FILES
             src/world.cppm
-            src/components.cppm      # интерфейсная партиция
-            src/logging.cppm         # внутренняя партиция — тоже сюда
+            src/components/components.cppm   # агрегатор партиций
+            src/components/light_component.cppm
+            src/systems/hooks.cppm           # внутренняя партиция — тоже сюда
     PRIVATE
-        src/world.cpp                # module vw.world;
+        src/world.cpp                        # module vw.world;
+        src/systems/light_system.cpp
 )
 ```
+
+`BASE_DIRS src` остаётся неизменным: подкаталоги внутри `src/` в путях файлов.
 
 Каждой модульной библиотеке нужен `vw_use_std_module(<target>)` — он включает
 `CXX_MODULE_STD` для MSVC и подсовывает собственный таргет `std` для Clang
@@ -93,4 +97,4 @@ target_sources(vw_world
 Только как экспортированный `constexpr`, не как макрос в заголовке потребителя:
 cache-переменная → `target_compile_definitions(... PRIVATE ...)` →
 `inline constexpr` в партиции. Образец — `VW_LOG_MIN_LEVEL` → `vw::log::min_level`
-в `engine/core/CMakeLists.txt` и `engine/core/src/log.cppm`.
+в `engine/core/CMakeLists.txt` и `engine/core/src/log/log.cppm`.

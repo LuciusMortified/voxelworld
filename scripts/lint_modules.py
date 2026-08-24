@@ -12,7 +12,7 @@ SOURCES = ["engine", "apps", "tests"]
 
 # Two places may still speak the Vulkan C API: the ImGui backend takes C
 # handles and nothing else, and GLFW creates the surface before vk:: exists.
-VULKAN_C_ALLOWED = {"engine/gfx/src/renderer.cpp", "engine/platform/src/window.cpp"}
+VULKAN_C_ALLOWED = {"engine/gfx/src/render/renderer.cpp", "engine/platform/src/window/window.cpp"}
 
 COMMENT_OR_STRING = re.compile(r'//[^\n]*|/\*.*?\*/|"(?:[^"\\\n]|\\.)*"', re.S)
 
@@ -61,8 +61,8 @@ def main() -> int:
             problems.append("%s: names vk:: outside vw.gfx" % name)
 
         # 5. the dispatcher detail is localised to one file
-        if "vk::detail" in text and name != "engine/gfx/src/vulkan_context.cpp":
-            problems.append("%s: vk::detail belongs to vulkan_context.cpp alone" % name)
+        if "vk::detail" in text and name != "engine/gfx/src/render/vulkan_context.cpp":
+            problems.append("%s: vk::detail belongs to render/vulkan_context.cpp alone" % name)
 
         # 6. exported interface partitions do not re-export third-party modules
         if path.suffix == ".cppm" and re.search(r"^export import vulkan;", raw, re.M):

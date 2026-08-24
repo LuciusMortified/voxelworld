@@ -67,7 +67,7 @@ auto render_debug_hud(
         ImGui::Separator();
         ImGui::Text("Animation FSM:");
         const auto& fsm_comp = world.get<ecs::animation_fsm_component>(player_ent);
-        for (size_t i = 0; i < fsm_comp.machine_count(); ++i) {
+        for (std::size_t i = 0; i < fsm_comp.machine_count(); ++i) {
             const auto& state = fsm_comp.get_machine(i).get_current_state();
             ImGui::Text("  Layer %zu: %s", i, state.c_str());
         }
