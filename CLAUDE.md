@@ -1,8 +1,7 @@
 # Voxel World
 
 Воксельный движок на C++23/Vulkan. Движок + ECS + приложение Sculptor (редактор
-вокселей). Описание движка — `docs/ENGINE.md`, продукт — `docs/PRD.md`, проверки
-качества и то, что гоняет CI, — `docs/quality.md`.
+вокселей). Описание движка — `docs/ENGINE.md`, продукт — `docs/PRD.md`.
 
 ## Architecture
 
@@ -10,7 +9,7 @@
 `vw.sculptor` и `vw.arena`. Заголовков движка не существует, только `import`.
 
 - **vw.core** (`engine/core/src/`, таргет `vw_core`) — типы, math, transform,
-  лог, блоки, геометрия `vw::spatial`; каталоги `types/ math/ spatial/ blocks/ log/`
+  лог, блоки, геометрия `vw::spatial`; каталоги `types/ math/ utils/ spatial/ blocks/ log/`
 - **vw.ecs** (`engine/ecs/src/`, таргет `vw_ecs`) — entity, type-erased пул,
   реестр с рантайм-идентификаторами компонентов
 - **vw.world** (`engine/world/src/`, таргет `vw_world`) — модели, анимации,

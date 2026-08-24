@@ -30,7 +30,7 @@
 
 | Модуль | Каталоги |
 |---|---|
-| `vw.core` | `types/`, `math/`, `spatial/`, `blocks/`, `log/` |
+| `vw.core` | `types/`, `math/`, `utils/`, `spatial/`, `blocks/`, `log/` |
 | `vw.ecs` | плоско: четыре юнита |
 | `vw.world` | `asset/`, `components/`, `systems/`, `grid/`, `light/`, `spatial/` |
 | `vw.platform` | `input/`, `window/` |
@@ -46,12 +46,12 @@
 `:components`, `:model`, `:anim`, `:light`, `:grid`, `:terrain`, `:serial`,
 `:resource`, `:render`, `:renderer`, `:debug`, `:gpu_buffers`).
 
-- **`vw.core`**: `:types`, `:vector`, `:matrix`, `:math`, `:color`, `:blocks`,
-  `:timing`, `:log`, `:spatial` (aabb, plane, ray, frustum — они взаимно
-  зависимы).
-- **`vw.world`**: `:model.*` (identity, occupancy, links, light_field),
-  `:anim.*` (keyframe, channel, clip, fsm), `:serial.*` (vox, voxa, storage,
-  writer, scene), `:index`, `:components.*` (по группам компонентов),
+- **`vw.core`**: `:types`, `:vector`, `:matrix`, `:transform`, `:math`, `:color`,
+  `:blocks`, `:timing`, `:log`, `:spatial` (aabb, plane, ray, frustum — они
+  взаимно зависимы).
+- **`vw.world`**: `:model.*` (identity, occupancy, links, light_field, volume,
+  edit, chunk), `:anim.*` (keyframe, channel, clip, fsm), `:serial.*` (vox, voxa,
+  storage, writer, scene), `:spatial`, `:components.*` (по группам компонентов),
   `:terrain.*` (generator, column, loader, perlin), `:light.*` (column, baker),
   `:grid.*` (visibility, chunk, world_grid), `:systems.*` (hooks плюс партиция
   на каждую систему); класс `world` — в первичном юните `world.cppm`.
@@ -128,7 +128,7 @@ cmake -S . -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release \
 ```
 
 Собирается — не значит проверена на ходу: GPU в CI нет, и `sculptor` под Linux
-никто не запускал. Что там гоняется на каждый коммит — `docs/quality.md`.
+никто не запускал.
 
 ```
 cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release
