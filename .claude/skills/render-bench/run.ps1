@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Прогоняет test_world_grid по списку сцен и складывает отчёты в каталог.
+    Прогоняет testbed по списку сцен и складывает отчёты в каталог.
 
 .DESCRIPTION
     Берёт на себя три вещи, без которых замер молча не состоится: опции с
@@ -20,7 +20,7 @@ param(
     # Прочие опции приложения как есть, например '--bench-dynamic=256'.
     [string[]]$Extra = @(),
 
-    [string]$ExeDir = 'build/release/apps/test_world_grid',
+    [string]$ExeDir = 'build/release/apps/testbed',
 
     # Первый прогон после сборки даёт мусор -- прогревочный запуск, отчёт
     # которого выбрасывается. Ставить 0 только если сборка уже прогрета.
@@ -32,8 +32,8 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $exeDirFull = (Resolve-Path $ExeDir).Path
-$exe = Join-Path $exeDirFull 'test_world_grid.exe'
-if (-not (Test-Path $exe)) { throw "не найден $exe -- собери таргет test_world_grid" }
+$exe = Join-Path $exeDirFull 'testbed.exe'
+if (-not (Test-Path $exe)) { throw "не найден $exe -- собери таргет testbed" }
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $outFull = (Resolve-Path $OutDir).Path

@@ -1,4 +1,4 @@
-project(test_world_grid)
+project(testbed)
 
 add_executable(${PROJECT_NAME}
     main.cpp

@@ -2397,8 +2397,8 @@ auto main(int argc, char** argv) -> int {
     }
 
     try {
-        log::add_file_sink("test_world_grid.log");
-        std::make_unique<gfx::engine>(1280, 720, "Voxel World - World Grid Test", std::move(bench))
+        log::add_file_sink("testbed.log");
+        std::make_unique<gfx::engine>(1280, 720, "Voxel World - Testbed", std::move(bench))
             ->run<world_grid_app>(opts);
     } catch (const std::exception& e) {
         log::error("Error: {}", e.what());

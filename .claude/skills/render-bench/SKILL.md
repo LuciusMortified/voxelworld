@@ -1,16 +1,16 @@
 ---
 name: render-bench
-description: Кадровые замеры voxelworld — как запускать test_world_grid в бенч-режиме, какая сцена что ловит, как снять числа до и после правки и по отчёту решить, есть регрессия или нет. Читай перед правкой, которая трогает кадровый путь (engine/gfx, shaders/, мешер, стриминг, свет).
+description: Кадровые замеры voxelworld — как запускать testbed в бенч-режиме, какая сцена что ловит, как снять числа до и после правки и по отчёту решить, есть регрессия или нет. Читай перед правкой, которая трогает кадровый путь (engine/gfx, shaders/, мешер, стриминг, свет).
 ---
 
-# Кадровые замеры test_world_grid
+# Кадровые замеры testbed
 
 Здесь то, как снять числа и как по ним судить. Что в кадре ещё стоит править и
 какие числа считаются текущими — `docs/optimization-plan.md`.
 
 ## Четыре вещи, без которых замер молча не состоится
 
-**Опции только через `=`.** `option_value` (`apps/test_world_grid/main.cpp:1858`)
+**Опции только через `=`.** `option_value` (`apps/testbed/main.cpp`)
 требует `--bench=parked`, а не `--bench parked`. Разделённый пробелом аргумент не
 парсится вообще: `measure_frames` остаётся нулём, бенч не включается, приложение
 работает как обычное окно и никогда не закрывается. Это первый подозреваемый,
@@ -83,14 +83,14 @@ pwsh .claude/skills/render-bench/compare.ps1 -Before bench/before/parked.txt -Af
 & .claude/skills/render-bench/run.ps1 -Scenes torches -OutDir bench/x -Extra @('--bench-dynamic=256')
 ```
 
-Проверять — по строке сцены в `test_world_grid.log`: `torches: N emitters
+Проверять — по строке сцены в `testbed.log`: `torches: N emitters
 standing, M moving lights`. Если `M` не тот, что просили, замер не состоялся.
 
 Вручную это выглядит так:
 
 ```
-cd build/release/apps/test_world_grid
-./test_world_grid.exe --bench=parked --bench-frames=600 --bench-out=parked.txt
+cd build/release/apps/testbed
+./testbed.exe --bench=parked --bench-frames=600 --bench-out=parked.txt
 ```
 
 ## Сцены
@@ -179,7 +179,7 @@ cd build/release/apps/test_world_grid
 источников и число кадров у предела снимаются только перехватом stdout —
 `Start-Process -RedirectStandardOutput`.
 
-Лог рядом с экзешником (`test_world_grid.log`) — про сцену, а не про время:
+Лог рядом с экзешником (`testbed.log`) — про сцену, а не про время:
 готовность камеры, `torches: N emitters standing, M moving lights`,
 `blobs: N bodies of M asked`. Если чисел меньше, чем просили, сцена мерила не то,
 что заявила.

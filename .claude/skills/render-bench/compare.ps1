@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Сравнивает два отчёта test_world_grid и печатает вердикт по порогам.
+    Сравнивает два отчёта testbed и печатает вердикт по порогам.
 
 .EXAMPLE
     pwsh .claude/skills/render-bench/compare.ps1 -Before before/parked.txt -After after/parked.txt
