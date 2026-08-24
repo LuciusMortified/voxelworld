@@ -6,11 +6,14 @@ on:
 
 env:
   VW_CMAKE_VERSION: 4.4.0
+  VW_LLVM_VERSION: 20
 
-# Сборка только под Windows: PRD называет её единственной платформой релиза, а
-# полная конфигурация с vw.gfx на Linux не проверена — зависимости из vcpkg
-# собираются другой стандартной библиотекой. Прежний linux-джоб на gcc-13 не мог
-# собраться в принципе и падал на конфигурации.
+# Релизная платформа по PRD одна — Windows, и Linux-архив её не догоняет: он
+# собирается, но ни разу не запускался, потому что GPU у раннера нет. Кладётся
+# он в релиз затем же, зачем в CI стоит вторая сборка: непереносимость иначе
+# копится молча, а замечается в тот день, когда её починка стоит дороже всего.
+# Прежний linux-джоб был на gcc-13 и не мог собраться в принципе; этот идёт на
+# Clang с libc++ — той же паре, что и вся динамика в Analysis.
 jobs:
   build-windows:
     runs-on: windows-latest
@@ -63,8 +66,80 @@ jobs:
           name: sculptor-windows
           path: package/
 
+  build-linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Clang and libc++
+        run: |
+          wget -qO llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh ${{ env.VW_LLVM_VERSION }}
+          sudo apt-get install -y \
+            libc++-${{ env.VW_LLVM_VERSION }}-dev \
+            libc++abi-${{ env.VW_LLVM_VERSION }}-dev
+          echo "VW_LLVM_SUFFIX=-${{ env.VW_LLVM_VERSION }}" >> "$GITHUB_ENV"
+
+      - name: Install windowing dependencies
+        run: |
+          sudo apt-get install -y \
+            xorg-dev libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev \
+            libglu1-mesa-dev libxkbcommon-dev libwayland-dev wayland-protocols \
+            extra-cmake-modules pkg-config
+
+      - name: Install Vulkan SDK
+        run: |
+          wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc \
+            | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc > /dev/null
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-noble.list \
+            https://packages.lunarg.com/vulkan/lunarg-vulkan-noble.list
+          sudo apt-get update
+          sudo apt-get install -y vulkan-sdk
+
+      - name: Setup CMake and Ninja
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: ${{ env.VW_CMAKE_VERSION }}
+          ninjaVersion: latest
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+
+      - name: Configure
+        run: >
+          cmake -B build -S . -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DVW_BUILD_TESTS=OFF
+          -DCMAKE_C_COMPILER=clang-${{ env.VW_LLVM_VERSION }}
+          -DCMAKE_CXX_COMPILER=clang++-${{ env.VW_LLVM_VERSION }}
+          -DCMAKE_CXX_FLAGS=-stdlib=libc++
+          -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++
+          -DVCPKG_TARGET_TRIPLET=x64-linux-libcxx
+          -DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/cmake/triplets
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+      - name: Build sculptor
+        run: cmake --build build --target sculptor
+
+      # Архив собирается здесь, а не в джобе релиза: upload-artifact кладёт файлы
+      # в zip, который прав доступа не хранит, и на той стороне бинарь приехал бы
+      # без бита исполнения. Внутри tar он его сохраняет.
+      - name: Package
+        run: |
+          mkdir package
+          cp build/apps/sculptor/sculptor package/
+          cp -r build/apps/sculptor/shaders package/
+          tar -czf sculptor-${{ github.ref_name }}-linux.tar.gz -C package .
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sculptor-linux
+          path: sculptor-${{ github.ref_name }}-linux.tar.gz
+
   release:
-    needs: [build-windows]
+    needs: [build-windows, build-linux]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -72,11 +147,14 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
 
+      # Linux-архив приезжает уже собранным, ему упаковка не нужна.
       - name: Create zip archive
         run: cd sculptor-windows && zip -r ../sculptor-${{ github.ref_name }}-windows.zip .
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: sculptor-${{ github.ref_name }}-windows.zip
+          files: |
+            sculptor-${{ github.ref_name }}-windows.zip
+            sculptor-linux/sculptor-${{ github.ref_name }}-linux.tar.gz
           generate_release_notes: true

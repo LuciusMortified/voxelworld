@@ -111,12 +111,24 @@ ImGui и GLFW остаются заголовочными и живут толь
 требует модуля стандартной библиотеки, а Clang, целящийся в MSVC-ABI, берёт его
 из `std.ixx` от MSVC.
 
-Полная конфигурация — с `vw.platform`, `vw.gfx` и приложениями — собирается
-только на Windows. Headless-ядро (`vw.core`, `vw.ecs`, `vw.world` и тесты)
-собирается и на Linux: Clang с libc++ приносит собственный std-модуль, и
-`import std` работает штатным путём CMake, без `std.ixx`. Так устроены
-санитайзерные джобы (`docs/quality.md`). Полная сборка на Linux не проверена:
-зависимости из vcpkg собираются другой стандартной библиотекой, и ABI разъедется.
+На Linux `import std` работает штатным путём CMake, без `std.ixx`: Clang с
+libc++ приносит собственный std-модуль. Там собирается и headless-ядро — так
+устроены санитайзерные джобы, — и полная конфигурация с `vw.platform`, `vw.gfx`
+и приложениями. Последней нужен overlay-триплет `x64-linux-libcxx`
+(`cmake/triplets/`), иначе зависимости приедут из vcpkg собранными libstdc++ и
+ABI разъедется:
+
+```
+cmake -S . -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
+      -DCMAKE_CXX_FLAGS=-stdlib=libc++ -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++ \
+      -DVCPKG_TARGET_TRIPLET=x64-linux-libcxx \
+      -DVCPKG_OVERLAY_TRIPLETS=$PWD/cmake/triplets \
+      -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+```
+
+Собирается — не значит проверена на ходу: GPU в CI нет, и `sculptor` под Linux
+никто не запускал. Что там гоняется на каждый коммит — `docs/quality.md`.
 
 ```
 cmake -S . -B build/release -G Ninja -DCMAKE_BUILD_TYPE=Release

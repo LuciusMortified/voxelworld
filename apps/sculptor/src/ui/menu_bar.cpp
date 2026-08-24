@@ -1,8 +1,15 @@
 module;
 
 #include <imgui.h>
-#include <windows.h>
-#include <shellapi.h>
+
+// Только ради ShellExecuteA ниже: на остальных системах папку открывает
+// команда, а не вызов API, и заголовков ей не нужно.
+#ifdef _WIN32
+#  define NOMINMAX
+#  define WIN32_LEAN_AND_MEAN
+#  include <windows.h>
+#  include <shellapi.h>
+#endif
 
 module vw.sculptor;
 
@@ -13,13 +20,6 @@ import vw.ecs;
 import vw.world;
 import vw.platform;
 import vw.gfx;
-
-#ifdef _WIN32
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
-
-#else
-#endif
 
 namespace vw::sculptor {
 

@@ -15,11 +15,14 @@ env:
   # гейт, роняя сборку на генерации.
   VW_CMAKE_VERSION: 4.4.0
   VCPKG_BINARY_SOURCES: 'clear;x-gha,readwrite'
+  VW_LLVM_VERSION: 20
 
-# Полная конфигурация собирается только на Windows — не из-за `import std`, а
-# из-за зависимостей: glfw3, imgui и Vulkan приезжают из vcpkg, и на Linux их
-# пришлось бы собирать той же стандартной библиотекой, что и движок. Ядро там
-# собирается прекрасно — этим занят workflow Analysis.
+# Полная конфигурация собирается на обеих системах. Релизная платформа по PRD
+# по-прежнему одна — Windows; Linux здесь держит переносимость честной, потому
+# что единственное, что мешало ей раньше, — расхождение стандартных библиотек:
+# движок шёл на libc++, а зависимости приезжали из vcpkg собранными libstdc++.
+# Лечится это overlay-триплетом (cmake/triplets/x64-linux-libcxx.cmake), а не
+# правками в коде.
 jobs:
   build:
     runs-on: windows-latest
@@ -116,6 +119,90 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build-headless --output-on-failure
+
+  # Полная конфигурация на второй системе: движок, приложения и тесты. Один
+  # Release, а не матрица — джоб и так самый долгий из всех, потому что vcpkg
+  # собирает glfw3, imgui и Catch2 из исходников: под libc++ бинарного кэша
+  # LunarG и GitHub для этого триплета не существует.
+  #
+  # Версия дистрибутива прибита по той же причине, что и версия CMake выше:
+  # список пакетов LunarG именует релиз (noble), и `ubuntu-latest`, съехав,
+  # уронил бы установку Vulkan SDK, а не сборку — искать было бы дольше.
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Export cache tokens for vcpkg
+        uses: actions/github-script@v7
+        with:
+          script: |
+            core.exportVariable('ACTIONS_CACHE_URL', process.env.ACTIONS_CACHE_URL || '');
+            core.exportVariable('ACTIONS_RESULTS_URL', process.env.ACTIONS_RESULTS_URL || '');
+            core.exportVariable('ACTIONS_RUNTIME_TOKEN', process.env.ACTIONS_RUNTIME_TOKEN || '');
+
+      - name: Install Clang and libc++
+        run: |
+          wget -qO llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh ${{ env.VW_LLVM_VERSION }}
+          sudo apt-get install -y \
+            libc++-${{ env.VW_LLVM_VERSION }}-dev \
+            libc++abi-${{ env.VW_LLVM_VERSION }}-dev
+          # Тем же компилятором vcpkg собирает и порты: суффикс отсюда читает
+          # cmake/toolchains/linux-libcxx.cmake. llvm.sh имени без суффикса не
+          # заводит, а `clang++` из PATH — это системный Clang 18 с libstdc++.
+          echo "VW_LLVM_SUFFIX=-${{ env.VW_LLVM_VERSION }}" >> "$GITHUB_ENV"
+
+      # xorg-dev и родня — то, чего требует порт glfw3: без них он собирается,
+      # но без единого бэкенда окна, и падение приходит уже на линковке.
+      - name: Install windowing dependencies
+        run: |
+          sudo apt-get install -y \
+            xorg-dev libxinerama-dev libxcursor-dev libxi-dev libxrandr-dev \
+            libglu1-mesa-dev libxkbcommon-dev libwayland-dev wayland-protocols \
+            extra-cmake-modules pkg-config
+
+      # Ради glslc и libvulkan: заголовки придут из vcpkg (в них и лежит
+      # vulkan.cppm, из которого собирается модуль `vulkan`), а компилятор
+      # шейдеров и сама библиотека — отсюда.
+      - name: Install Vulkan SDK
+        run: |
+          wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc \
+            | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc > /dev/null
+          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-noble.list \
+            https://packages.lunarg.com/vulkan/lunarg-vulkan-noble.list
+          sudo apt-get update
+          sudo apt-get install -y vulkan-sdk
+
+      - name: Setup CMake and Ninja
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: ${{ env.VW_CMAKE_VERSION }}
+          ninjaVersion: latest
+
+      - name: Setup vcpkg
+        uses: lukka/run-vcpkg@v11
+
+      - name: Configure
+        run: >
+          cmake -B build -S . -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_C_COMPILER=clang-${{ env.VW_LLVM_VERSION }}
+          -DCMAKE_CXX_COMPILER=clang++-${{ env.VW_LLVM_VERSION }}
+          -DCMAKE_CXX_FLAGS=-stdlib=libc++
+          -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++
+          -DVCPKG_TARGET_TRIPLET=x64-linux-libcxx
+          -DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/cmake/triplets
+          -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+      - name: Build
+        run: cmake --build build
+
+      # Раннер без GPU, поэтому исполняются те же тесты, что и везде: ни один из
+      # них устройства не открывает.
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
 
   lint:
     runs-on: ubuntu-latest
