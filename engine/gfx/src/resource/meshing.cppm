@@ -96,6 +96,10 @@ struct mesh_options {
 // У модели, которая чанком не является — а это всё, что открыто в редакторе, —
 // чанковой половины нет вовсе, и мешер строит её как отдельно стоящую: за её
 // границами ничего не известно, и известным оно не станет.
+//
+// Передаётся по значению: два указателя едут в регистрах, а по ссылке каждое
+// обращение к вокселям стоило лишней загрузки. Замерено на advance — 568 против
+// 549 мкс на чанк, три прогона на сборку, группы не пересекались.
 struct mesh_source {
     const vw::asset::model& voxels;
     const vw::asset::chunk_volume* chunk = nullptr;
@@ -128,7 +132,7 @@ class simple_mesh_generator {
 public:
     [[nodiscard]]
     static auto generate_mesh_data(
-        const mesh_source& src,
+        mesh_source src,
         const block_registry& registry,
         mesh_options opts = {}
     ) -> mesh;
@@ -136,7 +140,7 @@ public:
 private:
     static auto add_cube_face(
         std::vector<quad>& quads,
-        const mesh_source& src,
+        mesh_source src,
         int32 x,
         int32 y,
         int32 z,
@@ -148,7 +152,7 @@ private:
 
     [[nodiscard]]
     static auto is_face_visible(
-        const mesh_source& src, int32 x, int32 y, int32 z,
+        mesh_source src, int32 x, int32 y, int32 z,
         int32 face_direction
     ) -> bool;
 };
@@ -211,7 +215,7 @@ struct face_axis_mapping {
     int32 face_direction;
     int32 voxel_scale;
 
-    face_axis_mapping(const mesh_source& src, int32 face_dir);
+    face_axis_mapping(mesh_source src, int32 face_dir);
 
     [[nodiscard]] auto to_model_coords(int32 u, int32 v, int32 layer) const
         -> std::tuple<int32, int32, int32>;
@@ -220,11 +224,11 @@ struct face_axis_mapping {
         -> std::pair<vec3i, vec3i>;
 };
 
-[[nodiscard]] auto compute_corner_darkness(const mesh_source& src, int32 x, int32 y, int32 z,
+[[nodiscard]] auto compute_corner_darkness(mesh_source src, int32 x, int32 y, int32 z,
                                            int32 face) -> uint8;
-[[nodiscard]] auto compute_corner_convexity(const mesh_source& src, int32 x, int32 y, int32 z,
+[[nodiscard]] auto compute_corner_convexity(mesh_source src, int32 x, int32 y, int32 z,
                                             int32 face) -> uint8;
-[[nodiscard]] auto compute_corner_light(const mesh_source& src, int32 x, int32 y, int32 z,
+[[nodiscard]] auto compute_corner_light(mesh_source src, int32 x, int32 y, int32 z,
                                         int32 face) -> corner_light;
 
 // Единственная грань, для которой считается выпуклость. Боковая грань и так
@@ -232,12 +236,12 @@ struct face_axis_mapping {
 // смотрят, — остальные пять платили бы ключом слияния и ничего не показывали.
 inline constexpr int32 convex_face = 2;
 
-[[nodiscard]] auto is_face_visible(const mesh_source& src, int32 x, int32 y, int32 z,
+[[nodiscard]] auto is_face_visible(mesh_source src, int32 x, int32 y, int32 z,
                                    int32 face_direction) -> bool;
 
 auto build_face_mask(
     mesh_generation_storage& storage,
-    const mesh_source& src,
+    mesh_source src,
     const face_axis_mapping& axes,
     int32 face_direction,
     int32 layer,
@@ -272,12 +276,12 @@ struct layer_rows {
     bool front_outside = false;
 };
 
-[[nodiscard]] auto light_from_rows(const mesh_source& src, const layer_rows& rows,
+[[nodiscard]] auto light_from_rows(mesh_source src, const layer_rows& rows,
                                    int32 u_at, int32 v_at, int32 x, int32 y, int32 z,
                                    int32 face) -> corner_light;
 
 [[nodiscard]] auto build_layer_rows(
-    const mesh_source& src,
+    mesh_source src,
     const vw::asset::chunk_occupancy& occupancy,
     const face_axis_mapping& axes,
     int32 face_direction,
@@ -303,7 +307,7 @@ public:
     [[nodiscard]]
     static auto generate_mesh_data(
         mesh_generation_storage& storage,
-        const mesh_source& src,
+        mesh_source src,
         const block_registry& registry,
         mesh_options opts = {}
     ) -> mesh;
@@ -311,7 +315,7 @@ public:
 private:
     static auto merge_and_emit_strips(
         mesh_generation_storage& storage,
-        const mesh_source& src,
+        mesh_source src,
         const detail::face_axis_mapping& axes,
         int32 face_direction,
         int32 layer,
@@ -321,7 +325,7 @@ private:
 
     static auto generate_face_quads(
         mesh_generation_storage& storage,
-        const mesh_source& src,
+        mesh_source src,
         int32 face_direction,
         const block_registry& registry,
         mesh_options opts
@@ -333,7 +337,7 @@ public:
     [[nodiscard]]
     static auto generate_mesh_data(
         mesh_generation_storage& storage,
-        const mesh_source& src,
+        mesh_source src,
         const block_registry& registry,
         mesh_options opts = {}
     ) -> mesh;
@@ -352,7 +356,7 @@ private:
 
     static auto merge_and_emit_rects(
         mesh_generation_storage& storage,
-        const mesh_source& src,
+        mesh_source src,
         const detail::face_axis_mapping& axes,
         int32 face_direction,
         int32 layer,
@@ -362,7 +366,7 @@ private:
 
     static auto generate_face_quads(
         mesh_generation_storage& storage,
-        const mesh_source& src,
+        mesh_source src,
         int32 face_direction,
         const block_registry& registry,
         mesh_options opts

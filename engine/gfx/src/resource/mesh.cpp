@@ -116,7 +116,7 @@ static constexpr std::array<vec3i, 6> ao_tangent_v = {
 namespace detail {
 
 face_axis_mapping::face_axis_mapping(
-    const mesh_source& src, int face_dir
+    mesh_source src, int face_dir
 )
     : face_direction(face_dir), voxel_scale(src.voxels.voxel_scale()) {
     switch (face_dir / 2) {
@@ -171,7 +171,7 @@ face_axis_mapping::face_axis_mapping(
 }
 
 auto is_solid_at(
-    const mesh_source& src, vec3i p
+    mesh_source src, vec3i p
 ) -> bool {
     const bool ox = p.x < 0 || p.x >= src.voxels.width();
     const bool oy = p.y < 0 || p.y >= src.voxels.height();
@@ -233,7 +233,7 @@ auto is_solid_at(
 // Выпуклость же прочтёт тот же ответ как «соседа здесь нет», а это нарисовало бы
 // яркую кайму вокруг габаритной коробки каждой модели без срезов — то есть всего в
 // редакторе. Неизвестное обязано читаться заполненным.
-[[nodiscard]] auto is_open_at(const mesh_source& src, vec3i p) -> bool {
+[[nodiscard]] auto is_open_at(mesh_source src, vec3i p) -> bool {
     const bool ox = p.x < 0 || p.x >= src.voxels.width();
     const bool oy = p.y < 0 || p.y >= src.voxels.height();
     const bool oz = p.z < 0 || p.z >= src.voxels.depth();
@@ -276,7 +276,7 @@ auto is_solid_at(
 }
 
 [[nodiscard]] auto compute_corner_convexity(
-    const mesh_source& src, int x, int y, int z, int face
+    mesh_source src, int x, int y, int z, int face
 ) -> uint8 {
     if (face != convex_face) {
         return 0;
@@ -305,7 +305,7 @@ auto is_solid_at(
 }
 
 auto compute_corner_darkness(
-    const mesh_source& src, int x, int y, int z, int face
+    mesh_source src, int x, int y, int z, int face
 ) -> uint8 {
     const vec3i n = vec3i{x, y, z} + ao_normal[face];
     const vec3i u = ao_tangent_u[face];
@@ -355,7 +355,7 @@ auto compute_corner_darkness(
 // Бит i в open_bits — это ячейка (du, dv) = (i % 3 - 1, i / 3 - 1), выставленный
 // там, где эта ячейка воздух. Бит 4, центр, выставлен всегда.
 auto corners_from_patch(
-    const mesh_source& src, vec3i n, vec3i u, vec3i v, uint32 open_bits
+    mesh_source src, vec3i n, vec3i u, vec3i v, uint32 open_bits
 ) -> corner_light {
     const auto* sky   = src.sky_light();
     const auto* block = src.block_light();
@@ -444,7 +444,7 @@ auto corners_from_patch(
 // Медленный путь — для всего, у чего нет строк занятости: девять обращений к
 // вокселям ради того, что битовый путь уже знает.
 auto compute_corner_light(
-    const mesh_source& src, int x, int y, int z, int face
+    mesh_source src, int x, int y, int z, int face
 ) -> corner_light {
     const vec3i n = vec3i{x, y, z} + ao_normal[face];
     const vec3i u = ao_tangent_u[face];
@@ -481,7 +481,7 @@ auto compute_corner_light(
 // А это быстрый: плоскость перед гранью уже есть три строки бит занятости — те же
 // три, что читает ядро затенения.
 auto light_from_rows(
-    const mesh_source& src, const layer_rows& rows, int32 u_at, int32 v_at, int x,
+    mesh_source src, const layer_rows& rows, int32 u_at, int32 v_at, int x,
     int y, int z, int face
 ) -> corner_light {
     uint32 open_bits = 0;
@@ -502,7 +502,7 @@ auto light_from_rows(
 }
 
 auto is_face_visible(
-    const mesh_source& src, int x, int y, int z, int face_direction
+    mesh_source src, int x, int y, int z, int face_direction
 ) -> bool {
     static constexpr int dx[6] = {1, -1, 0, 0, 0, 0};
     static constexpr int dy[6] = {0, 0, 1, -1, 0, 0};
@@ -525,7 +525,7 @@ auto is_face_visible(
 
 auto build_face_mask(
     mesh_generation_storage& storage,
-    const mesh_source& src,
+    mesh_source src,
     const face_axis_mapping& axes,
     int face_direction,
     int layer,
@@ -676,7 +676,7 @@ auto add_quad(
 // хранимая плоскость уже разложена строками по u; ±X держит строки по y, поэтому
 // она собирается по биту — а случается это на одном слое из шестидесяти четырёх.
 auto boundary_row(
-    const mesh_source& src, int face_direction, int v
+    mesh_source src, int face_direction, int v
 ) -> uint64 {
     if (!src.has_boundary_slice(face_direction)) {
         return 0;  // no neighbour: the far side is open, every face is visible
@@ -698,7 +698,7 @@ auto boundary_row(
 }
 
 auto build_layer_rows(
-    const mesh_source& src,
+    mesh_source src,
     const vw::asset::chunk_occupancy& occupancy,
     const face_axis_mapping& axes,
     int face_direction,
@@ -822,7 +822,7 @@ auto emit_rect(
 
 
 auto simple_mesh_generator::generate_mesh_data(
-    const mesh_source& src, const block_registry& registry, mesh_options opts
+    mesh_source src, const block_registry& registry, mesh_options opts
 ) -> mesh {
     std::vector<quad> quads;
     std::array<uint32, 6> face_counts{};
@@ -856,7 +856,7 @@ auto simple_mesh_generator::generate_mesh_data(
 
 auto simple_mesh_generator::add_cube_face(
     std::vector<quad>& quads,
-    const mesh_source& src,
+    mesh_source src,
     int x,
     int y,
     int z,
@@ -878,7 +878,7 @@ auto simple_mesh_generator::add_cube_face(
 }
 
 auto simple_mesh_generator::is_face_visible(
-    const mesh_source& src, int x, int y, int z, int face_direction
+    mesh_source src, int x, int y, int z, int face_direction
 ) -> bool {
     static constexpr int dx[6] = {1, -1, 0, 0, 0, 0};
     static constexpr int dy[6] = {0, 0, 1, -1, 0, 0};
@@ -899,7 +899,7 @@ auto simple_mesh_generator::is_face_visible(
 
 auto strip_mesh_generator::generate_mesh_data(
     mesh_generation_storage& storage,
-    const mesh_source& src,
+    mesh_source src,
     const block_registry& registry,
     mesh_options opts
 ) -> mesh {
@@ -930,7 +930,7 @@ auto strip_mesh_generator::generate_mesh_data(
 
 auto strip_mesh_generator::merge_and_emit_strips(
     mesh_generation_storage& storage,
-    [[maybe_unused]] const mesh_source& src,
+    [[maybe_unused]] mesh_source src,
     const detail::face_axis_mapping& axes,
     int face_direction,
     int layer,
@@ -964,7 +964,7 @@ auto strip_mesh_generator::merge_and_emit_strips(
 
 auto strip_mesh_generator::generate_face_quads(
     mesh_generation_storage& storage,
-    const mesh_source& src,
+    mesh_source src,
     int face_direction,
     const block_registry& registry,
     mesh_options opts
@@ -1014,7 +1014,7 @@ auto strip_mesh_generator::generate_face_quads(
 
 auto greedy_mesh_generator::generate_mesh_data(
     mesh_generation_storage& storage,
-    const mesh_source& src,
+    mesh_source src,
     const block_registry& registry,
     mesh_options opts
 ) -> mesh {
@@ -1123,7 +1123,7 @@ auto greedy_mesh_generator::merge_and_emit_rects_bits(
 
 auto greedy_mesh_generator::merge_and_emit_rects(
     mesh_generation_storage& storage,
-    [[maybe_unused]] const mesh_source& src,
+    [[maybe_unused]] mesh_source src,
     const detail::face_axis_mapping& axes,
     int face_direction,
     int layer,
@@ -1174,7 +1174,7 @@ auto greedy_mesh_generator::merge_and_emit_rects(
 
 auto greedy_mesh_generator::generate_face_quads(
     mesh_generation_storage& storage,
-    const mesh_source& src,
+    mesh_source src,
     int face_direction,
     const block_registry& registry,
     mesh_options opts
