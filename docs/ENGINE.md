@@ -119,8 +119,8 @@ libc++ приносит собственный std-модуль. Там соби
 ABI разъедется:
 
 ```
+export CC=clang CXX=clang++          # тот же компилятор соберёт порты vcpkg
 cmake -S . -B build/linux -G Ninja -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \
       -DCMAKE_CXX_FLAGS=-stdlib=libc++ -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++ \
       -DVCPKG_TARGET_TRIPLET=x64-linux-libcxx \
       -DVCPKG_OVERLAY_TRIPLETS=$PWD/cmake/triplets \

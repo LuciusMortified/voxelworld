@@ -57,11 +57,15 @@ Catch2 — нет: он несёт `std::string` через границу би�
 Catch2 против инструментированных объектов — дала `LNK2038` про
 `annotate_string`, и Catch2 пришлось собирать из исходников.
 
-Лечит это overlay-триплет `x64-linux-libcxx` (`cmake/triplets/`): он подсовывает
-портам тот же Clang с тем же `-stdlib=libc++` через chainload-тулчейн. Версию
-компилятора триплет берёт из `VW_LLVM_SUFFIX`, потому что `llvm.sh` ставит
-`clang++-20` и имени без суффикса не заводит, а `clang++` из PATH на Ubuntu —
-это системный Clang 18 с libstdc++, то есть ровно то, от чего уходим.
+Лечит это overlay-триплет `x64-linux-libcxx` (`cmake/triplets/`): `-stdlib=libc++`
+он передаёт портам через штатные `VCPKG_CXX_FLAGS`, а компилятор берётся из `CC`
+и `CXX`. Компилятор именно оттуда, а не из своего тулчейн-файла: подсунуть его
+можно только через `VCPKG_CHAINLOAD_TOOLCHAIN_FILE`, а тот замещает
+`scripts/toolchains/linux.cmake` целиком — вместе с `-fPIC`, `CMAKE_SYSTEM_NAME`,
+снятым `CMAKE_CROSSCOMPILING` и четырьмя policy, которые порты рассчитывают
+получить. Имена компиляторов в CI с суффиксом версии, потому что другого
+`llvm.sh` не заводит, а `clang++` из PATH на Ubuntu 24.04 — это Clang 18 с
+libstdc++, то есть ровно то, от чего уходим.
 
 Кода это стоило одной правки: `menu_bar.cpp` включал `<windows.h>` и
 `<shellapi.h>` безусловно, хотя нужны они только ветке `ShellExecuteA`.

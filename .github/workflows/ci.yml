@@ -149,10 +149,12 @@ jobs:
           sudo apt-get install -y \
             libc++-${{ env.VW_LLVM_VERSION }}-dev \
             libc++abi-${{ env.VW_LLVM_VERSION }}-dev
-          # Тем же компилятором vcpkg собирает и порты: суффикс отсюда читает
-          # cmake/toolchains/linux-libcxx.cmake. llvm.sh имени без суффикса не
-          # заводит, а `clang++` из PATH — это системный Clang 18 с libstdc++.
-          echo "VW_LLVM_SUFFIX=-${{ env.VW_LLVM_VERSION }}" >> "$GITHUB_ENV"
+          # Отсюда компилятор берут и порты vcpkg: свой тулчейн им подсовывать
+          # нельзя, он замещает штатный целиком, а CC и CXX штатный уважает.
+          # Имена с суффиксом, потому что другого llvm.sh не заводит, а `clang++`
+          # из PATH на Ubuntu 24.04 — это Clang 18 с libstdc++.
+          echo "CC=clang-${{ env.VW_LLVM_VERSION }}" >> "$GITHUB_ENV"
+          echo "CXX=clang++-${{ env.VW_LLVM_VERSION }}" >> "$GITHUB_ENV"
 
       # xorg-dev и родня — то, чего требует порт glfw3: без них он собирается,
       # но без единого бэкенда окна, и падение приходит уже на линковке.
@@ -174,6 +176,10 @@ jobs:
             https://packages.lunarg.com/vulkan/lunarg-vulkan-noble.list
           sudo apt-get update
           sudo apt-get install -y vulkan-sdk
+          # Пакет LunarG раскладывает SDK по /usr и переменной за собой не
+          # оставляет, а порт `vulkan` в vcpkg падает FATAL_ERROR, если
+          # find_package(Vulkan) промахнулся.
+          echo "VULKAN_SDK=/usr" >> "$GITHUB_ENV"
 
       - name: Setup CMake and Ninja
         uses: lukka/get-cmake@latest
@@ -195,6 +201,25 @@ jobs:
           -DVCPKG_TARGET_TRIPLET=x64-linux-libcxx
           -DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/cmake/triplets
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
+
+      # Порт, упавший внутри vcpkg, оставляет причину в buildtrees и в вывод
+      # джоба её не выносит: там остаётся только «vcpkg install failed». Без
+      # этого шага падение порта неотличимо от падения нашей конфигурации.
+      - name: Show vcpkg failure logs
+        if: failure()
+        run: |
+          logs=$(ls -t vcpkg/buildtrees/*/*-err.log vcpkg/buildtrees/*/*-out.log 2>/dev/null | head -6)
+          if [ -z "$logs" ]; then
+            echo "::error::vcpkg left no build logs — the failure is outside port builds"
+            exit 0
+          fi
+          for f in $logs; do
+            echo "::group::$f"
+            tail -100 "$f"
+            echo "::endgroup::"
+          done
+          first=$(echo "$logs" | head -1)
+          tail -20 "$first" | while IFS= read -r line; do echo "::error::${line}"; done
 
       - name: Build
         run: cmake --build build

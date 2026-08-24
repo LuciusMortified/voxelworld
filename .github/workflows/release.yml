@@ -79,7 +79,8 @@ jobs:
           sudo apt-get install -y \
             libc++-${{ env.VW_LLVM_VERSION }}-dev \
             libc++abi-${{ env.VW_LLVM_VERSION }}-dev
-          echo "VW_LLVM_SUFFIX=-${{ env.VW_LLVM_VERSION }}" >> "$GITHUB_ENV"
+          echo "CC=clang-${{ env.VW_LLVM_VERSION }}" >> "$GITHUB_ENV"
+          echo "CXX=clang++-${{ env.VW_LLVM_VERSION }}" >> "$GITHUB_ENV"
 
       - name: Install windowing dependencies
         run: |
@@ -96,6 +97,7 @@ jobs:
             https://packages.lunarg.com/vulkan/lunarg-vulkan-noble.list
           sudo apt-get update
           sudo apt-get install -y vulkan-sdk
+          echo "VULKAN_SDK=/usr" >> "$GITHUB_ENV"
 
       - name: Setup CMake and Ninja
         uses: lukka/get-cmake@latest
