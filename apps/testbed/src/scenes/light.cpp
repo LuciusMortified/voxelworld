@@ -13,9 +13,11 @@ import vw.gfx;
 namespace vw::testbed {
 
 light_scene::light_scene(
-    testbed_app& stand, light_options opts
+    testbed_app& stand, const arg_reader& args
 )
-    : scene{stand}, opts_{opts} {}
+    : scene{stand}
+    , per_frame_{args.integer("--bench-lamps", 1)}
+    , inert_{args.flag("--bench-inert")} {}
 
 auto light_scene::drive_camera() -> void {
     auto& camera = stand().camera();
@@ -60,7 +62,7 @@ auto light_scene::tick(float32 /*delta_time*/) -> void {
     // через четыре, поэтому каждая поверхность в квадрате оказывается внутри
     // чьего-нибудь градиента. Лампа с чистой землёй вокруг оценила бы лучший
     // случай, а освещённое подземелье выглядит не так.
-    for (int32 done = 0; done < opts_.lamps_per_frame && cursor_ < cells; ++cursor_) {
+    for (int32 done = 0; done < per_frame_ && cursor_ < cells; ++cursor_) {
         const int32 ix = cursor_ % side;
         const int32 iz = cursor_ / side;
 
@@ -77,7 +79,7 @@ auto light_scene::tick(float32 /*delta_time*/) -> void {
         // оказался.
         stand().grid().set_voxel(
             {vx * scale, (*surface + 1) * scale, vz * scale},
-            voxel{opts_.inert ? blocks::gray_5 : blocks::lamp}
+            voxel{inert_ ? blocks::gray_5 : blocks::lamp}
         );
 
         ++placed_;
@@ -119,12 +121,12 @@ auto light_scene::collect_report(gfx::report& out) const -> void {
 
     out.section("light")
         .value("placed", placed_)
-        .value("block", opts_.inert ? "inert" : "lamp")
+        .value("block", inert_ ? "inert" : "lamp")
         .value("chunk_meshes", meshed)
         .value("meshes_per_edit", per(meshed), 2)
         .value("grid_side", static_cast<int64>(side))
         .value("spacing", static_cast<int64>(spacing))
-        .value("per_frame", static_cast<int64>(opts_.lamps_per_frame))
+        .value("per_frame", static_cast<int64>(per_frame_))
         .value("cursor", static_cast<int64>(cursor_))
         .value("cells", static_cast<int64>(cells))
         .value("relight_columns", relit)
@@ -141,7 +143,7 @@ auto light_scene::collect_report(gfx::report& out) const -> void {
 
 auto light_scene::ui() -> void {
     ImGui::Text("light: %llu %s placed, cursor %d of %d",
-                static_cast<unsigned long long>(placed_), opts_.inert ? "inert blocks" : "lamps",
+                static_cast<unsigned long long>(placed_), inert_ ? "inert blocks" : "lamps",
                 cursor_, cells);
 }
 

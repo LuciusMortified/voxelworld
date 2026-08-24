@@ -4,7 +4,6 @@ import std;
 
 import vw.core;
 import vw.gfx;
-import :options;
 
 export namespace vw::testbed {
 

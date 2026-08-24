@@ -4,6 +4,7 @@ import std;
 
 import vw.core;
 import :app;
+import :args;
 import :scene;
 
 export namespace vw::testbed {
@@ -20,7 +21,9 @@ export namespace vw::testbed {
 // стриминга, ради которого он есть.
 class traverse_scene : public scene {
 public:
-    using scene::scene;
+    // Ключей у путей нет: всё их поведение — в них самих. Аргументы всё равно
+    // принимаются, чтобы сцену строили одинаково, какой бы она ни была.
+    traverse_scene(testbed_app& stand, const arg_reader& /*args*/) : scene{stand} {}
 
 protected:
     static constexpr float32 clearance         = 400.0f;

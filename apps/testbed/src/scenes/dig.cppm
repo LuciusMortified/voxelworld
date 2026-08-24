@@ -4,7 +4,7 @@ import std;
 
 import vw.core;
 import :app;
-import :options;
+import :args;
 import :scene;
 
 export namespace vw::testbed {
@@ -26,7 +26,7 @@ export namespace vw::testbed {
 // бы среднее на правку.
 class dig_scene final : public scene {
 public:
-    dig_scene(testbed_app& stand, dig_options opts);
+    dig_scene(testbed_app& stand, const arg_reader& args);
 
     [[nodiscard]] auto name() const -> std::string_view override {
         return "dig";
@@ -46,7 +46,8 @@ private:
 
     auto start_() -> void;
 
-    dig_options opts_;
+    // Вокселей за кадр: --bench-dig.
+    int32 per_frame_ = 1;
 
     int32 cursor_    = 0;
     int32 top_voxel_ = 0;

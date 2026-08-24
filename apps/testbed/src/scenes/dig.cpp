@@ -13,9 +13,9 @@ import vw.gfx;
 namespace vw::testbed {
 
 dig_scene::dig_scene(
-    testbed_app& stand, dig_options opts
+    testbed_app& stand, const arg_reader& args
 )
-    : scene{stand}, opts_{opts} {}
+    : scene{stand}, per_frame_{args.integer("--bench-dig", 1)} {}
 
 auto dig_scene::drive_camera() -> void {
     auto& camera = stand().camera();
@@ -58,7 +58,7 @@ auto dig_scene::tick(float32 /*delta_time*/) -> void {
 
     const int32 scale = stand().voxel_scale();
 
-    for (int32 done = 0; done < opts_.per_frame && cursor_ < cells; ++cursor_) {
+    for (int32 done = 0; done < per_frame_ && cursor_ < cells; ++cursor_) {
         const int32 x = (cursor_ % side) - (side / 2);
         const int32 z = ((cursor_ / side) % side) - (side / 2);
         const int32 y = top_voxel_ - (cursor_ / (side * side));
@@ -97,7 +97,7 @@ auto dig_scene::collect_report(gfx::report& out) const -> void {
         .value("chunk_meshes", meshed)
         .value("meshes_per_edit", per(meshed), 2)
         .value("box_side", static_cast<int64>(side))
-        .value("voxels_per_frame", static_cast<int64>(opts_.per_frame))
+        .value("voxels_per_frame", static_cast<int64>(per_frame_))
         .value("cursor", static_cast<int64>(cursor_))
         .value("cells", static_cast<int64>(cells))
         .value("relight_columns", relit)

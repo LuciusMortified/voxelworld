@@ -10,54 +10,43 @@ namespace {
 // уже стоящем стенде.
 struct scene_entry {
     std::string_view name;
-    auto (*build)(testbed_app&, const testbed_options&) -> std::unique_ptr<scene>;
+    auto (*build)(testbed_app&, const arg_reader&) -> std::unique_ptr<scene>;
 };
 
-constexpr std::array<scene_entry, 10> scene_table{{
-    {"parked", [](testbed_app& stand, const testbed_options&) -> std::unique_ptr<scene> {
-         return std::make_unique<parked_scene>(stand);
-     }},
-    {"spin", [](testbed_app& stand, const testbed_options&) -> std::unique_ptr<scene> {
-         return std::make_unique<spin_scene>(stand);
-     }},
-    {"advance", [](testbed_app& stand, const testbed_options&) -> std::unique_ptr<scene> {
-         return std::make_unique<advance_scene>(stand);
-     }},
-    {"flythrough", [](testbed_app& stand, const testbed_options&) -> std::unique_ptr<scene> {
-         return std::make_unique<flythrough_scene>(stand);
-     }},
-    {"dig", [](testbed_app& stand, const testbed_options& opts) -> std::unique_ptr<scene> {
-         return std::make_unique<dig_scene>(stand, opts.dig);
-     }},
-    {"light", [](testbed_app& stand, const testbed_options& opts) -> std::unique_ptr<scene> {
-         return std::make_unique<light_scene>(stand, opts.light);
-     }},
-    {"torches", [](testbed_app& stand, const testbed_options& opts) -> std::unique_ptr<scene> {
-         return std::make_unique<torches_scene>(stand, opts.torches);
-     }},
-    {"village", [](testbed_app& stand, const testbed_options& opts) -> std::unique_ptr<scene> {
-         return std::make_unique<village_scene>(stand, opts.torches);
-     }},
-    {"blobs", [](testbed_app& stand, const testbed_options& opts) -> std::unique_ptr<scene> {
-         return std::make_unique<blobs_scene>(stand, opts.blobs);
-     }},
-    {"crowd", [](testbed_app& stand, const testbed_options& opts) -> std::unique_ptr<scene> {
-         return std::make_unique<crowd_scene>(stand, opts.crowd);
-     }},
+// Сцена строится из стенда и командной строки: свои ключи она читает сама, и
+// таблица о них ничего не знает.
+template <typename Scene>
+constexpr auto entry_for(std::string_view name) -> scene_entry {
+    return {name, [](testbed_app& stand, const arg_reader& args) -> std::unique_ptr<scene> {
+                return std::make_unique<Scene>(stand, args);
+            }};
+}
+
+const std::array<scene_entry, 10> scene_table{{
+    entry_for<parked_scene>("parked"),
+    entry_for<spin_scene>("spin"),
+    entry_for<advance_scene>("advance"),
+    entry_for<flythrough_scene>("flythrough"),
+    entry_for<dig_scene>("dig"),
+    entry_for<light_scene>("light"),
+    entry_for<torches_scene>("torches"),
+    entry_for<village_scene>("village"),
+    entry_for<blobs_scene>("blobs"),
+    entry_for<crowd_scene>("crowd"),
 }};
 
 }  // namespace
 
 auto find_scene(
-    std::string_view name, const testbed_options& opts
+    std::string_view name, const arg_reader& args
 ) -> std::optional<scene_factory> {
     const auto found = std::ranges::find(scene_table, name, &scene_entry::name);
     if (found == scene_table.end()) {
         return std::nullopt;
     }
 
-    return scene_factory{[build = found->build, opts](testbed_app& stand) {
-        return build(stand, opts);
+    return scene_factory{[build = found->build, args](testbed_app& stand) {
+        return build(stand, args);
     }};
 }
 

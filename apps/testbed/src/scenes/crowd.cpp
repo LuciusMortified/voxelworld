@@ -13,9 +13,9 @@ import vw.gfx;
 namespace vw::testbed {
 
 crowd_scene::crowd_scene(
-    testbed_app& stand, crowd_options opts
+    testbed_app& stand, const arg_reader& args
 )
-    : scene{stand}, opts_{opts} {}
+    : scene{stand}, size_{args.count("--bench-crowd", 50)} {}
 
 auto crowd_scene::drive_camera() -> void {
     auto& camera = stand().camera();
@@ -24,7 +24,7 @@ auto crowd_scene::drive_camera() -> void {
 }
 
 auto crowd_scene::on_world_ready() -> void {
-    if (spawned_ || opts_.size == 0) {
+    if (spawned_ || size_ == 0) {
         return;
     }
 
@@ -84,7 +84,7 @@ auto crowd_scene::spawn_(float32 ground_y) -> void {
     const auto clip = make_clip_(world);
 
     const auto side =
-        static_cast<int32>(std::ceil(std::sqrt(static_cast<float32>(opts_.size))));
+        static_cast<int32>(std::ceil(std::sqrt(static_cast<float32>(size_))));
     constexpr float32 spacing = 40.0f;
     const float32 origin      = -0.5f * static_cast<float32>(side - 1) * spacing;
 
@@ -94,7 +94,7 @@ auto crowd_scene::spawn_(float32 ground_y) -> void {
     auto& model_sys     = world.system<ecs::model_system>();
     auto& anim_sys      = world.system<ecs::animation_system>();
 
-    for (uint32 i = 0; i < opts_.size; ++i) {
+    for (uint32 i = 0; i < size_; ++i) {
         const auto col = static_cast<int32>(i) % side;
         const auto row = static_cast<int32>(i) / side;
 
@@ -157,11 +157,11 @@ auto crowd_scene::spawn_(float32 ground_y) -> void {
         bodies_.push_back(root);
     }
 
-    log::info("crowd: {} bodies, {} entities", opts_.size, bodies_.size());
+    log::info("crowd: {} bodies, {} entities", size_, bodies_.size());
 }
 
 auto crowd_scene::ui() -> void {
-    ImGui::Text("crowd: %u bodies, %zu entities, settled %u/%u", opts_.size, bodies_.size(),
+    ImGui::Text("crowd: %u bodies, %zu entities, settled %u/%u", size_, bodies_.size(),
                 settle_frames_, settle_target);
 }
 

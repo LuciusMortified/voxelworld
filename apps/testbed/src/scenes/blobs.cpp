@@ -13,9 +13,9 @@ import vw.gfx;
 namespace vw::testbed {
 
 blobs_scene::blobs_scene(
-    testbed_app& stand, blobs_options opts
+    testbed_app& stand, const arg_reader& args
 )
-    : scene{stand}, opts_{opts} {}
+    : scene{stand}, bodies_asked_{args.integer("--bench-bodies", 8)} {}
 
 // Медленно по кругу, чтобы всё кольцо прошло через вид.
 auto blobs_scene::drive_camera() -> void {
@@ -35,7 +35,7 @@ auto blobs_scene::spawn_() -> void {
     auto& model_sys     = world.system<ecs::model_system>();
 
     const auto scale = static_cast<float32>(stand().voxel_scale());
-    const auto count = std::max(opts_.bodies, 1);
+    const auto count = std::max(bodies_asked_, 1);
 
     if (!seeded_) {
         // Одна модель на всех. Воксель модели — одна мировая единица, воксель
@@ -132,7 +132,7 @@ auto blobs_scene::spawn_() -> void {
 
     if (pending_.empty()) {
         log::info(
-            "blobs: {} bodies of {} asked on a ring of {} voxels", bodies_.size(), opts_.bodies,
+            "blobs: {} bodies of {} asked on a ring of {} voxels", bodies_.size(), bodies_asked_,
             ring
         );
     }
@@ -157,7 +157,7 @@ auto blobs_scene::tick(float32 /*delta_time*/) -> void {
 }
 
 auto blobs_scene::ui() -> void {
-    ImGui::Text("blobs: %zu bodies of %d asked", bodies_.size(), opts_.bodies);
+    ImGui::Text("blobs: %zu bodies of %d asked", bodies_.size(), bodies_asked_);
 }
 
 }  // namespace vw::testbed

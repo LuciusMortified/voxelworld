@@ -4,7 +4,7 @@ import std;
 
 import vw.core;
 import :app;
-import :options;
+import :args;
 import :scene;
 
 export namespace vw::testbed {
@@ -21,7 +21,7 @@ export namespace vw::testbed {
 // разница будет ценой света, а не блока.
 class light_scene final : public scene {
 public:
-    light_scene(testbed_app& stand, light_options opts);
+    light_scene(testbed_app& stand, const arg_reader& args);
 
     [[nodiscard]] auto name() const -> std::string_view override {
         return "light";
@@ -43,7 +43,13 @@ private:
 
     auto start_() -> void;
 
-    light_options opts_;
+    // Ламп за кадр: --bench-lamps. Тот же ключ читает и torches — обе ставят
+    // светящие блоки, просто с разными целями.
+    int32 per_frame_ = 1;
+
+    // --bench-inert: контрольный прогон теми же правками и той же геометрией,
+    // но блоком, который не светит.
+    bool inert_ = false;
 
     int32 cursor_  = 0;
     uint64 placed_ = 0;

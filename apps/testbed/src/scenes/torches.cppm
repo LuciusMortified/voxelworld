@@ -5,7 +5,7 @@ import std;
 import vw.core;
 import vw.ecs;
 import :app;
-import :options;
+import :args;
 import :scene;
 
 export namespace vw::testbed {
@@ -20,7 +20,7 @@ export namespace vw::testbed {
 // всюду несёт градиенты света от блоков.
 class torches_scene : public scene {
 public:
-    torches_scene(testbed_app& stand, torches_options opts);
+    torches_scene(testbed_app& stand, const arg_reader& args);
 
     [[nodiscard]] auto name() const -> std::string_view override {
         return "torches";
@@ -56,8 +56,15 @@ protected:
     // никаких двух точек, попавших друг на друга.
     [[nodiscard]] static auto spiral_point(int32 i, int32 count, float32 span) -> vec2f;
 
-    [[nodiscard]] auto options() const -> const torches_options& {
-        return opts_;
+    // Ключи сцены: --bench-static (эмиттеров), --bench-dynamic (движущихся
+    // источников), --bench-groups (хуторов у деревни), --bench-lamps (эмиттеров
+    // за кадр, пока сцена расставляется) и --light-speed.
+    [[nodiscard]] auto static_lights() const -> int32 {
+        return static_lights_;
+    }
+
+    [[nodiscard]] auto village_groups() const -> int32 {
+        return village_groups_;
     }
 
     // Где стоит эмиттер номер i и вокруг чего ходит движущийся источник.
@@ -75,7 +82,14 @@ private:
     auto place_emitters_() -> void;
     auto drive_lights_(float32 delta_time) -> void;
 
-    torches_options opts_;
+    int32 static_lights_  = 400;
+    int32 dynamic_lights_ = 64;
+    int32 village_groups_ = 24;
+    int32 per_frame_      = 1;
+
+    // Во сколько раз быстрее ходят движущиеся источники. Замерный прогон, где
+    // это не единица, меряет другую сцену.
+    float32 light_speed_ = 1.0F;
 
     uint64 placed_  = 0;
     bool seeded_    = false;

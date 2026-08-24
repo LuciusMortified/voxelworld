@@ -8,11 +8,18 @@ import vw.world;
 import vw.platform;
 import vw.gfx;
 
-import :options;
+import :args;
 import :probes.clusters;
 import :scene;
 
 export namespace vw::testbed {
+
+// Несомый источник круглый там, где лужа поставленного блока — ромб, поэтому
+// одна и та же досягаемость у них накрывает разный пол. Сечение ромба по свету
+// — квадрат площади 2r^2, шара — круг pi*r^2, и сходятся они на r * sqrt(2/pi).
+// Излучение четырнадцать поэтому несёт одиннадцать вокселей, а не четырнадцать,
+// и лужа на земле выходит того размера, какой дал бы блок.
+inline constexpr float32 round_reach = 0.8f;
 
 // Что делает левая кнопка при захваченном курсоре. По умолчанию ничего: это
 // прежде всего стенд для замеров, и случайный клик, переложивший рельеф, тихо
@@ -55,7 +62,7 @@ struct voxel_pick {
 // конструкторе.
 class testbed_app final : public gfx::app {
 public:
-    testbed_app(gfx::engine& eng, testbed_options opts, const scene_factory& make_scene);
+    testbed_app(gfx::engine& eng, const arg_reader& args, const scene_factory& make_scene);
     ~testbed_app() override;
 
     testbed_app(const testbed_app&)                    = delete;

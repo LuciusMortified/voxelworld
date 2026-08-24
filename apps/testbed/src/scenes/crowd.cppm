@@ -6,7 +6,7 @@ import vw.core;
 import vw.ecs;
 import vw.world;
 import :app;
-import :options;
+import :args;
 import :scene;
 
 export namespace vw::testbed {
@@ -19,7 +19,7 @@ export namespace vw::testbed {
 // работы, и разброс топит то, ради чего сцена существует.
 class crowd_scene final : public scene {
 public:
-    crowd_scene(testbed_app& stand, crowd_options opts);
+    crowd_scene(testbed_app& stand, const arg_reader& args);
 
     [[nodiscard]] auto name() const -> std::string_view override {
         return "crowd";
@@ -47,7 +47,9 @@ private:
 
     auto spawn_(float32 ground_y) -> void;
 
-    crowd_options opts_;
+    // Тел: --bench-crowd. Полсотни по умолчанию — столько эта сцена и мерила,
+    // когда размер задавался снаружи.
+    uint32 size_ = 50;
 
     std::vector<ecs::entity> bodies_;
     uint32 settle_frames_ = 0;

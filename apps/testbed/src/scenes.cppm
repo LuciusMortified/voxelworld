@@ -11,7 +11,7 @@ export import :scenes.crowd;
 import std;
 
 import vw.core;
-import :options;
+import :args;
 import :scene;
 
 export namespace vw::testbed {
@@ -19,7 +19,7 @@ export namespace vw::testbed {
 // Имя сцены и то, как её построить, — в одном месте. Добавить сцену теперь
 // значит написать её файл и вписать сюда строку; раньше это была правка четырёх
 // разных ветвлений плюс разбора опций.
-[[nodiscard]] auto find_scene(std::string_view name, const testbed_options& opts)
+[[nodiscard]] auto find_scene(std::string_view name, const arg_reader& args)
     -> std::optional<scene_factory>;
 
 // Для сообщения об ошибке: раньше имя, не совпавшее ни с одним, молча давало

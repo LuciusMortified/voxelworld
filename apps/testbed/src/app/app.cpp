@@ -10,30 +10,37 @@ import vw.gfx;
 namespace vw::testbed {
 
 testbed_app::testbed_app(
-    gfx::engine& eng, testbed_options opts, const scene_factory& make_scene
+    gfx::engine& eng, const arg_reader& args, const scene_factory& make_scene
 )
     // Порядок повторяет объявление полей: иначе список врёт о том, что
     // произойдёт на самом деле, и -Wreorder-ctor это ловит.
     : app{eng}
-    , sun_in_bench_{opts.stand.sun_in_bench}
-    , drives_camera_{opts.stand.bench_running}
-    , clusters_{opts.stand.cluster_stats, opts.stand.verify_every} {
+    // --sun: солнце ходит и в замерном прогоне. По умолчанию нет — свет,
+    // который поворачивается, обнуляет каждый каскад, и прогон мерил бы солнце,
+    // а не то, что проверяют.
+    , sun_in_bench_{args.flag("--sun")}
+    // Замерный прогон камеру ведёт сам; свободные режимы оставляют её мыши.
+    , drives_camera_{args.text("--bench").has_value()}
+    , clusters_{args.flag("--cluster-stats"), args.count("--verify-lights", 0)} {
     auto& renderer = get_engine().get_renderer();
 
-    renderer.set_chunk_cull_enabled(opts.stand.chunk_cull);
-    renderer.get_cluster_settings().enabled = opts.stand.clustered_lights;
+    renderer.set_chunk_cull_enabled(args.flag("--chunk-cull"));
+    renderer.get_cluster_settings().enabled = !args.flag("--no-clusters");
 
-    if (opts.stand.visible_lights > 0) {
-        renderer.get_max_visible_lights() = opts.stand.visible_lights;
+    // Ноль оставляет движку его умолчание, для всех четырёх.
+    if (const auto visible = args.count("--bench-visible", 0); visible > 0) {
+        renderer.get_max_visible_lights() = visible;
     }
-    if (opts.stand.cluster_tile > 0) {
-        renderer.get_cluster_settings().tile_size = opts.stand.cluster_tile;
+    if (const auto tile = args.count("--cluster-tile", 0); tile > 0) {
+        renderer.get_cluster_settings().tile_size = tile;
     }
-    if (opts.stand.cluster_slices > 0) {
-        renderer.get_cluster_settings().slices = opts.stand.cluster_slices;
+    if (const auto slices = args.count("--cluster-slices", 0); slices > 0) {
+        // Один срез — это ровно плоские тайлы, единственный честный способ
+        // назвать цену резки по глубине.
+        renderer.get_cluster_settings().slices = slices;
     }
-    if (opts.stand.cluster_cap > 0) {
-        renderer.get_cluster_settings().cap = opts.stand.cluster_cap;
+    if (const auto cap = args.count("--cluster-cap", 0); cap > 0) {
+        renderer.get_cluster_settings().cap = cap;
     }
 
     // Проверка подразумевает списки; одни счётчики избавляют от мегабайтов,

@@ -8,7 +8,7 @@ target_sources(${PROJECT_NAME}
     PUBLIC
         FILE_SET CXX_MODULES BASE_DIRS src FILES
             src/testbed.cppm
-            src/options.cppm
+            src/args.cppm
             src/scene.cppm
             src/probes/clusters.cppm
             src/app.cppm

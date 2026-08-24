@@ -6,7 +6,7 @@ import vw.core;
 import vw.ecs;
 import vw.world;
 import :app;
-import :options;
+import :args;
 import :scene;
 
 export namespace vw::testbed {
@@ -17,7 +17,7 @@ export namespace vw::testbed {
 // кадре нет стоящего на земле.
 class blobs_scene final : public scene {
 public:
-    blobs_scene(testbed_app& stand, blobs_options opts);
+    blobs_scene(testbed_app& stand, const arg_reader& args);
 
     [[nodiscard]] auto name() const -> std::string_view override {
         return "blobs";
@@ -55,7 +55,8 @@ private:
 
     auto spawn_() -> void;
 
-    blobs_options opts_;
+    // Тел в кольце: --bench-bodies.
+    int32 bodies_asked_ = 8;
 
     bool seeded_         = false;
     uint32 bob_frame_    = 0;

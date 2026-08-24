@@ -13,9 +13,14 @@ import vw.gfx;
 namespace vw::testbed {
 
 torches_scene::torches_scene(
-    testbed_app& stand, torches_options opts
+    testbed_app& stand, const arg_reader& args
 )
-    : scene{stand}, opts_{opts} {}
+    : scene{stand}
+    , static_lights_{args.integer("--bench-static", 400)}
+    , dynamic_lights_{args.integer("--bench-dynamic", 64)}
+    , village_groups_{std::max(args.integer("--bench-groups", 24), 1)}
+    , per_frame_{args.integer("--bench-lamps", 1)}
+    , light_speed_{std::max(args.real("--light-speed", 1.0F), 0.0F)} {}
 
 auto torches_scene::spiral_point(int32 i, int32 count, float32 span) -> vec2f {
     constexpr float32 golden = 2.39996323f;
@@ -30,7 +35,7 @@ auto torches_scene::spiral_point(int32 i, int32 count, float32 span) -> vec2f {
 
 auto torches_scene::site(int32 i) const -> vec2i {
     const vec2f at =
-        spiral_point(i, std::max(opts_.static_lights, 1), static_cast<float32>(radius));
+        spiral_point(i, std::max(static_lights_, 1), static_cast<float32>(radius));
 
     return vec2i{
         static_cast<int32>(std::lround(at.x)),
@@ -62,7 +67,7 @@ auto torches_scene::is_ready() const -> bool {
 auto torches_scene::spawn_lights_() -> void {
     auto& world = stand().world();
 
-    while (static_cast<int32>(lights_.size()) < opts_.dynamic_lights) {
+    while (static_cast<int32>(lights_.size()) < dynamic_lights_) {
         lights_.push_back(
             world.create().with<ecs::transform_component>().with<ecs::light_component>().get_entity()
         );
@@ -81,8 +86,8 @@ auto torches_scene::place_emitters_() -> void {
     spawn_lights_();
 
     if (!seeded_) {
-        pending_.reserve(static_cast<std::size_t>(std::max(opts_.static_lights, 0)));
-        for (int32 i = 0; i < opts_.static_lights; ++i) {
+        pending_.reserve(static_cast<std::size_t>(std::max(static_lights_, 0)));
+        for (int32 i = 0; i < static_lights_; ++i) {
             pending_.push_back(i);
         }
         seeded_ = true;
@@ -100,7 +105,7 @@ auto torches_scene::place_emitters_() -> void {
     for (std::size_t i = 0; i < pending_.size(); ++i) {
         const int32 at_site = pending_[i];
 
-        if (done < opts_.per_frame) {
+        if (done < per_frame_) {
             const vec2i at = site(at_site);
             if (const auto surface = stand().grid().get_surface_y(at.x, at.y)) {
                 stand().grid().set_voxel(
@@ -161,8 +166,8 @@ auto torches_scene::drive_lights_(float32 delta_time) -> void {
     const auto phase = static_cast<float32>(phase_);
 
     phase_ += stand().drives_camera()
-        ? static_cast<float64>(opts_.light_speed)
-        : static_cast<float64>(delta_time * steps_per_second * opts_.light_speed);
+        ? static_cast<float64>(light_speed_)
+        : static_cast<float64>(delta_time * steps_per_second * light_speed_);
 
     for (std::size_t i = 0; i < lights_.size(); ++i) {
         const auto k      = static_cast<float32>(i);
@@ -220,7 +225,7 @@ auto torches_scene::collect_report(gfx::report& out) const -> void {
     auto& section = out.section(std::string{name()});
 
     section.value("emitters_placed", placed_)
-        .value("emitters_asked", static_cast<int64>(opts_.static_lights))
+        .value("emitters_asked", static_cast<int64>(static_lights_))
         .value("moving_lights", static_cast<uint64>(lights_.size()))
         .value("layout", layout_text())
         .value("radius_voxels", static_cast<int64>(radius))
@@ -240,23 +245,23 @@ auto torches_scene::collect_report(gfx::report& out) const -> void {
 auto torches_scene::ui() -> void {
     ImGui::Text(
         "%s: %llu of %d emitters, %zu moving, %u visible", std::string{name()}.c_str(),
-        static_cast<unsigned long long>(placed_), opts_.static_lights, lights_.size(),
+        static_cast<unsigned long long>(placed_), static_lights_, lights_.size(),
         stand().renderer().get_visible_light_count()
     );
 }
 
 auto village_scene::centre_(int32 group) const -> vec2f {
-    return spiral_point(group, options().village_groups, static_cast<float32>(radius));
+    return spiral_point(group, village_groups(), static_cast<float32>(radius));
 }
 
 auto village_scene::site(int32 i) const -> vec2i {
-    const int32 groups = std::max(options().village_groups, 1);
+    const int32 groups = std::max(village_groups(), 1);
 
     // Сначала группа, потом её житель: прогон, поставивший только половину
     // эмиттеров, получает начатыми все хутора, а не законченными первые.
     const int32 group  = i % groups;
     const int32 member = i / groups;
-    const int32 per    = (std::max(options().static_lights, 1) + groups - 1) / groups;
+    const int32 per    = (std::max(static_lights(), 1) + groups - 1) / groups;
 
     const vec2f centre = centre_(group);
     const vec2f offset = spiral_point(member, per, static_cast<float32>(village_spread));
@@ -271,7 +276,7 @@ auto village_scene::site(int32 i) const -> vec2i {
 // Отправленные по всему диску, они провели бы большую часть прогона над пустой
 // землёй, и сцена перестала бы быть той плотной, ради которой она есть.
 auto village_scene::orbit_home(std::size_t i) const -> vec2f {
-    return centre_(static_cast<int32>(i) % std::max(options().village_groups, 1));
+    return centre_(static_cast<int32>(i) % std::max(village_groups(), 1));
 }
 
 auto village_scene::orbit_radius(std::size_t /*i*/, float32 spread) const -> float32 {
@@ -280,7 +285,7 @@ auto village_scene::orbit_radius(std::size_t /*i*/, float32 spread) const -> flo
 
 auto village_scene::layout_text() const -> std::string {
     return std::format(
-        "{} hamlets {} voxels across, spread over a spiral", options().village_groups,
+        "{} hamlets {} voxels across, spread over a spiral", village_groups(),
         village_spread * 2
     );
 }
