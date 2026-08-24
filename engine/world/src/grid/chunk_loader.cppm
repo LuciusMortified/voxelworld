@@ -13,7 +13,9 @@ export namespace vw::ecs {
 // очередь.
 class chunk_loader {
 public:
-    // Ноль просит умолчание — то, на котором остановились по снятой кривой.
+    // Ноль просит умолчание — колено снятой кривой рабочих потоков против
+    // пропускной способности: после четырёх сквозное время стоит на месте, а
+    // цена одной колонки продолжает расти.
     explicit chunk_loader(std::unique_ptr<terrain_generator> generator, uint32 workers = 0);
     ~chunk_loader();
 

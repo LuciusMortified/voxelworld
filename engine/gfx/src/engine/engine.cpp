@@ -19,14 +19,6 @@ import :vk;
 import :engine;
 import :engine.frame_recorder;
 
-#ifdef _WIN32
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-
-
-#endif
-
 namespace vw::gfx {
 
 namespace {
