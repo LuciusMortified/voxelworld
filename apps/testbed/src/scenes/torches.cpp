@@ -1,0 +1,288 @@
+module;
+
+#include <imgui.h>
+
+module vw.testbed;
+
+import std;
+import vw.core;
+import vw.ecs;
+import vw.world;
+import vw.gfx;
+
+namespace vw::testbed {
+
+torches_scene::torches_scene(
+    testbed_app& stand, torches_options opts
+)
+    : scene{stand}, opts_{opts} {}
+
+auto torches_scene::spiral_point(int32 i, int32 count, float32 span) -> vec2f {
+    constexpr float32 golden = 2.39996323f;
+
+    const auto n    = static_cast<float32>(std::max(count, 1));
+    const float32 t = static_cast<float32>(i) / n;
+    const float32 r = span * std::sqrt(t);
+    const float32 a = static_cast<float32>(i) * golden;
+
+    return vec2f{r * std::cos(a), r * std::sin(a)};
+}
+
+auto torches_scene::site(int32 i) const -> vec2i {
+    const vec2f at =
+        spiral_point(i, std::max(opts_.static_lights, 1), static_cast<float32>(radius));
+
+    return vec2i{
+        static_cast<int32>(std::lround(at.x)),
+        static_cast<int32>(std::lround(at.y)),
+    };
+}
+
+auto torches_scene::orbit_home(std::size_t /*i*/) const -> vec2f {
+    return vec2f{0.0f, 0.0f};
+}
+
+auto torches_scene::orbit_radius(std::size_t /*i*/, float32 spread) const -> float32 {
+    return static_cast<float32>(radius) * (0.2f + (0.8f * spread));
+}
+
+// Поворачивается, а не стоит: отсев, которого ни разу не попросили ничего
+// отбросить, — это отсев, который не измеряют.
+auto torches_scene::drive_camera() -> void {
+    auto& camera = stand().camera();
+    camera.set_position({0.0f, stand().altitude(), 0.0f});
+    camera.set_rotation(-20.0f, static_cast<float32>(camera_frame_++) * 0.25f);
+}
+
+auto torches_scene::is_ready() const -> bool {
+    const auto& wgs = stand().world().system<ecs::world_grid_system>();
+    return standing_ && wgs.get_stats().relight_backlog == 0;
+}
+
+auto torches_scene::spawn_lights_() -> void {
+    auto& world = stand().world();
+
+    while (static_cast<int32>(lights_.size()) < opts_.dynamic_lights) {
+        lights_.push_back(
+            world.create().with<ecs::transform_component>().with<ecs::light_component>().get_entity()
+        );
+    }
+}
+
+auto torches_scene::place_emitters_() -> void {
+    if (standing_) {
+        return;
+    }
+
+    // До первого эмиттера и до того, как мир закончил приезжать. Движущемуся
+    // источнику земля под ним не нужна, а сцена, у которой свет появляется
+    // только после посадки последней колонки, меряет мир, построенный в темноте
+    // и освещённый потом, — а это не тот мир, цену которого она заявляет.
+    spawn_lights_();
+
+    if (!seeded_) {
+        pending_.reserve(static_cast<std::size_t>(std::max(opts_.static_lights, 0)));
+        for (int32 i = 0; i < opts_.static_lights; ++i) {
+            pending_.push_back(i);
+        }
+        seeded_ = true;
+    }
+
+    const int32 scale = stand().voxel_scale();
+
+    // Точка, чья колонка ещё не приехала, откладывается на следующий кадр, а не
+    // пропускается. Курсор, прошедший мимо неё, терял этот эмиттер до конца
+    // прогона, а пряталось это за ожиданием всего мира — из-за чего свет не
+    // попадал ни в один загрузочный кадр.
+    int32 done       = 0;
+    std::size_t keep = 0;
+
+    for (std::size_t i = 0; i < pending_.size(); ++i) {
+        const int32 at_site = pending_[i];
+
+        if (done < opts_.per_frame) {
+            const vec2i at = site(at_site);
+            if (const auto surface = stand().grid().get_surface_y(at.x, at.y)) {
+                stand().grid().set_voxel(
+                    {at.x * scale, (*surface + 1) * scale, at.y * scale}, voxel{blocks::lamp}
+                );
+
+                ++placed_;
+                ++done;
+                continue;
+            }
+        }
+
+        pending_[keep++] = at_site;
+    }
+
+    pending_.resize(keep);
+
+    if (!pending_.empty()) {
+        return;
+    }
+
+    standing_ = true;
+
+    log::info(
+        "{}: {} emitters standing, {} moving lights", name(), placed_, lights_.size()
+    );
+}
+
+// Орбиты — функция номера кадра и никогда не времени, по той же причине, что и
+// путь камеры: сцена, которую ведут по стенным часам, на каждой машине другая.
+auto torches_scene::drive_lights_(float32 delta_time) -> void {
+    if (lights_.empty()) {
+        return;
+    }
+
+    // Только по замерному окну. Источники ходят с того кадра, в котором их
+    // создали, а кадры ожидания колонок — не то установившееся состояние, о
+    // котором отчитываются.
+    if (stand().is_bench_ready()) {
+        const uint32 visible = stand().renderer().get_visible_light_count();
+        visible_peak_        = std::max(visible_peak_, visible);
+        visible_sum_ += visible;
+        ++visible_frames_;
+
+        // Спрашивается у рендера, а не хранится рядом: как часто сцена упирается
+        // в предел, ничего не значит, если это не тот предел, которым кадр
+        // действительно пользовался.
+        capped_frames_ +=
+            (visible >= stand().renderer().get_max_visible_lights()) ? 1 : 0;
+    }
+
+    auto& world         = stand().world();
+    auto& transform_sys = world.system<ecs::transform_system>();
+    auto& light_sys     = world.system<ecs::light_system>();
+
+    const auto& lamp = stand().renderer().get_block_light_settings();
+    const auto scale = static_cast<float32>(stand().voxel_scale());
+    const auto phase = static_cast<float32>(phase_);
+
+    phase_ += stand().drives_camera()
+        ? static_cast<float64>(opts_.light_speed)
+        : static_cast<float64>(delta_time * steps_per_second * opts_.light_speed);
+
+    for (std::size_t i = 0; i < lights_.size(); ++i) {
+        const auto k      = static_cast<float32>(i);
+        const auto spread = k / static_cast<float32>(lights_.size());
+
+        // Разброс по радиусу, фазе и скорости, чтобы они не ходили одним
+        // кольцом: кольцо либо влезает в пирамиду видимости, либо нет, и тогда
+        // отсев спрашивают всегда об одном и том же.
+        const float32 speed = 0.004f + (0.002f * std::fmod(k, 5.0f));
+        const float32 angle = (k * 1.7f) + (phase * speed);
+
+        const vec2f home    = orbit_home(i);
+        const float32 orbit = orbit_radius(i, spread);
+
+        const float32 at_x = home.x + (orbit * std::cos(angle));
+        const float32 at_z = home.y + (orbit * std::sin(angle));
+
+        // Округляется, только чтобы спросить сетку про высоту земли, и больше
+        // нигде. Сам источник стоит там, куда его привела орбита: свет на целых
+        // вокселях прыгает на целый воксель за раз, и его затухание каждый кадр
+        // ложится на границы вокселей, отчего земля под ним читается кольцами
+        // ровно освещённых блоков, а не лужей света.
+        const auto vx = static_cast<int32>(std::lround(at_x));
+        const auto vz = static_cast<int32>(std::lround(at_z));
+
+        const auto surface = stand().grid().get_surface_y(vx, vz);
+        const float32 y =
+            surface ? (static_cast<float32>(*surface + 3) * scale) : stand().altitude();
+
+        transform_sys.modify(lights_[i]).set_position({at_x * scale, y, at_z * scale});
+
+        light_sys.modify(lights_[i])
+            .set_color(vec3f{
+                lamp.color.x * lamp.intensity,
+                lamp.color.y * lamp.intensity,
+                lamp.color.z * lamp.intensity,
+            })
+            .set_intensity(14.0f / 15.0f)
+            .set_range(14.0f * round_reach * scale);
+    }
+}
+
+auto torches_scene::tick(float32 delta_time) -> void {
+    place_emitters_();
+    drive_lights_(delta_time);
+}
+
+auto torches_scene::collect_report(gfx::report& out) const -> void {
+    if (visible_frames_ == 0) {
+        return;
+    }
+
+    const uint32 cap = stand().renderer().get_max_visible_lights();
+
+    auto& section = out.section(std::string{name()});
+
+    section.value("emitters_placed", placed_)
+        .value("emitters_asked", static_cast<int64>(opts_.static_lights))
+        .value("moving_lights", static_cast<uint64>(lights_.size()))
+        .value("layout", layout_text())
+        .value("radius_voxels", static_cast<int64>(radius))
+        .value("visible_mean",
+               static_cast<float64>(visible_sum_) / static_cast<float64>(visible_frames_), 1)
+        .value("visible_peak", static_cast<uint64>(visible_peak_))
+        .value("frames", visible_frames_);
+
+    // Только когда есть предел, в который можно упереться: без него строка
+    // «0 кадров у предела 4294967295» не говорит ничего.
+    if (cap != gfx::light_buffer::no_cap) {
+        section.value("frames_at_cap", static_cast<uint64>(capped_frames_))
+            .value("cap", static_cast<uint64>(cap));
+    }
+}
+
+auto torches_scene::ui() -> void {
+    ImGui::Text(
+        "%s: %llu of %d emitters, %zu moving, %u visible", std::string{name()}.c_str(),
+        static_cast<unsigned long long>(placed_), opts_.static_lights, lights_.size(),
+        stand().renderer().get_visible_light_count()
+    );
+}
+
+auto village_scene::centre_(int32 group) const -> vec2f {
+    return spiral_point(group, options().village_groups, static_cast<float32>(radius));
+}
+
+auto village_scene::site(int32 i) const -> vec2i {
+    const int32 groups = std::max(options().village_groups, 1);
+
+    // Сначала группа, потом её житель: прогон, поставивший только половину
+    // эмиттеров, получает начатыми все хутора, а не законченными первые.
+    const int32 group  = i % groups;
+    const int32 member = i / groups;
+    const int32 per    = (std::max(options().static_lights, 1) + groups - 1) / groups;
+
+    const vec2f centre = centre_(group);
+    const vec2f offset = spiral_point(member, per, static_cast<float32>(village_spread));
+
+    return vec2i{
+        static_cast<int32>(std::lround(centre.x + offset.x)),
+        static_cast<int32>(std::lround(centre.y + offset.y)),
+    };
+}
+
+// В деревне движущиеся источники принадлежат хутору и ходят внутри него.
+// Отправленные по всему диску, они провели бы большую часть прогона над пустой
+// землёй, и сцена перестала бы быть той плотной, ради которой она есть.
+auto village_scene::orbit_home(std::size_t i) const -> vec2f {
+    return centre_(static_cast<int32>(i) % std::max(options().village_groups, 1));
+}
+
+auto village_scene::orbit_radius(std::size_t /*i*/, float32 spread) const -> float32 {
+    return static_cast<float32>(village_spread) * (0.3f + (0.7f * spread));
+}
+
+auto village_scene::layout_text() const -> std::string {
+    return std::format(
+        "{} hamlets {} voxels across, spread over a spiral", options().village_groups,
+        village_spread * 2
+    );
+}
+
+}  // namespace vw::testbed

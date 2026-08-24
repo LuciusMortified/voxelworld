@@ -1,0 +1,163 @@
+module;
+
+#include <imgui.h>
+
+module vw.testbed;
+
+import std;
+import vw.core;
+import vw.ecs;
+import vw.world;
+import vw.gfx;
+
+namespace vw::testbed {
+
+blobs_scene::blobs_scene(
+    testbed_app& stand, blobs_options opts
+)
+    : scene{stand}, opts_{opts} {}
+
+// Медленно по кругу, чтобы всё кольцо прошло через вид.
+auto blobs_scene::drive_camera() -> void {
+    auto& camera = stand().camera();
+    camera.set_position({0.0f, stand().altitude(), 0.0f});
+    camera.set_rotation(-25.0f, static_cast<float32>(camera_frame_++) * 0.25f * 0.25f);
+}
+
+auto blobs_scene::spawn_() -> void {
+    if (seeded_ && pending_.empty()) {
+        return;
+    }
+
+    auto& world         = stand().world();
+    auto& registry      = world.resource<asset::model_registry>();
+    auto& transform_sys = world.system<ecs::transform_system>();
+    auto& model_sys     = world.system<ecs::model_system>();
+
+    const auto scale = static_cast<float32>(stand().voxel_scale());
+    const auto count = std::max(opts_.bodies, 1);
+
+    if (!seeded_) {
+        // Одна модель на всех. Воксель модели — одна мировая единица, воксель
+        // рельефа — восемь, поэтому тело размером с человека это шестнадцать
+        // поперёк и сорок в высоту; построенное по числам рельефа, оно стоит в
+        // один воксель и читается крапинкой — с чего эта сцена и начиналась.
+        model_ = registry.create("blob_body", 16, 40, 16);
+        model_->fill(voxel{blocks::red_4});
+
+        pending_.reserve(static_cast<std::size_t>(count));
+        for (int32 i = 0; i < count; ++i) {
+            pending_.push_back(i);
+        }
+
+        seeded_ = true;
+    }
+
+    // Тело, чьи колонки ещё не приехали, ждёт их, а не выбрасывается. Именно
+    // пропуск таких заставлял сцену ждать весь мир: кольцо вставало одним
+    // проходом, и первый его прогон поставил пять тел из восьми. Все числа ниже
+    // читают индекс кольца, а не порядок появления земли, поэтому кольцо
+    // получается одно и то же в любом случае.
+    std::size_t keep = 0;
+
+    for (std::size_t at = 0; at < pending_.size(); ++at) {
+        const int32 i = pending_[at];
+
+        const float32 angle =
+            (static_cast<float32>(i) / static_cast<float32>(count)) * 2.0f * math::pi;
+
+        const auto vx =
+            static_cast<int32>(std::lround(static_cast<float32>(ring) * std::cos(angle)));
+        const auto vz =
+            static_cast<int32>(std::lround(static_cast<float32>(ring) * std::sin(angle)));
+
+        // Тело шестнадцать единиц поперёк, а воксель рельефа восемь, поэтому
+        // стоит оно на четырёх колонках, а не на одной. Посаженное по той, над
+        // которой его мерили, оно на остальных трёх может оказаться на воксель
+        // ниже и уйти в землю на четверть — плохая опора для стенда, судящего о
+        // тенях.
+        std::optional<int32> surface;
+        for (int32 dz = 0; dz <= 1; ++dz) {
+            for (int32 dx = 0; dx <= 1; ++dx) {
+                const auto column = stand().grid().get_surface_y(vx + dx, vz + dz);
+                if (column && (!surface || *column > *surface)) {
+                    surface = column;
+                }
+            }
+        }
+
+        if (!surface) {
+            pending_[keep++] = i;
+            continue;
+        }
+
+        const auto ent = world.create()
+                             .with<ecs::transform_component>()
+                             .with<ecs::spatial_component>()
+                             .with<ecs::model_component>()
+                             // Диск чуть шире тела, а тело шестнадцать поперёк,
+                             // то есть восемь от середины.
+                             .with(ecs::blob_shadow_component{20.0f, 48.0f, 0.6f})
+                             .get_entity();
+
+        model_sys.modify(ent).set_model(model_);
+
+        const float32 ground = static_cast<float32>(*surface + 1) * scale;
+
+        transform_sys.modify(ent).set_position(
+            {static_cast<float32>(vx) * scale, ground, static_cast<float32>(vz) * scale}
+        );
+
+        bodies_.push_back(bob{
+            .ent    = ent,
+            .x      = static_cast<float32>(vx) * scale,
+            .z      = static_cast<float32>(vz) * scale,
+            .ground = ground,
+
+            // От нуля до чуть больше высоты падения, вразброс по кольцу. Первое
+            // не отрывается от земли вовсе и служит контролем, последнее уходит
+            // заметно выше, поэтому и самое широкое пятно, и самое тугое стоят
+            // в одном кадре.
+            .amplitude =
+                (static_cast<float32>(i) / static_cast<float32>(count)) * 1.3f * 48.0f,
+
+            // Разные скорости, иначе они поднимаются и опускаются как одно, и
+            // кадр показывает всегда одну высоту.
+            .speed = 0.012f + (0.004f * static_cast<float32>(i % 4)),
+            .phase = static_cast<float32>(i) * 0.9f,
+        });
+    }
+
+    pending_.resize(keep);
+
+    if (pending_.empty()) {
+        log::info(
+            "blobs: {} bodies of {} asked on a ring of {} voxels", bodies_.size(), opts_.bodies,
+            ring
+        );
+    }
+}
+
+auto blobs_scene::tick(float32 /*delta_time*/) -> void {
+    spawn_();
+
+    if (bodies_.empty()) {
+        return;
+    }
+
+    auto& transform_sys = stand().world().system<ecs::transform_system>();
+    const auto frame    = static_cast<float32>(bob_frame_++);
+
+    for (const bob& b : bodies_) {
+        const float32 rise =
+            b.amplitude * 0.5f * (1.0f - std::cos((frame * b.speed) + b.phase));
+
+        transform_sys.modify(b.ent).set_position({b.x, b.ground + rise, b.z});
+    }
+}
+
+auto blobs_scene::ui() -> void {
+    ImGui::Text("blobs: %zu bodies of %d asked", bodies_.size(), opts_.bodies);
+}
+
+}  // namespace vw::testbed

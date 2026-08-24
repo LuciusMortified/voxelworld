@@ -42,7 +42,11 @@ $shell = New-Object -ComObject WScript.Shell
 
 function Invoke-Scene([string]$scene, [string]$report) {
     $args = @("--bench=$scene", "--bench-frames=$Frames", "--bench-warmup=$Warmup")
-    if ($report) { $args += "--bench-out=$report" }
+    if ($report) {
+        $args += "--bench-out=$report"
+        # Тот же прогон деревом, рядом с таблицами: человеку txt, разбору json.
+        $args += "--bench-json=$([System.IO.Path]::ChangeExtension($report, 'json'))"
+    }
     $args += $Extra
 
     $proc = Start-Process -FilePath $exe -WorkingDirectory $exeDirFull -ArgumentList $args -PassThru
