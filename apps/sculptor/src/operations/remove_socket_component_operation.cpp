@@ -15,7 +15,7 @@ remove_socket_component_operation::remove_socket_component_operation(
 )
     : engine_(&engine), state_(&state), params_(params) {}
 
-void remove_socket_component_operation::execute() {
+auto remove_socket_component_operation::execute() -> void {
     auto& world = engine_->get_world();
     if (!state_->scene.name_to_entity.contains(params_.name)) {
         return;
@@ -34,7 +34,7 @@ void remove_socket_component_operation::execute() {
     state_->file.has_unsaved_changes = true;
 }
 
-void remove_socket_component_operation::undo() {
+auto remove_socket_component_operation::undo() -> void {
     auto& world         = engine_->get_world();
     auto& socket_sys = world.system<ecs::socket_system>();
 

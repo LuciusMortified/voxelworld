@@ -32,9 +32,9 @@ color_palette_panel::color_palette_panel(
 )
     : state_(&st), registry_(&registry) {}
 
-void color_palette_panel::render(
-    float delta_time
-) {
+auto color_palette_panel::render(
+    [[maybe_unused]] float delta_time
+) -> void {
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImVec2 window_pos       = ImVec2(
         viewport->WorkPos.x + 10,

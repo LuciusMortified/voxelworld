@@ -34,7 +34,7 @@ cull_pipeline::~cull_pipeline() {
     device.destroyDescriptorSetLayout(buffer_descriptor_set_layout_);
 }
 
-void cull_pipeline::create_descriptor_set_layouts_() {
+auto cull_pipeline::create_descriptor_set_layouts_() -> void {
     const vk::DescriptorSetLayoutBinding frustum_binding{
         .binding         = 0,
         .descriptorType  = vk::DescriptorType::eUniformBuffer,
@@ -64,14 +64,14 @@ void cull_pipeline::create_descriptor_set_layouts_() {
 
     buffer_descriptor_set_layout_ = vk_must(
         context_->get_device().createDescriptorSetLayout({
-            .bindingCount = buffer_bindings.size(),
+            .bindingCount = static_cast<uint32>(buffer_bindings.size()),
             .pBindings    = buffer_bindings.data(),
         }),
         "create buffer descriptor set layout"
     );
 }
 
-void cull_pipeline::create_pipeline_() {
+auto cull_pipeline::create_pipeline_() -> void {
     std::array<vk::DescriptorSetLayout, 2> set_layouts{
         frustum_descriptor_set_layout_,
         buffer_descriptor_set_layout_,
@@ -85,7 +85,7 @@ void cull_pipeline::create_pipeline_() {
 
     compute_pipeline_layout_ = vk_must(
         context_->get_device().createPipelineLayout({
-            .setLayoutCount         = set_layouts.size(),
+            .setLayoutCount         = static_cast<uint32>(set_layouts.size()),
             .pSetLayouts            = set_layouts.data(),
             .pushConstantRangeCount = 1,
             .pPushConstantRanges    = &push_constant,
@@ -105,7 +105,7 @@ void cull_pipeline::create_pipeline_() {
     );
 }
 
-void cull_pipeline::create_frustum_ubos_() {
+auto cull_pipeline::create_frustum_ubos_() -> void {
     for (uint32 i = 0; i < max_frames_in_flight; i++) {
         frustum_ubos_[i] = std::make_unique<uniform_buffer>(
             *context_, static_cast<vk::DeviceSize>(sizeof(cull_frustum_ubo))
@@ -151,12 +151,12 @@ static_assert(
     "one cull pass for the camera and one per shadow cascade"
 );
 
-void cull_pipeline::update_frustums(
+auto cull_pipeline::update_frustums(
     uint32 frame_index,
     const vw::spatial::frustum& view_frustum,
     std::span<const vw::spatial::frustum> shadow_frustums,
     const vec3f& eye
-) {
+) -> void {
     cull_frustum_ubo ubo{};
     ubo.pass_count =
         std::min(combined_buffer::cull_pass_count,
@@ -179,11 +179,11 @@ void cull_pipeline::update_frustums(
     frustum_ubos_[frame_index]->copy_from_struct(ubo);
 }
 
-void cull_pipeline::dispatch(
+auto cull_pipeline::dispatch(
     vk::CommandBuffer cmd,
     const std::vector<std::unique_ptr<combined_buffer>>& buffers,
     uint32 frame_index
-) {
+) -> void {
     bool any = false;
 
     for (const auto& buffer : buffers) {

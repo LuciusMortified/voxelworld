@@ -15,7 +15,7 @@ create_clip_operation::create_clip_operation(
 )
     : base_operation(), engine_(&engine), state_(&state), params_(params) {}
 
-void create_clip_operation::execute() {
+auto create_clip_operation::execute() -> void {
     auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     (void)registry.create(params_.name);
     state_->anim.selected_clip_name          = params_.name;
@@ -23,7 +23,7 @@ void create_clip_operation::execute() {
     state_->anim.unsaved_clips[params_.name] = true;
 }
 
-void create_clip_operation::undo() {
+auto create_clip_operation::undo() -> void {
     auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     registry.remove(params_.name);
     state_->anim.selected_clip_name.clear();

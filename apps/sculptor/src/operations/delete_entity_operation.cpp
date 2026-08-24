@@ -15,7 +15,7 @@ delete_entity_operation::delete_entity_operation(
 )
     : engine_(&engine), state_(&state), params_(params) {}
 
-void delete_entity_operation::execute() {
+auto delete_entity_operation::execute() -> void {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world          = engine_->get_world();
@@ -55,7 +55,7 @@ void delete_entity_operation::execute() {
     state_->file.has_unsaved_changes = true;
 }
 
-void delete_entity_operation::undo() {
+auto delete_entity_operation::undo() -> void {
     auto& world            = engine_->get_world();
     auto& hierarchy_sys = world.system<ecs::hierarchy_system>();
     auto& transform_sys = world.system<ecs::transform_system>();

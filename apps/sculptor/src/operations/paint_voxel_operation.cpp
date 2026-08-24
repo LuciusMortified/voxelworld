@@ -15,7 +15,7 @@ paint_voxel_operation::paint_voxel_operation(
 )
     : engine_(&eng), state_(&st), params_(params) {}
 
-void paint_voxel_operation::execute() {
+auto paint_voxel_operation::execute() -> void {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
@@ -28,7 +28,7 @@ void paint_voxel_operation::execute() {
     state_->file.has_unsaved_changes = true;
 }
 
-void paint_voxel_operation::undo() {
+auto paint_voxel_operation::undo() -> void {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();

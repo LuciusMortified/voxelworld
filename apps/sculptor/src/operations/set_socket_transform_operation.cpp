@@ -15,7 +15,7 @@ set_socket_transform_operation::set_socket_transform_operation(
 )
     : engine_(&engine), state_(&st), params_(params) {}
 
-void set_socket_transform_operation::execute() {
+auto set_socket_transform_operation::execute() -> void {
     auto& world = engine_->get_world();
     auto ent    = state_->scene.name_to_entity[params_.entity_name];
 
@@ -44,7 +44,7 @@ void set_socket_transform_operation::execute() {
     state_->file.has_unsaved_changes = true;
 }
 
-void set_socket_transform_operation::undo() {
+auto set_socket_transform_operation::undo() -> void {
     auto& world = engine_->get_world();
     auto ent    = state_->scene.name_to_entity[params_.entity_name];
 
@@ -64,9 +64,9 @@ void set_socket_transform_operation::undo() {
     state_->file.has_unsaved_changes = true;
 }
 
-void set_socket_transform_operation::update_attached_(
+auto set_socket_transform_operation::update_attached_(
     const vec3f& position, const quat& rotation, const vec3f& scale
-) {
+) -> void {
     auto& world = engine_->get_world();
     auto ent    = state_->scene.name_to_entity[params_.entity_name];
 
@@ -83,9 +83,9 @@ void set_socket_transform_operation::update_attached_(
         .set_scale(scale);
 }
 
-void set_socket_transform_operation::update_preview_(
+auto set_socket_transform_operation::update_preview_(
     const vec3f& position, const quat& rotation, const vec3f& scale
-) {
+) -> void {
     const auto pkey = socket_state::socket_preview_key(params_.entity_name, params_.socket_name);
     const auto it   = state_->sockets.socket_previews.find(pkey);
     if (it == state_->sockets.socket_previews.end()) {

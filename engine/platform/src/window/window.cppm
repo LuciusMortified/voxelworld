@@ -27,7 +27,7 @@ public:
 
     [[nodiscard]] auto should_close() const -> bool;
 
-    void poll_events();
+    auto poll_events() -> void;
 
     [[nodiscard]] auto framebuffer_size() const -> vec2i;
 
@@ -54,23 +54,23 @@ public:
 
     [[nodiscard]] auto get_cursor_pos() const -> vec2d;
 
-    void set_cursor_pos(vec2d pos) const;
-    void set_cursor_pos(float64 x, float64 y) const;
+    auto set_cursor_pos(vec2d pos) const -> void;
+    auto set_cursor_pos(float64 x, float64 y) const -> void;
 
-    void set_cursor_mode(cursor_modes mode) const;
-    void set_input_mode(input_modes mode, bool value) const;
+    auto set_cursor_mode(cursor_modes mode) const -> void;
+    auto set_input_mode(input_modes mode, bool value) const -> void;
 
-    void set_title(std::string_view title) const;
+    auto set_title(std::string_view title) const -> void;
 
-    void set_size(vec2i size) const;
-    void set_size(int32 width, int32 height) const;
+    auto set_size(vec2i size) const -> void;
+    auto set_size(int32 width, int32 height) const -> void;
 
-    void set_position(vec2i pos) const;
-    void set_position(int32 x, int32 y) const;
+    auto set_position(vec2i pos) const -> void;
+    auto set_position(int32 x, int32 y) const -> void;
 
-    void maximize() const;
-    void minimize() const;
-    void restore() const;
+    auto maximize() const -> void;
+    auto minimize() const -> void;
+    auto restore() const -> void;
 
     // GLFWwindow* для бэкенда imgui, которому нужен нативный дескриптор.
     [[nodiscard]] auto native_handle() const -> void* {
@@ -83,7 +83,7 @@ public:
     }
 
     template <event_type E>
-    void unsub(event_sub<E> sub) {
+    auto unsub(event_sub<E> sub) -> void {
         return event_dispatcher_.unsub(sub);
     }
 
@@ -92,13 +92,13 @@ private:
     // живут в имплементационном юните и добираются до диспетчера через это.
     friend struct detail::window_callbacks;
 
-    void on_key_(int32 key, int32 scancode, int32 mods, bool pressed, bool repeat);
-    void on_mouse_button_(int32 button, int32 mods, bool pressed);
-    void on_mouse_move_(float64 x, float64 y);
-    void on_mouse_scroll_(float64 offset_x, float64 offset_y);
-    void on_resize_(int32 width, int32 height);
-    void on_focus_(bool focused);
-    void on_close_();
+    auto on_key_(int32 key, int32 scancode, int32 mods, bool pressed, bool repeat) -> void;
+    auto on_mouse_button_(int32 button, int32 mods, bool pressed) -> void;
+    auto on_mouse_move_(float64 x, float64 y) -> void;
+    auto on_mouse_scroll_(float64 offset_x, float64 offset_y) -> void;
+    auto on_resize_(int32 width, int32 height) -> void;
+    auto on_focus_(bool focused) -> void;
+    auto on_close_() -> void;
 
     void* handle_ = nullptr;
 

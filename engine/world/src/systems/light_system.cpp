@@ -10,7 +10,7 @@ light_system::light_system(world& w)
 
 template <typename C>
     requires std::same_as<C, light_component>
-void light_system::on_add(entity e) {
+auto light_system::on_add(entity e) -> void {
     world_->registry().request_change<light_component>(e);
 }
 
@@ -25,7 +25,7 @@ void light_system::on_add(entity e) {
 //
 // Опустошать набор всё равно надо: модификаторы продолжают его наполнять, а
 // набор, который никто не чистит, только растёт.
-void light_system::update(float32 /*dt*/) {
+auto light_system::update(float32 /*dt*/) -> void {
     auto& reg       = world_->registry();
     auto& requested = reg.requested<light_component>();
     if (requested.empty()) {

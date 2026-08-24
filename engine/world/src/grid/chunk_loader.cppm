@@ -32,8 +32,8 @@ public:
     [[nodiscard]] auto get_gen_stats() const -> column_gen_stats;
 
 private:
-    void gen_thread_function_();
-    void merge_worker_stats_(column_gen_worker_stats& worker);
+    auto gen_thread_function_() -> void;
+    auto merge_worker_stats_(column_gen_worker_stats& worker) -> void;
 
     struct gen_task {
         vec2i coord;

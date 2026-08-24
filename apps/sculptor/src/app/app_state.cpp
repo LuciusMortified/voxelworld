@@ -10,9 +10,9 @@ import vw.gfx;
 
 namespace vw::sculptor {
 
-void scene_state::clear_entities(
+auto scene_state::clear_entities(
     world_type& world
-) {
+) -> void {
     for (auto ent : entities) {
         world.destroy(ent);
     }
@@ -21,18 +21,18 @@ void scene_state::clear_entities(
     entity_to_name.clear();
 }
 
-void socket_state::socket_preview::destroy_entities(
+auto socket_state::socket_preview::destroy_entities(
     world_type& world
-) {
+) -> void {
     for (auto ent : entities) {
         world.destroy(ent);
     }
     entities.clear();
 }
 
-void socket_state::erase_preview(
+auto socket_state::erase_preview(
     const std::string& key, world_type& world
-) {
+) -> void {
     const auto it = socket_previews.find(key);
     if (it == socket_previews.end()) {
         return;
@@ -41,9 +41,9 @@ void socket_state::erase_preview(
     socket_previews.erase(it);
 }
 
-void socket_state::erase_previews_for(
+auto socket_state::erase_previews_for(
     const std::string& entity_name, world_type& world
-) {
+) -> void {
     const auto prefix = entity_name + ":";
     std::erase_if(socket_previews, [&](auto& kv) {
         if (kv.first.starts_with(prefix)) {
@@ -54,18 +54,18 @@ void socket_state::erase_previews_for(
     });
 }
 
-void socket_state::clear_all(
+auto socket_state::clear_all(
     world_type& world
-) {
+) -> void {
     for (auto& preview : socket_previews | std::views::values) {
         preview.destroy_entities(world);
     }
     socket_previews.clear();
 }
 
-void app_state::reset(
+auto app_state::reset(
     world_type& world
-) {
+) -> void {
     scene.clear_entities(world);
     sockets.clear_all(world);
     *this = app_state{};

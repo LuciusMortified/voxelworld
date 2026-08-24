@@ -80,7 +80,7 @@ engine::~engine() {
     shutdown();
 }
 
-void engine::shutdown() {
+auto engine::shutdown() -> void {
     running_ = false;
     // Генерация мешей читает страницы моделей, которыми владеет world_, а он
     // разрушается раньше renderer_; потоки обязаны встать до ухода любого из них.
@@ -116,7 +116,7 @@ auto engine::get_debug_tool() const -> debug_window_type& {
     return *debug_tool_;
 }
 
-void engine::main_loop() {
+auto engine::main_loop() -> void {
     running_         = true;
     last_frame_time_ = std::chrono::high_resolution_clock::now();
 
@@ -370,9 +370,9 @@ auto engine::write_bench_report_() const -> void {
     out << report;
 }
 
-void engine::render(
+auto engine::render(
     float delta_time
-) {
+) -> void {
     stats_.world_update_ms = measure_ms([&] { world_->update(delta_time); });
 
     stats_.world_render_ms = measure_ms([&] {
@@ -388,11 +388,11 @@ void engine::render(
     world_->clear_changed();
 }
 
-const engine_stats& engine::get_stats() const {
+auto engine::get_stats() const -> const engine_stats& {
     return stats_;
 }
 
-void engine::update_stats() {
+auto engine::update_stats() -> void {
     const auto current_time = std::chrono::high_resolution_clock::now();
     stats_.frame_ms =
         std::chrono::duration<float32>(current_time - frame_start_time_).count() * 1000.0f;

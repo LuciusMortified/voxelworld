@@ -19,16 +19,16 @@ delete_track_modal::delete_track_modal(
 )
     : engine_(&eng), state_(&st), op_manager_(&op_manager) {}
 
-void delete_track_modal::open(
+auto delete_track_modal::open(
     const std::string& track_name
-) {
+) -> void {
     need_open_  = true;
     track_name_ = track_name;
 }
 
-void delete_track_modal::render(
+auto delete_track_modal::render(
     float /*delta_time*/
-) {
+) -> void {
     if (need_open_) {
         ImGui::OpenPopup("Delete Track?");
         need_open_ = false;

@@ -15,7 +15,7 @@ add_socket_component_operation::add_socket_component_operation(
 )
     : engine_(&engine), state_(&state), params_(params) {}
 
-void add_socket_component_operation::execute() {
+auto add_socket_component_operation::execute() -> void {
     if (!state_->scene.name_to_entity.contains(params_.name)) {
         return;
     }
@@ -25,7 +25,7 @@ void add_socket_component_operation::execute() {
     state_->file.has_unsaved_changes = true;
 }
 
-void add_socket_component_operation::undo() {
+auto add_socket_component_operation::undo() -> void {
     if (!state_->scene.name_to_entity.contains(params_.name)) {
         return;
     }

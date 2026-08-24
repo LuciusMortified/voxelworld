@@ -23,18 +23,18 @@ public:
     explicit app(engine_type& eng);
     ~app() override;
 
-    void render(float delta_time) override;
+    auto render(float delta_time) -> void override;
 
 private:
-    void handle_key_press(const plat::key_press_event& ev);
-    void handle_file_shortcuts(const plat::key_press_event& ev);
-    void handle_mouse_move(const plat::mouse_move_event& ev);
-    void handle_mouse_press(const plat::mouse_press_event& ev);
-    void handle_mouse_release(const plat::mouse_release_event& ev);
+    auto handle_key_press(const plat::key_press_event& ev) -> void;
+    auto handle_file_shortcuts(const plat::key_press_event& ev) -> void;
+    auto handle_mouse_move(const plat::mouse_move_event& ev) -> void;
+    auto handle_mouse_press(const plat::mouse_press_event& ev) -> void;
+    auto handle_mouse_release(const plat::mouse_release_event& ev) -> void;
 
-    void handle_animation_actions_();
-    void update_title_();
-    static void init_asset_dir_();
+    auto handle_animation_actions_() -> void;
+    auto update_title_() -> void;
+    static auto init_asset_dir_() -> void;
 
     gfx::free_camera_controller camera_controller_;
     bool camera_movement_enabled_ = false;

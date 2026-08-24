@@ -15,9 +15,9 @@ import vw.gfx;
 namespace vw::sculptor {
 
 
-void imgui_input_text_string(
+auto imgui_input_text_string(
     std::string_view label, std::string& value
-) {
+) -> void {
     constexpr std::size_t max_length = 64;
     std::array<char, max_length> buffer{};
 
@@ -48,7 +48,7 @@ auto imgui_input_int_left(
     return ImGui::InputInt(hidden_label.c_str(), value);
 }
 
-void imgui_clamp_window_pos_to_viewport() {
+auto imgui_clamp_window_pos_to_viewport() -> void {
     if (!ImGui::IsWindowCollapsed() && !ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
         const ImVec2 window_pos       = ImGui::GetWindowPos();

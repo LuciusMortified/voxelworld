@@ -48,7 +48,9 @@ light_buffer::light_buffer(
 
 light_buffer::~light_buffer() {
     if (descriptor_pool_) {
-        context_->get_device().freeDescriptorSets(descriptor_pool_, descriptor_sets_);
+        static_cast<void>(
+            context_->get_device().freeDescriptorSets(descriptor_pool_, descriptor_sets_)
+        );
     }
 }
 

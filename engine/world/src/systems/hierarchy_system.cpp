@@ -8,7 +8,7 @@ namespace vw::ecs {
 hierarchy_system::hierarchy_system(world& w)
     : world_{&w} {}
 
-void hierarchy_system::update(float32 /*dt*/) {}
+auto hierarchy_system::update(float32 /*dt*/) -> void {}
 
 hierarchy_system::hierarchy_modifier::hierarchy_modifier(
     hierarchy_system* system,
@@ -16,9 +16,9 @@ hierarchy_system::hierarchy_modifier::hierarchy_modifier(
 )
     : system_{system}, entity_{ent} {}
 
-void hierarchy_system::cleanup(
+auto hierarchy_system::cleanup(
     entity ent
-) {
+) -> void {
     auto& reg = world_->registry();
     if (!reg.has<hierarchy_component>(ent)) {
         return;

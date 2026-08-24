@@ -29,9 +29,9 @@ timeline_panel::timeline_panel(
     , create_kf_modal_(eng, st, op_manager)
     , delete_track_modal_(eng, st, op_manager) {}
 
-void timeline_panel::render(
+auto timeline_panel::render(
     float delta_time
-) {
+) -> void {
     keyframe_clicked_ = false;
 
     const auto& clip_registry = engine_->get_world().resource<asset::animation_clip_registry>();
@@ -141,9 +141,9 @@ void timeline_panel::render(
     ImGui::End();
 }
 
-void timeline_panel::render_toolbar(
+auto timeline_panel::render_toolbar(
     float clip_duration
-) {
+) -> void {
     const auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(state_->anim.selected_clip_name);
     if (!clip) {
@@ -212,7 +212,7 @@ void timeline_panel::render_toolbar(
     constexpr std::array loop_modes = {"Once", "Loop", "Ping-Pong"};
     int loop_index                  = static_cast<int>(cs.loop_mode);
     const bool loop_changed =
-        ImGui::Combo("##Loop", &loop_index, loop_modes.data(), loop_modes.size());
+        ImGui::Combo("##Loop", &loop_index, loop_modes.data(), static_cast<int32>(loop_modes.size()));
     if (loop_changed) {
         cs.loop_mode = static_cast<asset::animation_loop_mode>(loop_index);
     }
@@ -255,7 +255,7 @@ void timeline_panel::render_toolbar(
     zoom_percent_ = std::clamp(zoom_percent_, 100.f, 1000.f);
 }
 
-void timeline_panel::render_tracks() {
+auto timeline_panel::render_tracks() -> void {
     const auto& clip_registry = engine_->get_world().resource<asset::animation_clip_registry>();
 
     const auto clip = clip_registry.get(state_->anim.selected_clip_name);
@@ -347,12 +347,12 @@ void timeline_panel::render_tracks() {
     ImGui::EndChild();
 }
 
-void timeline_panel::render_track_row(
+auto timeline_panel::render_track_row(
     const asset::animation_track& track,
     float track_area_width,
     float clip_duration,
     float scroll_offset
-) {
+) -> void {
     const auto& target           = track.get_target_name();
     const bool is_expanded       = state_->anim.expanded_tracks.contains(target);
     const bool is_track_selected = (state_->anim.selected_track_name == target);
@@ -442,9 +442,9 @@ auto timeline_panel::try_get_root_entity() const -> std::optional<ecs::entity> {
     return state_->scene.name_to_entity[state_->scene.root_name];
 }
 
-void timeline_panel::handle_pause(
+auto timeline_panel::handle_pause(
     ecs::entity root
-) const {
+) const -> void {
     auto& world = engine_->get_world();
     if (world.has<ecs::animation_player_component>(root)) {
         const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
@@ -452,9 +452,9 @@ void timeline_panel::handle_pause(
     }
 }
 
-void timeline_panel::handle_play(
+auto timeline_panel::handle_play(
     ecs::entity root, const std::shared_ptr<asset::animation_clip>& clip
-) const {
+) const -> void {
     auto& world = engine_->get_world();
 
     if (!world.has<ecs::animation_player_component>(root)) {
@@ -495,9 +495,9 @@ void timeline_panel::handle_play(
     }
 }
 
-void timeline_panel::handle_stop(
+auto timeline_panel::handle_stop(
     ecs::entity root
-) const {
+) const -> void {
     auto& world          = engine_->get_world();
     const auto layer_idx = state_->anim.get_layer_for_clip(state_->anim.selected_clip_name);
     if (world.has<ecs::animation_player_component>(root)) {
@@ -506,9 +506,9 @@ void timeline_panel::handle_stop(
     state_->anim.timeline_cursor = 0.f;
 }
 
-void timeline_panel::render_playback_controls(
+auto timeline_panel::render_playback_controls(
     const std::shared_ptr<asset::animation_clip>& clip
-) {
+) -> void {
     const bool playing     = is_current_layer_playing();
     const char* play_label = playing ? "||" : ">";
     if (ImGui::Button(play_label)) {
@@ -527,7 +527,7 @@ void timeline_panel::render_playback_controls(
     }
 }
 
-void timeline_panel::render_clip_blend_controls_() const {
+auto timeline_panel::render_clip_blend_controls_() const -> void {
     constexpr std::array interp_names = {
         "Linear", "Step", "Ease In", "Ease Out", "Ease In/Out", "Cubic Bezier"
     };
@@ -544,15 +544,17 @@ void timeline_panel::render_clip_blend_controls_() const {
     ImGui::SameLine();
     ImGui::PushItemWidth(80.f);
     int interp = static_cast<int>(cs.blend_transition.interp);
-    if (ImGui::Combo("##BlendInterp", &interp, interp_names.data(), interp_names.size())) {
+    if (ImGui::Combo(
+            "##BlendInterp", &interp, interp_names.data(), static_cast<int32>(interp_names.size())
+        )) {
         cs.blend_transition.interp = static_cast<math::interpolation_type>(interp);
     }
     ImGui::PopItemWidth();
 }
 
-void timeline_panel::render_time_ruler(
+auto timeline_panel::render_time_ruler(
     vec2f ruler_start, float ruler_width, float track_area_width, float clip_duration
-) const {
+) const -> void {
     auto* draw_list = ImGui::GetWindowDrawList();
 
     const float visible_start = scroll_offset_ / track_area_width * clip_duration;
@@ -590,9 +592,9 @@ void timeline_panel::render_time_ruler(
     ImGui::Dummy(ImVec2(ruler_width, 16.f));
 }
 
-void timeline_panel::render_scrollbar(
+auto timeline_panel::render_scrollbar(
     float usable_track_width, float track_area_width, float max_scroll
-) {
+) -> void {
     if (max_scroll <= 0.f) {
         scrollbar_dragging_ = false;
         return;
@@ -658,9 +660,9 @@ void timeline_panel::render_scrollbar(
     }
 }
 
-void timeline_panel::render_track_context_menu(
+auto timeline_panel::render_track_context_menu(
     const std::string& target
-) {
+) -> void {
     auto ctx_id = std::format("TrackCtx_{}", target);
     if (ImGui::BeginPopupContextItem(ctx_id.c_str())) {
         state_->anim.selected_track_name = target;
@@ -675,13 +677,13 @@ void timeline_panel::render_track_context_menu(
     }
 }
 
-void timeline_panel::render_expanded_channels(
+auto timeline_panel::render_expanded_channels(
     const asset::animation_track& track,
     const std::string& target,
     float track_area_width,
     float clip_duration,
     float scroll_offset
-) {
+) -> void {
     for (int i = 0; i < 4; ++i) {
         constexpr std::array prop_names{"Position", "Rotation", "Scale", "Origin"};
         constexpr std::array props = {
@@ -719,14 +721,14 @@ void timeline_panel::render_expanded_channels(
     }
 }
 
-void timeline_panel::render_keyframe_markers(
+auto timeline_panel::render_keyframe_markers(
     const asset::animation_channel_variant& channel_var,
     const std::string& track_name,
     asset::animation_property prop,
     float track_width,
     float clip_duration,
     float scroll_offset
-) {
+) -> void {
     auto* draw_list   = ImGui::GetWindowDrawList();
     ImVec2 cursor_pos = ImGui::GetCursorScreenPos();
     float row_height  = 16.f;
@@ -793,14 +795,14 @@ void timeline_panel::render_keyframe_markers(
     }
 }
 
-void timeline_panel::render_playhead(
+auto timeline_panel::render_playhead(
     float track_area_x,
     float track_width,
     float clip_duration,
     float area_top,
     float area_bottom,
     float scroll_offset
-) const {
+) const -> void {
     if (clip_duration <= 0.f) {
         return;
     }
@@ -865,9 +867,9 @@ auto timeline_panel::is_clip_on_layer() const -> bool {
         player.get_layer(idx).clip->get_name() == state_->anim.selected_clip_name;
 }
 
-void timeline_panel::ensure_clip_on_layer(
+auto timeline_panel::ensure_clip_on_layer(
     ecs::entity root
-) const {
+) const -> void {
     if (is_clip_on_layer()) {
         return;
     }

@@ -55,7 +55,7 @@ struct scene_state {
     std::unordered_map<ecs::entity, std::string> entity_to_name;
     std::vector<ecs::entity> entities;
 
-    void clear_entities(world_type& world);
+    auto clear_entities(world_type& world) -> void;
 };
 
 struct tool_state {
@@ -108,7 +108,7 @@ struct socket_state {
         std::string preview_root_name;
         std::vector<ecs::entity> entities;
 
-        void destroy_entities(world_type& world);
+        auto destroy_entities(world_type& world) -> void;
     };
 
     std::unordered_map<std::string, socket_preview> socket_previews;
@@ -129,9 +129,9 @@ struct socket_state {
         return result;
     }
 
-    void erase_preview(const std::string& key, world_type& world);
-    void erase_previews_for(const std::string& entity_name, world_type& world);
-    void clear_all(world_type& world);
+    auto erase_preview(const std::string& key, world_type& world) -> void;
+    auto erase_previews_for(const std::string& entity_name, world_type& world) -> void;
+    auto clear_all(world_type& world) -> void;
 };
 
 struct app_state {
@@ -144,7 +144,7 @@ struct app_state {
     animation_state anim;
     socket_state sockets;
 
-    void reset(world_type& world);
+    auto reset(world_type& world) -> void;
 };
 
 }  // namespace vw::sculptor

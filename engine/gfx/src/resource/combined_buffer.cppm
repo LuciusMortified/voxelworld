@@ -115,13 +115,13 @@ public:
     combined_buffer(combined_buffer&&) noexcept            = default;
     combined_buffer& operator=(combined_buffer&&) noexcept = default;
 
-    void allocate(
+    auto allocate(
         entity e, vw::asset::model_identity model_id, const mesh& mesh_data,
         const mat4f& transform_matrix, const vw::spatial::aabb& bounds
-    );
-    void allocate_mesh(vw::asset::model_identity model_id, const mesh& mesh_data);
-    void write_mesh(vw::asset::model_identity model_id, const mesh& mesh_data);
-    void write_transform(entity ent, const mat4f& transform_matrix, const vw::spatial::aabb& bounds);
+    ) -> void;
+    auto allocate_mesh(vw::asset::model_identity model_id, const mesh& mesh_data) -> void;
+    auto write_mesh(vw::asset::model_identity model_id, const mesh& mesh_data) -> void;
+    auto write_transform(entity ent, const mat4f& transform_matrix, const vw::spatial::aabb& bounds) -> void;
     auto free(entity ent) -> std::optional<entity>;
 
     // По флагу на инстанс; шейдер отсева читает их до проверки фрустумом. Span
@@ -131,32 +131,32 @@ public:
 
     [[nodiscard]] auto get_entity_allocation(entity ent) -> const entity_allocation&;
     [[nodiscard]] auto get_quad_buffer() const -> vk::Buffer;
-    [[nodiscard]] vk::Buffer get_instance_index_buffer() const;
-    [[nodiscard]] vk::Buffer get_indirect_draw_buffer() const;
-    [[nodiscard]] vk::Buffer get_aabb_buffer() const;
-    [[nodiscard]] vk::Buffer get_model_matrix_buffer() const;
-    [[nodiscard]] vk::Buffer get_normal_matrix_buffer() const;
+    [[nodiscard]] auto get_instance_index_buffer() const -> vk::Buffer;
+    [[nodiscard]] auto get_indirect_draw_buffer() const -> vk::Buffer;
+    [[nodiscard]] auto get_aabb_buffer() const -> vk::Buffer;
+    [[nodiscard]] auto get_model_matrix_buffer() const -> vk::Buffer;
+    [[nodiscard]] auto get_normal_matrix_buffer() const -> vk::Buffer;
     // Инстансов в буфере и потолок на число команд, которые проход отсева может из
     // них произвести: по шесть на меш, по одной на направление грани.
-    [[nodiscard]] uint32 get_instance_count() const;
-    [[nodiscard]] uint32 get_draw_command_count() const;
-    [[nodiscard]] vk::Buffer get_culled_indirect_buffer() const;
-    [[nodiscard]] vk::Buffer get_count_buffer() const;
-    [[nodiscard]] bool is_empty() const;
-    [[nodiscard]] const combined_buffer_stats& get_stats() const;
-    [[nodiscard]] vk::DescriptorSet get_descriptor_set() const {
+    [[nodiscard]] auto get_instance_count() const -> uint32;
+    [[nodiscard]] auto get_draw_command_count() const -> uint32;
+    [[nodiscard]] auto get_culled_indirect_buffer() const -> vk::Buffer;
+    [[nodiscard]] auto get_count_buffer() const -> vk::Buffer;
+    [[nodiscard]] auto is_empty() const -> bool;
+    [[nodiscard]] auto get_stats() const -> const combined_buffer_stats&;
+    [[nodiscard]] auto get_descriptor_set() const -> vk::DescriptorSet {
         return descriptor_set_;
     }
-    [[nodiscard]] vk::DescriptorSet get_compute_descriptor_set() const {
+    [[nodiscard]] auto get_compute_descriptor_set() const -> vk::DescriptorSet {
         return compute_descriptor_set_;
     }
 
 private:
-    void write_draw_command_(uint32 instance_index, const mesh_allocation& mesh_alloc);
-    void expand_mesh_buffers_();
-    void expand_instance_buffers_();
-    void update_descriptor_set_();
-    void update_compute_descriptor_set_();
+    auto write_draw_command_(uint32 instance_index, const mesh_allocation& mesh_alloc) -> void;
+    auto expand_mesh_buffers_() -> void;
+    auto expand_instance_buffers_() -> void;
+    auto update_descriptor_set_() -> void;
+    auto update_compute_descriptor_set_() -> void;
 
     static constexpr uint32 default_mesh_capacity_     = 32;
     static constexpr uint32 default_instance_capacity_ = 64;

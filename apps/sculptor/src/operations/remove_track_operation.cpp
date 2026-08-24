@@ -15,7 +15,7 @@ remove_track_operation::remove_track_operation(
 )
     : engine_(&eng), state_(&state), params_(std::move(params)) {}
 
-void remove_track_operation::execute() {
+auto remove_track_operation::execute() -> void {
     auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     auto clip      = registry.get(params_.clip_name);
     if (!clip) {
@@ -37,7 +37,7 @@ void remove_track_operation::execute() {
     state_->anim.expanded_tracks.erase(params_.track_name);
 }
 
-void remove_track_operation::undo() {
+auto remove_track_operation::undo() -> void {
     auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     auto clip      = registry.get(params_.clip_name);
     if (!clip || !saved_track_) {

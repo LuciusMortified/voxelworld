@@ -72,9 +72,9 @@ block_registry::block_registry() {
     // clang-format on
 }
 
-void block_registry::reg(
+auto block_registry::reg(
     block_id id, color c, uint8 flags, uint8 light, uint8 glow
-) {
+) -> void {
     blocks_[id.value] = {id, c, flags, light, glow};
 }
 

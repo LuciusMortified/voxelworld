@@ -78,7 +78,7 @@ staging_buffer::~staging_buffer() {
     }
 }
 
-void staging_buffer::begin_frame() {
+auto staging_buffer::begin_frame() -> void {
     current_frame_index_ = (current_frame_index_ + 1) % max_frames_in_flight_;
     write_offset_        = current_frame_index_ * frame_capacity_;
     frame_end_offset_    = write_offset_ + frame_capacity_;
@@ -94,33 +94,33 @@ auto staging_buffer::stage(
     return offset;
 }
 
-void staging_buffer::copy_to(
+auto staging_buffer::copy_to(
     vk::Buffer dst, vk::DeviceSize dst_offset, vk::DeviceSize staging_offset, vk::DeviceSize size
-) {
+) -> void {
     pending_copies_.push_back({buffer_, dst, {staging_offset, dst_offset, size}});
 }
 
-void staging_buffer::copy_buffer(
+auto staging_buffer::copy_buffer(
     vk::Buffer src, vk::DeviceSize src_offset,
     vk::Buffer dst, vk::DeviceSize dst_offset,
     vk::DeviceSize size
-) {
+) -> void {
     if (size == 0) {
         return;
     }
     pending_copies_.push_back({src, dst, {src_offset, dst_offset, size}});
 }
 
-void staging_buffer::replace_buffer(vk::Buffer old_buf, vk::Buffer new_buf) {
+auto staging_buffer::replace_buffer(vk::Buffer old_buf, vk::Buffer new_buf) -> void {
     for (auto& copy : pending_copies_) {
         if (copy.src == old_buf) copy.src = new_buf;
         if (copy.dst == old_buf) copy.dst = new_buf;
     }
 }
 
-void staging_buffer::flush(
+auto staging_buffer::flush(
     vk::CommandBuffer cmd
-) {
+) -> void {
     if (pending_copies_.empty()) {
         return;
     }

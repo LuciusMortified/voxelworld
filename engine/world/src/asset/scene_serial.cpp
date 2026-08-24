@@ -59,7 +59,7 @@ auto vox_serializer::extract() const -> asset::vox_prefab_data {
     return prefab;
 }
 
-void vox_serializer::generate_entity_names_() {
+auto vox_serializer::generate_entity_names_() -> void {
     std::deque<entity> to_process;
     to_process.push_back(root_);
     entity_names_[root_] = "root";
@@ -176,9 +176,9 @@ auto vox_deserializer::deserialize(
     return res;
 }
 
-void vox_deserializer::apply_entity_(
+auto vox_deserializer::apply_entity_(
     const asset::vox_entity_data& data, result& res, const options& opts
-) {
+) -> void {
     const auto ent = world_->create()
         .with<hierarchy_component>()
         .with<transform_component>()

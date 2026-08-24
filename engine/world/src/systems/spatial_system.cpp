@@ -32,7 +32,7 @@ auto spatial_system::spatial_modifier::set_layer(
     return *this;
 }
 
-void spatial_system::update(float32 /*dt*/) {
+auto spatial_system::update(float32 /*dt*/) -> void {
     auto& reg       = world_->registry();
     auto& requested = reg.requested<spatial_component>();
     if (requested.empty()) {
@@ -54,9 +54,9 @@ void spatial_system::update(float32 /*dt*/) {
     reg.clear_requested<spatial_component>();
 }
 
-void spatial_system::update_entity(
+auto spatial_system::update_entity(
     entity ent
-) {
+) -> void {
     auto& reg     = world_->registry();
     auto& spatial = reg.get<spatial_component>(ent);
 
@@ -162,34 +162,34 @@ auto spatial_system::calculate_aabb_from_model(
     return spatial::aabb{min_point, max_point};
 }
 
-void spatial_system::query_all(
+auto spatial_system::query_all(
     const spatial::frustum& f, std::vector<entity>& result_out, spatial_layer_mask layer_mask
-) const {
+) const -> void {
     tree_.query_all(f, result_out, layer_mask);
 }
 
-void spatial_system::query_all_any(
+auto spatial_system::query_all_any(
     std::span<const spatial::frustum> frustums, std::vector<entity>& result_out
-) const {
+) const -> void {
     tree_.query_all_any(frustums, result_out);
     std::sort(result_out.begin(), result_out.end());
 }
 
-void spatial_system::query_all(
+auto spatial_system::query_all(
     const spatial::ray& r, std::vector<entity>& result_out, spatial_layer_mask layer_mask
-) const {
+) const -> void {
     tree_.query_all(r, result_out, layer_mask);
 }
 
-void spatial_system::query_all(
+auto spatial_system::query_all(
     const spatial::aabb& bounds, std::vector<entity>& result_out, spatial_layer_mask layer_mask
-) const {
+) const -> void {
     tree_.query_all(bounds, result_out, layer_mask);
 }
 
-void spatial_system::cleanup(
+auto spatial_system::cleanup(
     entity ent
-) {
+) -> void {
     tree_.remove(ent);
 }
 

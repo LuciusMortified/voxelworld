@@ -23,8 +23,8 @@ public:
     base_operation(const base_operation&)                    = delete;
     auto operator=(const base_operation&) -> base_operation& = delete;
 
-    virtual void execute() = 0;
-    virtual void undo()    = 0;
+    virtual auto execute() -> void = 0;
+    virtual auto undo() -> void    = 0;
 };
 
 }  // namespace vw::sculptor
@@ -45,8 +45,8 @@ public:
         engine_type& engine, app_state& state, const add_animation_target_params& params
     );
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -76,8 +76,8 @@ public:
         engine_type& engine, app_state& state, const add_keyframe_params& params
     );
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -104,8 +104,8 @@ public:
         engine_type& engine, app_state& state, const add_model_component_params& params
     );
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -130,8 +130,8 @@ public:
         engine_type& engine, app_state& state, const add_socket_component_params& params
     );
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -158,8 +158,8 @@ public:
 
     add_socket_operation(engine_type& engine, app_state& st, const add_socket_params& params);
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -185,8 +185,8 @@ public:
 
     add_track_operation(engine_type& engine, app_state& state, const add_track_params& params);
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -212,8 +212,8 @@ public:
 
     add_voxel_operation(engine_type& eng, app_state& st, const add_voxel_params& params);
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -236,8 +236,8 @@ public:
 
     close_clip_operation(engine_type& engine, app_state& state, const close_clip_params& params);
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -261,8 +261,8 @@ public:
 
     create_clip_operation(engine_type& engine, app_state& state, const create_clip_params& params);
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -292,8 +292,8 @@ public:
         engine_type& engine, app_state& state, const create_entity_params& params = {}
     );
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -319,8 +319,8 @@ public:
         engine_type& engine, app_state& state, const delete_entity_params& params
     );
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -349,8 +349,8 @@ public:
 
     expand_model_operation(engine_type& eng, app_state& st, const expand_model_params& params);
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -380,11 +380,11 @@ public:
         engine_type& engine, app_state& state, const modify_keyframe_params& params
     );
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
-    void apply(const keyframe_value& replacement) const;
+    auto apply(const keyframe_value& replacement) const -> void;
 
     engine_type* engine_;
     app_state* state_;
@@ -403,13 +403,13 @@ public:
     operation_manager(const operation_manager&)                    = delete;
     auto operator=(const operation_manager&) -> operation_manager& = delete;
 
-    void execute(std::unique_ptr<base_operation> op);
+    auto execute(std::unique_ptr<base_operation> op) -> void;
 
-    [[nodiscard]] bool is_undo_empty() const;
-    void undo();
+    [[nodiscard]] auto is_undo_empty() const -> bool;
+    auto undo() -> void;
 
-    [[nodiscard]] bool is_redo_empty() const;
-    void redo();
+    [[nodiscard]] auto is_redo_empty() const -> bool;
+    auto redo() -> void;
 
 private:
     std::deque<std::unique_ptr<base_operation>> undo_;
@@ -433,8 +433,8 @@ public:
 
     paint_voxel_operation(engine_type& eng, app_state& st, const paint_voxel_params& params);
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -460,8 +460,8 @@ public:
         engine_type& engine, app_state& state, const remove_animation_target_params& params
     );
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -493,8 +493,8 @@ public:
         engine_type& engine, app_state& state, const remove_keyframe_params& params
     );
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -519,8 +519,8 @@ public:
         engine_type& engine, app_state& state, const remove_model_component_params& params
     );
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -547,8 +547,8 @@ public:
         engine_type& engine, app_state& state, const remove_socket_component_params& params
     );
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     struct saved_socket {
@@ -581,8 +581,8 @@ public:
 
     remove_socket_operation(engine_type& engine, app_state& st, const remove_socket_params& params);
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -609,8 +609,8 @@ public:
 
     remove_track_operation(engine_type& eng, app_state& state, remove_track_params params);
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -635,8 +635,8 @@ public:
 
     remove_voxel_operation(engine_type& eng, app_state& st, const remove_voxel_params& params);
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;
@@ -665,12 +665,12 @@ public:
     set_socket_transform_operation(engine_type& engine, app_state& st,
                                    const set_socket_transform_params& params);
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
-    void update_attached_(const vec3f& position, const quat& rotation, const vec3f& scale);
-    void update_preview_(const vec3f& position, const quat& rotation, const vec3f& scale);
+    auto update_attached_(const vec3f& position, const quat& rotation, const vec3f& scale) -> void;
+    auto update_preview_(const vec3f& position, const quat& rotation, const vec3f& scale) -> void;
 
     engine_type* engine_;
     app_state* state_;
@@ -696,8 +696,8 @@ public:
 
     set_transform_operation(engine_type& engine, app_state& st, const set_transform_params& params);
 
-    void execute() override;
-    void undo() override;
+    auto execute() -> void override;
+    auto undo() -> void override;
 
 private:
     engine_type* engine_;

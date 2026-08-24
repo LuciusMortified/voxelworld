@@ -48,9 +48,9 @@ public:
         if (root_.is_valid())  world.destroy(root_);
     }
 
-    void render(
+    auto render(
         float32 delta_time
-    ) override {
+    ) -> void override{
         camera_controller_->update(delta_time);
 
         auto& renderer = get_engine().get_renderer();
@@ -63,7 +63,7 @@ public:
     }
 
 private:
-    void setup_scene() {
+    auto setup_scene() -> void {
         auto& world            = get_engine().get_world();
         auto& model_reg = world.resource<asset::model_registry>();
         auto& transform_sys = world.system<ecs::transform_system>();
@@ -169,14 +169,14 @@ private:
             .set_parent(root_ent);
     }
 
-    void create_animations() {
+    auto create_animations() -> void {
         create_bounce_animation();
         create_rotation_animation();
         create_wave_animation();
         create_scale_animation();
     }
 
-    void create_bounce_animation() {
+    auto create_bounce_animation() -> void {
         auto& world         = get_engine().get_world();
         auto& clip_registry = world.resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("bounce");
@@ -236,7 +236,7 @@ private:
         layer_mod.play();
     }
 
-    void create_rotation_animation() {
+    auto create_rotation_animation() -> void {
         auto& world         = get_engine().get_world();
         auto& clip_registry = world.resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("rotation");
@@ -302,7 +302,7 @@ private:
         }
     }
 
-    void create_wave_animation() {
+    auto create_wave_animation() -> void {
         auto& world         = get_engine().get_world();
         auto& clip_registry = world.resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("wave");
@@ -360,7 +360,7 @@ private:
         }
     }
 
-    void create_scale_animation() {
+    auto create_scale_animation() -> void {
         auto& world         = get_engine().get_world();
         auto& clip_registry = world.resource<asset::animation_clip_registry>();
         auto clip           = clip_registry.create("scale");
@@ -426,9 +426,9 @@ private:
         }
     }
 
-    void handle_key_press(
+    auto handle_key_press(
         const plat::key_press_event& ev
-    ) {
+    ) -> void {
         using keys = plat::keyboard::keys;
 
         if (ev.key == keys::ESCAPE) {
@@ -439,7 +439,7 @@ private:
         }
     }
 
-    void render_ui() {
+    auto render_ui() -> void {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         ImVec2 window_pos       = ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
         ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always);

@@ -50,10 +50,10 @@ inline constexpr std::array<vec3i, 6> boundary_face_offsets{
 // остальных, is_sky(vec3i) -> bool, starts_in(const asset::chunk_pocket&) -> bool
 // выбирает карман, который занимает наблюдатель, visit(vec3i) -> void.
 template <typename LinksAt, typename IsSky, typename StartsIn, typename Visit>
-void walk_visible_chunks(
+auto walk_visible_chunks(
     vec3i origin, vec3i lo, vec3i hi, LinksAt&& links_at, IsSky&& is_sky, StartsIn&& starts_in,
     Visit&& visit
-) {
+) -> void {
     constexpr int32 face_count = asset::chunk_pocket::face_count;
 
     // Ячейка без собственной связности — небо или ещё не смешенный чанк — это
@@ -163,7 +163,7 @@ void walk_visible_chunks(
 // Всё пустое считается небом. Для тестов и для вызывающих, под чьим обходом мира
 // нет.
 template <typename LinksAt, typename Visit>
-void walk_visible_chunks(vec3i origin, int32 radius, LinksAt&& links_at, Visit&& visit) {
+auto walk_visible_chunks(vec3i origin, int32 radius, LinksAt&& links_at, Visit&& visit) -> void {
     const vec3i extent{radius, radius, radius};
     walk_visible_chunks(
         origin, origin - extent, origin + extent, std::forward<LinksAt>(links_at),

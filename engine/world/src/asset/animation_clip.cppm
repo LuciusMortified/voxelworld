@@ -12,7 +12,7 @@ class animation_clip final {
 public:
     explicit animation_clip(std::string name);
 
-    void add_track(animation_track track);
+    auto add_track(animation_track track) -> void;
 
     [[nodiscard]] auto get_track(std::string_view target_name) const -> const animation_track*;
     [[nodiscard]] auto get_track_mut(std::string_view target_name) -> animation_track*;
@@ -22,7 +22,7 @@ public:
         return tracks_;
     }
 
-    void remove_track(std::string_view target_name);
+    auto remove_track(std::string_view target_name) -> void;
 
     [[nodiscard]] auto get_duration() const -> float32;
 
@@ -30,7 +30,7 @@ public:
         return name_;
     }
 
-    void set_name(std::string name);
+    auto set_name(std::string name) -> void;
 
     [[nodiscard]] auto get_target_names() const -> std::unordered_set<std::string>;
 
@@ -53,10 +53,10 @@ public:
         unordered_map<std::string, std::shared_ptr<animation_clip>, string_hash, std::equal_to<>>;
 
     [[nodiscard]] auto create(std::string_view name) -> std::shared_ptr<animation_clip>;
-    void add(std::string_view name, std::shared_ptr<animation_clip> clip);
+    auto add(std::string_view name, std::shared_ptr<animation_clip> clip) -> void;
     [[nodiscard]] auto get(std::string_view name) const -> std::shared_ptr<animation_clip>;
     [[nodiscard]] auto has(std::string_view name) const -> bool;
-    void remove(std::string_view name);
+    auto remove(std::string_view name) -> void;
 
     [[nodiscard]] auto all() const -> const map_type& {
         return clips_;
@@ -66,7 +66,7 @@ public:
         return clips_.size();
     }
 
-    void clear();
+    auto clear() -> void;
 
 private:
     map_type clips_;

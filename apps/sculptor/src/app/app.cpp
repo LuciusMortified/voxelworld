@@ -91,9 +91,9 @@ app::~app() {
     state_.sockets.clear_all(get_engine().get_world());
 }
 
-void app::render(
+auto app::render(
     float delta_time
-) {
+) -> void {
     if (state_.tool.selected_tool != active_tool_) {
         active_tool_ = state_.tool.selected_tool;
         tools_[active_tool_]->on_activate();
@@ -182,14 +182,14 @@ void app::render(
 #endif
 }
 
-void app::handle_key_press(
+auto app::handle_key_press(
     const plat::key_press_event& ev
-) {
+) -> void {
     const auto& io = ImGui::GetIO();
 
     const bool really_want_keyboard =  //
         ImGui::IsAnyItemActive() || ImGui::IsAnyItemFocused();
-    if (io.WantCaptureKeyboard && really_want_keyboard || camera_movement_enabled_) {
+    if ((io.WantCaptureKeyboard && really_want_keyboard) || camera_movement_enabled_) {
         return;
     }
 
@@ -243,9 +243,9 @@ void app::handle_key_press(
     handle_file_shortcuts(ev);
 }
 
-void app::handle_file_shortcuts(
+auto app::handle_file_shortcuts(
     const plat::key_press_event& ev
-) {
+) -> void {
     using keys = plat::keyboard::keys;
     using mods = plat::keyboard::mods;
 
@@ -267,9 +267,9 @@ void app::handle_file_shortcuts(
     }
 }
 
-void app::handle_mouse_move(
+auto app::handle_mouse_move(
     const plat::mouse_move_event& ev
-) {
+) -> void {
     const auto& io = ImGui::GetIO();
     if (io.WantCaptureMouse) {
         return;
@@ -280,9 +280,9 @@ void app::handle_mouse_move(
     }
 }
 
-void app::handle_mouse_press(
+auto app::handle_mouse_press(
     const plat::mouse_press_event& ev
-) {
+) -> void {
     auto& io = ImGui::GetIO();
     if (io.WantCaptureMouse) {
         return;
@@ -306,9 +306,9 @@ void app::handle_mouse_press(
     }
 }
 
-void app::handle_mouse_release(
+auto app::handle_mouse_release(
     const plat::mouse_release_event& ev
-) {
+) -> void {
     auto& io = ImGui::GetIO();
     if (io.WantCaptureMouse) {
         return;
@@ -327,7 +327,7 @@ void app::handle_mouse_release(
     }
 }
 
-void app::handle_animation_actions_() {
+auto app::handle_animation_actions_() -> void {
     if (state_.anim.need_toggle_playback) {
         state_.anim.need_toggle_playback = false;
         playback_service_.toggle_playback();
@@ -349,7 +349,7 @@ void app::handle_animation_actions_() {
     }
 }
 
-void app::update_title_() {
+auto app::update_title_() -> void {
     std::string title;
     if (state_.file.filename.empty()) {
         title = std::format("Sculptor {}", version_string);
@@ -375,7 +375,7 @@ void app::update_title_() {
     get_engine().get_window().set_title(title);
 }
 
-void app::init_asset_dir_() {
+auto app::init_asset_dir_() -> void {
     if (!std::filesystem::exists(app_state::asset_dir_name)) {
         std::error_code ec;
         std::filesystem::create_directories(app_state::asset_dir_name, ec);

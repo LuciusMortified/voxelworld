@@ -12,15 +12,15 @@ auto animation_system::get_target_fps() const -> float32 {
     return 1.0f / target_frame_time_;
 }
 
-void animation_system::set_target_fps(
+auto animation_system::set_target_fps(
     float32 fps
-) {
+) -> void {
     target_frame_time_ = 1.0f / fps;
 }
 
-void animation_system::update(
+auto animation_system::update(
     float32 delta_time
-) {
+) -> void {
     accumulated_delta_time_ += delta_time;
 
     if (accumulated_delta_time_ < target_frame_time_) {
@@ -56,9 +56,9 @@ void animation_system::update(
     }
 }
 
-void animation_system::add_active_entity(
+auto animation_system::add_active_entity(
     entity root_ent
-) {
+) -> void {
     auto [it, inserted] = active_entities_.insert(root_ent);
 
     if (inserted) {
@@ -66,16 +66,16 @@ void animation_system::add_active_entity(
     }
 }
 
-void animation_system::remove_active_entity(
+auto animation_system::remove_active_entity(
     entity root_ent
-) {
+) -> void {
     active_entities_.erase(root_ent);
     target_maps_.erase(root_ent);
 }
 
-void animation_system::build_and_cache_target_map(
+auto animation_system::build_and_cache_target_map(
     entity root_ent
-) {
+) -> void {
     std::unordered_map<std::string, entity> target_map;
 
     to_visit_.clear();
@@ -112,9 +112,9 @@ auto animation_system::get_cached_target_map(
     return nullptr;
 }
 
-void animation_system::update_layer_time(
+auto animation_system::update_layer_time(
     asset::animation_layer& layer, float32 delta_time
-) {
+) -> void {
     layer.time += delta_time * layer.playback_speed * layer.direction;
 
     float32 duration = layer.clip->get_duration();
@@ -146,9 +146,9 @@ void animation_system::update_layer_time(
     }
 }
 
-void animation_system::process_layer(
+auto animation_system::process_layer(
     asset::animation_layer& layer, float32 delta_time, bool is_base
-) {
+) -> void {
     if (!layer.clip) {
         return;
     }
@@ -277,9 +277,9 @@ auto animation_system::compute_layer_transform(
     return t;
 }
 
-void animation_system::process_animation(
+auto animation_system::process_animation(
     entity ent, animation_player_component& anim_comp, float32 delta_time
-) {
+) -> void {
     for (std::size_t i = 0; i < anim_comp.layers_.size(); ++i) {
         process_layer(anim_comp.layers_[i], delta_time, i == 0);
     }
@@ -287,9 +287,9 @@ void animation_system::process_animation(
     apply_animation(ent, anim_comp);
 }
 
-void animation_system::apply_animation(
+auto animation_system::apply_animation(
     entity root_ent, const animation_player_component& anim_comp
-) {
+) -> void {
     const auto* target_map = get_cached_target_map(root_ent);
     if (!target_map) {
         return;
@@ -407,9 +407,9 @@ auto animation_system::modify_player(
     return player_modifier(this, ent, &comp);
 }
 
-void animation_system::player_modifier::add_layer(
+auto animation_system::player_modifier::add_layer(
     std::size_t index
-) const {
+) const -> void {
     if (index >= component_->layers_.size()) {
         component_->layers_.resize(index + 1);
     }
@@ -422,14 +422,14 @@ auto animation_system::player_modifier::layer(
     return layer_modifier(system_, entity_, &component_->layers_[index]);
 }
 
-void animation_system::player_modifier::apply_pose() const {
+auto animation_system::player_modifier::apply_pose() const -> void {
     if (!system_->get_cached_target_map(entity_)) {
         system_->build_and_cache_target_map(entity_);
     }
     system_->apply_animation(entity_, *component_);
 }
 
-void animation_system::player_modifier::rebuild_target_map() const {
+auto animation_system::player_modifier::rebuild_target_map() const -> void {
     system_->build_and_cache_target_map(entity_);
 }
 
@@ -438,7 +438,7 @@ animation_system::layer_modifier::layer_modifier(
 )
     : system_(system), entity_(ent), layer_(layer) {}
 
-void animation_system::layer_modifier::play() const {
+auto animation_system::layer_modifier::play() const -> void {
     if (layer_->state != asset::animation_state::playing) {
         layer_->state          = asset::animation_state::playing;
         layer_->time           = 0.0f;
@@ -451,9 +451,9 @@ void animation_system::layer_modifier::play() const {
     }
 }
 
-void animation_system::layer_modifier::play(
+auto animation_system::layer_modifier::play(
     const asset::transition& fade_in
-) const {
+) const -> void {
     layer_->fade_in        = fade_in;
     layer_->fade_influence = 0.0f;
     layer_->fade_is_out    = false;
@@ -468,71 +468,71 @@ void animation_system::layer_modifier::play(
     }
 }
 
-void animation_system::layer_modifier::pause() const {
+auto animation_system::layer_modifier::pause() const -> void {
     if (layer_->state == asset::animation_state::playing) {
         layer_->state = asset::animation_state::paused;
     }
 }
 
-void animation_system::layer_modifier::stop() const {
+auto animation_system::layer_modifier::stop() const -> void {
     layer_->state          = asset::animation_state::stopped;
     layer_->time           = 0.0f;
     layer_->fade_influence = 0.0f;
     layer_->fade_is_out    = false;
 }
 
-void animation_system::layer_modifier::clear() const {
+auto animation_system::layer_modifier::clear() const -> void {
     *layer_ = asset::animation_layer{};
 }
 
-void animation_system::layer_modifier::stop(
+auto animation_system::layer_modifier::stop(
     const asset::transition& fade_out
-) const {
+) const -> void {
     layer_->fade_out     = fade_out;
     layer_->fade_is_out  = true;
     layer_->fade_elapsed = 0.0f;
 }
 
-void animation_system::layer_modifier::resume() const {
+auto animation_system::layer_modifier::resume() const -> void {
     if (layer_->state == asset::animation_state::paused) {
         layer_->state = asset::animation_state::playing;
         system_->add_active_entity(entity_);
     }
 }
 
-void animation_system::layer_modifier::set_time(
+auto animation_system::layer_modifier::set_time(
     float32 time
-) const {
+) const -> void {
     layer_->time = time;
 }
 
-void animation_system::layer_modifier::set_playback_speed(
+auto animation_system::layer_modifier::set_playback_speed(
     float32 speed
-) const {
+) const -> void {
     layer_->playback_speed = speed;
 }
 
-void animation_system::layer_modifier::set_loop_mode(
+auto animation_system::layer_modifier::set_loop_mode(
     asset::animation_loop_mode mode
-) const {
+) const -> void {
     layer_->loop_mode = mode;
 }
 
-void animation_system::layer_modifier::set_fade_in(
+auto animation_system::layer_modifier::set_fade_in(
     const asset::transition& t
-) const {
+) const -> void {
     layer_->fade_in = t;
 }
 
-void animation_system::layer_modifier::set_fade_out(
+auto animation_system::layer_modifier::set_fade_out(
     const asset::transition& t
-) const {
+) const -> void {
     layer_->fade_out = t;
 }
 
-void animation_system::layer_modifier::blend_to(
+auto animation_system::layer_modifier::blend_to(
     std::shared_ptr<asset::animation_clip> clip, std::optional<asset::transition> t
-) const {
+) const -> void {
     asset::transition trans = t.value_or(layer_->blend_transition);
 
     if (trans.duration > 0.0f && layer_->clip) {
@@ -626,9 +626,9 @@ void animation_system::layer_modifier::blend_to(
     system_->add_active_entity(entity_);
 }
 
-void animation_system::layer_modifier::blend_to_by_name(
+auto animation_system::layer_modifier::blend_to_by_name(
     std::string_view name, std::optional<asset::transition> t
-) {
+) -> void {
     auto clip = system_->world_->resource<asset::animation_clip_registry>().get(name);
     if (clip) {
         blend_to(std::move(clip), t);
@@ -647,15 +647,15 @@ auto animation_system::modify_target(
     return target_modifier(ent, &comp);
 }
 
-void animation_system::target_modifier::set_target_name(
+auto animation_system::target_modifier::set_target_name(
     std::string name
-) const {
+) const -> void {
     component_->target_name_ = std::move(name);
 }
 
-void animation_system::target_modifier::set_rest_transform(
+auto animation_system::target_modifier::set_rest_transform(
     const transform& rest
-) const {
+) const -> void {
     component_->rest_transform_ = rest;
 }
 

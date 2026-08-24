@@ -27,17 +27,17 @@ camera::camera(
     update_vectors();
 }
 
-void camera::set_position(
+auto camera::set_position(
     const vec3f& position
-) {
+) -> void {
     position_          = position;
     view_matrix_dirty_ = true;
     frustum_dirty_     = true;
 }
 
-void camera::set_rotation(
+auto camera::set_rotation(
     float pitch, float yaw
-) {
+) -> void {
     pitch_             = pitch;
     yaw_               = yaw;
     vectors_dirty_     = true;
@@ -45,9 +45,9 @@ void camera::set_rotation(
     frustum_dirty_     = true;
 }
 
-void camera::set_aspect_ratio(
+auto camera::set_aspect_ratio(
     float aspect
-) {
+) -> void {
     aspect_                  = aspect;
     projection_matrix_dirty_ = true;
     frustum_dirty_           = true;
@@ -61,55 +61,55 @@ auto camera::set_far(
     frustum_dirty_           = true;
 }
 
-float camera::get_near() const {
+auto camera::get_near() const -> float {
     return near_;
 }
 
-float camera::get_far() const {
+auto camera::get_far() const -> float {
     return far_;
 }
 
-float camera::get_fov() const {
+auto camera::get_fov() const -> float {
     return fov_;
 }
 
-float camera::get_aspect_ratio() const {
+auto camera::get_aspect_ratio() const -> float {
     return aspect_;
 }
 
-vec3f camera::get_position() const {
+auto camera::get_position() const -> vec3f {
     return position_;
 }
 
-float camera::get_pitch() const {
+auto camera::get_pitch() const -> float {
     return pitch_;
 }
 
-float camera::get_yaw() const {
+auto camera::get_yaw() const -> float {
     return yaw_;
 }
 
-mat4f camera::get_view_matrix() const {
+auto camera::get_view_matrix() const -> mat4f {
     if (view_matrix_dirty_) {
         update_view_matrix();
     }
     return view_matrix_;
 }
 
-mat4f camera::get_projection_matrix() const {
+auto camera::get_projection_matrix() const -> mat4f {
     if (projection_matrix_dirty_) {
         update_projection_matrix();
     }
     return projection_matrix_;
 }
 
-mat4f camera::get_view_projection_matrix() const {
+auto camera::get_view_projection_matrix() const -> mat4f {
     return get_projection_matrix() * get_view_matrix();
 }
 
-void camera::move_forward(
+auto camera::move_forward(
     float distance
-) {
+) -> void {
     if (vectors_dirty_) {
         update_vectors();
     }
@@ -118,9 +118,9 @@ void camera::move_forward(
     frustum_dirty_     = true;
 }
 
-void camera::move_right(
+auto camera::move_right(
     float distance
-) {
+) -> void {
     if (vectors_dirty_) {
         update_vectors();
     }
@@ -129,9 +129,9 @@ void camera::move_right(
     frustum_dirty_     = true;
 }
 
-void camera::move_up(
+auto camera::move_up(
     float distance
-) {
+) -> void {
     if (vectors_dirty_) {
         update_vectors();
     }
@@ -140,9 +140,9 @@ void camera::move_up(
     frustum_dirty_     = true;
 }
 
-void camera::rotate(
+auto camera::rotate(
     float delta_pitch, float delta_yaw
-) {
+) -> void {
     pitch_ += delta_pitch;
     yaw_ += delta_yaw;
 
@@ -153,28 +153,28 @@ void camera::rotate(
     frustum_dirty_     = true;
 }
 
-vec3f camera::get_forward() const {
+auto camera::get_forward() const -> vec3f {
     if (vectors_dirty_) {
         update_vectors();
     }
     return forward_;
 }
 
-vec3f camera::get_right() const {
+auto camera::get_right() const -> vec3f {
     if (vectors_dirty_) {
         update_vectors();
     }
     return right_;
 }
 
-vec3f camera::get_up() const {
+auto camera::get_up() const -> vec3f {
     if (vectors_dirty_) {
         update_vectors();
     }
     return up_;
 }
 
-void camera::update_vectors() const {
+auto camera::update_vectors() const -> void {
     const float pitch_rad = math::radians(pitch_);
     const float yaw_rad   = math::radians(yaw_);
 
@@ -189,7 +189,7 @@ void camera::update_vectors() const {
     vectors_dirty_ = false;
 }
 
-void camera::update_view_matrix() const {
+auto camera::update_view_matrix() const -> void {
     if (vectors_dirty_) {
         update_vectors();
     }
@@ -199,12 +199,12 @@ void camera::update_view_matrix() const {
     view_matrix_dirty_ = false;
 }
 
-void camera::update_projection_matrix() const {
+auto camera::update_projection_matrix() const -> void {
     projection_matrix_       = math::perspective_matrix_reversed(fov_, aspect_, near_, far_);
     projection_matrix_dirty_ = false;
 }
 
-const vw::spatial::frustum& camera::get_frustum() const {
+auto camera::get_frustum() const -> const vw::spatial::frustum& {
     if (vectors_dirty_) {
         update_vectors();
     }
@@ -220,7 +220,7 @@ const vw::spatial::frustum& camera::get_frustum() const {
     return frustum_;
 }
 
-void camera::update_frustum() const {
+auto camera::update_frustum() const -> void {
     frustum_       = vw::spatial::frustum::from_view_projection_matrix(get_view_projection_matrix());
     frustum_dirty_ = false;
 }

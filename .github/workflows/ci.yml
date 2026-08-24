@@ -65,6 +65,7 @@ jobs:
         run: >
           cmake -B build -S . -G Ninja
           -DCMAKE_BUILD_TYPE=${{ matrix.config }}
+          -DVW_WARNINGS_AS_ERRORS=ON
           ${{ matrix.compiler == 'clang' && '-DCMAKE_C_COMPILER=clang-cl -DCMAKE_CXX_COMPILER=clang++' || '' }}
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake
 
@@ -102,9 +103,8 @@ jobs:
       # No Vulkan SDK on purpose: vw.core, vw.ecs and vw.world must build and
       # test on a machine that has never seen a GPU.
       #
-      # Ядро собирается без единого предупреждения, поэтому здесь они ошибки:
-      # регрессия не пройдёт. У vw.gfx и приложений долг ещё не выплачен, и в
-      # остальных джобах предупреждения остаются предупреждениями.
+      # Предупреждения — ошибки во всех джобах: чисто собирается и движок
+      # целиком, и приложения, обоими компиляторами.
       - name: Configure without a GPU
         run: >
           cmake -B build-headless -S . -G Ninja
@@ -198,6 +198,7 @@ jobs:
           -DCMAKE_CXX_COMPILER=clang++-${{ env.VW_LLVM_VERSION }}
           -DCMAKE_CXX_FLAGS=-stdlib=libc++
           -DCMAKE_EXE_LINKER_FLAGS=-stdlib=libc++
+          -DVW_WARNINGS_AS_ERRORS=ON
           -DVCPKG_TARGET_TRIPLET=x64-linux-libcxx
           -DVCPKG_OVERLAY_TRIPLETS=${{ github.workspace }}/cmake/triplets
           -DCMAKE_TOOLCHAIN_FILE=${{ github.workspace }}/vcpkg/scripts/buildsystems/vcpkg.cmake

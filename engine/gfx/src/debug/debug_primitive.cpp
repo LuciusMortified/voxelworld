@@ -42,19 +42,19 @@ auto debug_vertex::get_attribute_descriptions()
     return attributes;
 }
 
-void debug_primitives::clear() {
+auto debug_primitives::clear() -> void {
     vertices_.clear();
 }
 
-void debug_primitives::add_line(
+auto debug_primitives::add_line(
     const vec3f& begin, const vec3f& end, color clr
-) {
+) -> void {
     vertices_.emplace_back(begin, clr);
     vertices_.emplace_back(end, clr);
 }
-void debug_primitives::add_box(
+auto debug_primitives::add_box(
     const mat4f& matrix, const vec3f& size, color clr
-) {
+) -> void {
     const vec3f p0 = matrix * vec3f{0.0f, 0.0f, 0.0f};
     const vec3f p1 = matrix * vec3f{size.x, 0.0f, 0.0f};
     const vec3f p2 = matrix * vec3f{size.x, 0.0f, size.z};
@@ -84,21 +84,21 @@ auto debug_primitives::get_vertices() const -> const std::vector<debug_vertex>& 
     return vertices_;
 }
 
-void debug_primitives::add_box(
+auto debug_primitives::add_box(
     const transform& transform, const vec3f& size, color clr
-) {
+) -> void {
     add_box(transform.calc_matrix(), size, clr);
 }
 
-void debug_primitives::add_box(
+auto debug_primitives::add_box(
     const vec3f& pos, const vec3f& size, color clr
-) {
+) -> void {
     add_box(math::translation_matrix(pos), size, clr);
 }
 
-void debug_primitives::add_grid(
+auto debug_primitives::add_grid(
     const mat4f& matrix, float cell_size, int cols, int rows, color clr
-) {
+) -> void {
     const float cols_size = cell_size * static_cast<float>(cols);
     for (int i = 0; i <= cols; ++i) {
         const vec3f start = matrix * vec3f{static_cast<float>(i) * cell_size, 0.0f, 0.0f};
@@ -114,15 +114,15 @@ void debug_primitives::add_grid(
     }
 }
 
-void debug_primitives::add_grid(
+auto debug_primitives::add_grid(
     const transform& transform, float cell_size, int cols, int rows, color clr
-) {
+) -> void {
     add_grid(transform.calc_matrix(), cell_size, cols, rows, clr);
 }
 
-void debug_primitives::add_grid(
+auto debug_primitives::add_grid(
     const vec3f& pos, float cell_size, int cols, int rows, color clr
-) {
+) -> void {
     add_grid(math::translation_matrix(pos), cell_size, cols, rows, clr);
 }
 

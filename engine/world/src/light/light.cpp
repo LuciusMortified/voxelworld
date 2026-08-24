@@ -31,7 +31,7 @@ constexpr uint64 outside_high = ~((uint64{1} << (bit0 + span - 128)) - 1);
     return ((static_cast<std::size_t>(y) * span) + static_cast<std::size_t>(z)) * words;
 }
 
-void seal_outside(uint64* row) {
+auto seal_outside(uint64* row) -> void {
     row[0] |= outside_low;
     row[2] |= outside_high;
 }
@@ -40,21 +40,21 @@ void seal_outside(uint64* row) {
 // считается освещённым. Делать это надо до сдвига, а не после — сдвиг втягивает
 // бит сразу за краем в первый бит внутри, и чтение его как тёмного впустую засевает
 // всю внешнюю стену юбки.
-void pad_as_sky(const uint64* in, uint64* out) {
+auto pad_as_sky(const uint64* in, uint64* out) -> void {
     out[0] = in[0] | outside_low;
     out[1] = in[1];
     out[2] = in[2] | outside_high;
 }
 
 // Бит x результата — это бит x - 1 входа: то, что лежит на шаг западнее.
-void shift_west(const uint64* in, uint64* out) {
+auto shift_west(const uint64* in, uint64* out) -> void {
     out[2] = (in[2] << 1) | (in[1] >> 63);
     out[1] = (in[1] << 1) | (in[0] >> 63);
     out[0] = in[0] << 1;
     seal_outside(out);
 }
 
-void shift_east(const uint64* in, uint64* out) {
+auto shift_east(const uint64* in, uint64* out) -> void {
     out[0] = (in[0] >> 1) | (in[1] << 63);
     out[1] = (in[1] >> 1) | (in[2] << 63);
     out[2] = in[2] >> 1;
@@ -108,7 +108,7 @@ auto light_column::solid_at_(int32 x, int32 y, int32 z) const -> bool {
             1U) != 0;
 }
 
-void light_column::build_solid_(const neighbourhood& around) {
+auto light_column::build_solid_(const neighbourhood& around) -> void {
     auto& solid = buffers_.solid;
 
     const auto plane = static_cast<std::size_t>(height_) * span * words;
@@ -158,7 +158,7 @@ void light_column::build_solid_(const neighbourhood& around) {
     }
 }
 
-void light_column::seed_sky_() {
+auto light_column::seed_sky_() -> void {
     auto& levels = buffers_.levels;
     auto& solid  = buffers_.solid;
     auto& sky    = buffers_.sky;
@@ -244,9 +244,9 @@ void light_column::seed_sky_() {
 
 }
 
-void light_column::seed_block_(
+auto light_column::seed_block_(
     const neighbourhood& around, const emission_table& emission
-) {
+) -> void {
     auto& levels = buffers_.levels;
 
     constexpr int32 ps = model::page_size;
@@ -416,7 +416,7 @@ void light_column::seed_block_(
     });
 }
 
-void light_column::spread_(light_channel channel) {
+auto light_column::spread_(light_channel channel) -> void {
     auto& levels  = buffers_.levels;
     auto& solid   = buffers_.solid;
     auto& current = buffers_.frontier;
@@ -769,9 +769,9 @@ auto light_baker::pending_count() const -> uint32 {
     return static_cast<uint32>(pending_.size());
 }
 
-void light_baker::merge_worker_stats_(
+auto light_baker::merge_worker_stats_(
     light_worker_stats& worker
-) {
+) -> void {
     if (worker.columns == 0) {
         return;
     }
@@ -822,7 +822,7 @@ auto light_baker::get_stats() const -> light_stats {
     return out;
 }
 
-void light_baker::worker_() {
+auto light_baker::worker_() -> void {
     light_worker_stats local;
 
     // Девять колонок занятости — это 4,6 МБ. Это рабочая память, а не результат,

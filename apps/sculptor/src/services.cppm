@@ -21,20 +21,20 @@ public:
 
     auto save_clip(const std::string& clip_name) const -> bool;
     auto save_clip_as(const std::string& clip_name, const std::string& new_name) const -> bool;
-    void save_all_clips() const;
+    auto save_all_clips() const -> void;
     auto load_clip(const std::string& filename) const -> bool;
-    void close_clip(const std::string& clip_name) const;
+    auto close_clip(const std::string& clip_name) const -> void;
 
-    void enter_animation_mode();
-    void exit_animation_mode();
-    void force_exit_animation_mode();
+    auto enter_animation_mode() -> void;
+    auto exit_animation_mode() -> void;
+    auto force_exit_animation_mode() -> void;
 
-    void save_transforms();
-    void restore_transforms();
-    void reset_all();
+    auto save_transforms() -> void;
+    auto restore_transforms() -> void;
+    auto reset_all() -> void;
 
-    void stop_layer_for_clip(const std::string& clip_name);
-    void stop_all_layers();
+    auto stop_layer_for_clip(const std::string& clip_name) -> void;
+    auto stop_all_layers() -> void;
 
 private:
     engine_type* engine_;
@@ -72,8 +72,8 @@ public:
 
     keyframe_service(engine_type& eng, app_state& state, operation_manager& op_manager);
 
-    void add_keyframe();
-    void delete_keyframe();
+    auto add_keyframe() -> void;
+    auto delete_keyframe() -> void;
 
 private:
     engine_type* engine_;
@@ -92,8 +92,8 @@ public:
 
     playback_service(engine_type& eng, app_state& state);
 
-    void toggle_playback() const;
-    void stop_playback() const;
+    auto toggle_playback() const -> void;
+    auto stop_playback() const -> void;
 
 private:
     engine_type* engine_;

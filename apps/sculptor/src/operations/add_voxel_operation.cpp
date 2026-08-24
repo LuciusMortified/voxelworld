@@ -15,7 +15,7 @@ add_voxel_operation::add_voxel_operation(
 )
     : engine_(&eng), state_(&st), params_(params) {}
 
-void add_voxel_operation::execute() {
+auto add_voxel_operation::execute() -> void {
     const auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
@@ -25,7 +25,7 @@ void add_voxel_operation::execute() {
     state_->file.has_unsaved_changes = true;
 }
 
-void add_voxel_operation::undo() {
+auto add_voxel_operation::undo() -> void {
     const auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();

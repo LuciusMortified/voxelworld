@@ -57,7 +57,7 @@ public:
         return chunks_;
     }
 
-    void set_phase(column_phase phase) {
+    auto set_phase(column_phase phase) -> void {
         phase_ = phase;
     }
 

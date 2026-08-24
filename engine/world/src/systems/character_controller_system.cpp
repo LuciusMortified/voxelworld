@@ -8,7 +8,7 @@ namespace vw::ecs {
 character_controller_system::character_controller_system(world& w)
     : world_(&w) {}
 
-void character_controller_system::update(float32 delta_time) {
+auto character_controller_system::update(float32 delta_time) -> void {
     auto& reg = world_->registry();
     for (auto [ent, cc, rb, mi] :
          reg.view<character_controller_component, rigid_body_component, movement_intent_component>()) {

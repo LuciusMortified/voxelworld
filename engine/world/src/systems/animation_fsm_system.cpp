@@ -8,7 +8,7 @@ namespace vw::ecs {
 animation_fsm_system::animation_fsm_system(world& w)
     : world_(&w) {}
 
-void animation_fsm_system::update(float32 /*dt*/) {
+auto animation_fsm_system::update(float32 /*dt*/) -> void {
     auto view =
         world_->registry()
             .view<animation_fsm_component, animation_player_component>();
@@ -69,18 +69,18 @@ animation_fsm_system::modifier::modifier(
 )
     : component_(component) {}
 
-void animation_fsm_system::modifier::add_machine(
+auto animation_fsm_system::modifier::add_machine(
     std::size_t index, asset::animation_fsm machine
-) const {
+) const -> void {
     if (index >= component_->machines_.size()) {
         component_->machines_.resize(index + 1);
     }
     component_->machines_[index] = std::move(machine);
 }
 
-void animation_fsm_system::modifier::fire_trigger(
+auto animation_fsm_system::modifier::fire_trigger(
     std::string_view name
-) const {
+) const -> void {
     component_->triggers_.emplace(name);
 }
 

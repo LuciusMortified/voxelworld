@@ -19,9 +19,9 @@ open_file_modal::open_file_modal(
 )
     : engine_(&eng), state_(&st) {}
 
-void open_file_modal::render(
+auto open_file_modal::render(
     float /*delta_time*/
-) {
+) -> void {
     if (state_->ui.need_open_file_modal) {
         ImGui::OpenPopup("Open File");
         state_->ui.need_open_file_modal = false;
@@ -80,7 +80,7 @@ void open_file_modal::render(
     }
 }
 
-void open_file_modal::load_existing_filenames_() {
+auto open_file_modal::load_existing_filenames_() -> void {
     existing_filenames_.clear();
 
     namespace fs = std::filesystem;

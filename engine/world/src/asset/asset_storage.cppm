@@ -15,8 +15,8 @@ class asset_storage final {
 public:
     asset_storage(vox_parser& parser, model_registry& registry);
 
-    void load_prefab(std::string_view name, const std::filesystem::path& filepath);
-    void load_clip(std::string_view name, const std::filesystem::path& filepath);
+    auto load_prefab(std::string_view name, const std::filesystem::path& filepath) -> void;
+    auto load_clip(std::string_view name, const std::filesystem::path& filepath) -> void;
 
     [[nodiscard]] auto get_entity(std::string_view prefab, std::string_view entity_name) const
         -> const vox_entity_data&;

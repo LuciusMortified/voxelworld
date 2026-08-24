@@ -15,7 +15,7 @@ remove_model_component_operation::remove_model_component_operation(
 )
     : engine_(&engine), state_(&state), params_(params) {}
 
-void remove_model_component_operation::execute() {
+auto remove_model_component_operation::execute() -> void {
     auto& world          = engine_->get_world();
     auto& model_reg = world.resource<asset::model_registry>();
 
@@ -34,7 +34,7 @@ void remove_model_component_operation::execute() {
     state_->file.has_unsaved_changes = true;
 }
 
-void remove_model_component_operation::undo() {
+auto remove_model_component_operation::undo() -> void {
     auto& world        = engine_->get_world();
     auto& model_sys = world.system<ecs::model_system>();
 

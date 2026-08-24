@@ -10,19 +10,19 @@ import vw.gfx;
 
 namespace vw::sculptor {
 
-void operation_manager::execute(
+auto operation_manager::execute(
     std::unique_ptr<base_operation> op
-) {
+) -> void {
     op->execute();
     redo_.clear();
     undo_.emplace_back(std::move(op));
 }
 
-bool operation_manager::is_undo_empty() const {
+auto operation_manager::is_undo_empty() const -> bool {
     return undo_.empty();
 }
 
-void operation_manager::undo() {
+auto operation_manager::undo() -> void {
     if (undo_.empty()) {
         return;
     }
@@ -33,11 +33,11 @@ void operation_manager::undo() {
     undo_.pop_back();
 }
 
-bool operation_manager::is_redo_empty() const {
+auto operation_manager::is_redo_empty() const -> bool {
     return redo_.empty();
 }
 
-void operation_manager::redo() {
+auto operation_manager::redo() -> void {
     if (redo_.empty()) {
         return;
     }

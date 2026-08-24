@@ -15,7 +15,7 @@ set_transform_operation::set_transform_operation(
 )
     : engine_(&engine), state_(&st), params_(params) {}
 
-void set_transform_operation::execute() {
+auto set_transform_operation::execute() -> void {
     auto& world            = engine_->get_world();
     auto& transform_sys = world.system<ecs::transform_system>();
 
@@ -32,7 +32,7 @@ void set_transform_operation::execute() {
     state_->file.has_unsaved_changes = true;
 }
 
-void set_transform_operation::undo() {
+auto set_transform_operation::undo() -> void {
     auto& world            = engine_->get_world();
     auto& transform_sys = world.system<ecs::transform_system>();
 

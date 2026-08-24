@@ -54,7 +54,7 @@ public:
         if (floor_entity_.is_valid())  world.destroy(floor_entity_);
     }
 
-    void render(float delta_time) override {
+    auto render(float delta_time) -> void override{
         camera_controller_->update(delta_time);
         elapsed_time_ += delta_time;
         orbit_angle_ += delta_time * orbit_speed_;
@@ -67,7 +67,7 @@ public:
     }
 
 private:
-    void setup_scene() {
+    auto setup_scene() -> void {
         auto& world = get_engine().get_world();
         auto& model_reg = world.resource<asset::model_registry>();
         auto& transform_sys = world.system<ecs::transform_system>();
@@ -136,7 +136,7 @@ private:
         return {base_color, radius, height, phase};
     }
 
-    void sync_light_count() {
+    auto sync_light_count() -> void {
         auto target = static_cast<uint32>(target_light_count_);
         auto current = static_cast<uint32>(light_entities_.size());
         if (target == current) {
@@ -188,7 +188,7 @@ private:
         }
     }
 
-    void update_point_lights() {
+    auto update_point_lights() -> void {
         auto& world = get_engine().get_world();
         auto& transform_sys = world.system<ecs::transform_system>();
         auto& renderer = get_engine().get_renderer();
@@ -212,7 +212,7 @@ private:
         }
     }
 
-    void update_directional_light() {
+    auto update_directional_light() -> void {
         auto& renderer = get_engine().get_renderer();
         auto& settings = renderer.get_directional_light_settings();
 
@@ -229,7 +229,7 @@ private:
         settings.intensity = 0.3f + 0.5f * std::max(0.0f, -sun_y);
     }
 
-    void render_ui() {
+    auto render_ui() -> void {
         ImGuiViewport* viewport = ImGui::GetMainViewport();
         ImVec2 window_pos = ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
         ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.0f, 0.0f));
@@ -255,7 +255,7 @@ private:
         ImGui::End();
     }
 
-    void handle_key_press(plat::keyboard::keys key) const {
+    auto handle_key_press(plat::keyboard::keys key) const -> void {
         switch (key) {
             case plat::keyboard::keys::ESCAPE:
                 get_engine().shutdown();
@@ -287,7 +287,7 @@ private:
     int32 target_light_count_{8};
 };
 
-int main() {
+auto main() -> int {
     try {
         std::make_unique<gfx::engine>(1280, 720, "Voxel World - Lighting Test")
             ->run<lighting_app>();

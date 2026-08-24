@@ -16,7 +16,7 @@ public:
 
     explicit animation_channel(animation_property property) : property_(property) {}
 
-    void add(const keyframe<T>& kf) {
+    auto add(const keyframe<T>& kf) -> void {
         keyframes_.push_back(kf);
         if (keyframes_.back().id_ == invalid_keyframe_id) {
             keyframes_.back().id_ = next_id_++;
@@ -24,7 +24,7 @@ public:
         std::sort(keyframes_.begin(), keyframes_.end());
     }
 
-    void replace(uint32 id, const keyframe<T>& new_kf) {
+    auto replace(uint32 id, const keyframe<T>& new_kf) -> void {
         const auto it =
             std::ranges::find_if(keyframes_, [id](const auto& kf) { return kf.id_ == id; });
         if (it != keyframes_.end()) {
@@ -35,11 +35,11 @@ public:
         }
     }
 
-    void remove(uint32 id) {
+    auto remove(uint32 id) -> void {
         std::erase_if(keyframes_, [id](const auto& kf) { return kf.id_ == id; });
     }
 
-    void set_keyframes(std::vector<keyframe<T>> keyframes) {
+    auto set_keyframes(std::vector<keyframe<T>> keyframes) -> void {
         keyframes_ = std::move(keyframes);
         next_id_   = 0;
         for (auto& kf : keyframes_) {
@@ -48,7 +48,7 @@ public:
         std::sort(keyframes_.begin(), keyframes_.end());
     }
 
-    void clear() {
+    auto clear() -> void {
         keyframes_.clear();
     }
 
@@ -142,11 +142,11 @@ public:
     explicit animation_track(std::string target_name, float32 fps = 60.0F);
 
     template <animation_property Prop>
-    void add(animation_channel_for<Prop> channel) {
+    auto add(animation_channel_for<Prop> channel) -> void {
         add_impl(animation_channel_variant(std::move(channel)));
     }
 
-    void remove_channel(animation_property prop);
+    auto remove_channel(animation_property prop) -> void;
 
     [[nodiscard]] auto get_transform(float32 time) const -> std::expected<transform, error_type>;
     [[nodiscard]] auto get_duration() const -> float32;
@@ -169,13 +169,13 @@ public:
         return compiled_fps_;
     }
 
-    void mark_dirty() {
+    auto mark_dirty() -> void {
         is_dirty_ = true;
     }
 
 private:
-    void add_impl(animation_channel_variant channel);
-    void recompile_if_needed() const;
+    auto add_impl(animation_channel_variant channel) -> void;
+    auto recompile_if_needed() const -> void;
 
     std::string target_name_;
     std::vector<animation_channel_variant> channels_;

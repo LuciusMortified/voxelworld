@@ -25,47 +25,47 @@ public:
     buffer& operator=(buffer&& other) noexcept;
 
     [[nodiscard]]
-    vk::Buffer get_buffer() const {
+    auto get_buffer() const -> vk::Buffer {
         return buffer_;
     }
 
     [[nodiscard]]
-    vk::DeviceMemory get_memory() const {
+    auto get_memory() const -> vk::DeviceMemory {
         return memory_;
     }
 
     [[nodiscard]]
-    vk::DeviceSize get_size() const {
+    auto get_size() const -> vk::DeviceSize {
         return size_;
     }
 
     [[nodiscard]]
-    void* map();
+    auto map() -> void*;
 
-    void unmap();
+    auto unmap() -> void;
 
-    void copy_from(const void* data, vk::DeviceSize size, vk::DeviceSize offset = 0);
+    auto copy_from(const void* data, vk::DeviceSize size, vk::DeviceSize offset = 0) -> void;
 
-    void copy_to(void* data, vk::DeviceSize size, vk::DeviceSize offset = 0);
+    auto copy_to(void* data, vk::DeviceSize size, vk::DeviceSize offset = 0) -> void;
 
     template <typename T>
-    void copy_from_struct(
+    auto copy_from_struct(
         const T& data, vk::DeviceSize offset = 0
-    ) {
+    ) -> void {
         copy_from(&data, sizeof(T), offset);
     }
 
     template <typename T>
-    void copy_from_vector(
+    auto copy_from_vector(
         const std::vector<T>& data, vk::DeviceSize offset = 0
-    ) {
+    ) -> void {
         copy_from(data.data(), data.size() * sizeof(T), offset);
     }
 
     template <typename T>
-    void copy_to_struct(
+    auto copy_to_struct(
         T& dst, vk::DeviceSize offset = 0
-    ) {
+    ) -> void {
         copy_to(&dst, sizeof(T), offset);
     }
 
@@ -73,10 +73,10 @@ protected:
     vk::DeviceSize size_;
 
 private:
-    void cleanup();
+    auto cleanup() -> void;
 
     [[nodiscard]]
-    uint32 find_memory_type(uint32 type_filter, vk::MemoryPropertyFlags properties) const;
+    auto find_memory_type(uint32 type_filter, vk::MemoryPropertyFlags properties) const -> uint32;
 
     vulkan_context* context_;
 

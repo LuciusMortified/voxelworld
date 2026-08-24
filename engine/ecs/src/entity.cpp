@@ -35,14 +35,14 @@ auto entity_pool::has(entity e) const -> bool {
         generations_[e.index] == e.generation;
 }
 
-void entity_pool::destroy(entity e) {
+auto entity_pool::destroy(entity e) -> void {
     if (has(e)) [[likely]] {
         ++generations_[e.index];
         free_indices_.push_back(e.index);
     }
 }
 
-void entity_pool::batch_destroy(const std::vector<entity>& entities) {
+auto entity_pool::batch_destroy(const std::vector<entity>& entities) -> void {
     for (auto e : entities) {
         destroy(e);
     }

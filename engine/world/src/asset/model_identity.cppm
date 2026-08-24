@@ -39,7 +39,7 @@ public:
     [[nodiscard]] auto next_generation(model_identity id) -> model_identity;
     [[nodiscard]] auto has(model_identity id) const -> bool;
 
-    void destroy(model_identity id);
+    auto destroy(model_identity id) -> void;
 
 private:
     [[nodiscard]] auto has_unlocked_(model_identity id) const -> bool {
@@ -63,10 +63,10 @@ public:
     page_pool();
 
     [[nodiscard]] auto alloc() -> uint32;
-    void free(uint32 index);
+    auto free(uint32 index) -> void;
 
     [[nodiscard]] auto alloc_batch(uint32 count) -> std::vector<uint32>;
-    void free_batch(std::span<const uint32> indices);
+    auto free_batch(std::span<const uint32> indices) -> void;
 
     [[nodiscard]] auto get(uint32 index) -> page_type& {
         return (*blocks_[index / block_size])[index % block_size];
@@ -80,7 +80,7 @@ public:
     [[nodiscard]] auto free_count() const -> uint32;
 
 private:
-    void ensure_capacity_(uint32 index);
+    auto ensure_capacity_(uint32 index) -> void;
 
     mutable std::mutex mutex_;
     std::vector<std::unique_ptr<std::array<page_type, block_size>>> blocks_;

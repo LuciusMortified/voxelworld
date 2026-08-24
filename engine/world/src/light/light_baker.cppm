@@ -85,8 +85,8 @@ private:
     // которая и так строится целиком, хуже быть не может и дало 22% со строк —
     // восемь процентов задачи — за 25 МБ резидентной памяти. Для этапа, никогда не
     // касающегося кадра, память того не стоит.
-    void worker_();
-    void merge_worker_stats_(light_worker_stats& worker);
+    auto worker_() -> void;
+    auto merge_worker_stats_(light_worker_stats& worker) -> void;
 
     std::vector<std::thread> threads_;
     std::queue<light_request> queue_;

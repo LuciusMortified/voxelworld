@@ -15,9 +15,9 @@ remove_voxel_tool::remove_voxel_tool(
 )
     : engine_(&eng), state_(&st), op_manager_(&op_manager) {}
 
-void remove_voxel_tool::render(
+auto remove_voxel_tool::render(
     float /*delta_time*/
-) {
+) -> void {
     if (hovered_voxel_ == vec3i{-1, -1, -1}) {
         return;
     }
@@ -52,20 +52,20 @@ void remove_voxel_tool::render(
     renderer.draw_box(voxel_world_pos, vec3f{1.f, 1.f, 1.f}, colors::black);
 }
 
-void remove_voxel_tool::on_key_press(
+auto remove_voxel_tool::on_key_press(
     const plat::key_press_event& /*ev*/
-) {
+) -> void {
 }
 
-void remove_voxel_tool::on_mouse_move(
+auto remove_voxel_tool::on_mouse_move(
     const plat::mouse_move_event& /*ev*/
-) {
+) -> void {
    update_hovered_voxel_();
 }
 
-void remove_voxel_tool::on_mouse_press(
+auto remove_voxel_tool::on_mouse_press(
     const plat::mouse_press_event& ev
-) {
+) -> void {
     if (ev.button == plat::mouse::buttons::LEFT) {
         if (hovered_voxel_ == vec3i{-1, -1, -1}) {
             return;
@@ -89,15 +89,15 @@ void remove_voxel_tool::on_mouse_press(
     }
 }
 
-void remove_voxel_tool::on_mouse_release(
+auto remove_voxel_tool::on_mouse_release(
     const plat::mouse_release_event& /*ev*/
-) {}
+) -> void {}
 
-void remove_voxel_tool::on_activate() {
+auto remove_voxel_tool::on_activate() -> void {
     update_hovered_voxel_();
 }
 
-void remove_voxel_tool::update_hovered_voxel_() {
+auto remove_voxel_tool::update_hovered_voxel_() -> void {
     const auto& world  = engine_->get_world();
     const auto& window = engine_->get_window();
     const auto& camera = engine_->get_camera();

@@ -10,15 +10,18 @@ import :vk;
 
 namespace vw::gfx {
 
-namespace {
-constexpr log::log_category lc_cb_{"combined_buffer"};
-}
+// Результат освобождения отбрасывается везде в деструкторах: пул всё равно
+// уходит следом, а поднимать отсюда ошибку некуда.
 combined_buffer::~combined_buffer() {
     if (compute_descriptor_set_ && descriptor_pool_) {
-        context_->get_device().freeDescriptorSets(descriptor_pool_, compute_descriptor_set_);
+        static_cast<void>(
+            context_->get_device().freeDescriptorSets(descriptor_pool_, compute_descriptor_set_)
+        );
     }
     if (descriptor_set_ && descriptor_pool_) {
-        context_->get_device().freeDescriptorSets(descriptor_pool_, descriptor_set_);
+        static_cast<void>(
+            context_->get_device().freeDescriptorSets(descriptor_pool_, descriptor_set_)
+        );
     }
 }
 
@@ -106,10 +109,10 @@ combined_buffer::combined_buffer(
     }
 }
 
-void combined_buffer::allocate(
+auto combined_buffer::allocate(
     entity e, vw::asset::model_identity model_id, const mesh& mesh_data,
     const mat4f& transform_matrix, const vw::spatial::aabb& bounds
-) {
+) -> void {
 
     if (!mesh_allocations_.contains(model_id.index)) {
         allocate_mesh(model_id, mesh_data);
@@ -119,7 +122,7 @@ void combined_buffer::allocate(
 
     auto& mesh_alloc = mesh_allocations_[model_id.index];
 
-    const uint32 instance_index = entity_allocations_.size();
+    const auto instance_index = static_cast<uint32>(entity_allocations_.size());
     if (instance_index >= instance_capacity_) {
         expand_instance_buffers_();
     }
@@ -177,9 +180,9 @@ void combined_buffer::allocate(
 
 // Команда рисует меш, а не класс размера, в который он попал. Всё за quad_count —
 // остатки того, кто держал слот раньше, и не читается никогда.
-void combined_buffer::write_draw_command_(
+auto combined_buffer::write_draw_command_(
     uint32 instance_index, const mesh_allocation& mesh_alloc
-) {
+) -> void {
     // По команде на направление грани. Каждый меш индексирует один и тот же общий
     // шаблон с начала; gl_VertexIndex наводит на серию квадов этого направления
     // vertex_offset.
@@ -207,11 +210,11 @@ void combined_buffer::write_draw_command_(
     );
 }
 
-void combined_buffer::allocate_mesh(
+auto combined_buffer::allocate_mesh(
     vw::asset::model_identity model_id, const mesh& mesh_data
-) {
+) -> void {
 
-    const auto quad_count = mesh_data.quads.size();
+    const auto quad_count = static_cast<uint32>(mesh_data.quads.size());
     uint32 quad_offset    = quad_used_;
 
     if (!free_slots_.empty()) {
@@ -243,15 +246,15 @@ void combined_buffer::allocate_mesh(
     mesh_allocations_[model_id.index] = new_mesh_alloc;
 }
 
-void combined_buffer::write_mesh(
+auto combined_buffer::write_mesh(
     vw::asset::model_identity model_id, const mesh& mesh_data
-) {
+) -> void {
     auto& mesh_alloc = mesh_allocations_[model_id.index];
     if (mesh_alloc.generation == model_id.generation) {
         return;
     }
 
-    const auto quad_count = mesh_data.quads.size();
+    const auto quad_count = static_cast<uint32>(mesh_data.quads.size());
 
     const auto quads_staged = staging_->stage_vector(mesh_data.quads);
     staging_->copy_to(
@@ -274,9 +277,9 @@ void combined_buffer::write_mesh(
     }
 }
 
-void combined_buffer::write_transform(
+auto combined_buffer::write_transform(
     entity ent, const mat4f& transform_matrix, const vw::spatial::aabb& bounds
-) {
+) -> void {
     auto& [instance_index, model_index] = entity_allocations_[ent];
     const auto model_staged = staging_->stage_struct(transform_matrix);
     staging_->copy_to(
@@ -309,9 +312,9 @@ void combined_buffer::write_transform(
     );
 }
 
-void combined_buffer::write_visibility(
+auto combined_buffer::write_visibility(
     std::span<const uint32> flags
-) {
+) -> void {
     if (flags.empty()) {
         return;
     }
@@ -336,7 +339,7 @@ auto combined_buffer::free(
 
     std::optional<entity> swapped_entity;
 
-    auto last_index = entity_allocations_.size() - 1;
+    const auto last_index = static_cast<uint32>(entity_allocations_.size() - 1);
     bool need_swap =
         ent_alloc.instance_index != last_index && last_index < entity_allocations_.size();
     if (need_swap) {
@@ -365,7 +368,7 @@ auto combined_buffer::get_quad_buffer() const -> vk::Buffer {
     return quad_buffer_->get_buffer();
 }
 
-void combined_buffer::expand_mesh_buffers_() {
+auto combined_buffer::expand_mesh_buffers_() -> void {
     const auto old_bytes = (mesh_capacity_ * chunk_size_.quad_count) * sizeof(quad);
 
     // В полтора раза, а не вдвое. Буфер остаётся там, где его оставил прошлый рост,
@@ -392,7 +395,7 @@ void combined_buffer::expand_mesh_buffers_() {
     update_descriptor_set_();
 }
 
-void combined_buffer::expand_instance_buffers_() {
+auto combined_buffer::expand_instance_buffers_() -> void {
     const auto instance_count = entity_allocations_.size();
 
     instance_capacity_ *= 2;
@@ -497,7 +500,7 @@ void combined_buffer::expand_instance_buffers_() {
     }
 }
 
-void combined_buffer::update_descriptor_set_() {
+auto combined_buffer::update_descriptor_set_() -> void {
     const vk::DescriptorBufferInfo model_buffer_info{
         .buffer = model_matrix_buffer_->get_buffer(),
         .offset = 0,
@@ -546,7 +549,7 @@ void combined_buffer::update_descriptor_set_() {
     context_->get_device().updateDescriptorSets(descriptor_writes, nullptr);
 }
 
-void combined_buffer::update_compute_descriptor_set_() {
+auto combined_buffer::update_compute_descriptor_set_() -> void {
     const vk::DescriptorBufferInfo indirect_info{
         .buffer = indirect_draw_buffer_->get_buffer(),
         .offset = 0,
@@ -623,47 +626,47 @@ void combined_buffer::update_compute_descriptor_set_() {
     context_->get_device().updateDescriptorSets(writes, nullptr);
 }
 
-uint32 combined_buffer::get_instance_count() const {
+auto combined_buffer::get_instance_count() const -> uint32 {
     return static_cast<uint32>(entity_allocations_.size());
 }
 
-uint32 combined_buffer::get_draw_command_count() const {
+auto combined_buffer::get_draw_command_count() const -> uint32 {
     return static_cast<uint32>(entity_allocations_.size()) * faces_per_mesh;
 }
 
-vk::Buffer combined_buffer::get_instance_index_buffer() const {
+auto combined_buffer::get_instance_index_buffer() const -> vk::Buffer {
     return instance_index_buffer_->get_buffer();
 }
 
-vk::Buffer combined_buffer::get_indirect_draw_buffer() const {
+auto combined_buffer::get_indirect_draw_buffer() const -> vk::Buffer {
     return indirect_draw_buffer_->get_buffer();
 }
 
-vk::Buffer combined_buffer::get_aabb_buffer() const {
+auto combined_buffer::get_aabb_buffer() const -> vk::Buffer {
     return aabb_buffer_->get_buffer();
 }
 
-vk::Buffer combined_buffer::get_culled_indirect_buffer() const {
+auto combined_buffer::get_culled_indirect_buffer() const -> vk::Buffer {
     return culled_indirect_buffer_->get_buffer();
 }
 
-vk::Buffer combined_buffer::get_count_buffer() const {
+auto combined_buffer::get_count_buffer() const -> vk::Buffer {
     return count_buffer_->get_buffer();
 }
 
-vk::Buffer combined_buffer::get_model_matrix_buffer() const {
+auto combined_buffer::get_model_matrix_buffer() const -> vk::Buffer {
     return model_matrix_buffer_->get_buffer();
 }
 
-vk::Buffer combined_buffer::get_normal_matrix_buffer() const {
+auto combined_buffer::get_normal_matrix_buffer() const -> vk::Buffer {
     return normal_matrix_buffer_->get_buffer();
 }
 
-bool combined_buffer::is_empty() const {
+auto combined_buffer::is_empty() const -> bool {
     return entity_allocations_.empty();
 }
 
-const combined_buffer_stats& combined_buffer::get_stats() const {
+auto combined_buffer::get_stats() const -> const combined_buffer_stats& {
     stats_.chunk_size        = chunk_size_;
     stats_.mesh_capacity     = mesh_capacity_;
     stats_.mesh_count        = static_cast<uint32>(mesh_allocations_.size());

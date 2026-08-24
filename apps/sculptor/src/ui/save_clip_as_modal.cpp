@@ -19,7 +19,7 @@ save_clip_as_modal::save_clip_as_modal(
 )
     : engine_(&eng), state_(&st), clip_service_(&clip_svc) {}
 
-void save_clip_as_modal::open() {
+auto save_clip_as_modal::open() -> void {
     need_open_ = true;
     name_      = state_->anim.selected_clip_name;
     error_.clear();
@@ -27,9 +27,9 @@ void save_clip_as_modal::open() {
     has_overwrite_confirmation_  = false;
 }
 
-void save_clip_as_modal::render(
+auto save_clip_as_modal::render(
     float /*delta_time*/
-) {
+) -> void {
     if (need_open_) {
         ImGui::OpenPopup("Save Animation As");
         need_open_ = false;
@@ -48,7 +48,7 @@ void save_clip_as_modal::render(
     }
 }
 
-void save_clip_as_modal::render_overwrite_confirmation_() {
+auto save_clip_as_modal::render_overwrite_confirmation_() -> void {
     ImGui::TextColored(
         ImVec4{1.0f, 1.0f, 0.0f, 1.0f},
         "File \"%s.voxa\" already exists. Overwrite?",
@@ -69,7 +69,7 @@ void save_clip_as_modal::render_overwrite_confirmation_() {
     }
 }
 
-void save_clip_as_modal::render_save_form_() {
+auto save_clip_as_modal::render_save_form_() -> void {
     if (!error_.empty()) {
         ImGui::TextColored(ImVec4{1.0f, 0.0f, 0.0f, 1.0f}, "%s", error_.c_str());
         ImGui::Spacing();

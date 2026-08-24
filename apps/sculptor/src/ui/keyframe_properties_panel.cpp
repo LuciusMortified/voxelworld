@@ -19,9 +19,9 @@ keyframe_properties_panel::keyframe_properties_panel(
 )
     : engine_(&eng), state_(&st), op_manager_(&op_manager) {}
 
-void keyframe_properties_panel::render(
+auto keyframe_properties_panel::render(
     float /*delta_time*/
-) {
+) -> void {
     if (state_->anim.selected_keyframe_id == asset::invalid_keyframe_id ||
         state_->anim.selected_clip_name.empty() || state_->anim.selected_track_name.empty()) {
         return;

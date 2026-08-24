@@ -13,9 +13,9 @@ third_person_camera_controller::third_person_camera_controller(
 )
     : camera_(&camera), world_(&world), params_(params), actual_arm_length_(params.arm_length) {}
 
-void third_person_camera_controller::update(
+auto third_person_camera_controller::update(
     const player_input_state& input, entity target
-) {
+) -> void {
     yaw_ += input.look_delta.x;
     pitch_ += input.look_delta.y;
     pitch_ = math::clamp(pitch_, params_.pitch_min, params_.pitch_max);

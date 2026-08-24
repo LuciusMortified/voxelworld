@@ -8,7 +8,7 @@ namespace vw::asset {
 animation_track::animation_track(std::string target_name, float32 fps)
     : target_name_(std::move(target_name)), compiled_fps_(fps) {}
 
-void animation_track::recompile_if_needed() const {
+auto animation_track::recompile_if_needed() const -> void {
     if (!is_dirty_) {
         return;
     }
@@ -117,7 +117,7 @@ auto animation_track::get_frame_time() const -> float32 {
     return frame_time_;
 }
 
-void animation_track::add_impl(animation_channel_variant channel) {
+auto animation_track::add_impl(animation_channel_variant channel) -> void {
     animation_property prop{};
     std::visit([&](const auto& ch) { prop = ch.get_property(); }, channel);
 
@@ -137,7 +137,7 @@ void animation_track::add_impl(animation_channel_variant channel) {
     is_dirty_ = true;
 }
 
-void animation_track::remove_channel(animation_property prop) {
+auto animation_track::remove_channel(animation_property prop) -> void {
     const auto removed = std::ranges::remove_if(channels_, [prop](const auto& channel_var) {
         bool matches = false;
         std::visit([&](const auto& ch) { matches = ch.get_property() == prop; }, channel_var);
@@ -183,7 +183,7 @@ auto animation_track::has_channel(animation_property prop) const -> bool {
 
 animation_clip::animation_clip(std::string name) : name_(std::move(name)) {}
 
-void animation_clip::add_track(animation_track track) {
+auto animation_clip::add_track(animation_track track) -> void {
     const std::string_view target_name = track.get_target_name();
 
     for (auto& existing_track : tracks_) {
@@ -218,7 +218,7 @@ auto animation_clip::has_track(std::string_view target_name) const -> bool {
     return get_track(target_name) != nullptr;
 }
 
-void animation_clip::remove_track(std::string_view target_name) {
+auto animation_clip::remove_track(std::string_view target_name) -> void {
     const auto removed = std::ranges::remove_if(tracks_, [target_name](const auto& track) {
         return track.get_target_name() == target_name;
     });
@@ -235,7 +235,7 @@ auto animation_clip::get_duration() const -> float32 {
     return max_duration;
 }
 
-void animation_clip::set_name(std::string name) {
+auto animation_clip::set_name(std::string name) -> void {
     name_ = std::move(name);
 }
 
@@ -254,7 +254,7 @@ auto animation_clip_registry::create(std::string_view name) -> std::shared_ptr<a
     return clip;
 }
 
-void animation_clip_registry::add(std::string_view name, std::shared_ptr<animation_clip> clip) {
+auto animation_clip_registry::add(std::string_view name, std::shared_ptr<animation_clip> clip) -> void {
     clips_[std::string(name)] = std::move(clip);
 }
 
@@ -268,23 +268,23 @@ auto animation_clip_registry::has(std::string_view name) const -> bool {
     return clips_.contains(name);
 }
 
-void animation_clip_registry::remove(std::string_view name) {
+auto animation_clip_registry::remove(std::string_view name) -> void {
     const auto it = clips_.find(name);
     if (it != clips_.end()) {
         clips_.erase(it);
     }
 }
 
-void animation_clip_registry::clear() {
+auto animation_clip_registry::clear() -> void {
     clips_.clear();
 }
 
-void animation_fsm::add_state(state_node state) {
+auto animation_fsm::add_state(state_node state) -> void {
     auto name = state.name;
     states_.emplace(std::move(name), std::move(state));
 }
 
-void animation_fsm::set_entry_state(std::string_view name) {
+auto animation_fsm::set_entry_state(std::string_view name) -> void {
     entry_state_   = std::string(name);
     current_state_ = entry_state_;
 }
@@ -342,7 +342,7 @@ auto animation_fsm::evaluate(const animation_layer& layer, trigger_set& triggers
     return std::nullopt;
 }
 
-void animation_fsm::apply_transition(const transition_result& result) {
+auto animation_fsm::apply_transition(const transition_result& result) -> void {
     current_state_ = result.target_state;
 }
 

@@ -8,7 +8,7 @@ import vw.gfx;
 
 using namespace vw;
 
-int main() {
+auto main() -> int {
     try {
         // Создание окна
         plat::window window(1280, 720, "Voxel World - Test Window");

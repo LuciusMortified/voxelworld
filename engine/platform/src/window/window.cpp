@@ -28,34 +28,34 @@ struct window_callbacks {
         return static_cast<window*>(glfwGetWindowUserPointer(handle));
     }
 
-    static void key(GLFWwindow* handle, int key, int scancode, int action, int mods) {
+    static auto key(GLFWwindow* handle, int key, int scancode, int action, int mods) -> void {
         owner_of(handle)->on_key_(
             key, scancode, mods, action != GLFW_RELEASE, action == GLFW_REPEAT);
     }
 
-    static void mouse_button(GLFWwindow* handle, int button, int action, int mods) {
+    static auto mouse_button(GLFWwindow* handle, int button, int action, int mods) -> void {
         if (action == GLFW_PRESS || action == GLFW_RELEASE) {
             owner_of(handle)->on_mouse_button_(button, mods, action == GLFW_PRESS);
         }
     }
 
-    static void mouse_motion(GLFWwindow* handle, double pos_x, double pos_y) {
+    static auto mouse_motion(GLFWwindow* handle, double pos_x, double pos_y) -> void {
         owner_of(handle)->on_mouse_move_(pos_x, pos_y);
     }
 
-    static void mouse_scroll(GLFWwindow* handle, double offset_x, double offset_y) {
+    static auto mouse_scroll(GLFWwindow* handle, double offset_x, double offset_y) -> void {
         owner_of(handle)->on_mouse_scroll_(offset_x, offset_y);
     }
 
-    static void resize(GLFWwindow* handle, int width, int height) {
+    static auto resize(GLFWwindow* handle, int width, int height) -> void {
         owner_of(handle)->on_resize_(width, height);
     }
 
-    static void focus(GLFWwindow* handle, int focused) {
+    static auto focus(GLFWwindow* handle, int focused) -> void {
         owner_of(handle)->on_focus_(focused == GLFW_TRUE);
     }
 
-    static void close(GLFWwindow* handle) {
+    static auto close(GLFWwindow* handle) -> void {
         owner_of(handle)->on_close_();
     }
 };
@@ -97,7 +97,7 @@ window::~window() {
     glfwTerminate();
 }
 
-void window::on_key_(int32 key, int32 scancode, int32 mods, bool pressed, bool repeat) {
+auto window::on_key_(int32 key, int32 scancode, int32 mods, bool pressed, bool repeat) -> void {
     const auto typed_key  = static_cast<keyboard::keys>(key);
     const auto typed_mods = static_cast<keyboard::mods>(mods);
 
@@ -113,7 +113,7 @@ void window::on_key_(int32 key, int32 scancode, int32 mods, bool pressed, bool r
     }
 }
 
-void window::on_mouse_button_(int32 button, int32 mods, bool pressed) {
+auto window::on_mouse_button_(int32 button, int32 mods, bool pressed) -> void {
     const auto typed_button = static_cast<mouse::buttons>(button);
     const auto typed_mods   = static_cast<keyboard::mods>(mods);
 
@@ -126,31 +126,31 @@ void window::on_mouse_button_(int32 button, int32 mods, bool pressed) {
     }
 }
 
-void window::on_mouse_move_(float64 x, float64 y) {
+auto window::on_mouse_move_(float64 x, float64 y) -> void {
     last_cursor_pos_ = {x, y};
 
     mouse_move_event event(x, y);
     event_dispatcher_.dispatch(event);
 }
 
-void window::on_mouse_scroll_(float64 offset_x, float64 offset_y) {
+auto window::on_mouse_scroll_(float64 offset_x, float64 offset_y) -> void {
     mouse_scroll_event event(offset_x, offset_y);
     event_dispatcher_.dispatch(event);
 }
 
-void window::on_resize_(int32 width, int32 height) {
+auto window::on_resize_(int32 width, int32 height) -> void {
     size_ = {width, height};
 
     window_resize_event event{width, height};
     event_dispatcher_.dispatch(event);
 }
 
-void window::on_focus_(bool focused) {
+auto window::on_focus_(bool focused) -> void {
     window_focus_event event{focused};
     event_dispatcher_.dispatch(event);
 }
 
-void window::on_close_() {
+auto window::on_close_() -> void {
     window_close_event event{};
     event_dispatcher_.dispatch(event);
 }
@@ -159,7 +159,7 @@ auto window::should_close() const -> bool {
     return glfwWindowShouldClose(as_glfw(handle_)) == GLFW_TRUE;
 }
 
-void window::poll_events() {
+auto window::poll_events() -> void {
     glfwPollEvents();
 }
 
@@ -205,53 +205,53 @@ auto window::get_cursor_pos() const -> vec2d {
     return {x, y};
 }
 
-void window::set_cursor_pos(vec2d pos) const {
+auto window::set_cursor_pos(vec2d pos) const -> void {
     glfwSetCursorPos(as_glfw(handle_), pos.x, pos.y);
     last_cursor_pos_ = pos;
 }
 
-void window::set_cursor_pos(float64 x, float64 y) const {
+auto window::set_cursor_pos(float64 x, float64 y) const -> void {
     set_cursor_pos({x, y});
 }
 
-void window::set_cursor_mode(cursor_modes mode) const {
+auto window::set_cursor_mode(cursor_modes mode) const -> void {
     glfwSetInputMode(as_glfw(handle_), GLFW_CURSOR, static_cast<int32>(mode));
 }
 
-void window::set_input_mode(input_modes mode, bool value) const {
+auto window::set_input_mode(input_modes mode, bool value) const -> void {
     glfwSetInputMode(as_glfw(handle_), static_cast<int32>(mode), value ? GLFW_TRUE : GLFW_FALSE);
 }
 
-void window::set_title(std::string_view title) const {
+auto window::set_title(std::string_view title) const -> void {
     glfwSetWindowTitle(as_glfw(handle_), std::string(title).c_str());
 }
 
-void window::set_size(vec2i size) const {
+auto window::set_size(vec2i size) const -> void {
     glfwSetWindowSize(as_glfw(handle_), size.x, size.y);
     size_ = size;
 }
 
-void window::set_size(int32 width, int32 height) const {
+auto window::set_size(int32 width, int32 height) const -> void {
     set_size({width, height});
 }
 
-void window::set_position(vec2i pos) const {
+auto window::set_position(vec2i pos) const -> void {
     glfwSetWindowPos(as_glfw(handle_), pos.x, pos.y);
 }
 
-void window::set_position(int32 x, int32 y) const {
+auto window::set_position(int32 x, int32 y) const -> void {
     set_position({x, y});
 }
 
-void window::maximize() const {
+auto window::maximize() const -> void {
     glfwMaximizeWindow(as_glfw(handle_));
 }
 
-void window::minimize() const {
+auto window::minimize() const -> void {
     glfwIconifyWindow(as_glfw(handle_));
 }
 
-void window::restore() const {
+auto window::restore() const -> void {
     glfwRestoreWindow(as_glfw(handle_));
 }
 

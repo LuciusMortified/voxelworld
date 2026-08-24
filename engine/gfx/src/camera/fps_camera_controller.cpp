@@ -11,9 +11,9 @@ namespace vw::gfx {
 fps_camera_controller::fps_camera_controller(float mouse_sensitivity, float camera_speed)
     : mouse_sensitivity_(mouse_sensitivity), camera_speed_(camera_speed) {}
 
-void fps_camera_controller::setup(
+auto fps_camera_controller::setup(
     window& window, camera& camera
-) {
+) -> void {
     window_ = &window;
     camera_ = &camera;
 
@@ -31,42 +31,42 @@ void fps_camera_controller::setup(
     });
 }
 
-void fps_camera_controller::update(
+auto fps_camera_controller::update(
     float delta_time
-) const {
+) const -> void {
     if (!camera_ || !window_)
         return;
 
     update_camera_movement_(delta_time);
 }
 
-void fps_camera_controller::set_mouse_sensitivity(
+auto fps_camera_controller::set_mouse_sensitivity(
     float sensitivity
-) {
+) -> void {
     mouse_sensitivity_ = sensitivity;
 }
 
-float fps_camera_controller::get_mouse_sensitivity() const {
+auto fps_camera_controller::get_mouse_sensitivity() const -> float {
     return mouse_sensitivity_;
 }
 
-void fps_camera_controller::set_camera_speed(
+auto fps_camera_controller::set_camera_speed(
     float speed
-) {
+) -> void {
     camera_speed_ = speed;
 }
 
-float fps_camera_controller::get_camera_speed() const {
+auto fps_camera_controller::get_camera_speed() const -> float {
     return camera_speed_;
 }
 
-bool fps_camera_controller::is_mouse_captured() const {
+auto fps_camera_controller::is_mouse_captured() const -> bool {
     return mouse_captured_;
 }
 
-void fps_camera_controller::handle_mouse_moved_(
+auto fps_camera_controller::handle_mouse_moved_(
     double x, double y
-) {
+) -> void {
     if (!camera_) {
         return;
     }
@@ -92,9 +92,9 @@ void fps_camera_controller::handle_mouse_moved_(
     }
 }
 
-void fps_camera_controller::update_camera_movement_(
+auto fps_camera_controller::update_camera_movement_(
     float delta_time
-) const {
+) const -> void {
     if (!keyboard_control_enabled_) {
         return;
     }
@@ -125,9 +125,9 @@ void fps_camera_controller::update_camera_movement_(
     }
 }
 
-void fps_camera_controller::set_mouse_captured(
+auto fps_camera_controller::set_mouse_captured(
     bool captured
-) {
+) -> void {
     mouse_captured_ = captured;
 
     window_->set_cursor_mode(mouse_captured_ ? cursor_modes::DISABLED : cursor_modes::NORMAL);
@@ -136,21 +136,21 @@ void fps_camera_controller::set_mouse_captured(
     mouse_initialized_ = false;
 }
 
-void fps_camera_controller::toggle_mouse_captured() {
+auto fps_camera_controller::toggle_mouse_captured() -> void {
     set_mouse_captured(!mouse_captured_);
 }
 
-bool fps_camera_controller::keyboard_control_enabled() const {
+auto fps_camera_controller::keyboard_control_enabled() const -> bool {
     return keyboard_control_enabled_;
 }
 
-void fps_camera_controller::set_keyboard_control_enabled(
+auto fps_camera_controller::set_keyboard_control_enabled(
     bool enabled
-) {
+) -> void {
     keyboard_control_enabled_ = enabled;
 }
 
-void fps_camera_controller::toggle_keyboard_control_enabled() {
+auto fps_camera_controller::toggle_keyboard_control_enabled() -> void {
     keyboard_control_enabled_ = !keyboard_control_enabled_;
 }
 

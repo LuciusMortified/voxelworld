@@ -19,7 +19,7 @@ layer_blend_modal::layer_blend_modal(
 )
     : state_(&st) {}
 
-void layer_blend_modal::open() {
+auto layer_blend_modal::open() -> void {
     need_open_ = true;
 
     const auto& cs     = state_->anim.get_clip_settings(state_->anim.selected_clip_name);
@@ -29,9 +29,9 @@ void layer_blend_modal::open() {
     fade_out_interp_   = static_cast<int>(cs.fade_out.interp);
 }
 
-void layer_blend_modal::render(
+auto layer_blend_modal::render(
     float /*delta_time*/
-) {
+) -> void {
     if (need_open_) {
         ImGui::OpenPopup("Layer Blend");
         need_open_ = false;
@@ -50,7 +50,7 @@ void layer_blend_modal::render(
         ImGui::PushItemWidth(100.f);
         ImGui::DragFloat("Duration##fade_in", &fade_in_duration_, 0.01f, 0.f, 10.f, "%.2fs");
         ImGui::SameLine();
-        ImGui::Combo("Interp##fade_in", &fade_in_interp_, interp_names.data(), interp_names.size());
+        ImGui::Combo("Interp##fade_in", &fade_in_interp_, interp_names.data(), static_cast<int32>(interp_names.size()));
         ImGui::PopItemWidth();
 
         ImGui::Spacing();
@@ -60,7 +60,7 @@ void layer_blend_modal::render(
         ImGui::DragFloat("Duration##fade_out", &fade_out_duration_, 0.01f, 0.f, 10.f, "%.2fs");
         ImGui::SameLine();
         ImGui::Combo(
-            "Interp##fade_out", &fade_out_interp_, interp_names.data(), interp_names.size()
+            "Interp##fade_out", &fade_out_interp_, interp_names.data(), static_cast<int32>(interp_names.size())
         );
         ImGui::PopItemWidth();
 

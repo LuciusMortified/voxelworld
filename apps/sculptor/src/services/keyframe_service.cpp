@@ -15,7 +15,7 @@ keyframe_service::keyframe_service(
 )
     : engine_(&eng), state_(&state), op_manager_(&op_manager) {}
 
-void keyframe_service::add_keyframe() {
+auto keyframe_service::add_keyframe() -> void {
     if (state_->anim.selected_clip_name.empty() || state_->scene.selected_name.empty()) {
         return;
     }
@@ -70,7 +70,7 @@ void keyframe_service::add_keyframe() {
     }
 }
 
-void keyframe_service::delete_keyframe() {
+auto keyframe_service::delete_keyframe() -> void {
     if (state_->anim.selected_keyframe_id == asset::invalid_keyframe_id ||
         state_->anim.selected_clip_name.empty() || state_->anim.selected_track_name.empty()) {
         return;

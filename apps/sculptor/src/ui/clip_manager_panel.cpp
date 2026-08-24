@@ -26,9 +26,9 @@ clip_manager_panel::clip_manager_panel(
     , layer_blend_modal_(st)
     , save_clip_as_modal_(eng, st, clip_svc) {}
 
-void clip_manager_panel::render(
+auto clip_manager_panel::render(
     float delta_time
-) {
+) -> void {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const auto window_pos         = ImVec2(
         viewport->WorkPos.x + viewport->WorkSize.x - 10,
@@ -225,7 +225,7 @@ void clip_manager_panel::render(
     ImGui::End();
 }
 
-void clip_manager_panel::render_close_confirm_popup_() const {
+auto clip_manager_panel::render_close_confirm_popup_() const -> void {
     if (ImGui::BeginPopupModal("Close Animation?", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
         ImGui::Text(
             "Animation \"%s\" has unsaved changes. Close anyway?",
@@ -252,7 +252,7 @@ void clip_manager_panel::render_close_confirm_popup_() const {
     }
 }
 
-void clip_manager_panel::render_load_popup_() {
+auto clip_manager_panel::render_load_popup_() -> void {
     ImGuiWindowFlags dialog_flags = ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove;
 
     if (ImGui::BeginPopupModal("Open Animation", nullptr, dialog_flags)) {
@@ -300,7 +300,7 @@ void clip_manager_panel::render_load_popup_() {
     }
 }
 
-void clip_manager_panel::load_voxa_filenames_() {
+auto clip_manager_panel::load_voxa_filenames_() -> void {
     namespace fs = std::filesystem;
 
     voxa_filenames_.clear();

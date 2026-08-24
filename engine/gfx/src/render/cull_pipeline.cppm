@@ -56,12 +56,12 @@ public:
     cull_pipeline(cull_pipeline&&)                 = delete;
     auto operator=(cull_pipeline&&) -> cull_pipeline&      = delete;
 
-    void update_frustums(
+    auto update_frustums(
         uint32 frame_index,
         const vw::spatial::frustum& view_frustum,
         std::span<const vw::spatial::frustum> shadow_frustums,
         const vec3f& eye
-    );
+    ) -> void;
 
     // Все буферы разом. Один барьер накрывает все счётчики вместо барьера на
     // каждый: барьер — это остановка конвейера, а пул вырос с девяти буферов до
@@ -77,9 +77,9 @@ public:
     }
 
 private:
-    void create_descriptor_set_layouts_();
-    void create_pipeline_();
-    void create_frustum_ubos_();
+    auto create_descriptor_set_layouts_() -> void;
+    auto create_pipeline_() -> void;
+    auto create_frustum_ubos_() -> void;
 
     vulkan_context* context_;
     vk::DescriptorPool descriptor_pool_ = nullptr;

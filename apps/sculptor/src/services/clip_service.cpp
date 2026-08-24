@@ -77,7 +77,7 @@ auto clip_service::save_clip_as(
     return result.has_value();
 }
 
-void clip_service::save_all_clips() const {
+auto clip_service::save_all_clips() const -> void {
     namespace fs = std::filesystem;
 
     const auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
@@ -120,15 +120,15 @@ auto clip_service::load_clip(
     return true;
 }
 
-void clip_service::close_clip(
+auto clip_service::close_clip(
     const std::string& clip_name
-) const {
+) const -> void {
     close_clip_params params = {.name = clip_name};
     auto op = std::make_unique<close_clip_operation>(*engine_, *state_, params);
     op_manager_->execute(std::move(op));
 }
 
-void clip_service::enter_animation_mode() {
+auto clip_service::enter_animation_mode() -> void {
     if (state_->anim.animation_mode) {
         return;
     }
@@ -137,21 +137,21 @@ void clip_service::enter_animation_mode() {
     state_->anim.animation_mode = true;
 }
 
-void clip_service::exit_animation_mode() {
+auto clip_service::exit_animation_mode() -> void {
     stop_all_layers();
     restore_transforms();
     state_->anim.animation_mode  = false;
     state_->anim.timeline_cursor = 0.f;
 }
 
-void clip_service::force_exit_animation_mode() {
+auto clip_service::force_exit_animation_mode() -> void {
     if (state_->anim.animation_mode) {
         exit_animation_mode();
     }
     state_->ui.show_timeline = false;
 }
 
-void clip_service::save_transforms() {
+auto clip_service::save_transforms() -> void {
     if (state_->anim.has_saved_transforms) {
         return;
     }
@@ -169,7 +169,7 @@ void clip_service::save_transforms() {
     state_->anim.has_saved_transforms = true;
 }
 
-void clip_service::restore_transforms() {
+auto clip_service::restore_transforms() -> void {
     if (!state_->anim.has_saved_transforms) {
         return;
     }
@@ -190,7 +190,7 @@ void clip_service::restore_transforms() {
     state_->anim.has_saved_transforms = false;
 }
 
-void clip_service::reset_all() {
+auto clip_service::reset_all() -> void {
     stop_all_layers();
 
     if (state_->anim.has_saved_transforms) {
@@ -209,9 +209,9 @@ void clip_service::reset_all() {
     state_->anim.timeline_cursor = 0.f;
 }
 
-void clip_service::stop_layer_for_clip(
+auto clip_service::stop_layer_for_clip(
     const std::string& clip_name
-) {
+) -> void {
     if (state_->scene.root_name.empty() ||
         !state_->scene.name_to_entity.contains(state_->scene.root_name)) {
         return;
@@ -231,7 +231,7 @@ void clip_service::stop_layer_for_clip(
     }
 }
 
-void clip_service::stop_all_layers() {
+auto clip_service::stop_all_layers() -> void {
     if (state_->scene.root_name.empty() ||
         !state_->scene.name_to_entity.contains(state_->scene.root_name)) {
         return;

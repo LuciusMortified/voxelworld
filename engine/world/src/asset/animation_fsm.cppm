@@ -86,8 +86,8 @@ public:
 
     using trigger_set = std::unordered_set<std::string>;
 
-    void add_state(state_node state);
-    void set_entry_state(std::string_view name);
+    auto add_state(state_node state) -> void;
+    auto set_entry_state(std::string_view name) -> void;
 
     [[nodiscard]] auto get_current_state() const -> const std::string& {
         return current_state_;
@@ -97,7 +97,7 @@ public:
     [[nodiscard]] auto evaluate(const animation_layer& layer, trigger_set& triggers)
         -> std::optional<transition_result>;
 
-    void apply_transition(const transition_result& result);
+    auto apply_transition(const transition_result& result) -> void;
 
 private:
     std::string current_state_;

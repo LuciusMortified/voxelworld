@@ -15,7 +15,7 @@ add_track_operation::add_track_operation(
 )
     : base_operation(), engine_(&engine), state_(&state), params_(params) {}
 
-void add_track_operation::execute() {
+auto add_track_operation::execute() -> void {
     const auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(params_.clip_name);
     if (!clip) {
@@ -69,7 +69,7 @@ void add_track_operation::execute() {
     state_->anim.unsaved_clips[params_.clip_name] = true;
 }
 
-void add_track_operation::undo() {
+auto add_track_operation::undo() -> void {
     const auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(params_.clip_name);
     if (!clip) {

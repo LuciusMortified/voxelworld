@@ -17,9 +17,9 @@ constexpr uint8 liquid      = 1 << 2;
 }  // namespace block_flags
 
 struct block_id {
-    uint8 value;
+    uint8 value = 0;
 
-    constexpr block_id() : value(0) {}
+    constexpr block_id() = default;
     constexpr explicit block_id(
         uint8 value_
     )
@@ -130,8 +130,8 @@ public:
     [[nodiscard]] auto blocks() const -> const std::array<block_type, 256>&;
 
 private:
-    void reg(block_id id, color c, uint8 flags = block_flags::none, uint8 light = 0,
-             uint8 glow = 0);
+    auto reg(block_id id, color c, uint8 flags = block_flags::none, uint8 light = 0,
+             uint8 glow = 0) -> void;
 
     std::array<block_type, 256> blocks_{};
 };

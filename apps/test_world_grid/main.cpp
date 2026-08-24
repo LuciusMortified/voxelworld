@@ -155,21 +155,23 @@ public:
     explicit world_grid_app(
         gfx::engine& eng, scene_options opts = {}
     )
+        // Порядок повторяет объявление полей: иначе список врёт о том, что
+        // произойдёт на самом деле, и -Wreorder-ctor это ловит.
         : app{eng},
-          bench_scene_{opts.scene},
-          crowd_size_{opts.crowd_size},
           sun_in_bench_{opts.sun_in_bench},
+          crowd_size_{opts.crowd_size},
           dig_per_frame_{opts.dig_per_frame},
           lamps_per_frame_{opts.lamps_per_frame},
           light_inert_{opts.light_inert},
+          blob_bodies_{opts.blob_bodies},
+          free_blobs_{opts.free_blobs},
           static_lights_{opts.static_lights},
           dynamic_lights_{opts.dynamic_lights},
-          free_storm_{opts.free_storm},
-          free_blobs_{opts.free_blobs},
-          blob_bodies_{opts.blob_bodies},
-          village_groups_{std::max(opts.village_groups, 1)},
           light_speed_{opts.light_speed},
-          verify_every_{opts.verify_every} {
+          free_storm_{opts.free_storm},
+          village_groups_{std::max(opts.village_groups, 1)},
+          verify_every_{opts.verify_every},
+          bench_scene_{opts.scene} {
         auto& renderer = get_engine().get_renderer();
 
         renderer.set_chunk_cull_enabled(opts.chunk_cull);
@@ -294,9 +296,9 @@ public:
         return bench_ready_;
     }
 
-    void render(
+    auto render(
         float delta_time
-    ) override {
+    ) -> void override{
         if (bench_scene_ == bench_scene::off) {
             camera_controller_->update(delta_time);
         } else {
@@ -435,7 +437,7 @@ private:
     // at the origin voxel and adding three put the eye at the bottom of a
     // hillside, walled in by ground seven voxels over it. The eye goes above
     // the highest ground within about a chunk instead.
-    void try_place_camera() {
+    auto try_place_camera() -> void {
         if (camera_placed_) {
             return;
         }
@@ -499,7 +501,7 @@ private:
         apply_time_of_day_();
     }
 
-    void apply_time_of_day_() {
+    auto apply_time_of_day_() -> void {
         // Midnight at zero, sunrise at a quarter, noon at a half. The sun comes
         // up over +X and goes down over -X, tilted so shadows are never cast
         // straight along an axis -- axis-aligned voxels under an axis-aligned
@@ -594,7 +596,7 @@ private:
     // up to a lamp that has been placed and the two should be one light -- that
     // comparison is the whole acceptance test for the stitch between the baked
     // half of this stage and the dynamic one.
-    void set_torch_(bool on) {
+    auto set_torch_(bool on) -> void {
         auto& world = get_engine().get_world();
 
         if (!on) {
@@ -615,7 +617,7 @@ private:
                      .get_entity();
     }
 
-    void tick_torch_(const vec3f& at) {
+    auto tick_torch_(const vec3f& at) -> void {
         if (!torch_.is_valid()) {
             return;
         }
@@ -725,7 +727,7 @@ private:
         return std::nullopt;
     }
 
-    void update_hovered_() {
+    auto update_hovered_() -> void {
         hovered_.reset();
 
         if (tool_ == edit_tool::none || !camera_controller_->is_mouse_captured()) {
@@ -735,7 +737,7 @@ private:
         hovered_ = pick_voxel_();
     }
 
-    void draw_hover_() {
+    auto draw_hover_() -> void {
         if (!hovered_) {
             return;
         }
@@ -766,7 +768,7 @@ private:
         }
     }
 
-    void apply_tool_() {
+    auto apply_tool_() -> void {
         if (tool_ == edit_tool::none || world_grid_ == nullptr) {
             return;
         }
@@ -800,7 +802,7 @@ private:
     // because a column that far out is simply not loaded. tick_dig_ has a
     // comment about the same trap, which is where this should have been read
     // first.
-    void drop_emitter_(block_id id, int32 radius) {
+    auto drop_emitter_(block_id id, int32 radius) -> void {
         const int32 scale = generator_params_.voxel_scale;
 
         const auto floor_div = [](int32 a, int32 b) -> int32 {
@@ -952,7 +954,7 @@ private:
     // under them and not the body. Eight by default, which is what the frame
     // uniform holds: at that count every one of them has a patch, and none is
     // missing one because the nearest-eight rule dropped it.
-    void spawn_blob_bodies_() {
+    auto spawn_blob_bodies_() -> void {
         if (world_grid_ == nullptr || (blob_seeded_ && blob_pending_.empty())) {
             return;
         }
@@ -1072,7 +1074,7 @@ private:
     // A raised cosine off the frame index: starts on the ground, comes back to
     // it, and never dips below. Off the frame index and not the clock, for the
     // reason every other motion here is.
-    void tick_blob_bodies_() {
+    auto tick_blob_bodies_() -> void {
         if (bench_scene_ == bench_scene::blobs || free_blobs_) {
             spawn_blob_bodies_();
         }
@@ -1228,9 +1230,9 @@ private:
     // Orbits are a function of the frame index and never of elapsed time, for
     // the same reason the camera path is: a benchmark steered by wall clock
     // measures a different scene on every machine.
-    void drive_storm_lights_(
+    auto drive_storm_lights_(
         float32 delta_time
-    ) {
+    ) -> void {
         if (storm_lights_.empty() || world_grid_ == nullptr) {
             return;
         }
@@ -1432,12 +1434,12 @@ private:
         );
     }
 
-    void report_clusters_() const {
+    auto report_clusters_() const -> void {
         report_list_(gfx::cull_list::sources, "sources");
         report_list_(gfx::cull_list::blobs, "bodies");
     }
 
-    void report_list_(gfx::cull_list kind, std::string_view what) const {
+    auto report_list_(gfx::cull_list kind, std::string_view what) const -> void {
         const cluster_tally& tally = tally_[static_cast<std::size_t>(kind)];
 
         if (tally.frames == 0) {
@@ -1497,7 +1499,7 @@ private:
         }
     }
 
-    void report_torches_() const {
+    auto report_torches_() const -> void {
         if (!is_torch_scene_() || visible_frames_ == 0) {
             return;
         }
@@ -1535,7 +1537,7 @@ private:
         }
     }
 
-    void report_light_() const {
+    auto report_light_() const -> void {
         if (!light_started_ || lamps_placed_ == 0) {
             return;
         }
@@ -1597,7 +1599,7 @@ private:
         );
     }
 
-    void report_dig_() const {
+    auto report_dig_() const -> void {
         if (!dig_started_ || dig_edits_ == 0) {
             return;
         }
@@ -1646,9 +1648,9 @@ private:
 
     // A crowd of animated, physical bodies: the scene the PRD actually cares
     // about, and the only one where per-entity CPU work is visible at all.
-    void spawn_crowd(
+    auto spawn_crowd(
         float32 ground_y
-    ) {
+    ) -> void {
         auto& world    = get_engine().get_world();
         auto& registry = world.resource<asset::model_registry>();
 
@@ -1765,9 +1767,8 @@ private:
         return clip;
     }
 
-    void setup_world_grid() {
-        auto& world       = get_engine().get_world();
-        auto& grid_system = world.system<ecs::world_grid_system>();
+    auto setup_world_grid() -> void {
+        auto& world = get_engine().get_world();
 
         generator_params_ = {
             .voxel_scale = 8,
@@ -1794,7 +1795,7 @@ private:
         gs.modify_view(viewer_).set_view_distance(10);
     }
 
-    void render_ui() {
+    auto render_ui() -> void {
         const ImGuiViewport* viewport = ImGui::GetMainViewport();
         ImVec2 window_pos             = ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + 10);
         ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.0f, 0.0f));
@@ -1833,7 +1834,9 @@ private:
             static constexpr std::array<const char*, 3> tool_names{"none", "place", "remove"};
 
             auto tool = static_cast<int32>(tool_);
-            if (ImGui::Combo("Tool", &tool, tool_names.data(), tool_names.size())) {
+            if (ImGui::Combo(
+                    "Tool", &tool, tool_names.data(), static_cast<int32>(tool_names.size())
+                )) {
                 tool_ = static_cast<edit_tool>(tool);
             }
 
@@ -1978,7 +1981,9 @@ private:
                 "blob shadow", "light complexity",  "blob complexity"
             };
             auto view = static_cast<int32>(renderer.get_debug_view());
-            if (ImGui::Combo("Debug view", &view, view_names.data(), view_names.size())) {
+            if (ImGui::Combo(
+                    "Debug view", &view, view_names.data(), static_cast<int32>(view_names.size())
+                )) {
                 renderer.set_debug_view(static_cast<gfx::debug_view>(view));
             }
 
@@ -2032,15 +2037,15 @@ private:
         ImGui::End();
     }
 
-    void step_time_of_day_(float32 delta) {
+    auto step_time_of_day_(float32 delta) -> void {
         time_of_day_ += delta;
         time_of_day_ -= std::floor(time_of_day_);
         apply_time_of_day_();
     }
 
-    void handle_key_press(
+    auto handle_key_press(
         plat::keyboard::keys key
-    ) {
+    ) -> void {
         switch (key) {
             case plat::keyboard::keys::ESCAPE:
                 get_engine().shutdown();
@@ -2313,42 +2318,46 @@ auto main(int argc, char** argv) -> int {
         }
     }
 
+    // Объявлено разом на всю цепочку: в каждой ветке своё `value` скрывало бы
+    // предыдущее, а это ровно то, на что ругаются и /W4, и -Wshadow.
+    std::optional<std::string_view> value;
+
     for (int32 i = 1; i < argc; ++i) {
         const std::string_view arg{argv[i]};
 
-        if (const auto value = option_value(arg, "--bench-frames")) {
+        if ((value = option_value(arg, "--bench-frames"))) {
             bench.measure_frames = parse_uint(*value, 2000);
-        } else if (const auto value = option_value(arg, "--bench-warmup")) {
+        } else if ((value = option_value(arg, "--bench-warmup"))) {
             bench.warmup_frames = parse_uint(*value, 200);
-        } else if (const auto value = option_value(arg, "--bench-out")) {
+        } else if ((value = option_value(arg, "--bench-out"))) {
             bench.report_path = std::string{*value};
-        } else if (const auto value = option_value(arg, "--bench-crowd")) {
+        } else if ((value = option_value(arg, "--bench-crowd"))) {
             opts.crowd_size = parse_uint(*value, 50);
-        } else if (const auto value = option_value(arg, "--bench-dig")) {
+        } else if ((value = option_value(arg, "--bench-dig"))) {
             opts.dig_per_frame = static_cast<int32>(parse_uint(*value, 1));
-        } else if (const auto value = option_value(arg, "--bench-lamps")) {
+        } else if ((value = option_value(arg, "--bench-lamps"))) {
             opts.lamps_per_frame = static_cast<int32>(parse_uint(*value, 1));
-        } else if (const auto value = option_value(arg, "--bench-static")) {
+        } else if ((value = option_value(arg, "--bench-static"))) {
             opts.static_lights = static_cast<int32>(parse_uint(*value, 400));
-        } else if (const auto value = option_value(arg, "--bench-dynamic")) {
+        } else if ((value = option_value(arg, "--bench-dynamic"))) {
             opts.dynamic_lights = static_cast<int32>(parse_uint(*value, 64));
-        } else if (const auto value = option_value(arg, "--bench-visible")) {
+        } else if ((value = option_value(arg, "--bench-visible"))) {
             opts.visible_lights = parse_uint(*value, 0);
-        } else if (const auto value = option_value(arg, "--bench-groups")) {
+        } else if ((value = option_value(arg, "--bench-groups"))) {
             opts.village_groups = static_cast<int32>(parse_uint(*value, 24));
-        } else if (const auto value = option_value(arg, "--cluster-tile")) {
+        } else if ((value = option_value(arg, "--cluster-tile"))) {
             opts.cluster_tile = parse_uint(*value, 0);
-        } else if (const auto value = option_value(arg, "--cluster-slices")) {
+        } else if ((value = option_value(arg, "--cluster-slices"))) {
             // One slice is exactly flat tiles, which is the only honest way to
             // price what cutting by depth buys.
             opts.cluster_slices = parse_uint(*value, 0);
-        } else if (const auto value = option_value(arg, "--cluster-cap")) {
+        } else if ((value = option_value(arg, "--cluster-cap"))) {
             opts.cluster_cap = parse_uint(*value, 0);
         } else if (arg == "--cluster-stats") {
             // The cheap half of the readback: how full the grid runs and how
             // much of it overflowed, without the lists themselves.
             opts.cluster_stats = true;
-        } else if (const auto value = option_value(arg, "--verify-lights")) {
+        } else if ((value = option_value(arg, "--verify-lights"))) {
             opts.verify_every = parse_uint(*value, 60);
         } else if (arg == "--verify-lights") {
             opts.verify_every = 60;
@@ -2360,12 +2369,12 @@ auto main(int argc, char** argv) -> int {
             // The blob scene with nobody driving: the ring stands up, the
             // bodies bob, the camera is yours.
             opts.free_blobs = true;
-        } else if (const auto value = option_value(arg, "--light-speed")) {
+        } else if ((value = option_value(arg, "--light-speed"))) {
             // How fast the moving sources go round, one being what the bench
             // uses. Below one to study a single source crossing a tile
             // boundary; a bench run that sets it is measuring another scene.
             opts.light_speed = std::max(parse_float(*value, 1.0F), 0.0F);
-        } else if (const auto value = option_value(arg, "--bench-bodies")) {
+        } else if ((value = option_value(arg, "--bench-bodies"))) {
             opts.blob_bodies = static_cast<int32>(parse_uint(*value, 8));
         } else if (arg == "--lights") {
             // The torches scene with nobody driving: same four hundred emitters
@@ -2376,9 +2385,9 @@ auto main(int argc, char** argv) -> int {
             // The control run: the same edits, the same geometry, a block that
             // does not emit. What the two runs differ by is the light.
             opts.light_inert = true;
-        } else if (const auto value = option_value(arg, "--mesh-workers")) {
+        } else if ((value = option_value(arg, "--mesh-workers"))) {
             bench.mesh_workers = parse_uint(*value, 0);
-        } else if (const auto value = option_value(arg, "--terrain-workers")) {
+        } else if ((value = option_value(arg, "--terrain-workers"))) {
             bench.terrain_workers = parse_uint(*value, 0);
         } else if (arg == "--chunk-cull") {
             opts.chunk_cull = true;

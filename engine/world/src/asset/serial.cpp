@@ -16,18 +16,27 @@ vox_parser_plain::vox_parser_plain(const block_registry& block_registry)
 
 auto vox_parser_plain::parse(const std::filesystem::path& filepath)
     -> std::expected<vox_prefab_data, error_type> {
-    prefab_ = {};
-    current_entity_ = nullptr;
-    error_ = std::nullopt;
-
     std::ifstream file(filepath);
     if (!file.is_open()) {
         log::warn(detail::vox_parser_plain_lc, "failed to open file: {}", filepath.string());
         return std::unexpected(error_type::file_open_failed);
     }
 
+    auto result = parse(file);
+    if (!result) {
+        log::warn(detail::vox_parser_plain_lc, "parse error in file: {}", filepath.string());
+    }
+    return result;
+}
+
+auto vox_parser_plain::parse(std::istream& input)
+    -> std::expected<vox_prefab_data, error_type> {
+    prefab_ = {};
+    current_entity_ = nullptr;
+    error_ = std::nullopt;
+
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(input, line)) {
         if (error_.has_value()) break;
 
         std::istringstream iss(line);
@@ -62,14 +71,13 @@ auto vox_parser_plain::parse(const std::filesystem::path& filepath)
     }
 
     if (error_.has_value()) {
-        log::warn(detail::vox_parser_plain_lc, "parse error in file: {}", filepath.string());
         return std::unexpected(*error_);
     }
 
     return std::move(prefab_);
 }
 
-void vox_parser_plain::process_root_(std::istringstream& iss) {
+auto vox_parser_plain::process_root_(std::istringstream& iss) -> void {
     std::string name;
     iss >> name;
     if (iss.fail()) {
@@ -80,7 +88,7 @@ void vox_parser_plain::process_root_(std::istringstream& iss) {
     prefab_.root_name = name;
 }
 
-void vox_parser_plain::process_entity_(std::istringstream& iss) {
+auto vox_parser_plain::process_entity_(std::istringstream& iss) -> void {
     std::string name;
     iss >> name;
     if (iss.fail()) {
@@ -93,7 +101,7 @@ void vox_parser_plain::process_entity_(std::istringstream& iss) {
     current_entity_->name = name;
 }
 
-void vox_parser_plain::process_parent_(std::istringstream& iss) {
+auto vox_parser_plain::process_parent_(std::istringstream& iss) -> void {
     if (!current_entity_) {
         return;
     }
@@ -108,7 +116,7 @@ void vox_parser_plain::process_parent_(std::istringstream& iss) {
     current_entity_->parent_name = parent_name;
 }
 
-void vox_parser_plain::process_transform_(std::istringstream& iss) {
+auto vox_parser_plain::process_transform_(std::istringstream& iss) -> void {
     if (!current_entity_) {
         return;
     }
@@ -137,7 +145,7 @@ void vox_parser_plain::process_transform_(std::istringstream& iss) {
     current_entity_->has_transform = true;
 }
 
-void vox_parser_plain::process_target_(std::istringstream& iss) {
+auto vox_parser_plain::process_target_(std::istringstream& iss) -> void {
     if (!current_entity_) {
         return;
     }
@@ -152,7 +160,7 @@ void vox_parser_plain::process_target_(std::istringstream& iss) {
     current_entity_->animation_target_name = target_name;
 }
 
-void vox_parser_plain::process_sockets_() {
+auto vox_parser_plain::process_sockets_() -> void {
     if (!current_entity_) {
         return;
     }
@@ -160,7 +168,7 @@ void vox_parser_plain::process_sockets_() {
     current_entity_->has_sockets = true;
 }
 
-void vox_parser_plain::process_socket_(std::istringstream& iss) {
+auto vox_parser_plain::process_socket_(std::istringstream& iss) -> void {
     if (!current_entity_) {
         return;
     }
@@ -185,7 +193,7 @@ void vox_parser_plain::process_socket_(std::istringstream& iss) {
     current_entity_->sockets.push_back({name, position, rotation, scale});
 }
 
-void vox_parser_plain::process_model_(std::istringstream& iss) {
+auto vox_parser_plain::process_model_(std::istringstream& iss) -> void {
     if (!current_entity_) {
         return;
     }
@@ -200,7 +208,7 @@ void vox_parser_plain::process_model_(std::istringstream& iss) {
     current_entity_->model = vox_model_data{size, {}};
 }
 
-void vox_parser_plain::process_voxel_(std::istringstream& iss) {
+auto vox_parser_plain::process_voxel_(std::istringstream& iss) -> void {
     if (!current_entity_ || !current_entity_->model.has_value()) {
         return;
     }
@@ -276,14 +284,14 @@ auto voxa_serializer::serialize(
     return {};
 }
 
-void voxa_serializer::write_header_(std::ofstream& file) {
+auto voxa_serializer::write_header_(std::ofstream& file) -> void {
     file << std::format("# Voxa File Version {}\n", voxa_file_version);
     file << std::format("clip {}\n", clip_->get_name());
 }
 
-void voxa_serializer::write_track_(
+auto voxa_serializer::write_track_(
     std::ofstream& file, const animation_track& track
-) {
+) -> void {
     file << std::format("\ntrack {} {:.6g}\n", track.get_target_name(), track.get_fps());
 
     for (const auto& channel : track.get_channels()) {
@@ -291,9 +299,9 @@ void voxa_serializer::write_track_(
     }
 }
 
-void voxa_serializer::write_channel_(
+auto voxa_serializer::write_channel_(
     std::ofstream& file, const animation_channel_variant& channel
-) {
+) -> void {
     std::visit(
         [&](const auto& ch) {
             std::string_view prop_name;
@@ -316,9 +324,9 @@ void voxa_serializer::write_channel_(
     );
 }
 
-void voxa_serializer::write_keyframes_vec3f_(
+auto voxa_serializer::write_keyframes_vec3f_(
     std::ofstream& file, const animation_channel<vec3f>& ch
-) {
+) -> void {
     for (const auto& kf : ch.get_keyframes()) {
         file << std::format(
             "    k {:.6g} {:.6g} {:.6g} {:.6g} {} {:.6g} {:.6g}\n",
@@ -328,9 +336,9 @@ void voxa_serializer::write_keyframes_vec3f_(
     }
 }
 
-void voxa_serializer::write_keyframes_quat_(
+auto voxa_serializer::write_keyframes_quat_(
     std::ofstream& file, const animation_channel<quat>& ch
-) {
+) -> void {
     for (const auto& kf : ch.get_keyframes()) {
         file << std::format(
             "    k {:.6g} {:.6g} {:.6g} {:.6g} {:.6g} {} {:.6g} {:.6g}\n",
@@ -372,6 +380,16 @@ auto voxa_deserializer::deserialize(
         return std::unexpected(error_type::file_open_failed);
     }
 
+    auto result = deserialize(file);
+    if (!result) {
+        log::warn(detail::voxa_deserializer_lc, "parse error in file: {}", filepath.string());
+    }
+    return result;
+}
+
+auto voxa_deserializer::deserialize(
+    std::istream& input
+) -> std::expected<std::shared_ptr<animation_clip>, error_type> {
     clip_ = nullptr;
     current_track_ = nullptr;
     has_current_channel_ = false;
@@ -380,7 +398,7 @@ auto voxa_deserializer::deserialize(
     quat_keyframes_.clear();
 
     std::string line;
-    while (std::getline(file, line)) {
+    while (std::getline(input, line)) {
         if (error_.has_value()) break;
 
         std::istringstream iss(line);
@@ -405,7 +423,6 @@ auto voxa_deserializer::deserialize(
     }
 
     if (error_.has_value()) {
-        log::warn(detail::voxa_deserializer_lc, "parse error in file: {}", filepath.string());
         return std::unexpected(*error_);
     }
 
@@ -415,7 +432,7 @@ auto voxa_deserializer::deserialize(
     return clip_;
 }
 
-void voxa_deserializer::process_clip_(std::istringstream& iss) {
+auto voxa_deserializer::process_clip_(std::istringstream& iss) -> void {
     std::string name;
     iss >> name;
     if (iss.fail()) {
@@ -425,7 +442,7 @@ void voxa_deserializer::process_clip_(std::istringstream& iss) {
     clip_ = std::make_shared<animation_clip>(name);
 }
 
-void voxa_deserializer::process_track_(std::istringstream& iss) {
+auto voxa_deserializer::process_track_(std::istringstream& iss) -> void {
     finalize_channel_();
     finalize_track_();
 
@@ -440,7 +457,7 @@ void voxa_deserializer::process_track_(std::istringstream& iss) {
     current_track_ = std::make_unique<animation_track>(target_name, fps);
 }
 
-void voxa_deserializer::process_channel_(std::istringstream& iss) {
+auto voxa_deserializer::process_channel_(std::istringstream& iss) -> void {
     finalize_channel_();
 
     std::string prop_name;
@@ -467,7 +484,7 @@ void voxa_deserializer::process_channel_(std::istringstream& iss) {
     has_current_channel_ = true;
 }
 
-void voxa_deserializer::process_keyframe_(std::istringstream& iss) {
+auto voxa_deserializer::process_keyframe_(std::istringstream& iss) -> void {
     float32 time;
     iss >> time;
 
@@ -498,7 +515,7 @@ void voxa_deserializer::process_keyframe_(std::istringstream& iss) {
     }
 }
 
-void voxa_deserializer::finalize_channel_() {
+auto voxa_deserializer::finalize_channel_() -> void {
     if (!has_current_channel_ || !current_track_) {
         return;
     }
@@ -529,7 +546,7 @@ void voxa_deserializer::finalize_channel_() {
     has_current_channel_ = false;
 }
 
-void voxa_deserializer::finalize_track_() {
+auto voxa_deserializer::finalize_track_() -> void {
     if (!current_track_ || !clip_) {
         return;
     }
@@ -561,9 +578,9 @@ constexpr log::log_category asset_storage_lc{"asset_storage"};
 asset_storage::asset_storage(vox_parser& parser, model_registry& registry)
     : parser_(&parser), model_registry_(&registry) {}
 
-void asset_storage::load_prefab(
+auto asset_storage::load_prefab(
     std::string_view name, const std::filesystem::path& filepath
-) {
+) -> void {
     auto result = parser_->parse(filepath);
     if (!result.has_value()) {
         log::warn(detail::asset_storage_lc, "failed to load prefab '{}': {}", name, filepath.string());
@@ -591,9 +608,9 @@ void asset_storage::load_prefab(
     prefabs_[name_str] = std::move(*result);
 }
 
-void asset_storage::load_clip(
+auto asset_storage::load_clip(
     std::string_view name, const std::filesystem::path& filepath
-) {
+) -> void {
     voxa_deserializer deserializer;
     auto result = deserializer.deserialize(filepath);
     if (!result.has_value()) {
@@ -674,16 +691,16 @@ auto vox_writer_plain::write(
     return {};
 }
 
-void vox_writer_plain::write_header_(
+auto vox_writer_plain::write_header_(
     std::ofstream& file, const vw::asset::vox_prefab_data& prefab
-) {
+) -> void {
     file << std::format("# Vox File Version {}\n", vox_file_version);
     file << std::format("root {}\n", prefab.root_name);
 }
 
-void vox_writer_plain::write_entity_(
+auto vox_writer_plain::write_entity_(
     std::ofstream& file, const vw::asset::vox_entity_data& ent
-) {
+) -> void {
     file << std::format("entity {}\n", ent.name);
 
     if (!ent.parent_name.empty()) {
@@ -722,9 +739,9 @@ void vox_writer_plain::write_entity_(
     }
 }
 
-void vox_writer_plain::write_model_(
+auto vox_writer_plain::write_model_(
     std::ofstream& file, const vw::asset::vox_model_data& mdl
-) {
+) -> void {
     file << std::format("\tm {} {} {}\n", mdl.size.x, mdl.size.y, mdl.size.z);
 
     for (const auto& [pos, v] : mdl.voxels) {

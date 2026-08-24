@@ -15,9 +15,9 @@ paint_tool::paint_tool(
 )
     : engine_(&eng), state_(&st), op_manager_(&op_manager) {}
 
-void paint_tool::render(
-    float delta_time
-) {
+auto paint_tool::render(
+    [[maybe_unused]] float delta_time
+) -> void {
     if (hovered_voxel_ == vec3i{-1, -1, -1}) {
         return;
     }
@@ -52,19 +52,19 @@ void paint_tool::render(
     renderer.draw_box(voxel_world_pos, vec3f{1.f, 1.f, 1.f}, colors::black);
 }
 
-void paint_tool::on_key_press(
-    const plat::key_press_event& ev
-) {}
+auto paint_tool::on_key_press(
+    [[maybe_unused]] const plat::key_press_event& ev
+) -> void {}
 
-void paint_tool::on_mouse_move(
-    const plat::mouse_move_event& ev
-) {
+auto paint_tool::on_mouse_move(
+    [[maybe_unused]] const plat::mouse_move_event& ev
+) -> void {
     update_hovered_voxel_();
 }
 
-void paint_tool::on_mouse_press(
+auto paint_tool::on_mouse_press(
     const plat::mouse_press_event& ev
-) {
+) -> void {
     using buttons = plat::mouse::buttons;
 
     if (ev.button == buttons::LEFT) {
@@ -103,15 +103,15 @@ void paint_tool::on_mouse_press(
     }
 }
 
-void paint_tool::on_mouse_release(
-    const plat::mouse_release_event& ev
-) {}
+auto paint_tool::on_mouse_release(
+    [[maybe_unused]] const plat::mouse_release_event& ev
+) -> void {}
 
-void paint_tool::on_activate() {
+auto paint_tool::on_activate() -> void {
     update_hovered_voxel_();
 }
 
-void paint_tool::update_hovered_voxel_() {
+auto paint_tool::update_hovered_voxel_() -> void {
     const auto& world  = engine_->get_world();
     const auto& window = engine_->get_window();
     const auto& camera = engine_->get_camera();

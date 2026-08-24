@@ -21,8 +21,8 @@ public:
 
     add_model_component_modal(engine_type& eng, app_state& state, operation_manager& op_manager);
 
-    void open(const std::string& entity_name);
-    void render();
+    auto open(const std::string& entity_name) -> void;
+    auto render() -> void;
 
 private:
     auto confirm_() -> bool;
@@ -48,11 +48,11 @@ public:
 
     create_clip_modal(engine_type& eng, app_state& state, operation_manager& op_manager);
 
-    void open();
-    void render(float delta_time);
+    auto open() -> void;
+    auto render(float delta_time) -> void;
 
 private:
-    bool create_clip();
+    auto create_clip() -> bool;
 
     engine_type* engine_;
     app_state* state_;
@@ -74,8 +74,8 @@ class layer_blend_modal final {
 public:
     explicit layer_blend_modal(app_state& st);
 
-    void open();
-    void render(float delta_time);
+    auto open() -> void;
+    auto render(float delta_time) -> void;
 
 private:
     app_state* state_;
@@ -99,12 +99,12 @@ public:
 
     save_clip_as_modal(engine_type& eng, app_state& st, clip_service& clip_svc);
 
-    void open();
-    void render(float delta_time);
+    auto open() -> void;
+    auto render(float delta_time) -> void;
 
 private:
-    void render_overwrite_confirmation_();
-    void render_save_form_();
+    auto render_overwrite_confirmation_() -> void;
+    auto render_save_form_() -> void;
     auto save_clip_() -> bool;
 
     engine_type* engine_;
@@ -131,12 +131,12 @@ public:
     clip_manager_panel(engine_type& eng, app_state& st, operation_manager& op_manager,
                        clip_service& clip_svc);
 
-    void render(float delta_time);
+    auto render(float delta_time) -> void;
 
 private:
-    void render_close_confirm_popup_() const;
-    void render_load_popup_();
-    void load_voxa_filenames_();
+    auto render_close_confirm_popup_() const -> void;
+    auto render_load_popup_() -> void;
+    auto load_voxa_filenames_() -> void;
 
     engine_type* engine_;
     app_state* state_;
@@ -158,11 +158,11 @@ private:
 // ---- from src/ui/ui_utils.h
 export namespace vw::sculptor {
 
-void imgui_input_text_string(std::string_view label, std::string& value);
+auto imgui_input_text_string(std::string_view label, std::string& value) -> void;
 
 auto imgui_input_int_left(std::string_view label, int* value) -> bool;
 
-void imgui_clamp_window_pos_to_viewport();
+auto imgui_clamp_window_pos_to_viewport() -> void;
 
 auto imgui_drag_vec3f(std::string_view label, vec3f& vec, float label_offset = 60.f) -> bool;
 
@@ -175,7 +175,7 @@ class color_palette_panel final {
 public:
     color_palette_panel(app_state& st, const block_registry& registry);
 
-    void render(float delta_time);
+    auto render(float delta_time) -> void;
 
 private:
 
@@ -194,9 +194,9 @@ public:
 
     create_entity_modal(engine_type& eng, app_state& state, operation_manager& op_manager);
 
-    void open();
+    auto open() -> void;
 
-    void render(float delta_time);
+    auto render(float delta_time) -> void;
 
 private:
     auto create_entity() -> bool;
@@ -226,11 +226,11 @@ public:
 
     create_keyframe_modal(engine_type& eng, app_state& st, operation_manager& op_manager);
 
-    void open(const std::string& track_name);
-    void render(float delta_time);
+    auto open(const std::string& track_name) -> void;
+    auto render(float delta_time) -> void;
 
 private:
-    bool create_keyframe();
+    auto create_keyframe() -> bool;
 
     engine_type* engine_;
     app_state* state_;
@@ -259,9 +259,9 @@ public:
 
     delete_entity_modal(engine_type& eng, app_state& state, operation_manager& op_manager);
 
-    void open(const std::string& delete_name);
+    auto open(const std::string& delete_name) -> void;
 
-    void render(float delta_time);
+    auto render(float delta_time) -> void;
 
 private:
     engine_type* engine_;
@@ -284,8 +284,8 @@ public:
 
     delete_track_modal(engine_type& eng, app_state& st, operation_manager& op_manager);
 
-    void open(const std::string& track_name);
-    void render(float delta_time);
+    auto open(const std::string& track_name) -> void;
+    auto render(float delta_time) -> void;
 
 private:
     engine_type* engine_;
@@ -307,7 +307,7 @@ public:
 
     entity_properties_panel(engine_type& eng, app_state& st, operation_manager& op_manager);
 
-    void render(float delta_time);
+    auto render(float delta_time) -> void;
 
 private:
     engine_type* engine_;
@@ -320,12 +320,12 @@ private:
     mutable quat cached_rotation_quat_;
     mutable vec3f cached_rotation_deg_;
 
-    void render_components_section();
+    auto render_components_section() -> void;
 
-    void render_position() const;
-    void render_rotation() const;
-    void render_scale() const;
-    void render_origin() const;
+    auto render_position() const -> void;
+    auto render_rotation() const -> void;
+    auto render_scale() const -> void;
+    auto render_origin() const -> void;
 };
 
 }  // namespace vw::sculptor
@@ -339,7 +339,7 @@ public:
 
     entity_tree_panel(engine_type& eng, app_state& st, operation_manager& op_manager);
 
-    void render(float delta_time);
+    auto render(float delta_time) -> void;
 
 private:
     engine_type* engine_;
@@ -349,9 +349,9 @@ private:
     create_entity_modal creation_modal_;
     delete_entity_modal deletion_modal_;
 
-    void render_entity_node(
+    auto render_entity_node(
         const std::string& name, const std::unordered_set<ecs::entity>& preview_entities
-    );
+    ) -> void;
 };
 
 }  // namespace vw::sculptor
@@ -365,7 +365,7 @@ public:
 
     keyframe_properties_panel(engine_type& eng, app_state& st, operation_manager& op_manager);
 
-    void render(float delta_time);
+    auto render(float delta_time) -> void;
 
 private:
     engine_type* engine_;
@@ -385,7 +385,7 @@ public:
     menu_bar(engine_type& eng, app_state& state, operation_manager& op_manager,
              file_service& file_svc);
 
-    void render(float delta_time) const;
+    auto render(float delta_time) const -> void;
 
 private:
     engine_type* engine_;
@@ -405,11 +405,11 @@ public:
 
     new_file_modal(engine_type& eng, app_state& st);
 
-    void render(float delta_time);
+    auto render(float delta_time) -> void;
 
 private:
-    void render_overwrite_confirmation();
-    void render_create_form();
+    auto render_overwrite_confirmation() -> void;
+    auto render_create_form() -> void;
     auto create_file_() -> bool;
 
     engine_type* engine_;
@@ -433,10 +433,10 @@ public:
 
     open_file_modal(engine_type& eng, app_state& st);
 
-    void render(float delta_time);
+    auto render(float delta_time) -> void;
 
 private:
-    void load_existing_filenames_();
+    auto load_existing_filenames_() -> void;
     auto open_file_() -> bool;
 
     engine_type* engine_;
@@ -458,11 +458,11 @@ public:
 
     save_as_modal(engine_type& eng, app_state& st, file_service& file_svc);
 
-    void render(float delta_time);
+    auto render(float delta_time) -> void;
 
 private:
-    void render_overwrite_confirmation();
-    void render_save_form();
+    auto render_overwrite_confirmation() -> void;
+    auto render_save_form() -> void;
     auto save_file_() -> bool;
 
     engine_type* engine_;
@@ -487,19 +487,19 @@ public:
 
     socket_panel(engine_type& eng, app_state& st, operation_manager& op_manager);
 
-    void render(float delta_time);
+    auto render(float delta_time) -> void;
 
 private:
-    void render_socket_(const ecs::socket_point& sp, std::string& socket_to_remove);
-    void render_add_socket_();
-    void render_add_socket_modal_();
-    void render_preview_file_list_();
+    auto render_socket_(const ecs::socket_point& sp, std::string& socket_to_remove) -> void;
+    auto render_add_socket_() -> void;
+    auto render_add_socket_modal_() -> void;
+    auto render_preview_file_list_() -> void;
 
-    void load_preview_(const std::string& socket_name, const std::string& filename) const;
-    void unload_preview_(const std::string& key) const;
-    void update_preview_transform_(
+    auto load_preview_(const std::string& socket_name, const std::string& filename) const -> void;
+    auto unload_preview_(const std::string& key) const -> void;
+    auto update_preview_transform_(
         const std::string& key, const vec3f& position, const quat& rotation, const vec3f& scale
-    ) const;
+    ) const -> void;
 
     engine_type* engine_;
     app_state* state_;
@@ -526,7 +526,7 @@ public:
 
     startup_modal(engine_type& eng, app_state& state);
 
-    void render(float delta_time);
+    auto render(float delta_time) -> void;
 
 private:
     engine_type* engine_;
@@ -547,59 +547,59 @@ public:
     timeline_panel(engine_type& eng, app_state& st, operation_manager& op_manager,
                    clip_service& clip_svc, keyframe_service& kf_svc);
 
-    void render(float delta_time);
+    auto render(float delta_time) -> void;
 
 private:
-    void render_toolbar(float clip_duration);
-    void render_tracks();
-    void render_track_row(
+    auto render_toolbar(float clip_duration) -> void;
+    auto render_tracks() -> void;
+    auto render_track_row(
         const asset::animation_track& track,
         float track_area_width,
         float clip_duration,
         float scroll_offset
-    );
-    void render_time_ruler(
+    ) -> void;
+    auto render_time_ruler(
         vec2f ruler_start,
         float ruler_width,
         float track_area_width,
         float clip_duration
-    ) const;
-    void render_scrollbar(float usable_track_width, float track_area_width, float max_scroll);
-    void render_track_context_menu(const std::string& target);
-    void render_expanded_channels(
+    ) const -> void;
+    auto render_scrollbar(float usable_track_width, float track_area_width, float max_scroll) -> void;
+    auto render_track_context_menu(const std::string& target) -> void;
+    auto render_expanded_channels(
         const asset::animation_track& track,
         const std::string& target,
         float track_area_width,
         float clip_duration,
         float scroll_offset
-    );
-    void render_keyframe_markers(
+    ) -> void;
+    auto render_keyframe_markers(
         const asset::animation_channel_variant& channel_var,
         const std::string& track_name,
         asset::animation_property prop,
         float track_width,
         float clip_duration,
         float scroll_offset
-    );
-    void render_playhead(
+    ) -> void;
+    auto render_playhead(
         float track_area_x,
         float track_width,
         float clip_duration,
         float area_top,
         float area_bottom,
         float scroll_offset
-    ) const;
+    ) const -> void;
 
-    void render_playback_controls(const std::shared_ptr<asset::animation_clip>& clip);
-    void render_clip_blend_controls_() const;
-    void handle_play(ecs::entity root, const std::shared_ptr<asset::animation_clip>& clip) const;
-    void handle_pause(ecs::entity root) const;
-    void handle_stop(ecs::entity root) const;
+    auto render_playback_controls(const std::shared_ptr<asset::animation_clip>& clip) -> void;
+    auto render_clip_blend_controls_() const -> void;
+    auto handle_play(ecs::entity root, const std::shared_ptr<asset::animation_clip>& clip) const -> void;
+    auto handle_pause(ecs::entity root) const -> void;
+    auto handle_stop(ecs::entity root) const -> void;
     auto try_get_root_entity() const -> std::optional<ecs::entity>;
 
     [[nodiscard]] auto is_current_layer_playing() const -> bool;
     [[nodiscard]] auto is_clip_on_layer() const -> bool;
-    void ensure_clip_on_layer(ecs::entity root) const;
+    auto ensure_clip_on_layer(ecs::entity root) const -> void;
     engine_type* engine_;
     app_state* state_;
     operation_manager* op_manager_;
@@ -630,12 +630,12 @@ class tool_panel final {
 public:
     explicit tool_panel(app_state& st);
 
-    void render(float delta_time) const;
+    auto render(float delta_time) const -> void;
 
 private:
     app_state* state_;
 
-    void render_tool_button(tools tool, std::string_view label, std::string_view shortcut) const;
+    auto render_tool_button(tools tool, std::string_view label, std::string_view shortcut) const -> void;
 };
 
 }  // namespace vw::sculptor

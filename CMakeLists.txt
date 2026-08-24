@@ -43,6 +43,15 @@ option(VW_BUILD_GFX "Build the Vulkan renderer and everything that needs a GPU" 
 option(VW_BUILD_APPS "Build applications" ON)
 option(VW_BUILD_TESTS "Build unit tests" ON)
 
+# Фаззеры разборщиков ассетов: libFuzzer есть только у Clang, и польза от них
+# появляется лишь под санитайзерами, поэтому по умолчанию выключены и живут в
+# своём джобе CI.
+option(VW_BUILD_FUZZERS "Build libFuzzer targets for the asset parsers" OFF)
+
+if(VW_BUILD_FUZZERS AND NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+    message(FATAL_ERROR "VW_BUILD_FUZZERS needs Clang: libFuzzer ships with it and nothing else")
+endif()
+
 if(VW_BUILD_APPS AND NOT VW_BUILD_GFX)
     message(FATAL_ERROR "VW_BUILD_APPS needs VW_BUILD_GFX: every app opens a window")
 endif()
@@ -57,4 +66,10 @@ endif()
 
 if(VW_BUILD_TESTS)
     add_subdirectory(tests)
+endif()
+
+# Отдельно от VW_BUILD_TESTS: фаззерам не нужен ни Catch2, ни всё остальное из
+# tests/, а джоб фаззинга собирает только их.
+if(VW_BUILD_FUZZERS)
+    add_subdirectory(tests/fuzz)
 endif()

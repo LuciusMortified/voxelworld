@@ -26,10 +26,10 @@ enum class level : uint8 {
 
 inline constexpr auto min_level = level::VW_LOG_MIN_LEVEL;
 
-void set_level(level lvl);
+auto set_level(level lvl) -> void;
 [[nodiscard]] auto get_level() -> level;
-void add_file_sink(std::string_view path);
-void write(level lvl, std::string_view category, std::string_view message);
+auto add_file_sink(std::string_view path) -> void;
+auto write(level lvl, std::string_view category, std::string_view message) -> void;
 
 // Категория — отдельный тип, чтобы log::info(cat, fmt, ...) нельзя было спутать
 // с log::info(fmt, ...), когда первый аргумент строка.

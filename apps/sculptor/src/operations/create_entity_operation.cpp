@@ -15,7 +15,7 @@ create_entity_operation::create_entity_operation(
 )
     : base_operation(), engine_(&engine), state_(&state), params_(params) {}
 
-void create_entity_operation::execute() {
+auto create_entity_operation::execute() -> void {
     auto& world            = engine_->get_world();
     auto& hierarchy_sys = world.system<ecs::hierarchy_system>();
     auto& transform_sys = world.system<ecs::transform_system>();
@@ -65,7 +65,7 @@ void create_entity_operation::execute() {
     state_->file.has_unsaved_changes = true;
 }
 
-void create_entity_operation::undo() {
+auto create_entity_operation::undo() -> void {
     auto& world = engine_->get_world();
     auto ent    = state_->scene.name_to_entity[params_.name];
 

@@ -89,12 +89,12 @@ public:
     combined_buffer_pool(combined_buffer_pool&&)                 = delete;
     auto operator=(combined_buffer_pool&&) -> combined_buffer_pool&      = delete;
 
-    void update(
+    auto update(
         world_type& world,
         const camera& camera,
         vk::CommandBuffer cmd,
         mesh_pool& pool
-    );
+    ) -> void;
 
     [[nodiscard]] auto get_buffers() const -> const std::vector<std::unique_ptr<combined_buffer>>&;
 
@@ -130,16 +130,16 @@ public:
 private:
     auto get_or_create_buffer(const buffer_chunk_size& chunk_size) -> combined_buffer*;
 
-    void process_destroyed_(world_type& world);
-    void update_meshes_(world_type& world, const vec3f& camera_pos, mesh_pool& pool);
-    void update_transforms_(world_type& world);
-    void update_chunk_visibility_(world_type& world, const vec3f& camera_pos);
-    void evict_uploaded_(world_type& world, mesh_pool& pool);
+    auto process_destroyed_(world_type& world) -> void;
+    auto update_meshes_(world_type& world, const vec3f& camera_pos, mesh_pool& pool) -> void;
+    auto update_transforms_(world_type& world) -> void;
+    auto update_chunk_visibility_(world_type& world, const vec3f& camera_pos) -> void;
+    auto evict_uploaded_(world_type& world, mesh_pool& pool) -> void;
 
     vulkan_context* context_;
     deletion_queue* deletion_;
     staging_buffer staging_;
-    void ensure_index_pattern_(uint32 quads);
+    auto ensure_index_pattern_(uint32 quads) -> void;
 
     std::vector<std::unique_ptr<combined_buffer>> buffers_;
     std::unique_ptr<device_index_buffer> index_buffer_;

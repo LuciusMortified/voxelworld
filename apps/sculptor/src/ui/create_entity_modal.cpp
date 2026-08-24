@@ -19,16 +19,16 @@ create_entity_modal::create_entity_modal(
 )
     : engine_(&eng), state_(&state), op_manager_(&op_manager) {}
 
-void create_entity_modal::open() {
+auto create_entity_modal::open() -> void {
     need_open_ = true;
     name_        = std::format("new entity {}", state_->scene.name_to_entity.size());
     with_model_  = false;
     with_socket_ = false;
 }
 
-void create_entity_modal::render(
+auto create_entity_modal::render(
     float /*delta_time*/
-) {
+) -> void {
     if (need_open_) {
         ImGui::OpenPopup("Create Entity");
         need_open_ = false;

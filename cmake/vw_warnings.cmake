@@ -12,7 +12,15 @@ function(vw_set_warnings target)
     if(CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
         # /permissive- нужен не меньше самих предупреждений: без него MSVC
         # принимает код, который другие компиляторы отвергают.
-        set(flags /W4 /permissive-)
+        #
+        # C4324 — «структура дополнена из-за описателя выравнивания» — сообщает
+        # ровно о том, чего от alignas и добивались: раскладка UBO обязана
+        # совпасть с std140, и паддинг там не побочный эффект, а цель. Проверяют
+        # её static_assert на offsetof в render_uniforms.cppm, а не компилятор.
+        # Гасить приходится флагом: предупреждение всплывает не в точке
+        # определения, а у каждого потребителя, импортирующего структуру, и
+        # прагма внутри модуля до них не доходит.
+        set(flags /W4 /permissive- /wd4324)
         if(VW_WARNINGS_AS_ERRORS)
             list(APPEND flags /WX)
         endif()
@@ -30,6 +38,14 @@ function(vw_set_warnings target)
             -Woverloaded-virtual
             -Wformat=2
             -Wimplicit-fallthrough
+
+            # Из -Wextra, начиная с Clang 19: требует перечислять все поля там,
+            # где инициализация идёт по именам. Но назначенные инициализаторы
+            # затем и берут, чтобы назвать отличия от умолчаний, — описания
+            # состояний в arena перечисляют по три поля из десятка сознательно.
+            # Позиционная форма под -Wmissing-field-initializers остаётся: там
+            # умолчание не видно по месту, и молчаливый пропуск поля — ошибка.
+            -Wno-missing-designated-field-initializers
         )
         if(VW_WARNINGS_AS_ERRORS)
             list(APPEND flags -Werror)

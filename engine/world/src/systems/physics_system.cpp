@@ -8,7 +8,7 @@ namespace vw::ecs {
 physics_system::physics_system(world& w)
     : world_(&w) {}
 
-void physics_system::set_gravity(float32 g) {
+auto physics_system::set_gravity(float32 g) -> void {
     gravity_ = g;
 }
 
@@ -16,9 +16,9 @@ auto physics_system::get_gravity() const -> float32 {
     return gravity_;
 }
 
-void physics_system::update(
+auto physics_system::update(
     float32 delta_time
-) {
+) -> void {
     if (!world_->system<world_grid_system>().grid()) {
         return;
     }
@@ -47,9 +47,9 @@ auto physics_system::get_stats() const -> const physics_stats& {
     return stats_;
 }
 
-void physics_system::step(
+auto physics_system::step(
     float32 dt
-) {
+) -> void {
     using clock = std::chrono::high_resolution_clock;
     constexpr float32 impulse_epsilon = 0.01f;
 

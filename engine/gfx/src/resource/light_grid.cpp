@@ -59,7 +59,7 @@ light_grid::~light_grid() {
     device.destroyDescriptorSetLayout(params_descriptor_set_layout_);
 
     if (descriptor_pool_) {
-        device.freeDescriptorSets(descriptor_pool_, params_descriptor_sets_);
+        static_cast<void>(device.freeDescriptorSets(descriptor_pool_, params_descriptor_sets_));
     }
 }
 
@@ -125,7 +125,7 @@ auto light_grid::create_pipeline_() -> void {
 
     compute_pipeline_layout_ = vk_must(
         context_->get_device().createPipelineLayout({
-            .setLayoutCount = set_layouts.size(),
+            .setLayoutCount = static_cast<uint32>(set_layouts.size()),
             .pSetLayouts    = set_layouts.data(),
         }),
         "create light cull pipeline layout"

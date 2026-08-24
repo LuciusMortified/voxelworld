@@ -23,9 +23,9 @@ entity_tree_panel::entity_tree_panel(
     , creation_modal_(eng, st, op_manager)
     , deletion_modal_(eng, st, op_manager) {}
 
-void entity_tree_panel::render(
+auto entity_tree_panel::render(
     float delta_time
-) {
+) -> void {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const auto window_pos         = ImVec2(
         viewport->WorkPos.x + viewport->WorkSize.x - 10,
@@ -84,9 +84,9 @@ void entity_tree_panel::render(
     ImGui::End();
 }
 
-void entity_tree_panel::render_entity_node(
+auto entity_tree_panel::render_entity_node(
     const std::string& name, const std::unordered_set<ecs::entity>& preview_entities
-) {
+) -> void {
     if (name.empty()) {
         return;
     }

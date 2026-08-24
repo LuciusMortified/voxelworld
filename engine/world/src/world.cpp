@@ -33,11 +33,11 @@ world::~world() {
     }
 }
 
-void world::update(float32 delta_time) {
+auto world::update(float32 delta_time) -> void {
     std::apply([delta_time](auto&... s) { (s.update(delta_time), ...); }, systems_);
 }
 
-void world::clear_changed() {
+auto world::clear_changed() -> void {
     registry_.clear_changed();
 }
 
@@ -49,7 +49,7 @@ auto world::modify(entity ent) -> modifier {
     return modifier(*this, ent);
 }
 
-void world::destroy(entity ent) noexcept {
+auto world::destroy(entity ent) noexcept -> void {
     detach_components_(ent);
     registry_.destroy(ent);
 }
@@ -62,7 +62,7 @@ auto world::batch_modify(std::vector<entity> entities) -> batch_modifier {
     return batch_modifier(*this, std::move(entities));
 }
 
-void world::batch_destroy(const std::vector<entity>& entities) noexcept {
+auto world::batch_destroy(const std::vector<entity>& entities) noexcept -> void {
     for (auto ent : entities) {
         detach_components_(ent);
     }
@@ -77,7 +77,7 @@ auto world::destroyed() const -> const std::vector<entity>& {
     return registry_.destroyed();
 }
 
-void world::detach_components_(entity ent) noexcept {
+auto world::detach_components_(entity ent) noexcept -> void {
     for (uint32 id = 0; id < registry_.pool_count(); ++id) {
         const auto* pool = registry_.try_pool(id);
         if (pool == nullptr || !pool->has(ent)) {

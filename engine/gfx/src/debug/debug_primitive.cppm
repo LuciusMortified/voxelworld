@@ -35,19 +35,19 @@ struct debug_vertex {
 
 class debug_primitives {
 public:
-    void add_line(const vec3f& begin, const vec3f& end, color clr = colors::red);
+    auto add_line(const vec3f& begin, const vec3f& end, color clr = colors::red) -> void;
 
-    void add_box(const mat4f& matrix, const vec3f& size, color clr = colors::red);
-    void add_box(const transform& transform, const vec3f& size, color clr = colors::red);
-    void add_box(const vec3f& pos, const vec3f& size, color clr = colors::red);
+    auto add_box(const mat4f& matrix, const vec3f& size, color clr = colors::red) -> void;
+    auto add_box(const transform& transform, const vec3f& size, color clr = colors::red) -> void;
+    auto add_box(const vec3f& pos, const vec3f& size, color clr = colors::red) -> void;
 
-    void add_grid(
+    auto add_grid(
         const mat4f& matrix, float cell_size, int cols, int rows, color clr = colors::red
-    );
-    void add_grid(
+    ) -> void;
+    auto add_grid(
         const transform& transform, float cell_size, int cols, int rows, color clr = colors::red
-    );
-    void add_grid(const vec3f& pos, float cell_size, int cols, int rows, color clr = colors::red);
+    ) -> void;
+    auto add_grid(const vec3f& pos, float cell_size, int cols, int rows, color clr = colors::red) -> void;
 
     [[nodiscard]]
     auto get_vertices() const -> const std::vector<debug_vertex>&;
@@ -55,7 +55,7 @@ public:
     [[nodiscard]]
     auto is_empty() const -> bool;
 
-    void clear();
+    auto clear() -> void;
 
 private:
     std::vector<debug_vertex> vertices_;

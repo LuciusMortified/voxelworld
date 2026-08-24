@@ -19,14 +19,14 @@ add_model_component_modal::add_model_component_modal(
 )
     : engine_(&eng), state_(&state), op_manager_(&op_manager) {}
 
-void add_model_component_modal::open(const std::string& entity_name) {
+auto add_model_component_modal::open(const std::string& entity_name) -> void {
     need_open_   = true;
     entity_name_ = entity_name;
     size_        = {8, 8, 8};
     error_.clear();
 }
 
-void add_model_component_modal::render() {
+auto add_model_component_modal::render() -> void {
     if (need_open_) {
         ImGui::OpenPopup("Add Model Component");
         need_open_ = false;

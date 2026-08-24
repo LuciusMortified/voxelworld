@@ -110,7 +110,7 @@ public:
     explicit arena_app(gfx::engine& eng);
     ~arena_app() override = default;
 
-    void render(float delta_time) override;
+    auto render(float delta_time) -> void override;
 
 private:
     auto handle_key_press(plat::keyboard::keys key) -> void;

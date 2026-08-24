@@ -108,9 +108,9 @@ auto player_input_controller::get_params() -> player_input_params& {
     return params_;
 }
 
-void player_input_controller::set_mouse_captured(
+auto player_input_controller::set_mouse_captured(
     bool captured
-) {
+) -> void {
     mouse_captured_ = captured;
     window_->set_cursor_mode(mouse_captured_ ? cursor_modes::DISABLED : cursor_modes::NORMAL);
     window_->set_input_mode(input_modes::RAW_MOUSE_MOTION, mouse_captured_);

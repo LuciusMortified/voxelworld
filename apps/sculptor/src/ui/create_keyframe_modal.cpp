@@ -19,9 +19,9 @@ create_keyframe_modal::create_keyframe_modal(
 )
     : engine_(&eng), state_(&st), op_manager_(&op_manager) {}
 
-void create_keyframe_modal::open(
+auto create_keyframe_modal::open(
     const std::string& track_name
-) {
+) -> void {
     need_open_  = true;
     track_name_ = track_name;
     error_.clear();
@@ -55,9 +55,9 @@ void create_keyframe_modal::open(
     }
 }
 
-void create_keyframe_modal::render(
+auto create_keyframe_modal::render(
     float /*delta_time*/
-) {
+) -> void {
     if (need_open_) {
         ImGui::OpenPopup("Add Keyframe");
         need_open_ = false;
@@ -168,7 +168,7 @@ void create_keyframe_modal::render(
     }
 }
 
-bool create_keyframe_modal::create_keyframe() {
+auto create_keyframe_modal::create_keyframe() -> bool {
     error_.clear();
 
     if (track_name_.empty()) {

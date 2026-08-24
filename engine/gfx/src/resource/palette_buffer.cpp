@@ -101,7 +101,9 @@ palette_buffer::palette_buffer(
 
 palette_buffer::~palette_buffer() {
     if (descriptor_set_ && descriptor_pool_) {
-        context_->get_device().freeDescriptorSets(descriptor_pool_, descriptor_set_);
+        static_cast<void>(
+            context_->get_device().freeDescriptorSets(descriptor_pool_, descriptor_set_)
+        );
     }
 }
 

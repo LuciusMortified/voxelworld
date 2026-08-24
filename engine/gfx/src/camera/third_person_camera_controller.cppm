@@ -38,7 +38,7 @@ public:
         third_person_camera_params params = {}
     );
 
-    void update(const player_input_state& input, entity target);
+    auto update(const player_input_state& input, entity target) -> void;
 
     [[nodiscard]] auto get_params() -> third_person_camera_params&;
     [[nodiscard]] auto get_pitch() const -> float32;

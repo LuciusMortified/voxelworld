@@ -92,7 +92,7 @@ auto timestamp() -> std::string {
 
 }  // namespace
 
-void set_level(level lvl) {
+auto set_level(level lvl) -> void {
     current_level.store(lvl, std::memory_order_relaxed);
 }
 
@@ -100,7 +100,7 @@ auto get_level() -> level {
     return current_level.load(std::memory_order_relaxed);
 }
 
-void add_file_sink(std::string_view path) {
+auto add_file_sink(std::string_view path) -> void {
     const std::lock_guard lock{sink_mutex()};
     auto& file = file_sink();
     if (file.is_open()) {
@@ -110,7 +110,7 @@ void add_file_sink(std::string_view path) {
     file.open(std::string{path}, std::ios::out | std::ios::trunc);
 }
 
-void write(level lvl, std::string_view category, std::string_view message) {
+auto write(level lvl, std::string_view category, std::string_view message) -> void {
     const auto stamp = timestamp();
     const auto body = category.empty()
                           ? std::string{message}

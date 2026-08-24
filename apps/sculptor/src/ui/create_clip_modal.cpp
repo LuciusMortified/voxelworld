@@ -19,7 +19,7 @@ create_clip_modal::create_clip_modal(
 )
     : engine_(&eng), state_(&state), op_manager_(&op_manager) {}
 
-void create_clip_modal::open() {
+auto create_clip_modal::open() -> void {
     need_open_ = true;
     auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     name_ = std::format("clip_{}", registry.count());
@@ -28,9 +28,9 @@ void create_clip_modal::open() {
     has_overwrite_confirmation_  = false;
 }
 
-void create_clip_modal::render(
+auto create_clip_modal::render(
     float /*delta_time*/
-) {
+) -> void {
     if (need_open_) {
         ImGui::OpenPopup("Create Animation Clip");
         need_open_ = false;
@@ -81,7 +81,7 @@ void create_clip_modal::render(
     }
 }
 
-bool create_clip_modal::create_clip() {
+auto create_clip_modal::create_clip() -> bool {
     namespace fs = std::filesystem;
 
     error_.clear();

@@ -40,18 +40,18 @@ public:
     renderer(renderer&&)            = delete;
     renderer& operator=(renderer&&) = delete;
 
-    void begin_frame();
-    void render(world_type& world, camera& camera);
-    void end_frame();
+    auto begin_frame() -> void;
+    auto render(world_type& world, camera& camera) -> void;
+    auto end_frame() -> void;
 
-    void set_clear_color(float r, float g, float b, float a = 1.0f);
-    void set_clear_color(vec4f color);
+    auto set_clear_color(float r, float g, float b, float a = 1.0f) -> void;
+    auto set_clear_color(vec4f color) -> void;
 
-    void wait_idle() const;
+    auto wait_idle() const -> void;
 
-    void handle_resize();
+    auto handle_resize() -> void;
 
-    void set_render_mode(render_mode mode);
+    auto set_render_mode(render_mode mode) -> void;
 
     [[nodiscard]] auto get_render_mode() const -> render_mode;
 
@@ -69,21 +69,21 @@ public:
         return storage_descriptor_set_layout_;
     }
 
-    void draw_line(const vec3f& a, const vec3f& b, color col = colors::red);
+    auto draw_line(const vec3f& a, const vec3f& b, color col = colors::red) -> void;
 
-    void draw_box(const mat4f& matrix, const vec3f& size, color col = colors::red);
-    void draw_box(const transform& transform, const vec3f& size, color col = colors::red);
-    void draw_box(const vec3f& position, const vec3f& size, color col = colors::red);
+    auto draw_box(const mat4f& matrix, const vec3f& size, color col = colors::red) -> void;
+    auto draw_box(const transform& transform, const vec3f& size, color col = colors::red) -> void;
+    auto draw_box(const vec3f& position, const vec3f& size, color col = colors::red) -> void;
 
-    void draw_grid(
+    auto draw_grid(
         const mat4f& matrix, float cell_size, int cols, int rows, color clr = colors::red
-    );
-    void draw_grid(
+    ) -> void;
+    auto draw_grid(
         const transform& transform, float cell_size, int cols, int rows, color clr = colors::red
-    );
-    void draw_grid(
+    ) -> void;
+    auto draw_grid(
         const vec3f& position, float cell_size, int cols, int rows, color clr = colors::red
-    );
+    ) -> void;
 
     [[nodiscard]] auto get_directional_light_settings() -> directional_light_settings&;
     [[nodiscard]] auto get_fog_settings() -> fog_settings&;
@@ -113,7 +113,7 @@ public:
     [[nodiscard]] auto get_cluster_grid(const camera& camera) const -> spatial::cluster_grid;
     [[nodiscard]] auto get_shadow_settings() -> shadow_settings&;
 
-    void set_debug_view(debug_view view);
+    auto set_debug_view(debug_view view) -> void;
     [[nodiscard]] auto get_debug_view() const -> debug_view;
 
     // Где кончается каждый каскад и что покрывает один его тексель. Читать это
@@ -137,78 +137,78 @@ public:
         combined_buffer_pool_->set_chunk_cull_enabled(enabled);
     }
 
-    void draw_colliders(world_type& w, color col = colors::green);
+    auto draw_colliders(world_type& w, color col = colors::green) -> void;
 
     // Получить ImTextureID для shadow map (для отображения в ImGui::Image)
     // В Vulkan это vk::DescriptorSet, приведенный к void*
-    [[nodiscard]] void* get_shadow_map_texture_id(uint32 cascade_index = 0) const;
+    [[nodiscard]] auto get_shadow_map_texture_id(uint32 cascade_index = 0) const -> void*;
 
 private:
-    void create_swapchain();
-    void create_image_views();
-    void create_depth_resources();
-    void create_render_pass();
-    void create_descriptor_set_layouts();
-    void create_graphics_pipeline();
-    void create_wireframe_pipeline();
-    void create_shadow_pipeline();
-    void create_debug_pipeline();
-    void create_framebuffers();
-    void create_command_buffers();
-    void create_sync_objects();
-    void create_uniform_buffers();
-    void create_shadow_uniform_buffers();
-    void create_descriptor_pool();
-    void create_descriptor_sets();
-    void create_shadow_descriptor_sets();
-    void create_shadow_map_descriptor_sets();
+    auto create_swapchain() -> void;
+    auto create_image_views() -> void;
+    auto create_depth_resources() -> void;
+    auto create_render_pass() -> void;
+    auto create_descriptor_set_layouts() -> void;
+    auto create_graphics_pipeline() -> void;
+    auto create_wireframe_pipeline() -> void;
+    auto create_shadow_pipeline() -> void;
+    auto create_debug_pipeline() -> void;
+    auto create_framebuffers() -> void;
+    auto create_command_buffers() -> void;
+    auto create_sync_objects() -> void;
+    auto create_uniform_buffers() -> void;
+    auto create_shadow_uniform_buffers() -> void;
+    auto create_descriptor_pool() -> void;
+    auto create_descriptor_sets() -> void;
+    auto create_shadow_descriptor_sets() -> void;
+    auto create_shadow_map_descriptor_sets() -> void;
 
-    void init_imgui();
-    void setup_imgui_style();
-    void create_imgui_descriptor_pool();
-    void cleanup_imgui();
+    auto init_imgui() -> void;
+    auto setup_imgui_style() -> void;
+    auto create_imgui_descriptor_pool() -> void;
+    auto cleanup_imgui() -> void;
 
-    void cleanup_descriptor_pool();
-    void cleanup_render_pass();
-    void cleanup_descriptor_set_layouts();
-    void cleanup_pipelines();
-    void cleanup_shadow_pipeline();
-    void cleanup_debug_pipeline();
-    void cleanup_swapchain();
-    void cleanup_depth_resources();
-    void recreate_swapchain();
+    auto cleanup_descriptor_pool() -> void;
+    auto cleanup_render_pass() -> void;
+    auto cleanup_descriptor_set_layouts() -> void;
+    auto cleanup_pipelines() -> void;
+    auto cleanup_shadow_pipeline() -> void;
+    auto cleanup_debug_pipeline() -> void;
+    auto cleanup_swapchain() -> void;
+    auto cleanup_depth_resources() -> void;
+    auto recreate_swapchain() -> void;
 
-    void create_point_lights_descriptor_set_layout();
-    void cleanup_point_lights_resources();
+    auto create_point_lights_descriptor_set_layout() -> void;
+    auto cleanup_point_lights_resources() -> void;
 
-    void create_palette_descriptor_set_layout();
-    void cleanup_palette_resources();
+    auto create_palette_descriptor_set_layout() -> void;
+    auto cleanup_palette_resources() -> void;
 
-    void update_shadow_uniform_buffer() const;
-    void render_shadow_pass(world_type& world, const camera& camera);
+    auto update_shadow_uniform_buffer() const -> void;
+    auto render_shadow_pass(world_type& world, const camera& camera) -> void;
 
-    void update_uniform_buffer(world_type& world, const camera& camera) const;
+    auto update_uniform_buffer(world_type& world, const camera& camera) const -> void;
 
 
-    void render_world_pass(world_type& world, const camera& camera);
-    void render_world(world_type& world, const camera& camera);
+    auto render_world_pass(world_type& world, const camera& camera) -> void;
+    auto render_world(world_type& world, const camera& camera) -> void;
 
-    void sync_meshes_(world_type& world);
+    auto sync_meshes_(world_type& world) -> void;
 
-    void render_debug_primitives();
-    void update_debug_vertex_buffer();
+    auto render_debug_primitives() -> void;
+    auto update_debug_vertex_buffer() -> void;
 
-    void render_imgui() const;
-
-    [[nodiscard]]
-    vk::Format find_depth_format();
+    auto render_imgui() const -> void;
 
     [[nodiscard]]
-    vk::Format find_supported_format(
+    auto find_depth_format() -> vk::Format;
+
+    [[nodiscard]]
+    auto find_supported_format(
         const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features
-    );
+    ) -> vk::Format;
 
-    void create_image(
+    auto create_image(
         vk::Image& image,
         vk::DeviceMemory& image_memory,
         vk::Extent2D extent,
@@ -217,26 +217,26 @@ private:
         vk::ImageUsageFlags usage,
         vk::MemoryPropertyFlags properties,
         vk::SampleCountFlagBits samples = vk::SampleCountFlagBits::e1
-    );
+    ) -> void;
 
     [[nodiscard]]
-    vk::ImageView create_image_view(vk::Image image, vk::Format format, vk::ImageAspectFlags aspect_flags);
+    auto create_image_view(vk::Image image, vk::Format format, vk::ImageAspectFlags aspect_flags) -> vk::ImageView;
 
     [[nodiscard]]
-    uint32 find_memory_type(uint32 typeFilter, vk::MemoryPropertyFlags properties);
+    auto find_memory_type(uint32 typeFilter, vk::MemoryPropertyFlags properties) -> uint32;
 
     [[nodiscard]]
-    static vk::SurfaceFormatKHR choose_swap_surface_format(
+    static auto choose_swap_surface_format(
         const std::vector<vk::SurfaceFormatKHR>& available_formats
-    );
+    ) -> vk::SurfaceFormatKHR;
 
     [[nodiscard]]
-    static vk::PresentModeKHR choose_swap_present_mode(
+    static auto choose_swap_present_mode(
         const std::vector<vk::PresentModeKHR>& available_present_modes
-    );
+    ) -> vk::PresentModeKHR;
 
     [[nodiscard]]
-    vk::Extent2D choose_swap_extent(const vk::SurfaceCapabilitiesKHR& capabilities);
+    auto choose_swap_extent(const vk::SurfaceCapabilitiesKHR& capabilities) -> vk::Extent2D;
 
     vulkan_context* context_;
     window* window_;

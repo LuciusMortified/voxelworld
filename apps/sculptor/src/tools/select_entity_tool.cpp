@@ -15,9 +15,9 @@ select_entity_tool::select_entity_tool(
 )
     : engine_(&eng), state_(&st), hovered_entity_(ecs::invalid_entity) {}
 
-void select_entity_tool::render(
-    float delta_time
-) {
+auto select_entity_tool::render(
+    [[maybe_unused]] float delta_time
+) -> void {
     const bool has_selected =
         state_->scene.name_to_entity.contains(state_->scene.selected_name);
 
@@ -33,19 +33,19 @@ void select_entity_tool::render(
     }
 }
 
-void select_entity_tool::on_key_press(
-    const plat::key_press_event& ev
-) {}
+auto select_entity_tool::on_key_press(
+    [[maybe_unused]] const plat::key_press_event& ev
+) -> void {}
 
-void select_entity_tool::on_mouse_move(
-    const plat::mouse_move_event& ev
-) {
+auto select_entity_tool::on_mouse_move(
+    [[maybe_unused]] const plat::mouse_move_event& ev
+) -> void {
     update_hovered_entity_();
 }
 
-void select_entity_tool::on_mouse_press(
+auto select_entity_tool::on_mouse_press(
     const plat::mouse_press_event& ev
-) {
+) -> void {
     if (ev.button != plat::mouse::buttons::LEFT) {
         return;
     }
@@ -59,15 +59,15 @@ void select_entity_tool::on_mouse_press(
     }
 }
 
-void select_entity_tool::on_mouse_release(
-    const plat::mouse_release_event& ev
-) {}
+auto select_entity_tool::on_mouse_release(
+    [[maybe_unused]] const plat::mouse_release_event& ev
+) -> void {}
 
-void select_entity_tool::on_activate() {
+auto select_entity_tool::on_activate() -> void {
     update_hovered_entity_();
 }
 
-void select_entity_tool::update_hovered_entity_() {
+auto select_entity_tool::update_hovered_entity_() -> void {
     const auto& world  = engine_->get_world();
     const auto& window = engine_->get_window();
     const auto& camera = engine_->get_camera();
@@ -83,9 +83,9 @@ void select_entity_tool::update_hovered_entity_() {
     hovered_entity_ = hit->ent;
 }
 
-void select_entity_tool::draw_entity_box_(
+auto select_entity_tool::draw_entity_box_(
     ecs::entity ent, color col
-) {
+) -> void {
     auto& world = engine_->get_world();
 
     const bool is_renderable =

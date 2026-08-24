@@ -36,7 +36,7 @@ auto remove_animation_target_operation::find_animation_root_(
     return ecs::invalid_entity;
 }
 
-void remove_animation_target_operation::execute() {
+auto remove_animation_target_operation::execute() -> void {
     auto& world    = engine_->get_world();
     auto& anim_sys = world.system<ecs::animation_system>();
 
@@ -54,7 +54,7 @@ void remove_animation_target_operation::execute() {
     state_->file.has_unsaved_changes = true;
 }
 
-void remove_animation_target_operation::undo() {
+auto remove_animation_target_operation::undo() -> void {
     auto& world    = engine_->get_world();
     auto& anim_sys = world.system<ecs::animation_system>();
 

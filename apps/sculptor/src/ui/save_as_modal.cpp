@@ -19,9 +19,9 @@ save_as_modal::save_as_modal(
 )
     : engine_(&eng), state_(&st), file_service_(&file_svc) {}
 
-void save_as_modal::render(
+auto save_as_modal::render(
     float /*delta_time*/
-) {
+) -> void {
     if (state_->ui.need_save_as_modal) {
         ImGui::OpenPopup("Save As");
         state_->ui.need_save_as_modal = false;
@@ -48,7 +48,7 @@ void save_as_modal::render(
     }
 }
 
-void save_as_modal::render_overwrite_confirmation() {
+auto save_as_modal::render_overwrite_confirmation() -> void {
     ImGui::TextColored(ImVec4{1.0f, 1.0f, 0.0f, 1.0f}, "File already exists. Overwrite?");
     ImGui::Spacing();
 
@@ -65,7 +65,7 @@ void save_as_modal::render_overwrite_confirmation() {
     }
 }
 
-void save_as_modal::render_save_form() {
+auto save_as_modal::render_save_form() -> void {
     if (!error_.empty()) {
         ImGui::TextColored(ImVec4{1.0f, 0.0f, 0.0f, 1.0f}, "%s", error_.c_str());
         ImGui::Spacing();

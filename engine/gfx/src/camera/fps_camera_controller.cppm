@@ -20,26 +20,26 @@ public:
     explicit fps_camera_controller(float mouse_sensitivity = 0.1f, float camera_speed = 5.0f);
     virtual ~fps_camera_controller() = default;
 
-    void setup(window& window, camera& camera);
-    void update(float delta_time) const;
+    auto setup(window& window, camera& camera) -> void;
+    auto update(float delta_time) const -> void;
 
-    void set_mouse_sensitivity(float sensitivity);
+    auto set_mouse_sensitivity(float sensitivity) -> void;
     [[nodiscard]] auto get_mouse_sensitivity() const -> float;
 
-    void set_camera_speed(float speed);
+    auto set_camera_speed(float speed) -> void;
     [[nodiscard]] auto get_camera_speed() const -> float;
 
     [[nodiscard]] auto is_mouse_captured() const -> bool;
-    void set_mouse_captured(bool captured);
-    void toggle_mouse_captured();
+    auto set_mouse_captured(bool captured) -> void;
+    auto toggle_mouse_captured() -> void;
 
     [[nodiscard]] auto keyboard_control_enabled() const -> bool;
-    void set_keyboard_control_enabled(bool enabled);
-    void toggle_keyboard_control_enabled();
+    auto set_keyboard_control_enabled(bool enabled) -> void;
+    auto toggle_keyboard_control_enabled() -> void;
 
 private:
-    void update_camera_movement_(float delta_time) const;
-    void handle_mouse_moved_(double x, double y);
+    auto update_camera_movement_(float delta_time) const -> void;
+    auto handle_mouse_moved_(double x, double y) -> void;
 
     float mouse_sensitivity_;
     float camera_speed_;

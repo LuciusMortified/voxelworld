@@ -10,7 +10,7 @@ transform_system::transform_system(world& w)
 
 template <typename C>
     requires (std::same_as<C, transform_component> || std::same_as<C, spatial_component>)
-void transform_system::on_add(entity e) {
+auto transform_system::on_add(entity e) -> void {
     world_->registry().request_change<transform_component>(e);
 }
 
@@ -232,7 +232,7 @@ auto transform_system::transform_modifier::set_transform_with_matrix(
     return *this;
 }
 
-void transform_system::update(float32 /*dt*/) {
+auto transform_system::update(float32 /*dt*/) -> void {
     auto& reg       = world_->registry();
     auto& requested = reg.requested<transform_component>();
     if (requested.empty()) {
@@ -276,9 +276,9 @@ void transform_system::update(float32 /*dt*/) {
     reg.clear_requested<transform_component>();
 }
 
-void transform_system::mark_children_world_dirty(
+auto transform_system::mark_children_world_dirty(
     entity ent
-) {
+) -> void {
     auto& reg = world_->registry();
     if (!reg.has<hierarchy_component>(ent)) {
         return;
@@ -296,9 +296,9 @@ void transform_system::mark_children_world_dirty(
         mark_children_world_dirty(child);
     }
 }
-void transform_system::update_entity_world_matrix(
+auto transform_system::update_entity_world_matrix(
     entity ent, const transform_component& transform_comp
-) {
+) -> void {
     mat4f local_matrix           = transform_comp.get_local_matrix();
     transform_comp.world_matrix_ = local_matrix;
 

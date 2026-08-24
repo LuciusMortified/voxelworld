@@ -43,8 +43,8 @@ public:
     [[nodiscard]] auto batch_create(uint32 count) -> std::vector<entity>;
     [[nodiscard]] auto has(entity e) const -> bool;
 
-    void destroy(entity e);
-    void batch_destroy(const std::vector<entity>& entities);
+    auto destroy(entity e) -> void;
+    auto batch_destroy(const std::vector<entity>& entities) -> void;
 
     [[nodiscard]] auto alive_entities() const -> std::vector<entity>;
 

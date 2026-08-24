@@ -17,14 +17,14 @@ class base_tool {
 public:
     virtual ~base_tool() = default;
 
-    virtual void render(float delta_time) = 0;
+    virtual auto render(float delta_time) -> void = 0;
 
-    virtual void on_key_press(const plat::key_press_event& ev)         = 0;
-    virtual void on_mouse_move(const plat::mouse_move_event& ev)       = 0;
-    virtual void on_mouse_press(const plat::mouse_press_event& ev)     = 0;
-    virtual void on_mouse_release(const plat::mouse_release_event& ev) = 0;
+    virtual auto on_key_press(const plat::key_press_event& ev) -> void         = 0;
+    virtual auto on_mouse_move(const plat::mouse_move_event& ev) -> void       = 0;
+    virtual auto on_mouse_press(const plat::mouse_press_event& ev) -> void     = 0;
+    virtual auto on_mouse_release(const plat::mouse_release_event& ev) -> void = 0;
 
-    virtual void on_activate() = 0;
+    virtual auto on_activate() -> void = 0;
 };
 
 }  // namespace vw::sculptor
@@ -38,15 +38,15 @@ public:
 
     add_voxel_tool(engine_type& eng, app_state& st, operation_manager& op_manager);
 
-    void render(float delta_time) override;
-    void on_key_press(const plat::key_press_event& ev) override;
-    void on_mouse_move(const plat::mouse_move_event& ev) override;
-    void on_mouse_press(const plat::mouse_press_event& ev) override;
-    void on_mouse_release(const plat::mouse_release_event& ev) override;
-    void on_activate() override;
+    auto render(float delta_time) -> void override;
+    auto on_key_press(const plat::key_press_event& ev) -> void override;
+    auto on_mouse_move(const plat::mouse_move_event& ev) -> void override;
+    auto on_mouse_press(const plat::mouse_press_event& ev) -> void override;
+    auto on_mouse_release(const plat::mouse_release_event& ev) -> void override;
+    auto on_activate() -> void override;
 
 private:
-    void update_hovered_voxel_();
+    auto update_hovered_voxel_() -> void;
 
     engine_type* engine_;
     app_state* state_;
@@ -67,15 +67,15 @@ public:
 
     color_picker_tool(engine_type& eng, app_state& st, operation_manager& op_manager);
 
-    void render(float delta_time) override;
-    void on_key_press(const plat::key_press_event& ev) override;
-    void on_mouse_move(const plat::mouse_move_event& ev) override;
-    void on_mouse_press(const plat::mouse_press_event& ev) override;
-    void on_mouse_release(const plat::mouse_release_event& ev) override;
-    void on_activate() override;
+    auto render(float delta_time) -> void override;
+    auto on_key_press(const plat::key_press_event& ev) -> void override;
+    auto on_mouse_move(const plat::mouse_move_event& ev) -> void override;
+    auto on_mouse_press(const plat::mouse_press_event& ev) -> void override;
+    auto on_mouse_release(const plat::mouse_release_event& ev) -> void override;
+    auto on_activate() -> void override;
 
 private:
-    void update_hovered_voxel_();
+    auto update_hovered_voxel_() -> void;
 
     engine_type* engine_;
     app_state* state_;
@@ -92,27 +92,27 @@ export namespace vw::sculptor {
 
 class dummy_tool final : public base_tool {
 public:
-    void render(
-        float delta_time
-    ) override {}
+    auto render(
+        [[maybe_unused]] float delta_time
+    ) -> void override{}
 
-    void on_key_press(
-        const plat::key_press_event& ev
-    ) override {}
+    auto on_key_press(
+        [[maybe_unused]] const plat::key_press_event& ev
+    ) -> void override{}
 
-    void on_mouse_move(
-        const plat::mouse_move_event& ev
-    ) override {}
+    auto on_mouse_move(
+        [[maybe_unused]] const plat::mouse_move_event& ev
+    ) -> void override{}
 
-    void on_mouse_press(
-        const plat::mouse_press_event& ev
-    ) override {}
+    auto on_mouse_press(
+        [[maybe_unused]] const plat::mouse_press_event& ev
+    ) -> void override{}
 
-    void on_mouse_release(
-        const plat::mouse_release_event& ev
-    ) override {}
+    auto on_mouse_release(
+        [[maybe_unused]] const plat::mouse_release_event& ev
+    ) -> void override{}
 
-    void on_activate() override {}
+    auto on_activate() -> void override{}
 };
 
 }  // namespace vw::sculptor
@@ -126,15 +126,15 @@ public:
 
     paint_tool(engine_type& eng, app_state& st, operation_manager& op_manager);
 
-    void render(float delta_time) override;
-    void on_key_press(const plat::key_press_event& ev) override;
-    void on_mouse_move(const plat::mouse_move_event& ev) override;
-    void on_mouse_press(const plat::mouse_press_event& ev) override;
-    void on_mouse_release(const plat::mouse_release_event& ev) override;
-    void on_activate() override;
+    auto render(float delta_time) -> void override;
+    auto on_key_press(const plat::key_press_event& ev) -> void override;
+    auto on_mouse_move(const plat::mouse_move_event& ev) -> void override;
+    auto on_mouse_press(const plat::mouse_press_event& ev) -> void override;
+    auto on_mouse_release(const plat::mouse_release_event& ev) -> void override;
+    auto on_activate() -> void override;
 
 private:
-    void update_hovered_voxel_();
+    auto update_hovered_voxel_() -> void;
 
     engine_type* engine_;
     app_state* state_;
@@ -155,15 +155,15 @@ public:
 
     remove_voxel_tool(engine_type& eng, app_state& st, operation_manager& op_manager);
 
-    void render(float delta_time) override;
-    void on_key_press(const plat::key_press_event& ev) override;
-    void on_mouse_move(const plat::mouse_move_event& ev) override;
-    void on_mouse_press(const plat::mouse_press_event& ev) override;
-    void on_mouse_release(const plat::mouse_release_event& ev) override;
-    void on_activate() override;
+    auto render(float delta_time) -> void override;
+    auto on_key_press(const plat::key_press_event& ev) -> void override;
+    auto on_mouse_move(const plat::mouse_move_event& ev) -> void override;
+    auto on_mouse_press(const plat::mouse_press_event& ev) -> void override;
+    auto on_mouse_release(const plat::mouse_release_event& ev) -> void override;
+    auto on_activate() -> void override;
 
 private:
-    void update_hovered_voxel_();
+    auto update_hovered_voxel_() -> void;
 
     engine_type* engine_;
     app_state* state_;
@@ -184,16 +184,16 @@ public:
 
     select_entity_tool(engine_type& eng, app_state& st);
 
-    void render(float delta_time) override;
-    void on_key_press(const plat::key_press_event& ev) override;
-    void on_mouse_move(const plat::mouse_move_event& ev) override;
-    void on_mouse_press(const plat::mouse_press_event& ev) override;
-    void on_mouse_release(const plat::mouse_release_event& ev) override;
-    void on_activate() override;
+    auto render(float delta_time) -> void override;
+    auto on_key_press(const plat::key_press_event& ev) -> void override;
+    auto on_mouse_move(const plat::mouse_move_event& ev) -> void override;
+    auto on_mouse_press(const plat::mouse_press_event& ev) -> void override;
+    auto on_mouse_release(const plat::mouse_release_event& ev) -> void override;
+    auto on_activate() -> void override;
 
 private:
-    void update_hovered_entity_();
-    void draw_entity_box_(ecs::entity ent, color col);
+    auto update_hovered_entity_() -> void;
+    auto draw_entity_box_(ecs::entity ent, color col) -> void;
 
     engine_type* engine_;
     app_state* state_;

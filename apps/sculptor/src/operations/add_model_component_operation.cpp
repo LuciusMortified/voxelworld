@@ -15,7 +15,7 @@ add_model_component_operation::add_model_component_operation(
 )
     : engine_(&engine), state_(&state), params_(params) {}
 
-void add_model_component_operation::execute() {
+auto add_model_component_operation::execute() -> void {
     auto& world          = engine_->get_world();
     auto& model_reg = world.resource<asset::model_registry>();
     auto& model_sys = world.system<ecs::model_system>();
@@ -34,7 +34,7 @@ void add_model_component_operation::execute() {
     state_->file.has_unsaved_changes = true;
 }
 
-void add_model_component_operation::undo() {
+auto add_model_component_operation::undo() -> void {
     auto& world          = engine_->get_world();
     auto& model_reg = world.resource<asset::model_registry>();
 

@@ -25,7 +25,7 @@ constexpr int entity_count = 200000;
 constexpr int rounds       = 200;
 
 template <typename Fn>
-void measure(const char* label, Fn&& body) {
+auto measure(const char* label, Fn&& body) -> void {
     double sum       = 0.0;
     const auto start = std::chrono::steady_clock::now();
     for (int r = 0; r < rounds; ++r) {

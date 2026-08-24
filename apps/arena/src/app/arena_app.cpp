@@ -68,13 +68,13 @@ arena_app::arena_app(
 
     auto& fog         = get_engine().get_renderer().get_fog_settings();
     fog.color         = {0.4f, 0.6f, 0.9f};
-    fog.near_distance = 6 * 64 * generator_params_.voxel_scale;
-    fog.far_distance  = 9 * 64 * generator_params_.voxel_scale;
+    fog.near_distance = 6.f * 64.f * generator_params_.voxel_scale;
+    fog.far_distance  = 9.f * 64.f * generator_params_.voxel_scale;
 }
 
-void arena_app::render(
-    float delta_time
-) {
+auto arena_app::render(
+    [[maybe_unused]] float delta_time
+) -> void {
     if (!player_->is_placed()) {
         player_->try_place(static_cast<float32>(generator_params_.voxel_scale));
     }

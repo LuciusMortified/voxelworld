@@ -15,7 +15,7 @@ playback_service::playback_service(
 )
     : engine_(&eng), state_(&state) {}
 
-void playback_service::toggle_playback() const {
+auto playback_service::toggle_playback() const -> void {
     if (state_->anim.selected_clip_name.empty() || state_->scene.root_name.empty() ||
         !state_->scene.name_to_entity.contains(state_->scene.root_name)) {
         return;
@@ -66,7 +66,7 @@ void playback_service::toggle_playback() const {
     }
 }
 
-void playback_service::stop_playback() const {
+auto playback_service::stop_playback() const -> void {
     if (!state_->scene.root_name.empty() &&
         state_->scene.name_to_entity.contains(state_->scene.root_name)) {
         auto& world          = engine_->get_world();

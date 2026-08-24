@@ -19,9 +19,9 @@ socket_panel::socket_panel(
 )
     : engine_(&eng), state_(&st), op_manager_(&op_manager) {}
 
-void socket_panel::render(
+auto socket_panel::render(
     float /*delta_time*/
-) {
+) -> void {
     if (state_->scene.selected_name.empty()) {
         return;
     }
@@ -118,9 +118,9 @@ void socket_panel::render(
     render_preview_file_list_();
 }
 
-void socket_panel::render_socket_(
+auto socket_panel::render_socket_(
     const ecs::socket_point& sp, std::string& socket_to_remove
-) {
+) -> void {
     constexpr ImGuiTreeNodeFlags flags =  //
         ImGuiTreeNodeFlags_OpenOnArrow |  //
         ImGuiTreeNodeFlags_OpenOnDoubleClick;
@@ -216,7 +216,7 @@ void socket_panel::render_socket_(
     }
 }
 
-void socket_panel::render_add_socket_() {
+auto socket_panel::render_add_socket_() -> void {
     if (ImGui::Button("Add Socket")) {
         need_add_socket_modal_ = true;
         new_socket_name_.clear();
@@ -224,7 +224,7 @@ void socket_panel::render_add_socket_() {
     }
 }
 
-void socket_panel::render_add_socket_modal_() {
+auto socket_panel::render_add_socket_modal_() -> void {
     if (need_add_socket_modal_) {
         ImGui::OpenPopup("Add Socket");
         need_add_socket_modal_ = false;
@@ -269,7 +269,7 @@ void socket_panel::render_add_socket_modal_() {
     }
 }
 
-void socket_panel::render_preview_file_list_() {
+auto socket_panel::render_preview_file_list_() -> void {
     if (need_preview_modal_) {
         ImGui::OpenPopup("Load Preview");
         need_preview_modal_ = false;
@@ -334,9 +334,9 @@ void socket_panel::render_preview_file_list_() {
     }
 }
 
-void socket_panel::load_preview_(
+auto socket_panel::load_preview_(
     const std::string& socket_name, const std::string& filename
-) const {
+) const -> void {
     const auto pkey = socket_state::socket_preview_key(state_->scene.selected_name, socket_name);
     unload_preview_(pkey);
 
@@ -384,15 +384,15 @@ void socket_panel::load_preview_(
     state_->sockets.socket_previews[pkey] = std::move(preview);
 }
 
-void socket_panel::unload_preview_(
+auto socket_panel::unload_preview_(
     const std::string& key
-) const {
+) const -> void {
     state_->sockets.erase_preview(key, engine_->get_world());
 }
 
-void socket_panel::update_preview_transform_(
+auto socket_panel::update_preview_transform_(
     const std::string& key, const vec3f& position, const quat& rotation, const vec3f& scale
-) const {
+) const -> void {
     const auto it = state_->sockets.socket_previews.find(key);
     if (it == state_->sockets.socket_previews.end()) {
         return;

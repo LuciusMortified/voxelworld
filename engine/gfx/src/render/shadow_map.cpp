@@ -28,7 +28,7 @@ shadow_map::~shadow_map() {
     cleanup();
 }
 
-void shadow_map::create_shadow_map_image() {
+auto shadow_map::create_shadow_map_image() -> void {
     constexpr std::array candidates = {
         vk::Format::eD32Sfloat,
         vk::Format::eD32SfloatS8Uint,
@@ -129,7 +129,7 @@ void shadow_map::create_shadow_map_image() {
     }
 }
 
-void shadow_map::create_sampler() {
+auto shadow_map::create_sampler() -> void {
     // Линейная фильтрация на сравнивающем сэмплере — это бесплатный аппаратный PCF:
     // одна выборка становится взвешенным средним четырёх сравнений вместо одного.
     // Ближайшая давала двоичный край, квантованный по сетке текселей, а это половина
@@ -161,7 +161,7 @@ void shadow_map::create_sampler() {
         vk_must(context_->get_device().createSampler(sampler_info), "create shadow debug sampler");
 }
 
-void shadow_map::create_render_pass() {
+auto shadow_map::create_render_pass() -> void {
     vk::AttachmentDescription depth_attachment{};
     depth_attachment.format         = vk::Format::eD32Sfloat;
     depth_attachment.samples        = vk::SampleCountFlagBits::e1;
@@ -202,7 +202,7 @@ void shadow_map::create_render_pass() {
     );
 }
 
-void shadow_map::create_framebuffers() {
+auto shadow_map::create_framebuffers() -> void {
     for (uint32 i = 0; i < cascade_count; ++i) {
         vk::FramebufferCreateInfo framebuffer_info{};
         framebuffer_info.renderPass      = shadow_render_pass_;
@@ -219,9 +219,9 @@ void shadow_map::create_framebuffers() {
     }
 }
 
-void shadow_map::invalidate(
+auto shadow_map::invalidate(
     const vw::spatial::aabb& bounds
-) {
+) -> void {
     for (uint32 i = 0; i < cascade_count; ++i) {
         if (cascade_frustums_[i].intersects(bounds)) {
             dirty_mask_ |= 1U << i;
@@ -229,7 +229,7 @@ void shadow_map::invalidate(
     }
 }
 
-void shadow_map::invalidate_all() {
+auto shadow_map::invalidate_all() -> void {
     dirty_mask_ = (1U << cascade_count) - 1;
 }
 
@@ -243,13 +243,13 @@ auto shadow_map::get_pending_count() const -> uint32 {
     return static_cast<uint32>(std::popcount(pending_mask_));
 }
 
-void shadow_map::clear_pending() {
+auto shadow_map::clear_pending() -> void {
     pending_mask_ = 0;
 }
 
-void shadow_map::update(
+auto shadow_map::update(
     const camera& camera, const vec3f& light_direction
-) {
+) -> void {
     const vec3f light_dir = math::normalize(light_direction);
 
     // Разбиения идут геометрической прогрессией: каждый каскад — одно и то же
@@ -486,14 +486,14 @@ auto shadow_map::select_cascades_(
     return selected;
 }
 
-void shadow_map::build_cascade_matrix_(
+auto shadow_map::build_cascade_matrix_(
     uint32 cascade_index,
     const std::array<vec3f, 8>& corners,
     const vec3f& center,
     float32 radius,
     const vec3f& light_dir,
     float32 shadow_dist
-) {
+) -> void {
     drawn_centers_[cascade_index]    = center;
     drawn_radii_[cascade_index]      = radius;
     drawn_light_dirs_[cascade_index] = light_dir;
@@ -550,9 +550,9 @@ auto shadow_map::get_cascade_texel_sizes() const
     return cascade_texel_sizes_;
 }
 
-mat4f shadow_map::get_light_space_matrix(
+auto shadow_map::get_light_space_matrix(
     uint32 cascade_index
-) const {
+) const -> mat4f {
     return light_space_matrices_[cascade_index];
 }
 
@@ -569,39 +569,39 @@ auto shadow_map::get_cascade_frustums() const -> const std::array<vw::spatial::f
     return cascade_frustums_;
 }
 
-vk::Image shadow_map::get_image() const {
+auto shadow_map::get_image() const -> vk::Image {
     return shadow_image_;
 }
 
-vk::ImageView shadow_map::get_image_view(
+auto shadow_map::get_image_view(
     uint32 cascade_index
-) const {
+) const -> vk::ImageView {
     return shadow_cascade_image_views_[cascade_index];
 }
 
-vk::ImageView shadow_map::get_array_image_view() const {
+auto shadow_map::get_array_image_view() const -> vk::ImageView {
     return shadow_array_image_view_;
 }
 
-vk::Sampler shadow_map::get_sampler() const {
+auto shadow_map::get_sampler() const -> vk::Sampler {
     return shadow_sampler_;
 }
 
-vk::Sampler shadow_map::get_debug_sampler() const {
+auto shadow_map::get_debug_sampler() const -> vk::Sampler {
     return debug_sampler_;
 }
 
-vk::Framebuffer shadow_map::get_framebuffer(
+auto shadow_map::get_framebuffer(
     uint32 cascade_index
-) const {
+) const -> vk::Framebuffer {
     return shadow_framebuffers_[cascade_index];
 }
 
-vk::RenderPass shadow_map::get_render_pass() const {
+auto shadow_map::get_render_pass() const -> vk::RenderPass {
     return shadow_render_pass_;
 }
 
-void shadow_map::cleanup() {
+auto shadow_map::cleanup() -> void {
     const vk::Device device = context_->get_device();
 
     for (uint32 i = 0; i < cascade_count; ++i) {

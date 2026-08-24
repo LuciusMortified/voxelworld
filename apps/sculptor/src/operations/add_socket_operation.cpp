@@ -15,7 +15,7 @@ add_socket_operation::add_socket_operation(
 )
     : engine_(&engine), state_(&st), params_(params) {}
 
-void add_socket_operation::execute() {
+auto add_socket_operation::execute() -> void {
     auto& world         = engine_->get_world();
     auto& socket_sys = world.system<ecs::socket_system>();
 
@@ -26,7 +26,7 @@ void add_socket_operation::execute() {
     state_->file.has_unsaved_changes = true;
 }
 
-void add_socket_operation::undo() {
+auto add_socket_operation::undo() -> void {
     auto& world         = engine_->get_world();
     auto& socket_sys = world.system<ecs::socket_system>();
 

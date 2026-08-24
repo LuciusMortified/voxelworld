@@ -35,7 +35,7 @@ public:
 
     [[nodiscard]] auto get_params() -> player_input_params&;
 
-    void set_mouse_captured(bool captured);
+    auto set_mouse_captured(bool captured) -> void;
     [[nodiscard]] auto is_mouse_captured() const -> bool;
 
 private:

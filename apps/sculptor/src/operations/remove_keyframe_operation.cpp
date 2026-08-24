@@ -15,7 +15,7 @@ remove_keyframe_operation::remove_keyframe_operation(
 )
     : base_operation(), engine_(&engine), state_(&state), params_(params) {}
 
-void remove_keyframe_operation::execute() {
+auto remove_keyframe_operation::execute() -> void {
     auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     auto clip      = registry.get(params_.clip_name);
     if (!clip) {
@@ -43,7 +43,7 @@ void remove_keyframe_operation::execute() {
     state_->anim.unsaved_clips[params_.clip_name] = true;
 }
 
-void remove_keyframe_operation::undo() {
+auto remove_keyframe_operation::undo() -> void {
     const auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(params_.clip_name);
     if (!clip) {

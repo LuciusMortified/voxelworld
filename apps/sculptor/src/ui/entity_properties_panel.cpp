@@ -22,7 +22,7 @@ entity_properties_panel::entity_properties_panel(
     , op_manager_(&op_manager)
     , add_model_modal_(eng, st, op_manager) {}
 
-void entity_properties_panel::render(float /*delta_time*/) {
+auto entity_properties_panel::render(float /*delta_time*/) -> void {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const auto window_pos         = ImVec2(
         viewport->WorkPos.x + viewport->WorkSize.x - 10,
@@ -78,7 +78,7 @@ void entity_properties_panel::render(float /*delta_time*/) {
     ImGui::End();
 }
 
-void entity_properties_panel::render_position() const {
+auto entity_properties_panel::render_position() const -> void {
     const auto ent             = state_->scene.name_to_entity[state_->scene.selected_name];
     auto& world                = engine_->get_world();
     const auto& transform_comp = world.get<ecs::transform_component>(ent);
@@ -94,7 +94,7 @@ void entity_properties_panel::render_position() const {
     }
 }
 
-void entity_properties_panel::render_rotation() const {
+auto entity_properties_panel::render_rotation() const -> void {
     const auto& name           = state_->scene.selected_name;
     const auto ent             = state_->scene.name_to_entity[name];
     auto& world                = engine_->get_world();
@@ -129,7 +129,7 @@ void entity_properties_panel::render_rotation() const {
     }
 }
 
-void entity_properties_panel::render_scale() const {
+auto entity_properties_panel::render_scale() const -> void {
     const auto ent       = state_->scene.name_to_entity[state_->scene.selected_name];
     auto& world          = engine_->get_world();
     auto& transform_comp = world.get<ecs::transform_component>(ent);
@@ -145,7 +145,7 @@ void entity_properties_panel::render_scale() const {
     }
 }
 
-void entity_properties_panel::render_origin() const {
+auto entity_properties_panel::render_origin() const -> void {
     const auto ent             = state_->scene.name_to_entity[state_->scene.selected_name];
     auto& world                = engine_->get_world();
     const auto& transform_comp = world.get<ecs::transform_component>(ent);
@@ -161,7 +161,7 @@ void entity_properties_panel::render_origin() const {
     }
 }
 
-void entity_properties_panel::render_components_section() {
+auto entity_properties_panel::render_components_section() -> void {
     if (!ImGui::CollapsingHeader("Components")) {
         return;
     }

@@ -15,17 +15,17 @@ modify_keyframe_operation::modify_keyframe_operation(
 )
     : base_operation(), engine_(&engine), state_(&state), params_(params) {}
 
-void modify_keyframe_operation::execute() {
+auto modify_keyframe_operation::execute() -> void {
     apply(params_.new_keyframe);
 }
 
-void modify_keyframe_operation::undo() {
+auto modify_keyframe_operation::undo() -> void {
     apply(params_.old_keyframe);
 }
 
-void modify_keyframe_operation::apply(
+auto modify_keyframe_operation::apply(
     const keyframe_value& replacement
-) const {
+) const -> void {
     const auto& registry = engine_->get_world().resource<asset::animation_clip_registry>();
     const auto clip      = registry.get(params_.clip_name);
     if (!clip) {

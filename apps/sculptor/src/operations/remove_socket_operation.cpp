@@ -15,7 +15,7 @@ remove_socket_operation::remove_socket_operation(
 )
     : engine_(&engine), state_(&st), params_(params) {}
 
-void remove_socket_operation::execute() {
+auto remove_socket_operation::execute() -> void {
     auto& world         = engine_->get_world();
     auto& socket_sys = world.system<ecs::socket_system>();
 
@@ -35,7 +35,7 @@ void remove_socket_operation::execute() {
     state_->file.has_unsaved_changes = true;
 }
 
-void remove_socket_operation::undo() {
+auto remove_socket_operation::undo() -> void {
     auto& world         = engine_->get_world();
     auto& socket_sys = world.system<ecs::socket_system>();
 

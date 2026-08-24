@@ -24,7 +24,7 @@ public:
     staging_buffer(staging_buffer&&)                          = delete;
     auto operator=(staging_buffer&&) -> staging_buffer&       = delete;
 
-    void begin_frame();
+    auto begin_frame() -> void;
 
     auto stage(const void* data, vk::DeviceSize size) -> vk::DeviceSize;
 
@@ -38,9 +38,9 @@ public:
         return stage(data.data(), data.size() * sizeof(T));
     }
 
-    void copy_to(
+    auto copy_to(
         vk::Buffer dst, vk::DeviceSize dst_offset, vk::DeviceSize staging_offset, vk::DeviceSize size
-    );
+    ) -> void;
 
     // Копирование устройство-в-устройство, записанное в тот же кадровый командный
     // буфер. Flush ставит такие копии перед staging-записями, и это то, что нужно
@@ -57,9 +57,9 @@ public:
         return frame_end_offset_ - write_offset_;
     }
 
-    void replace_buffer(vk::Buffer old_buf, vk::Buffer new_buf);
+    auto replace_buffer(vk::Buffer old_buf, vk::Buffer new_buf) -> void;
 
-    void flush(vk::CommandBuffer cmd);
+    auto flush(vk::CommandBuffer cmd) -> void;
 
 private:
     struct pending_copy {

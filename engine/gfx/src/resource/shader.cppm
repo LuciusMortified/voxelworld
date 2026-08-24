@@ -22,16 +22,16 @@ public:
     shader& operator=(shader&&) = delete;
 
     [[nodiscard]]
-    vk::PipelineShaderStageCreateInfo get_stage_info() const;
+    auto get_stage_info() const -> vk::PipelineShaderStageCreateInfo;
 
     [[nodiscard]]
-    vk::ShaderModule get_module() const {
+    auto get_module() const -> vk::ShaderModule {
         return shader_module_;
     }
 
 private:
     [[nodiscard]]
-    vk::ShaderModule create_shader_module(const std::vector<char>& code) const;
+    auto create_shader_module(const std::vector<char>& code) const -> vk::ShaderModule;
 
     static std::vector<char> read_file(const std::string& filename);
 

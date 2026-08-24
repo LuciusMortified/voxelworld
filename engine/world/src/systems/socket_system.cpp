@@ -8,11 +8,11 @@ namespace vw::ecs {
 socket_system::socket_system(world& w)
     : world_(&w) {}
 
-void socket_system::update(float32 /*dt*/) {}
+auto socket_system::update(float32 /*dt*/) -> void {}
 
-void socket_system::cleanup(
+auto socket_system::cleanup(
     entity ent
-) {
+) -> void {
     auto& reg = world_->registry();
     if (!reg.has<socket_component>(ent)) {
         return;

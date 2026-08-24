@@ -31,7 +31,7 @@ public:
     [[nodiscard]] auto extract() const -> asset::vox_prefab_data;
 
 private:
-    void generate_entity_names_();
+    auto generate_entity_names_() -> void;
     [[nodiscard]] auto extract_entity_(entity ent) const -> asset::vox_entity_data;
 
     world* world_;
@@ -64,7 +64,7 @@ public:
         -> std::expected<result, error_type>;
 
 private:
-    void apply_entity_(const asset::vox_entity_data& data, result& res, const options& opts);
+    auto apply_entity_(const asset::vox_entity_data& data, result& res, const options& opts) -> void;
 
     world* world_;
     asset::vox_parser* parser_;

@@ -17,9 +17,9 @@ debug_window::debug_window(
 )
     : engine_(&engine) {}
 
-void debug_window::render(
+auto debug_window::render(
     [[maybe_unused]] float delta_time
-) {
+) -> void {
     if (!visible_) {
         return;
     }
@@ -36,20 +36,20 @@ void debug_window::render(
     }
 }
 
-void debug_window::toggle_visibility() {
+auto debug_window::toggle_visibility() -> void {
     visible_ = !visible_;
 }
 
-void debug_window::set_visible(
+auto debug_window::set_visible(
     bool visible
-) {
+) -> void {
     visible_ = visible;
 }
-bool debug_window::is_visible() const {
+auto debug_window::is_visible() const -> bool {
     return visible_;
 }
 
-void debug_window::render_fps_window() {
+auto debug_window::render_fps_window() -> void {
     ImGuiWindowFlags window_flags =          //
         ImGuiWindowFlags_NoResize |          //
         ImGuiWindowFlags_NoScrollbar |       //
@@ -162,7 +162,7 @@ void debug_window::render_fps_window() {
     ImGui::End();
 }
 
-void debug_window::render_render_mode_controls() const {
+auto debug_window::render_render_mode_controls() const -> void {
     ImGui::Spacing();
     if (ImGui::Button("lit")) {
         engine_->get_renderer().set_render_mode(render_mode::lit);
@@ -173,7 +173,7 @@ void debug_window::render_render_mode_controls() const {
     }
 }
 
-void debug_window::render_systems_detail() {
+auto debug_window::render_systems_detail() -> void {
     ImGuiWindowFlags window_flags =          //
         ImGuiWindowFlags_NoCollapse |        //
         ImGuiWindowFlags_NoSavedSettings |   //
@@ -188,7 +188,7 @@ void debug_window::render_systems_detail() {
     ImGui::End();
 }
 
-void debug_window::render_combined_buffers_detail() {
+auto debug_window::render_combined_buffers_detail() -> void {
     ImGuiWindowFlags window_flags =          //
         ImGuiWindowFlags_NoCollapse |        //
         ImGuiWindowFlags_NoSavedSettings |   //
@@ -226,7 +226,7 @@ void debug_window::render_combined_buffers_detail() {
     ImGui::End();
 }
 
-void debug_window::render_render_detail() {
+auto debug_window::render_render_detail() -> void {
     ImGuiWindowFlags window_flags =          //
         ImGuiWindowFlags_NoCollapse |        //
         ImGuiWindowFlags_NoSavedSettings |   //

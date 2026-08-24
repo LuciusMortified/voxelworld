@@ -60,16 +60,20 @@ public:
     auto parse(const std::filesystem::path& filepath)
         -> std::expected<vox_prefab_data, error_type> override;
 
+    // Разбор в отрыве от файловой системы: тем же путём идёт и файл, и буфер из
+    // фаззера, и строка из теста. Ошибку открытия эта форма вернуть не может.
+    auto parse(std::istream& input) -> std::expected<vox_prefab_data, error_type>;
+
 private:
-    void process_root_(std::istringstream& iss);
-    void process_entity_(std::istringstream& iss);
-    void process_parent_(std::istringstream& iss);
-    void process_transform_(std::istringstream& iss);
-    void process_target_(std::istringstream& iss);
-    void process_sockets_();
-    void process_socket_(std::istringstream& iss);
-    void process_model_(std::istringstream& iss);
-    void process_voxel_(std::istringstream& iss);
+    auto process_root_(std::istringstream& iss) -> void;
+    auto process_entity_(std::istringstream& iss) -> void;
+    auto process_parent_(std::istringstream& iss) -> void;
+    auto process_transform_(std::istringstream& iss) -> void;
+    auto process_target_(std::istringstream& iss) -> void;
+    auto process_sockets_() -> void;
+    auto process_socket_(std::istringstream& iss) -> void;
+    auto process_model_(std::istringstream& iss) -> void;
+    auto process_voxel_(std::istringstream& iss) -> void;
 
     const block_registry* block_registry_;
     vox_prefab_data prefab_;

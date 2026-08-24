@@ -19,9 +19,9 @@ new_file_modal::new_file_modal(
 )
     : engine_(&eng), state_(&st) {}
 
-void new_file_modal::render(
+auto new_file_modal::render(
     float /*delta_time*/
-) {
+) -> void {
     if (state_->ui.need_new_file_modal) {
         ImGui::OpenPopup("New File");
         state_->ui.need_new_file_modal = false;
@@ -45,7 +45,7 @@ void new_file_modal::render(
     }
 }
 
-void new_file_modal::render_overwrite_confirmation() {
+auto new_file_modal::render_overwrite_confirmation() -> void {
     ImGui::TextColored(ImVec4{1.0f, 1.0f, 0.0f, 1.0f}, "File already exists. Overwrite?");
     ImGui::Spacing();
 
@@ -62,7 +62,7 @@ void new_file_modal::render_overwrite_confirmation() {
     }
 }
 
-void new_file_modal::render_create_form() {
+auto new_file_modal::render_create_form() -> void {
     if (!error_.empty()) {
         ImGui::TextColored(ImVec4{1.0f, 0.0f, 0.0f, 1.0f}, "%s", error_.c_str());
         ImGui::Spacing();

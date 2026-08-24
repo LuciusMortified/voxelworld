@@ -15,9 +15,9 @@ color_picker_tool::color_picker_tool(
 )
     : engine_(&eng), state_(&st), op_manager_(&op_manager) {}
 
-void color_picker_tool::render(
-    float delta_time
-) {
+auto color_picker_tool::render(
+    [[maybe_unused]] float delta_time
+) -> void {
     const bool is_hovered = hovered_voxel_ != vec3i{-1, -1, -1};
     const bool has_selected_entity =
         state_->scene.name_to_entity.contains(state_->scene.selected_name);
@@ -51,19 +51,19 @@ void color_picker_tool::render(
     renderer.draw_box(voxel_world_pos, vec3f{1.f, 1.f, 1.f}, colors::black);
 }
 
-void color_picker_tool::on_key_press(
-    const plat::key_press_event& ev
-) {}
+auto color_picker_tool::on_key_press(
+    [[maybe_unused]] const plat::key_press_event& ev
+) -> void {}
 
-void color_picker_tool::on_mouse_move(
-    const plat::mouse_move_event& ev
-) {
+auto color_picker_tool::on_mouse_move(
+    [[maybe_unused]] const plat::mouse_move_event& ev
+) -> void {
     update_hovered_voxel_();
 }
 
-void color_picker_tool::on_mouse_press(
+auto color_picker_tool::on_mouse_press(
     const plat::mouse_press_event& ev
-) {
+) -> void {
     if (ev.button != plat::mouse::buttons::LEFT) {
         return;
     }
@@ -93,15 +93,15 @@ void color_picker_tool::on_mouse_press(
     state_->tool.selected_block = model_comp.get_voxel(hovered_voxel_).id;
 }
 
-void color_picker_tool::on_mouse_release(
-    const plat::mouse_release_event& ev
-) {}
+auto color_picker_tool::on_mouse_release(
+    [[maybe_unused]] const plat::mouse_release_event& ev
+) -> void {}
 
-void color_picker_tool::on_activate() {
+auto color_picker_tool::on_activate() -> void {
     update_hovered_voxel_();
 }
 
-void color_picker_tool::update_hovered_voxel_() {
+auto color_picker_tool::update_hovered_voxel_() -> void {
     const auto& world  = engine_->get_world();
     const auto& window = engine_->get_window();
     const auto& camera = engine_->get_camera();

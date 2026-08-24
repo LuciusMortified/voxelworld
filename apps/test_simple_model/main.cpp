@@ -51,9 +51,9 @@ public:
         }
     }
 
-    void render(
+    auto render(
         float delta_time
-    ) override {
+    ) -> void override{
         camera_controller_->update(delta_time);
         update_object_rotation(delta_time);
 
@@ -97,7 +97,7 @@ public:
     }
 
 private:
-    void create_flower_model() {
+    auto create_flower_model() -> void {
         auto& world            = get_engine().get_world();
         auto& model_reg = world.resource<asset::model_registry>();
         auto& transform_sys = world.system<ecs::transform_system>();
@@ -135,9 +135,9 @@ private:
         object_rotation_speed_ = math::radians(5.0f);
     }
 
-    void update_object_rotation(
+    auto update_object_rotation(
         float delta_time
-    ) {
+    ) -> void {
         object_rotation_ += object_rotation_speed_ * delta_time;
 
         if (object_rotation_ > math::radians(360.0f)) {
@@ -163,9 +163,9 @@ private:
 #endif
     }
 
-    void handle_key_press(
+    auto handle_key_press(
         plat::keyboard::keys key
-    ) const {
+    ) const -> void {
         switch (key) {
             case plat::keyboard::keys::ESCAPE:
                 get_engine().shutdown();
@@ -179,9 +179,9 @@ private:
         }
     }
 
-    void handle_mouse_press(
+    auto handle_mouse_press(
         const plat::mouse_press_event& event
-    ) {
+    ) -> void {
         if (event.button == plat::mouse::buttons::LEFT) {
             const auto& world  = get_engine().get_world();
             const auto& window = get_engine().get_window();
@@ -215,7 +215,7 @@ private:
         }
     }
 
-    void render_selected_voxel() {
+    auto render_selected_voxel() -> void {
         auto& world = get_engine().get_world();
 
         const bool can_be_rendered =  //
@@ -270,7 +270,7 @@ private:
     spatial::ray select_ray_{vec3f{}, vec3f{}};
 };
 
-int main() {
+auto main() -> int {
     try {
         std::make_unique<gfx::engine>(1280, 720, "Voxel World - Test Simple Model")
             ->run<simple_model_app>();

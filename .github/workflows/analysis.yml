@@ -72,6 +72,164 @@ jobs:
           LSAN_OPTIONS: report_objects=1
         run: ctest --test-dir build --output-on-failure
 
+  # Разборщики .vox и .voxa — единственное место, куда попадает содержимое, за
+  # которое движок не отвечает: файл мог быть написан руками, испорчен при
+  # переносе или прийти откуда угодно. Фаззер бьёт ровно по этой площади.
+  #
+  # Прогон короткий и стережёт регрессии, а не ищет новое: минута на разборщик
+  # при десятках тысяч запусков в секунду перебирает больше, чем весь набор
+  # тестов за всю его жизнь. Затравка — те же файлы, что лежат в assets/.
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Clang and libc++
+        run: |
+          wget -qO llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh ${{ env.VW_LLVM_VERSION }}
+          sudo apt-get install -y \
+            libc++-${{ env.VW_LLVM_VERSION }}-dev \
+            libc++abi-${{ env.VW_LLVM_VERSION }}-dev
+
+      - name: Setup CMake and Ninja
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: ${{ env.VW_CMAKE_VERSION }}
+          ninjaVersion: latest
+
+      # Тесты здесь не нужны, поэтому и Catch2 не нужен: собирается только ядро
+      # и две цели фаззинга.
+      - name: Configure
+        run: >
+          cmake -B build-fuzz -S . -G Ninja
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_CXX_COMPILER=clang++-${{ env.VW_LLVM_VERSION }}
+          -DCMAKE_C_COMPILER=clang-${{ env.VW_LLVM_VERSION }}
+          -DCMAKE_CXX_FLAGS="-stdlib=libc++ -fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer"
+          -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -fsanitize=address,undefined"
+          -DVW_BUILD_GFX=OFF -DVW_BUILD_APPS=OFF -DVW_BUILD_TESTS=OFF
+          -DVW_BUILD_FUZZERS=ON
+
+      - name: Build
+        run: cmake --build build-fuzz
+
+      # Первый каталог libFuzzer считает рабочим корпусом и пишет туда всё
+      # найденное, поэтому он временный, а assets/ идёт следом — только как
+      # затравка и только на чтение.
+      - name: Fuzz the .vox parser
+        env:
+          ASAN_OPTIONS: detect_leaks=1:detect_stack_use_after_return=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: >
+          mkdir -p corpus/vox &&
+          ./build-fuzz/tests/fuzz/vox_parse_fuzzer
+          -max_total_time=60 -print_final_stats=1 -artifact_prefix=vox-
+          corpus/vox assets/models
+
+      - name: Fuzz the .voxa parser
+        env:
+          ASAN_OPTIONS: detect_leaks=1:detect_stack_use_after_return=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: >
+          mkdir -p corpus/voxa &&
+          ./build-fuzz/tests/fuzz/voxa_parse_fuzzer
+          -max_total_time=60 -print_final_stats=1 -artifact_prefix=voxa-
+          corpus/voxa assets/animations
+
+      # Вход, на котором фаззер упал, — единственное, что нужно для повторения
+      # падения. Без выгрузки он остался бы на удалённой машине.
+      - name: Upload crashing inputs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashes
+          path: |
+            vox-*
+            voxa-*
+          if-no-files-found: ignore
+
+  # Сколько ядра тесты действительно проходят. Вопрос не праздный: под
+  # санитайзерами исполняется ровно то, до чего добрались тесты, и без этого
+  # числа непонятно, чего стоит их зелёный прогон.
+  #
+  # Порога намеренно нет. Порог заставляет писать тесты ради процента, а
+  # интересна здесь динамика: отчёт кладётся в сводку джоба, и падение видно
+  # глазами при обычном чтении.
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install Clang and libc++
+        run: |
+          wget -qO llvm.sh https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh ${{ env.VW_LLVM_VERSION }}
+          sudo apt-get install -y \
+            libc++-${{ env.VW_LLVM_VERSION }}-dev \
+            libc++abi-${{ env.VW_LLVM_VERSION }}-dev
+
+      - name: Setup CMake and Ninja
+        uses: lukka/get-cmake@latest
+        with:
+          cmakeVersion: ${{ env.VW_CMAKE_VERSION }}
+          ninjaVersion: latest
+
+      - name: Configure
+        run: >
+          cmake -B build-cov -S . -G Ninja
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_CXX_COMPILER=clang++-${{ env.VW_LLVM_VERSION }}
+          -DCMAKE_C_COMPILER=clang-${{ env.VW_LLVM_VERSION }}
+          -DCMAKE_CXX_FLAGS="-stdlib=libc++ -fprofile-instr-generate -fcoverage-mapping"
+          -DCMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -fprofile-instr-generate"
+          -DVW_BUILD_GFX=OFF -DVW_BUILD_APPS=OFF
+
+      - name: Build
+        run: cmake --build build-cov
+
+      # По файлу на процесс: тесты запускаются каждый своим, и один общий путь
+      # они бы затирали друг другу.
+      - name: Test
+        env:
+          LLVM_PROFILE_FILE: ${{ github.workspace }}/prof/%p.profraw
+        run: ctest --test-dir build-cov --output-on-failure
+
+      - name: Report
+        run: |
+          profdata=llvm-profdata-${{ env.VW_LLVM_VERSION }}
+          cov=llvm-cov-${{ env.VW_LLVM_VERSION }}
+          $profdata merge -sparse prof/*.profraw -o merged.profdata
+
+          objects="build-cov/tests/core_tests"
+          for t in ecs_tests world_tests; do
+            objects="$objects -object build-cov/tests/$t"
+          done
+
+          # Ни зависимости, ни сами тесты: измеряется движок, а не то, чем его
+          # измеряют.
+          skip='.*(vcpkg_installed|_deps|/tests/).*'
+
+          {
+            echo '## Покрытие headless-ядра'
+            echo
+            echo '```'
+            $cov report $objects -instr-profile=merged.profdata \
+              -ignore-filename-regex="$skip" engine
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          $cov show $objects -instr-profile=merged.profdata \
+            -ignore-filename-regex="$skip" -format=html -o coverage-html engine
+
+      - name: Upload the line-by-line report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-html
+          path: coverage-html
+
   # ASan ещё раз, но уже на той сборке, которой пользуются на самом деле:
   # у MSVC своя раскладка объектов и свой аллокатор, и промахи по границам
   # буферов там свои. Заодно это единственное место, где под санитайзер

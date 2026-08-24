@@ -19,9 +19,9 @@ tool_panel::tool_panel(
 )
     : state_(&st) {}
 
-void tool_panel::render(
+auto tool_panel::render(
     float /*delta_time*/
-) const {
+) const -> void {
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     const auto window_pos =
         ImVec2(viewport->WorkPos.x + 10, viewport->WorkPos.y + state_->ui.left_top_voffset + 10);
@@ -49,9 +49,9 @@ void tool_panel::render(
     ImGui::End();
 }
 
-void tool_panel::render_tool_button(
+auto tool_panel::render_tool_button(
     tools tool, std::string_view label, std::string_view shortcut
-) const {
+) const -> void {
     const bool is_selected        = state_->tool.selected_tool == tool;
     const auto button_color       = is_selected ? ImGuiCol_ButtonActive : ImGuiCol_Button;
     const auto button_hover_color = is_selected ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered;

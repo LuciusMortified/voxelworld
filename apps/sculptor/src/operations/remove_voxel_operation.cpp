@@ -15,7 +15,7 @@ remove_voxel_operation::remove_voxel_operation(
 )
     : engine_(&eng), state_(&st), params_(params) {}
 
-void remove_voxel_operation::execute() {
+auto remove_voxel_operation::execute() -> void {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
@@ -28,7 +28,7 @@ void remove_voxel_operation::execute() {
     state_->file.has_unsaved_changes = true;
 }
 
-void remove_voxel_operation::undo() {
+auto remove_voxel_operation::undo() -> void {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();

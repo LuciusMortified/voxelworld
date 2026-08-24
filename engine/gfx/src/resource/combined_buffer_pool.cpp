@@ -12,16 +12,7 @@ namespace vw::gfx {
 
 namespace {
 
-constexpr log::log_category lc_cbp_{"cbuf_pool"};
-
-void sorted_insert(std::vector<entity>& v, entity e) {
-    auto it = std::lower_bound(v.begin(), v.end(), e);
-    if (it == v.end() || *it != e) {
-        v.insert(it, e);
-    }
-}
-
-void sorted_erase(std::vector<entity>& v, entity e) {
+auto sorted_erase(std::vector<entity>& v, entity e) -> void {
     auto it = std::lower_bound(v.begin(), v.end(), e);
     if (it != v.end() && *it == e) {
         v.erase(it);
@@ -29,9 +20,9 @@ void sorted_erase(std::vector<entity>& v, entity e) {
 }
 
 template <typename Iter>
-void sorted_merge_range(
+auto sorted_merge_range(
     std::vector<entity>& dst, Iter first, Iter last
-) {
+) -> void {
     if (first == last) return;
     auto old_size = static_cast<std::ptrdiff_t>(dst.size());
     dst.insert(dst.end(), first, last);
@@ -56,12 +47,12 @@ combined_buffer_pool::combined_buffer_pool(
     , descriptor_set_layout_(descriptor_set_layout)
     , compute_descriptor_set_layout_(compute_descriptor_set_layout) {}
 
-void combined_buffer_pool::update(
+auto combined_buffer_pool::update(
     world_type& world,
     const camera& camera,
     vk::CommandBuffer cmd,
     mesh_pool& pool
-) {
+) -> void {
     staging_.begin_frame();
     touched_bounds_.clear();
 
@@ -90,7 +81,7 @@ const std::vector<std::unique_ptr<combined_buffer>>& combined_buffer_pool::get_b
     return buffers_;
 }
 
-void combined_buffer_pool::process_destroyed_(world_type& world) {
+auto combined_buffer_pool::process_destroyed_(world_type& world) -> void {
     for (auto ent : world.destroyed()) {
         if (entity_buffer_infos_.contains(ent)) {
             auto& info = entity_buffer_infos_[ent];
@@ -119,9 +110,9 @@ void combined_buffer_pool::process_destroyed_(world_type& world) {
 // слота пустой, а на классе с самыми большими чанками замерено 43%. Степени двойки
 // здесь никому не нужны: геометрия — это storage-буфер, читаемый по индексу, а не
 // вершинная привязка.
-buffer_chunk_size combined_buffer_pool::get_chunk_size_for_mesh(
+auto combined_buffer_pool::get_chunk_size_for_mesh(
     uint32 quad_count
-) {
+) -> buffer_chunk_size {
     uint32 chunk = 64;
     while (chunk < quad_count) {
         chunk += (chunk + 1) / 2;
@@ -137,7 +128,7 @@ auto combined_buffer_pool::get_index_buffer() const -> vk::Buffer {
 // Один шаблон на все меши всех буферов: квад i — это 4i+0, 4i+1, 4i+2, 4i+2, 4i+3,
 // 4i+0, а команда отрисовки сдвигает его на нужные квады. Длины ему хватает по
 // самому большому классу размера: длиннее своего слота меш не бывает.
-void combined_buffer_pool::ensure_index_pattern_(uint32 quads) {
+auto combined_buffer_pool::ensure_index_pattern_(uint32 quads) -> void {
     if (index_buffer_ && quads <= index_quads_) {
         return;
     }
@@ -177,9 +168,9 @@ void combined_buffer_pool::ensure_index_pattern_(uint32 quads) {
     index_buffer_ = std::move(buffer);
 }
 
-combined_buffer* combined_buffer_pool::get_or_create_buffer(
+auto combined_buffer_pool::get_or_create_buffer(
     const buffer_chunk_size& chunk_size
-) {
+) -> combined_buffer* {
     ensure_index_pattern_(chunk_size.quad_count);
 
     if (chunk_size_to_buffer_index_.contains(chunk_size)) {
@@ -199,9 +190,9 @@ combined_buffer* combined_buffer_pool::get_or_create_buffer(
     return buffers_[buffer_index].get();
 }
 
-void combined_buffer_pool::update_meshes_(
+auto combined_buffer_pool::update_meshes_(
     world_type& world, const vec3f& camera_pos, mesh_pool& pool
-) {
+) -> void {
     auto& model_changed = world.changed<model_component>();
     sorted_merge_range(mesh_pending_entities_, model_changed.begin(), model_changed.end());
 
@@ -285,7 +276,7 @@ void combined_buffer_pool::update_meshes_(
         // взгляд он всё равно перекрывает.
         chunk_links_[ent] = mesh_ptr->links;
 
-        auto quad_count = mesh_ptr->quads.size();
+        const auto quad_count = static_cast<uint32>(mesh_ptr->quads.size());
 
         if (quad_count == 0) {
             continue;
@@ -379,9 +370,9 @@ void combined_buffer_pool::update_meshes_(
 // отпускали, и все остальные ждали вечно. Сторона GPU проблемой не была никогда:
 // combined_buffer ключует геометрию по индексу модели и считает ссылки, поэтому
 // вторая сущность делит те же квады, что записала первая.
-void combined_buffer_pool::evict_uploaded_(
+auto combined_buffer_pool::evict_uploaded_(
     world_type& world, mesh_pool& pool
-) {
+) -> void {
     if (uploaded_models_.empty()) {
         return;
     }
@@ -407,9 +398,9 @@ void combined_buffer_pool::evict_uploaded_(
     }
 }
 
-void combined_buffer_pool::update_chunk_visibility_(
+auto combined_buffer_pool::update_chunk_visibility_(
     world_type& world, const vec3f& camera_pos
-) {
+) -> void {
     // Всё начинается видимым. Скрываются только чанки: у персонажа или предмета нет
     // ни связности, ни места в обходе.
     visibility_flags_.resize(buffers_.size());
@@ -601,9 +592,9 @@ void combined_buffer_pool::update_chunk_visibility_(
     }
 }
 
-void combined_buffer_pool::update_transforms_(
+auto combined_buffer_pool::update_transforms_(
     world_type& world
-) {
+) -> void {
     auto& transform_changed = world.changed<transform_component>();
     sorted_merge_range(
         transform_pending_entities_, transform_changed.begin(), transform_changed.end());
@@ -653,7 +644,7 @@ void combined_buffer_pool::update_transforms_(
     stats_.transform_pending = static_cast<uint32>(transform_pending_entities_.size());
 }
 
-const combined_buffer_pool_stats& combined_buffer_pool::get_stats() const {
+auto combined_buffer_pool::get_stats() const -> const combined_buffer_pool_stats& {
     stats_.quad_load_min     = 0.0f;
     stats_.quad_load_max     = 0.0f;
     stats_.quad_load_avg     = 0.0f;

@@ -19,16 +19,16 @@ delete_entity_modal::delete_entity_modal(
 )
     : engine_(&eng), state_(&state), op_manager_(&op_manager) {}
 
-void delete_entity_modal::open(
+auto delete_entity_modal::open(
     const std::string& delete_name
-) {
+) -> void {
     need_open_   = true;
     delete_name_ = delete_name;
 }
 
-void delete_entity_modal::render(
-    float delta_time
-) {
+auto delete_entity_modal::render(
+    [[maybe_unused]] float delta_time
+) -> void {
     if (need_open_) {
         ImGui::OpenPopup("Delete Entity");
         need_open_ = false;
