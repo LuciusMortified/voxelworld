@@ -218,8 +218,6 @@ jobs:
             tail -100 "$f"
             echo "::endgroup::"
           done
-          first=$(echo "$logs" | head -1)
-          tail -20 "$first" | while IFS= read -r line; do echo "::error::${line}"; done
 
       - name: Build
         run: cmake --build build
