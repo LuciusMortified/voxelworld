@@ -3,10 +3,6 @@ project(voxelworld_apps)
 
 # Apps directory - отдельные приложения на движке
 
-add_subdirectory(test_simple_model)
-add_subdirectory(test_window)
-add_subdirectory(test_animation)
-add_subdirectory(test_lighting)
 add_subdirectory(testbed)
 add_subdirectory(arena)
 
