@@ -7,7 +7,7 @@ import vw.ecs;
 import :anim;
 import :components;
 import :grid;
-import :index;
+import :spatial;
 import :model;
 import :light;
 import :terrain;
@@ -20,7 +20,7 @@ class transform_system final {
 public:
     explicit transform_system(world& w);
 
-    void update(float32 dt);
+    auto update(float32 dt) -> void;
 
     class transform_modifier {
     public:
@@ -49,11 +49,11 @@ public:
 
     template <typename C>
         requires(std::same_as<C, transform_component> || std::same_as<C, spatial_component>)
-    void on_add(entity e);
+    auto on_add(entity e) -> void;
 
 private:
-    void mark_children_world_dirty(entity ent);
-    void update_entity_world_matrix(entity ent, const transform_component& transform_comp);
+    auto mark_children_world_dirty(entity ent) -> void;
+    auto update_entity_world_matrix(entity ent, const transform_component& transform_comp) -> void;
 
     world* world_;
     std::vector<std::pair<std::size_t, entity>> sorted_entities_;

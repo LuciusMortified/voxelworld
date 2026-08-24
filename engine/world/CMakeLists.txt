@@ -5,6 +5,9 @@ target_sources(vw_world
         FILE_SET CXX_MODULES BASE_DIRS src FILES
             src/world.cppm
             src/asset/model.cppm
+            src/asset/model_volume.cppm
+            src/asset/model_edit.cppm
+            src/asset/chunk_volume.cppm
             src/asset/model_identity.cppm
             src/asset/model_occupancy.cppm
             src/asset/model_links.cppm
@@ -32,7 +35,7 @@ target_sources(vw_world
             src/light/light.cppm
             src/light/light_column.cppm
             src/light/light_baker.cppm
-            src/spatial/index.cppm
+            src/spatial/spatial.cppm
             src/grid/terrain.cppm
             src/grid/terrain_generator.cppm
             src/grid/gen_column.cppm
@@ -58,11 +61,13 @@ target_sources(vw_world
     PRIVATE
         src/world.cpp
         src/asset/model.cpp
+        src/asset/model_edit.cpp
+        src/asset/chunk_volume.cpp
         src/asset/anim.cpp
         src/asset/serial.cpp
         src/asset/scene_serial.cpp
         src/light/light.cpp
-        src/spatial/index.cpp
+        src/spatial/spatial.cpp
         src/grid/terrain.cpp
         src/grid/chunk.cpp
         src/grid/world_grid.cpp

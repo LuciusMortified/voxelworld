@@ -7,7 +7,7 @@ import vw.ecs;
 import :anim;
 import :components;
 import :grid;
-import :index;
+import :spatial;
 import :model;
 import :light;
 import :terrain;
@@ -20,29 +20,29 @@ class animation_system final {
 public:
     explicit animation_system(world& w);
 
-    void update(float32 delta_time);
+    auto update(float32 delta_time) -> void;
 
     [[nodiscard]] auto get_target_fps() const -> float32;
-    void set_target_fps(float32 fps);
+    auto set_target_fps(float32 fps) -> void;
 
     class layer_modifier {
     public:
-        void play() const;
-        void play(const asset::transition& fade_in) const;
-        void pause() const;
-        void stop() const;
-        void stop(const asset::transition& fade_out) const;
-        void clear() const;
-        void resume() const;
-        void set_time(float32 time) const;
-        void set_playback_speed(float32 speed) const;
-        void set_loop_mode(asset::animation_loop_mode mode) const;
-        void set_fade_in(const asset::transition& t) const;
-        void set_fade_out(const asset::transition& t) const;
-        void blend_to(std::shared_ptr<asset::animation_clip> clip,
-                      std::optional<asset::transition> t = std::nullopt) const;
-        void blend_to_by_name(std::string_view name,
-                              std::optional<asset::transition> t = std::nullopt);
+        auto play() const -> void;
+        auto play(const asset::transition& fade_in) const -> void;
+        auto pause() const -> void;
+        auto stop() const -> void;
+        auto stop(const asset::transition& fade_out) const -> void;
+        auto clear() const -> void;
+        auto resume() const -> void;
+        auto set_time(float32 time) const -> void;
+        auto set_playback_speed(float32 speed) const -> void;
+        auto set_loop_mode(asset::animation_loop_mode mode) const -> void;
+        auto set_fade_in(const asset::transition& t) const -> void;
+        auto set_fade_out(const asset::transition& t) const -> void;
+        auto blend_to(std::shared_ptr<asset::animation_clip> clip,
+                      std::optional<asset::transition> t = std::nullopt) const -> void;
+        auto blend_to_by_name(std::string_view name,
+                              std::optional<asset::transition> t = std::nullopt) -> void;
 
     private:
         friend class animation_system;
@@ -55,10 +55,10 @@ public:
 
     class player_modifier {
     public:
-        void add_layer(std::size_t index) const;
+        auto add_layer(std::size_t index) const -> void;
         auto layer(std::size_t index) -> layer_modifier;
-        void apply_pose() const;
-        void rebuild_target_map() const;
+        auto apply_pose() const -> void;
+        auto rebuild_target_map() const -> void;
 
     private:
         friend class animation_system;
@@ -72,8 +72,8 @@ public:
 
     class target_modifier {
     public:
-        void set_target_name(std::string name) const;
-        void set_rest_transform(const transform& rest) const;
+        auto set_target_name(std::string name) const -> void;
+        auto set_rest_transform(const transform& rest) const -> void;
 
     private:
         friend class animation_system;
@@ -87,19 +87,19 @@ public:
     auto modify_target(entity ent) -> target_modifier;
 
 private:
-    void add_active_entity(entity root_ent);
-    void remove_active_entity(entity root_ent);
-    void build_and_cache_target_map(entity root_ent);
+    auto add_active_entity(entity root_ent) -> void;
+    auto remove_active_entity(entity root_ent) -> void;
+    auto build_and_cache_target_map(entity root_ent) -> void;
 
     [[nodiscard]] auto get_cached_target_map(entity root_ent) const
         -> const std::unordered_map<std::string, entity>*;
 
-    void process_animation(entity ent, animation_player_component& anim_comp, float32 delta_time);
+    auto process_animation(entity ent, animation_player_component& anim_comp, float32 delta_time) -> void;
 
-    static void update_layer_time(asset::animation_layer& layer, float32 delta_time);
+    static auto update_layer_time(asset::animation_layer& layer, float32 delta_time) -> void;
 
-    void process_layer(asset::animation_layer& layer, float32 delta_time, bool is_base);
-    void apply_animation(entity root_ent, const animation_player_component& anim_comp);
+    auto process_layer(asset::animation_layer& layer, float32 delta_time, bool is_base) -> void;
+    auto apply_animation(entity root_ent, const animation_player_component& anim_comp) -> void;
 
     [[nodiscard]] auto compute_layer_transform(const asset::animation_layer& layer,
                                                const std::string& target_name,

@@ -21,8 +21,8 @@ renderer::renderer(
 )
     : context_(&context)
     , window_(&window)
-    , block_registry_(&registry)
-    , mesh_pool_(context, registry, mesh_workers) {
+    , mesh_pool_(context, registry, mesh_workers)
+    , block_registry_(&registry) {
     vertex_shader_ =
         std::make_unique<shader>(*context_, "shaders/voxel.vert.spv", shader_type::VERTEX);
     fragment_shader_ =
@@ -127,7 +127,7 @@ renderer::~renderer() {
     cleanup_descriptor_pool();
 }
 
-void renderer::begin_frame() {
+auto renderer::begin_frame() -> void {
     // Ждем завершения предыдущего кадра
     const vk::Device device = context_->get_device();
     vk_must(
@@ -188,7 +188,7 @@ void renderer::begin_frame() {
     ImGui::NewFrame();
 }
 
-void renderer::end_frame() {
+auto renderer::end_frame() -> void {
     vk::SubmitInfo submit_info{};
 
     vk::Semaphore wait_semaphores[]      = {image_available_semaphores_[current_frame_]};
@@ -245,7 +245,7 @@ auto renderer::get_present_mode_name() const -> std::string_view {
     }
 }
 
-const renderer_stats& renderer::get_stats() const {
+auto renderer::get_stats() const -> const renderer_stats& {
     stats_.combined_buffers = combined_buffer_pool_->get_stats();
     return stats_;
 }
@@ -317,9 +317,9 @@ auto renderer::get_shadow_settings() -> shadow_settings& {
     return shadow_map_->get_settings();
 }
 
-void renderer::set_debug_view(
+auto renderer::set_debug_view(
     debug_view view
-) {
+) -> void {
     debug_view_ = view;
 }
 
@@ -337,9 +337,9 @@ auto renderer::get_cascade_texel_sizes() const
     return shadow_map_->get_cascade_texel_sizes();
 }
 
-void renderer::draw_colliders(
+auto renderer::draw_colliders(
     world& w, color col
-) {
+) -> void {
     for (auto [ent, box, tc] :
          w.registry().view<box_collider_component, transform_component>()) {
         auto pos  = tc.get_position() + box.get_offset();
@@ -348,37 +348,37 @@ void renderer::draw_colliders(
     }
 }
 
-void renderer::set_clear_color(
+auto renderer::set_clear_color(
     float r, float g, float b, float a
-) {
+) -> void {
     clear_color_ = {r, g, b, a};
 }
 
-void renderer::set_clear_color(
+auto renderer::set_clear_color(
     vec4f color
-) {
+) -> void {
     clear_color_ = color;
 }
 
-void renderer::wait_idle() const {
+auto renderer::wait_idle() const -> void {
     vk_must(context_->get_device().waitIdle(), "wait for device idle");
 }
 
-void renderer::handle_resize() {
+auto renderer::handle_resize() -> void {
     framebuffer_resized_ = true;
 }
 
-void renderer::set_render_mode(
+auto renderer::set_render_mode(
     render_mode mode
-) {
+) -> void {
     current_render_mode_ = mode;
 }
 
-render_mode renderer::get_render_mode() const {
+auto renderer::get_render_mode() const -> render_mode {
     return current_render_mode_;
 }
 
-void renderer::sync_meshes_(world_type& world) {
+auto renderer::sync_meshes_(world_type& world) -> void {
     mesh_pool_.process_completed();
 
     auto& registry = world.registry();
@@ -410,6 +410,7 @@ void renderer::sync_meshes_(world_type& world) {
         if (!mesh_pool_.has(identity) && !mesh_pool_.is_pending(identity)) {
             mesh_pool_.request_mesh(
                 comp.get_model(),
+                comp.get_chunk(),
                 mesh_options{
                     // Меши, построенные до включения обхода, сохраняют свои
                     // полностью открытые связи: это скрывает ничего, а не лишнее.
@@ -421,9 +422,9 @@ void renderer::sync_meshes_(world_type& world) {
     }
 }
 
-void renderer::render(
+auto renderer::render(
     world_type& world, camera& camera
-) {
+) -> void {
     // Начинаем запись в command buffer
     vk::CommandBufferBeginInfo begin_info{};
     begin_info.flags = vk::CommandBufferUsageFlagBits::eOneTimeSubmit;
@@ -563,49 +564,49 @@ void renderer::render(
     vk_must(command_buffers_[current_image_index_].end(), "record command buffer");
 }
 
-void renderer::draw_line(
+auto renderer::draw_line(
     const vec3f& a, const vec3f& b, color col
-) {
+) -> void {
     debug_primitives_.add_line(a, b, col);
 }
 
-void renderer::draw_box(
+auto renderer::draw_box(
     const mat4f& matrix, const vec3f& size, const color col
-) {
+) -> void {
     debug_primitives_.add_box(matrix, size, col);
 }
 
-void renderer::draw_box(
+auto renderer::draw_box(
     const transform& transform, const vec3f& size, color col
-) {
+) -> void {
     debug_primitives_.add_box(transform, size, col);
 }
 
-void renderer::draw_box(
+auto renderer::draw_box(
     const vec3f& position, const vec3f& size, color col
-) {
+) -> void {
     debug_primitives_.add_box(position, size, col);
 }
 
-void renderer::draw_grid(
+auto renderer::draw_grid(
     const mat4f& matrix, float cell_size, int cols, int rows, color clr
-) {
+) -> void {
     debug_primitives_.add_grid(matrix, cell_size, cols, rows, clr);
 }
 
-void renderer::draw_grid(
+auto renderer::draw_grid(
     const transform& transform, float cell_size, int cols, int rows, color clr
-) {
+) -> void {
     debug_primitives_.add_grid(transform, cell_size, cols, rows, clr);
 }
 
-void renderer::draw_grid(
+auto renderer::draw_grid(
     const vec3f& position, float cell_size, int cols, int rows, color clr
-) {
+) -> void {
     debug_primitives_.add_grid(position, cell_size, cols, rows, clr);
 }
 
-void renderer::create_swapchain() {
+auto renderer::create_swapchain() -> void {
     auto swapchain_support = context_->query_swapchain_support_();
 
     vk::SurfaceFormatKHR surface_format = choose_swap_surface_format(swapchain_support.formats);
@@ -653,7 +654,7 @@ void renderer::create_swapchain() {
     swapchain_extent_       = extent;
 }
 
-void renderer::create_image_views() {
+auto renderer::create_image_views() -> void {
     swapchain_image_views_.resize(swapchain_images_.size());
 
     for (std::size_t i = 0; i < swapchain_images_.size(); i++) {
@@ -675,7 +676,7 @@ void renderer::create_image_views() {
     }
 }
 
-void renderer::create_depth_resources() {
+auto renderer::create_depth_resources() -> void {
     vk::Format depth_format = find_depth_format();
 
     create_image(
@@ -691,7 +692,7 @@ void renderer::create_depth_resources() {
     depth_image_view_ = create_image_view(depth_image_, depth_format, vk::ImageAspectFlagBits::eDepth);
 }
 
-void renderer::create_render_pass() {
+auto renderer::create_render_pass() -> void {
     // Вложение 0: образ цепочки показа, в него рисуют напрямую
     vk::AttachmentDescription color_attachment{};
     color_attachment.format         = swapchain_image_format_;
@@ -784,7 +785,7 @@ void renderer::create_render_pass() {
     render_pass_ = vk_must(context_->get_device().createRenderPass(render_pass_info), "failed to create render pass");
 }
 
-void renderer::create_descriptor_set_layouts() {
+auto renderer::create_descriptor_set_layouts() -> void {
     // Раскладка дескрипторного набора uniform-буфера (набор 0, биндинг 0)
     vk::DescriptorSetLayoutBinding ubo_layout_binding{};
     ubo_layout_binding.binding         = 0;
@@ -821,7 +822,7 @@ void renderer::create_descriptor_set_layouts() {
     storage_layout_bindings[2].pImmutableSamplers = nullptr;
 
     vk::DescriptorSetLayoutCreateInfo storage_layout_info{};
-    storage_layout_info.bindingCount = storage_layout_bindings.size();
+    storage_layout_info.bindingCount = static_cast<uint32>(storage_layout_bindings.size());
     storage_layout_info.pBindings    = storage_layout_bindings.data();
 
     storage_descriptor_set_layout_ = vk_must(context_->get_device().createDescriptorSetLayout(storage_layout_info), "failed to create storage descriptor set layout");
@@ -841,7 +842,7 @@ void renderer::create_descriptor_set_layouts() {
     shadow_descriptor_set_layout_ = vk_must(context_->get_device().createDescriptorSetLayout(shadow_layout_info), "failed to create shadow descriptor set layout");
 }
 
-void renderer::create_graphics_pipeline() {
+auto renderer::create_graphics_pipeline() -> void {
     // Используем уже созданные шейдеры
     vk::PipelineShaderStageCreateInfo shader_stages[] = {
         vertex_shader_->get_stage_info(), fragment_shader_->get_stage_info()
@@ -943,7 +944,7 @@ void renderer::create_graphics_pipeline() {
     graphics_pipeline_ =
         vk_must(context_->get_device().createGraphicsPipeline(nullptr, pipeline_info), "create graphics pipeline");
 }
-void renderer::create_wireframe_pipeline() {
+auto renderer::create_wireframe_pipeline() -> void {
     vk::PipelineShaderStageCreateInfo shader_stages[] = {
         vertex_shader_->get_stage_info(), fragment_shader_->get_stage_info()
     };
@@ -1028,7 +1029,7 @@ void renderer::create_wireframe_pipeline() {
         vk_must(context_->get_device().createGraphicsPipeline(nullptr, pipeline_info), "create wireframe pipeline");
 }
 
-void renderer::create_debug_pipeline() {
+auto renderer::create_debug_pipeline() -> void {
     // Используем уже созданные шейдеры
     vk::PipelineShaderStageCreateInfo shader_stages[] = {
         debug_vertex_shader_->get_stage_info(), debug_fragment_shader_->get_stage_info()
@@ -1123,7 +1124,7 @@ void renderer::create_debug_pipeline() {
         vk_must(context_->get_device().createGraphicsPipeline(nullptr, pipeline_info), "create debug pipeline");
 }
 
-void renderer::create_framebuffers() {
+auto renderer::create_framebuffers() -> void {
     framebuffers_.resize(swapchain_image_views_.size());
 
     for (std::size_t i = 0; i < swapchain_image_views_.size(); i++) {
@@ -1144,7 +1145,7 @@ void renderer::create_framebuffers() {
     }
 }
 
-void renderer::create_command_buffers() {
+auto renderer::create_command_buffers() -> void {
     command_buffers_.resize(framebuffers_.size());
 
     vk::CommandBufferAllocateInfo alloc_info{};
@@ -1156,7 +1157,7 @@ void renderer::create_command_buffers() {
         vk_must(context_->get_device().allocateCommandBuffers(alloc_info), "allocate command buffers");
 }
 
-void renderer::create_sync_objects() {
+auto renderer::create_sync_objects() -> void {
     // Семафоры создаем по количеству кадров в полете
     image_available_semaphores_.resize(max_frames_in_flight_);
     render_finished_semaphores_.resize(swapchain_images_.size());
@@ -1186,7 +1187,7 @@ void renderer::create_sync_objects() {
     }
 }
 
-void renderer::create_uniform_buffers() {
+auto renderer::create_uniform_buffers() -> void {
     vk::DeviceSize buffer_size = sizeof(uniform_buffer_object);
     uniform_buffers_.resize(max_frames_in_flight_);
 
@@ -1195,7 +1196,7 @@ void renderer::create_uniform_buffers() {
     }
 }
 
-void renderer::create_descriptor_pool() {
+auto renderer::create_descriptor_pool() -> void {
     constexpr uint32 MAX_DESCRIPTOR_SETS  = 512;
     constexpr uint32 STORAGE_BUFFER_COUNT = 1024;
 
@@ -1225,7 +1226,7 @@ void renderer::create_descriptor_pool() {
     descriptor_pool_ = vk_must(context_->get_device().createDescriptorPool(pool_info), "failed to create descriptor pool");
 }
 
-void renderer::create_descriptor_sets() {
+auto renderer::create_descriptor_sets() -> void {
     // Создаем descriptor sets для uniform buffer (set 0)
     std::vector layouts(max_frames_in_flight_, uniform_descriptor_set_layout_);
     vk::DescriptorSetAllocateInfo alloc_info{};
@@ -1254,7 +1255,7 @@ void renderer::create_descriptor_sets() {
     }
 }
 
-void renderer::init_imgui() {
+auto renderer::init_imgui() -> void {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io    = ImGui::GetIO();
@@ -1276,7 +1277,7 @@ void renderer::init_imgui() {
     init_info.Queue                     = context_->get_graphics_queue();
     init_info.DescriptorPool            = imgui_descriptor_pool_;
     init_info.MinImageCount             = 2;
-    init_info.ImageCount                = swapchain_images_.size();
+    init_info.ImageCount                = static_cast<uint32>(swapchain_images_.size());
     init_info.Allocator                 = nullptr;
     init_info.CheckVkResultFn           = nullptr;
 
@@ -1289,10 +1290,10 @@ void renderer::init_imgui() {
     }
 }
 
-void renderer::setup_imgui_style() {
+auto renderer::setup_imgui_style() -> void {
 }
 
-void renderer::create_imgui_descriptor_pool() {
+auto renderer::create_imgui_descriptor_pool() -> void {
     std::array pool_sizes = {
         vk::DescriptorPoolSize{vk::DescriptorType::eSampler, 1000},
         vk::DescriptorPoolSize{vk::DescriptorType::eCombinedImageSampler, 1000},
@@ -1316,7 +1317,7 @@ void renderer::create_imgui_descriptor_pool() {
     imgui_descriptor_pool_ = vk_must(context_->get_device().createDescriptorPool(pool_info), "failed to create imgui descriptor pool");
 }
 
-void renderer::cleanup_imgui() {
+auto renderer::cleanup_imgui() -> void {
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
@@ -1327,21 +1328,21 @@ void renderer::cleanup_imgui() {
     }
 }
 
-void renderer::cleanup_descriptor_pool() {
+auto renderer::cleanup_descriptor_pool() -> void {
     if (descriptor_pool_ != nullptr) {
         context_->get_device().destroyDescriptorPool(descriptor_pool_);
         descriptor_pool_ = nullptr;
     }
 }
 
-void renderer::cleanup_render_pass() {
+auto renderer::cleanup_render_pass() -> void {
     if (render_pass_ != nullptr) {
         context_->get_device().destroyRenderPass(render_pass_);
         render_pass_ = nullptr;
     }
 }
 
-void renderer::cleanup_descriptor_set_layouts() {
+auto renderer::cleanup_descriptor_set_layouts() -> void {
     if (storage_descriptor_set_layout_ != nullptr) {
         context_->get_device().destroyDescriptorSetLayout(storage_descriptor_set_layout_);
         storage_descriptor_set_layout_ = nullptr;
@@ -1356,7 +1357,7 @@ void renderer::cleanup_descriptor_set_layouts() {
     }
 }
 
-void renderer::cleanup_pipelines() {
+auto renderer::cleanup_pipelines() -> void {
     if (graphics_pipeline_ != nullptr) {
         context_->get_device().destroyPipeline(graphics_pipeline_);
         graphics_pipeline_ = nullptr;
@@ -1371,7 +1372,7 @@ void renderer::cleanup_pipelines() {
     }
 }
 
-void renderer::cleanup_shadow_pipeline() {
+auto renderer::cleanup_shadow_pipeline() -> void {
     if (shadow_pipeline_ != nullptr) {
         context_->get_device().destroyPipeline(shadow_pipeline_);
         shadow_pipeline_ = nullptr;
@@ -1382,7 +1383,7 @@ void renderer::cleanup_shadow_pipeline() {
     }
 }
 
-void renderer::cleanup_debug_pipeline() {
+auto renderer::cleanup_debug_pipeline() -> void {
     if (debug_pipeline_ != nullptr) {
         context_->get_device().destroyPipeline(debug_pipeline_);
         debug_pipeline_ = nullptr;
@@ -1393,7 +1394,7 @@ void renderer::cleanup_debug_pipeline() {
     }
 }
 
-void renderer::cleanup_swapchain() {
+auto renderer::cleanup_swapchain() -> void {
     for (auto framebuffer : framebuffers_) {
         context_->get_device().destroyFramebuffer(framebuffer);
     }
@@ -1418,7 +1419,7 @@ void renderer::cleanup_swapchain() {
     }
 }
 
-void renderer::cleanup_depth_resources() {
+auto renderer::cleanup_depth_resources() -> void {
     if (depth_image_view_ != nullptr) {
         context_->get_device().destroyImageView(depth_image_view_);
         depth_image_view_ = nullptr;
@@ -1433,7 +1434,7 @@ void renderer::cleanup_depth_resources() {
     }
 }
 
-void renderer::recreate_swapchain() {
+auto renderer::recreate_swapchain() -> void {
     vec2i size = window_->framebuffer_size();
     while (size.x == 0 || size.y == 0) {
         size = window_->framebuffer_size();
@@ -1459,9 +1460,9 @@ void renderer::recreate_swapchain() {
     current_image_index_ = 0;
 }
 
-void renderer::render_world_pass(
+auto renderer::render_world_pass(
     world_type& world, const camera& camera
-) {
+) -> void {
     stats_.timing.world_pass_uniform_ms =
         measure_ms([&] { update_uniform_buffer(world, camera); });
 
@@ -1523,9 +1524,9 @@ void renderer::render_world_pass(
     command_buffers_[current_image_index_].endRenderPass();
 }
 
-void renderer::render_world(
-    world_type& world, const camera& camera
-) {
+auto renderer::render_world(
+    [[maybe_unused]] world_type& world, [[maybe_unused]] const camera& camera
+) -> void {
     vk::Pipeline current_pipeline =
         (current_render_mode_ == render_mode::lit) ? graphics_pipeline_ : wireframe_pipeline_;
     command_buffers_[current_image_index_].bindPipeline(vk::PipelineBindPoint::eGraphics, current_pipeline);
@@ -1609,9 +1610,9 @@ void renderer::render_world(
     }
 }
 
-void renderer::update_uniform_buffer(
-    world_type& world, const camera& camera
-) const {
+auto renderer::update_uniform_buffer(
+    [[maybe_unused]] world_type& world, const camera& camera
+) const -> void {
     uniform_buffer_object ubo{};
 
     const mat4f& view_matrix = camera.get_view_matrix();
@@ -1719,7 +1720,7 @@ void renderer::update_uniform_buffer(
     uniform_buffers_[current_frame_]->copy_from_struct(ubo);
 }
 
-void renderer::render_debug_primitives() {
+auto renderer::render_debug_primitives() -> void {
     if (debug_primitives_.is_empty()) {
         return;
     }
@@ -1746,7 +1747,7 @@ void renderer::render_debug_primitives() {
         0);
 }
 
-void renderer::update_debug_vertex_buffer() {
+auto renderer::update_debug_vertex_buffer() -> void {
     const auto& debug_vertices = debug_primitives_.get_vertices();
 
     const vk::DeviceSize required_size = sizeof(debug_vertex) * debug_vertices.size();
@@ -1757,14 +1758,14 @@ void renderer::update_debug_vertex_buffer() {
     debug_vertex_buffer_->copy_from_vector(debug_vertices);
 }
 
-void renderer::render_imgui() const {
+auto renderer::render_imgui() const -> void {
     ImGui::Render();
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), command_buffers_[current_image_index_]);
 }
 
-void* renderer::get_shadow_map_texture_id(
+auto renderer::get_shadow_map_texture_id(
     uint32 cascade_index
-) const {
+) const -> void* {
     struct Cache {
         std::array<vk::DescriptorSet, shadow_map::cascade_count> sets{};
         std::array<vk::ImageView, shadow_map::cascade_count> views{};
@@ -1800,7 +1801,7 @@ void* renderer::get_shadow_map_texture_id(
     return cache.sets[cascade_index];
 }
 
-vk::Format renderer::find_depth_format() {
+auto renderer::find_depth_format() -> vk::Format {
     return find_supported_format(
         {
             vk::Format::eD32Sfloat,
@@ -1812,9 +1813,9 @@ vk::Format renderer::find_depth_format() {
     );
 }
 
-vk::Format renderer::find_supported_format(
+auto renderer::find_supported_format(
     const std::vector<vk::Format>& candidates, vk::ImageTiling tiling, vk::FormatFeatureFlags features
-) {
+) -> vk::Format {
     for (vk::Format format : candidates) {
         const vk::FormatProperties props =
             context_->get_physical_device().getFormatProperties(format);
@@ -1830,7 +1831,7 @@ vk::Format renderer::find_supported_format(
     throw std::runtime_error("failed to find supported format for physical device");
 }
 
-void renderer::create_image(
+auto renderer::create_image(
     vk::Image& image,
     vk::DeviceMemory& image_memory,
     vk::Extent2D extent,
@@ -1839,7 +1840,7 @@ void renderer::create_image(
     vk::ImageUsageFlags usage,
     vk::MemoryPropertyFlags properties,
     vk::SampleCountFlagBits samples
-) {
+) -> void {
     vk::ImageCreateInfo image_info{};
     image_info.imageType     = vk::ImageType::e2D;
     image_info.extent.width  = extent.width;
@@ -1870,9 +1871,9 @@ void renderer::create_image(
     );
 }
 
-vk::ImageView renderer::create_image_view(
+auto renderer::create_image_view(
     vk::Image image, vk::Format format, vk::ImageAspectFlags aspect_flags
-) {
+) -> vk::ImageView {
     vk::ImageViewCreateInfo view_info{};
     view_info.image                           = image;
     view_info.viewType                        = vk::ImageViewType::e2D;
@@ -1889,9 +1890,9 @@ vk::ImageView renderer::create_image_view(
     return image_view;
 }
 
-uint32 renderer::find_memory_type(
+auto renderer::find_memory_type(
     uint32 typeFilter, vk::MemoryPropertyFlags properties
-) {
+) -> uint32 {
     const vk::PhysicalDeviceMemoryProperties mem_properties =
         context_->get_physical_device().getMemoryProperties();
 
@@ -1905,9 +1906,9 @@ uint32 renderer::find_memory_type(
     throw std::runtime_error("Failed to find suitable memory type");
 }
 
-vk::SurfaceFormatKHR renderer::choose_swap_surface_format(
+auto renderer::choose_swap_surface_format(
     const std::vector<vk::SurfaceFormatKHR>& available_formats
-) {
+) -> vk::SurfaceFormatKHR {
     for (const auto& available_format : available_formats) {
         if (available_format.format == vk::Format::eB8G8R8A8Srgb &&
             available_format.colorSpace == vk::ColorSpaceKHR::eSrgbNonlinear) {
@@ -1917,9 +1918,9 @@ vk::SurfaceFormatKHR renderer::choose_swap_surface_format(
     return available_formats[0];
 }
 
-vk::PresentModeKHR renderer::choose_swap_present_mode(
+auto renderer::choose_swap_present_mode(
     const std::vector<vk::PresentModeKHR>& available_present_modes
-) {
+) -> vk::PresentModeKHR {
     for (const auto& available_present_mode : available_present_modes) {
         if (available_present_mode == vk::PresentModeKHR::eMailbox) {
             return available_present_mode;
@@ -1928,9 +1929,9 @@ vk::PresentModeKHR renderer::choose_swap_present_mode(
     return vk::PresentModeKHR::eFifo;
 }
 
-vk::Extent2D renderer::choose_swap_extent(
+auto renderer::choose_swap_extent(
     const vk::SurfaceCapabilitiesKHR& capabilities
-) {
+) -> vk::Extent2D {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32>::max()) {
         return capabilities.currentExtent;
     }
@@ -1953,7 +1954,7 @@ vk::Extent2D renderer::choose_swap_extent(
 
 namespace vw::gfx {
 
-void renderer::create_palette_descriptor_set_layout() {
+auto renderer::create_palette_descriptor_set_layout() -> void {
     vk::DescriptorSetLayoutBinding palette_layout_binding{};
     palette_layout_binding.binding            = 0;
     palette_layout_binding.descriptorType     = vk::DescriptorType::eStorageBuffer;
@@ -1968,7 +1969,7 @@ void renderer::create_palette_descriptor_set_layout() {
     palette_descriptor_set_layout_ = vk_must(context_->get_device().createDescriptorSetLayout(palette_layout_info), "failed to create palette descriptor set layout");
 }
 
-void renderer::cleanup_palette_resources() {
+auto renderer::cleanup_palette_resources() -> void {
     if (palette_descriptor_set_layout_ != nullptr) {
         context_->get_device().destroyDescriptorSetLayout(palette_descriptor_set_layout_);
         palette_descriptor_set_layout_ = nullptr;
@@ -1979,7 +1980,7 @@ void renderer::cleanup_palette_resources() {
 
 namespace vw::gfx {
 
-void renderer::create_point_lights_descriptor_set_layout() {
+auto renderer::create_point_lights_descriptor_set_layout() -> void {
     // Набор 3, и под принесённое фроксельной сеткой новый набор не заводился:
     // биндинг 0 — список источников, 1 — счётчик на кластер, 2 — индексы; 3 —
     // список пятен под телами, 4 и 5 — их собственные счётчики и индексы. Четыре
@@ -1998,14 +1999,14 @@ void renderer::create_point_lights_descriptor_set_layout() {
 
     point_lights_descriptor_set_layout_ = vk_must(
         context_->get_device().createDescriptorSetLayout({
-            .bindingCount = bindings.size(),
+            .bindingCount = static_cast<uint32>(bindings.size()),
             .pBindings    = bindings.data(),
         }),
         "failed to create point lights descriptor set layout"
     );
 }
 
-void renderer::cleanup_point_lights_resources() {
+auto renderer::cleanup_point_lights_resources() -> void {
     if (point_lights_descriptor_set_layout_ != nullptr) {
         context_->get_device().destroyDescriptorSetLayout(point_lights_descriptor_set_layout_);
         point_lights_descriptor_set_layout_ = nullptr;
@@ -2016,7 +2017,7 @@ void renderer::cleanup_point_lights_resources() {
 
 namespace vw::gfx {
 
-void renderer::create_shadow_uniform_buffers() {
+auto renderer::create_shadow_uniform_buffers() -> void {
     vk::DeviceSize buffer_size = sizeof(shadow_uniform_buffer_object);
     shadow_uniform_buffers_.resize(max_frames_in_flight_);
 
@@ -2025,7 +2026,7 @@ void renderer::create_shadow_uniform_buffers() {
     }
 }
 
-void renderer::create_shadow_descriptor_sets() {
+auto renderer::create_shadow_descriptor_sets() -> void {
     std::vector layouts(max_frames_in_flight_, uniform_descriptor_set_layout_);
     vk::DescriptorSetAllocateInfo alloc_info{};
     alloc_info.descriptorPool     = descriptor_pool_;
@@ -2053,7 +2054,7 @@ void renderer::create_shadow_descriptor_sets() {
     }
 }
 
-void renderer::create_shadow_map_descriptor_sets() {
+auto renderer::create_shadow_map_descriptor_sets() -> void {
     std::vector layouts(max_frames_in_flight_, shadow_descriptor_set_layout_);
     vk::DescriptorSetAllocateInfo alloc_info{};
     alloc_info.descriptorPool     = descriptor_pool_;
@@ -2081,7 +2082,7 @@ void renderer::create_shadow_map_descriptor_sets() {
     }
 }
 
-void renderer::create_shadow_pipeline() {
+auto renderer::create_shadow_pipeline() -> void {
     // Используем shadow шейдеры
     vk::PipelineShaderStageCreateInfo shader_stages[] = {
         shadow_vertex_shader_->get_stage_info(), shadow_fragment_shader_->get_stage_info()
@@ -2189,7 +2190,7 @@ void renderer::create_shadow_pipeline() {
         vk_must(context_->get_device().createGraphicsPipeline(nullptr, pipeline_info), "create shadow pipeline");
 }
 
-void renderer::update_shadow_uniform_buffer() const {
+auto renderer::update_shadow_uniform_buffer() const -> void {
     shadow_uniform_buffer_object ubo{};
     const auto& light_space_matrices = shadow_map_->get_light_space_matrices();
     for (uint32 i = 0; i < shadow_map::cascade_count; ++i) {
@@ -2198,9 +2199,9 @@ void renderer::update_shadow_uniform_buffer() const {
     shadow_uniform_buffers_[current_frame_]->copy_from_struct(ubo);
 }
 
-void renderer::render_shadow_pass(
-    world_type& world, const camera& camera
-) {
+auto renderer::render_shadow_pass(
+    [[maybe_unused]] world_type& world, [[maybe_unused]] const camera& camera
+) -> void {
     update_shadow_uniform_buffer();
 
     stats_.timing.shadow_cascades_drawn =

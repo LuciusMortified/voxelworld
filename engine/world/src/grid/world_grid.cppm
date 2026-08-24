@@ -24,7 +24,7 @@ public:
     auto operator=(world_grid&&) -> world_grid&      = delete;
 
     [[nodiscard]] auto get_voxel(vec3i world_pos) const -> voxel;
-    void set_voxel(vec3i world_pos, const voxel& v);
+    auto set_voxel(vec3i world_pos, const voxel& v) -> void;
 
     [[nodiscard]] auto has_chunk(vec3i chunk_coord) const -> bool;
     [[nodiscard]] auto get_chunk(vec3i chunk_coord) -> chunk*;
@@ -45,20 +45,21 @@ public:
     // воздух: загружены и проходимы, но рисовать в них нечего.
     [[nodiscard]] auto drawn_chunk_count() const -> uint32;
 
-    auto place_chunk(vec3i chunk_coord, std::shared_ptr<asset::model> mdl) -> chunk*;
-    void register_column(vec2i coord, std::vector<int32> y_levels);
-    void unload_column(vec2i coord);
+    auto place_chunk(vec3i chunk_coord, std::shared_ptr<asset::chunk_volume> volume)
+        -> chunk*;
+    auto register_column(vec2i coord, std::vector<int32> y_levels) -> void;
+    auto unload_column(vec2i coord) -> void;
 
     // Снова выдаёт чанку шесть соседних плоскостей и ставит его на мешинг.
     // Плоскости — кэш над вокселями соседей и сбрасываются, когда мешер закончил,
     // поэтому правка выводит их заново. Правке это и нужно: копия, сохранённая с
     // момента размещения, была бы теперь устаревшей стороной шва.
-    void refresh_chunk(vec3i chunk_coord);
+    auto refresh_chunk(vec3i chunk_coord) -> void;
 
     // То же для чанка, уже стоящего в сцене, и только для него: перезаливка света
     // трогает каждый чанк колонки, а у погребённой породы нет граней, на которые
     // свет мог бы лечь. refresh_chunk выдал бы ей сущность и меш впустую.
-    void remesh_drawn_chunk(vec3i chunk_coord);
+    auto remesh_drawn_chunk(vec3i chunk_coord) -> void;
 
     // Колонки, чей небесный свет больше не соответствует вокселям; забираются и
     // очищаются. Сетка не знает, что такое свет: она знает, какие воксели
@@ -71,7 +72,7 @@ public:
     // f(vec3i coord, const chunk&). Нужен рендереру: он обязан каждый кадр
     // что-то сказать о каждом загруженном чанке, видимом или нет.
     template <typename F>
-    void for_each_chunk(F&& f) const {
+    auto for_each_chunk(F&& f) const -> void {
         for (const auto& [coord, ptr] : chunks_) {
             f(coord, *ptr);
         }
@@ -82,7 +83,7 @@ public:
     [[nodiscard]] auto chunk_to_world_coord(vec3i chunk_coord) const -> vec3i;
 
 private:
-    void mark_light_dirty_(vec3i chunk_coord, vec3i local);
+    auto mark_light_dirty_(vec3i chunk_coord, vec3i local) -> void;
 
     world* world_;
     int32 voxel_scale_{1};

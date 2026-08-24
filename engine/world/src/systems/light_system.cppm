@@ -7,7 +7,7 @@ import vw.ecs;
 import :anim;
 import :components;
 import :grid;
-import :index;
+import :spatial;
 import :model;
 import :light;
 import :terrain;
@@ -20,7 +20,7 @@ class light_system final {
 public:
     explicit light_system(world& w);
 
-    void update(float32 dt);
+    auto update(float32 dt) -> void;
 
     class light_modifier {
     public:
@@ -40,7 +40,7 @@ public:
 
     template <typename C>
         requires std::same_as<C, light_component>
-    void on_add(entity e);
+    auto on_add(entity e) -> void;
 
 private:
     world* world_;

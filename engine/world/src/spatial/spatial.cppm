@@ -1,4 +1,4 @@
-export module vw.world:index;
+export module vw.world:spatial;
 
 import std;
 
@@ -27,28 +27,28 @@ class dynamic_aabb_tree {
 public:
     dynamic_aabb_tree();
 
-    void insert(entity e, const spatial::aabb& bounds,
-                spatial_layer_mask layer = spatial_layer::all);
-    void remove(entity e);
-    void update(entity e, const spatial::aabb& new_bounds,
-                spatial_layer_mask layer = spatial_layer::all);
+    auto insert(entity e, const spatial::aabb& bounds,
+                spatial_layer_mask layer = spatial_layer::all) -> void;
+    auto remove(entity e) -> void;
+    auto update(entity e, const spatial::aabb& new_bounds,
+                spatial_layer_mask layer = spatial_layer::all) -> void;
 
-    void query_all(const spatial::frustum& f, std::vector<entity>& result_out,
-                   spatial_layer_mask layer_mask = spatial_layer::all) const;
+    auto query_all(const spatial::frustum& f, std::vector<entity>& result_out,
+                   spatial_layer_mask layer_mask = spatial_layer::all) const -> void;
 
-    void query_all(const spatial::ray& r, std::vector<entity>& result_out,
-                   spatial_layer_mask layer_mask = spatial_layer::all) const;
+    auto query_all(const spatial::ray& r, std::vector<entity>& result_out,
+                   spatial_layer_mask layer_mask = spatial_layer::all) const -> void;
 
-    void query_all(const spatial::aabb& bounds, std::vector<entity>& result_out,
-                   spatial_layer_mask layer_mask = spatial_layer::all) const;
+    auto query_all(const spatial::aabb& bounds, std::vector<entity>& result_out,
+                   spatial_layer_mask layer_mask = spatial_layer::all) const -> void;
 
-    void query_all_any(std::span<const spatial::frustum> frustums,
-                       std::vector<entity>& result_out) const;
+    auto query_all_any(std::span<const spatial::frustum> frustums,
+                       std::vector<entity>& result_out) const -> void;
 
     [[nodiscard]] auto size() const -> std::size_t;
     [[nodiscard]] auto empty() const -> bool;
 
-    void clear();
+    auto clear() -> void;
 
 private:
     static constexpr uint32 invalid_node_index = std::numeric_limits<uint32>::max();
@@ -70,13 +70,13 @@ private:
     };
 
     [[nodiscard]] auto allocate_node() -> uint32;
-    void free_node(uint32 index);
+    auto free_node(uint32 index) -> void;
 
     [[nodiscard]] auto find_best_sibling(uint32 new_node_index) const -> uint32;
-    void insert_leaf(uint32 leaf_index);
-    void remove_leaf(uint32 leaf_index);
-    void refit(uint32 index);
-    void rotate(uint32 index);
+    auto insert_leaf(uint32 leaf_index) -> void;
+    auto remove_leaf(uint32 leaf_index) -> void;
+    auto refit(uint32 index) -> void;
+    auto rotate(uint32 index) -> void;
 
     std::vector<node> nodes_;
     std::vector<uint32> free_nodes_;

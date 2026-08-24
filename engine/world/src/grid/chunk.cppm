@@ -23,7 +23,8 @@ public:
     static constexpr int32 size   = 64;
     static constexpr int32 volume = size * size * size;
 
-    chunk(world& w, vec3i coord, std::shared_ptr<asset::model> mdl, int32 voxel_scale = 1);
+    chunk(world& w, vec3i coord, std::shared_ptr<asset::chunk_volume> volume,
+          int32 voxel_scale = 1);
     ~chunk();
 
     chunk(const chunk&)                    = delete;
@@ -33,11 +34,12 @@ public:
 
     [[nodiscard]] auto get_voxel(int32 x, int32 y, int32 z) const -> voxel;
     [[nodiscard]] auto get_voxel(vec3i local) const -> voxel;
-    void set_voxel(int32 x, int32 y, int32 z, const voxel& v);
-    void set_voxel(vec3i local, const voxel& v);
+    auto set_voxel(int32 x, int32 y, int32 z, const voxel& v) -> void;
+    auto set_voxel(vec3i local, const voxel& v) -> void;
     [[nodiscard]] auto is_empty(int32 x, int32 y, int32 z) const -> bool;
 
     [[nodiscard]] auto get_model() const -> std::shared_ptr<asset::model>;
+    [[nodiscard]] auto get_volume() const -> std::shared_ptr<asset::chunk_volume>;
 
     // Недействительна для чанка, которого нет в сцене. Вызывающие, ищущие
     // сущность в таблице, не получают ничего, и это верный ответ, но обход
@@ -60,16 +62,16 @@ public:
         return x >= 0 && x < size && y >= 0 && y < size && z >= 0 && z < size;
     }
 
-    void set_known_neighbors(uint8 mask);
+    auto set_known_neighbors(uint8 mask) -> void;
 
 private:
-    void create_entity_();
+    auto create_entity_() -> void;
 
     world* world_;
     vec3i coord_{};
     int32 voxel_scale_{1};
     entity ent_;
-    std::shared_ptr<asset::model> model_;
+    std::shared_ptr<asset::chunk_volume> volume_;
     asset::model_fill fill_ = asset::model_fill::mixed;
     uint8 known_neighbors_  = 0;
 };

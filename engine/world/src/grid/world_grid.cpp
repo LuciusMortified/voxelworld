@@ -22,9 +22,9 @@ auto world_grid::get_voxel(
     return it->second->get_voxel(lc / voxel_scale_);
 }
 
-void world_grid::set_voxel(
+auto world_grid::set_voxel(
     vec3i world_pos, const voxel& v
-) {
+) -> void {
     auto cc = world_to_chunk_coord(world_pos);
     auto it = chunks_.find(cc);
     if (it == chunks_.end()) {
@@ -57,9 +57,9 @@ void world_grid::set_voxel(
 // О высоте здесь не говорится ничего, потому что колонка освещается как целое и
 // обязана так освещаться. Копка вниз из-под открытого неба перезаливает всю шахту
 // под лопатой; замуровывание шахты снова затемняет тот же объём.
-void world_grid::mark_light_dirty_(
+auto world_grid::mark_light_dirty_(
     vec3i chunk_coord, vec3i local
-) {
+) -> void {
     constexpr int32 reach = asset::light_column::max_level;
     static_assert(reach * 2 < chunk::size, "an edit must not reach past the next column");
 
@@ -93,9 +93,9 @@ auto world_grid::take_light_dirty() -> std::vector<vec2i> {
     return out;
 }
 
-void world_grid::remesh_drawn_chunk(
+auto world_grid::remesh_drawn_chunk(
     vec3i chunk_coord
-) {
+) -> void {
     const auto it = chunks_.find(chunk_coord);
     if (it == chunks_.end() || !it->second->is_drawn()) {
         return;
@@ -103,16 +103,16 @@ void world_grid::remesh_drawn_chunk(
     refresh_chunk(chunk_coord);
 }
 
-void world_grid::refresh_chunk(
+auto world_grid::refresh_chunk(
     vec3i chunk_coord
-) {
+) -> void {
     const auto it = chunks_.find(chunk_coord);
     if (it == chunks_.end()) {
         return;
     }
 
     auto& c    = *it->second;
-    auto& mdl  = *c.get_model();
+    auto& vol  = *c.get_volume();
     uint8 mask = 0;
 
     for (int32 fd = 0; fd < 6; ++fd) {
@@ -120,7 +120,7 @@ void world_grid::refresh_chunk(
         if (neighbor == chunks_.end()) {
             continue;
         }
-        mdl.set_boundary_slice(fd, *neighbor->second->get_model());
+        vol.set_boundary_slice(fd, neighbor->second->get_volume()->voxels());
         mask |= static_cast<uint8>(1U << fd);
     }
 
@@ -214,11 +214,11 @@ auto world_grid::drawn_chunk_count() const -> uint32 {
 }
 
 auto world_grid::place_chunk(
-    vec3i chunk_coord, std::shared_ptr<asset::model> mdl
+    vec3i chunk_coord, std::shared_ptr<asset::chunk_volume> volume
 ) -> chunk* {
     auto [it, inserted] = chunks_.emplace(
         chunk_coord,
-        std::make_unique<chunk>(*world_, chunk_coord, std::move(mdl), voxel_scale_)
+        std::make_unique<chunk>(*world_, chunk_coord, std::move(volume), voxel_scale_)
     );
 
     if (inserted && it->second->is_drawn()) {
@@ -228,15 +228,15 @@ auto world_grid::place_chunk(
     return it->second.get();
 }
 
-void world_grid::register_column(
+auto world_grid::register_column(
     vec2i coord, std::vector<int32> y_levels
-) {
+) -> void {
     column_chunks_[coord] = std::move(y_levels);
 }
 
-void world_grid::unload_column(
+auto world_grid::unload_column(
     vec2i coord
-) {
+) -> void {
     auto col_it = column_chunks_.find(coord);
     if (col_it != column_chunks_.end()) {
         for (int32 y : col_it->second) {

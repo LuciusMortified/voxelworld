@@ -7,7 +7,7 @@ import vw.ecs;
 import :anim;
 import :components;
 import :grid;
-import :index;
+import :spatial;
 import :model;
 import :light;
 import :terrain;
@@ -20,12 +20,12 @@ class animation_fsm_system final {
 public:
     explicit animation_fsm_system(world& w);
 
-    void update(float32 dt);
+    auto update(float32 dt) -> void;
 
     class modifier {
     public:
-        void add_machine(std::size_t index, asset::animation_fsm machine) const;
-        void fire_trigger(std::string_view name) const;
+        auto add_machine(std::size_t index, asset::animation_fsm machine) const -> void;
+        auto fire_trigger(std::string_view name) const -> void;
 
     private:
         friend class animation_fsm_system;

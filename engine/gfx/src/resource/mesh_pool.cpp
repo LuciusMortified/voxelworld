@@ -7,12 +7,6 @@ import vw.world;
 import vw.platform;
 
 namespace vw::gfx {
-namespace {
-constexpr log::log_category lc_{"mesh_pool"};
-}
-}
-
-namespace vw::gfx {
 
 
 mesh_pool::mesh_pool(
@@ -32,7 +26,7 @@ mesh_pool::~mesh_pool() {
     stop_gen_threads();
 }
 
-void mesh_pool::stop_gen_threads() {
+auto mesh_pool::stop_gen_threads() -> void {
     {
         std::scoped_lock lock(gen_mutex_);
         if (!gen_running_) {
@@ -61,9 +55,11 @@ void mesh_pool::stop_gen_threads() {
     return pending_meshes_.contains(identity);
 }
 
-void mesh_pool::request_mesh(
-    const std::shared_ptr<vw::asset::model>& model_ptr, mesh_options opts
-) {
+auto mesh_pool::request_mesh(
+    const std::shared_ptr<vw::asset::model>& model_ptr,
+    const std::shared_ptr<vw::asset::chunk_volume>& chunk_ptr,
+    mesh_options opts
+) -> void {
     vw::asset::model_identity identity = model_ptr->get_identity();
 
     if (has(identity) || is_pending(identity)) {
@@ -81,9 +77,11 @@ void mesh_pool::request_mesh(
     pending_indices_.insert(identity.index);
 
     model_refs_[identity] = model_ptr;
+    chunk_refs_[identity] = chunk_ptr;
 
     {
-        auto task   = std::make_unique<mesh_generation_task>(identity, model_ptr, opts);
+        auto task =
+            std::make_unique<mesh_generation_task>(identity, model_ptr, chunk_ptr, opts);
         auto future = task->promise.get_future();
 
         std::scoped_lock lock(gen_mutex_);
@@ -101,23 +99,24 @@ void mesh_pool::request_mesh(
     return iter != meshes_.end() ? iter->second : nullptr;
 }
 
-void mesh_pool::remove(
+auto mesh_pool::remove(
     const vw::asset::model_identity& identity
-) {
+) -> void {
     meshes_.erase(identity);
     model_refs_.erase(identity);
+    chunk_refs_.erase(identity);
     pending_meshes_.erase(identity);
     pending_indices_.erase(identity.index);
 }
 
-void mesh_pool::evict(
+auto mesh_pool::evict(
     const vw::asset::model_identity& identity
-) {
+) -> void {
     meshes_.erase(identity);
     pending_indices_.erase(identity.index);
 }
 
-void mesh_pool::sweep_orphaned_() {
+auto mesh_pool::sweep_orphaned_() -> void {
     const auto buckets = model_refs_.bucket_count();
     if (buckets == 0) {
         sweep_bucket_ = 0;
@@ -148,6 +147,7 @@ void mesh_pool::sweep_orphaned_() {
             pending_meshes_.erase(identity);
             pending_indices_.erase(identity.index);
             model_refs_.erase(identity);
+            chunk_refs_.erase(identity);
             ++freed;
         }
 
@@ -160,7 +160,7 @@ void mesh_pool::sweep_orphaned_() {
     }
 }
 
-void mesh_pool::process_completed() {
+auto mesh_pool::process_completed() -> void {
     sweep_orphaned_();
 
     constexpr uint32 max_meshes_per_frame = 4;
@@ -178,9 +178,9 @@ void mesh_pool::process_completed() {
             // Соседние плоскости были нужны только чтобы построить этот меш, а
             // прочитавший их воркер закончил. Иначе эти три килобайта на чанк лежали
             // бы всё время, пока чанк загружен.
-            if (const auto ref = model_refs_.find(identity); ref != model_refs_.end()) {
-                if (const auto model = ref->second.lock()) {
-                    model->release_boundary();
+            if (const auto ref = chunk_refs_.find(identity); ref != chunk_refs_.end()) {
+                if (const auto chunk = ref->second.lock()) {
+                    chunk->release_boundary();
                 }
             }
 
@@ -196,9 +196,9 @@ auto mesh_pool::get_pending_count() const -> uint32 {
     return static_cast<uint32>(pending_meshes_.size());
 }
 
-void mesh_pool::merge_worker_stats_(
+auto mesh_pool::merge_worker_stats_(
     mesh_gen_worker_stats& worker
-) {
+) -> void {
     if (worker.chunks == 0) {
         return;
     }
@@ -250,7 +250,7 @@ auto mesh_pool::get_gen_stats() const -> mesh_gen_stats {
     return out;
 }
 
-void mesh_pool::gen_thread_function() {
+auto mesh_pool::gen_thread_function() -> void {
     mesh_generation_storage storage;
     mesh_gen_worker_stats local;
 
@@ -283,10 +283,13 @@ void mesh_pool::gen_thread_function() {
                 continue;
             }
 
+            const auto chunk_ptr = task->chunk_ref.lock();
+            const mesh_source source{.voxels = *model_ptr, .chunk = chunk_ptr.get()};
+
             try {
                 const auto started = std::chrono::steady_clock::now();
                 mesh data = greedy_mesh_generator::generate_mesh_data(
-                    storage, *model_ptr, *registry_, task->opts
+                    storage, source, *registry_, task->opts
                 );
                 const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
                     std::chrono::steady_clock::now() - started
@@ -294,7 +297,7 @@ void mesh_pool::gen_thread_function() {
                 local.record(static_cast<uint64>(elapsed.count()), data.quads.size());
 
                 task->promise.set_value(std::move(data));
-            } catch (const std::exception& e) {
+            } catch (const std::exception&) {
                 task->promise.set_exception(std::current_exception());
             }
         }

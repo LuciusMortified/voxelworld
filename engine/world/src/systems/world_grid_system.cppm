@@ -7,7 +7,7 @@ import vw.ecs;
 import :anim;
 import :components;
 import :grid;
-import :index;
+import :spatial;
 import :model;
 import :light;
 import :terrain;
@@ -63,8 +63,8 @@ public:
     world_grid_system(world_grid_system&&) noexcept;
     auto operator=(world_grid_system&&) noexcept -> world_grid_system&;
 
-    void set_grid(std::unique_ptr<world_grid> grid);
-    void set_loader(std::unique_ptr<chunk_loader> loader);
+    auto set_grid(std::unique_ptr<world_grid> grid) -> void;
+    auto set_loader(std::unique_ptr<chunk_loader> loader) -> void;
 
     [[nodiscard]] auto grid() -> world_grid*;
     [[nodiscard]] auto grid() const -> const world_grid*;
@@ -73,8 +73,8 @@ public:
     [[nodiscard]] auto has_grid() const -> bool;
     [[nodiscard]] auto has_loader() const -> bool;
 
-    void update(float32 dt);
-    void shutdown();
+    auto update(float32 dt) -> void;
+    auto shutdown() -> void;
 
     [[nodiscard]] auto get_stats() const -> const world_grid_system_stats&;
     [[nodiscard]] auto get_loader_stats() const -> column_gen_stats;
@@ -110,11 +110,11 @@ private:
 
     auto process_dirty_entity_(entity ent) -> bool;
     auto process_dirty_entities_() -> bool;
-    void stage_completed_columns_();
-    void collect_lit_columns_();
-    void relight_dirty_columns_();
-    void apply_relit_column_(light_result& result);
-    void integrate_completed_columns_();
+    auto stage_completed_columns_() -> void;
+    auto collect_lit_columns_() -> void;
+    auto relight_dirty_columns_() -> void;
+    auto apply_relit_column_(light_result& result) -> void;
+    auto integrate_completed_columns_() -> void;
     auto dispatch_light_(vec2i coord) -> bool;
     [[nodiscard]] auto column_stack_(vec2i coord, int32 bottom)
         -> std::vector<std::shared_ptr<asset::model>>;
@@ -124,15 +124,15 @@ private:
     [[nodiscard]] auto column_ready_(vec2i coord) const -> bool;
     [[nodiscard]] auto within_draw_(vec2i coord) const -> bool;
     [[nodiscard]] auto model_at_(vec3i chunk_coord) const -> asset::model*;
-    void queue_if_ready_(vec2i coord);
-    void demote_column_(vec2i coord);
-    void dispatch_column_requests_();
-    void update_grid_stats_();
+    auto queue_if_ready_(vec2i coord) -> void;
+    auto demote_column_(vec2i coord) -> void;
+    auto dispatch_column_requests_() -> void;
+    auto update_grid_stats_() -> void;
     auto rebuild_active_set_() -> vec2i;
-    void unload_inactive_columns_();
-    void rebuild_pending_requests_(vec2i camera_column);
-    void clear_grid_transient_state_();
-    void clear_loader_transient_state_();
+    auto unload_inactive_columns_() -> void;
+    auto rebuild_pending_requests_(vec2i camera_column) -> void;
+    auto clear_grid_transient_state_() -> void;
+    auto clear_loader_transient_state_() -> void;
 
     world* world_;
     std::unique_ptr<world_grid> grid_;

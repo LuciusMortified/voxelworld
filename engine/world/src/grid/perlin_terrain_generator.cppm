@@ -210,7 +210,7 @@ private:
 
     [[nodiscard]] auto sample_column_(int32 cx, int32 cz) const -> column_profile;
 
-    auto carve_caves_(asset::model& mdl, terrain_context& ctx, int32 chunk_y,
+    auto carve_caves_(asset::model_writer& writer, terrain_context& ctx, int32 chunk_y,
                       const column_profile& profile) const -> void;
 
     auto generate_chunk(terrain_context& ctx, int32 chunk_y, const column_profile& profile) -> void;

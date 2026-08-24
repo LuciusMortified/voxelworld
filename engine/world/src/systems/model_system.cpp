@@ -12,11 +12,11 @@ model_system::model_system(
 
 template <typename C>
     requires std::same_as<C, model_component>
-void model_system::on_add(entity e) {
+auto model_system::on_add(entity e) -> void {
     world_->registry().request_change<model_component>(e);
 }
 
-void model_system::update(float32 /*dt*/) {
+auto model_system::update(float32 /*dt*/) -> void {
     auto& reg       = world_->registry();
     auto& requested = reg.requested<model_component>();
     for (auto ent : requested) {
@@ -41,34 +41,43 @@ auto model_system::model_modifier::get_model() const -> std::shared_ptr<asset::m
     return component_->model_;
 }
 
-void model_system::model_modifier::set_model(
+auto model_system::model_modifier::set_model(
     std::shared_ptr<asset::model> model_ptr
-) {
+) -> void {
     component_->model_ = std::move(model_ptr);
+    component_->chunk_.reset();
     system_->world_->registry().request_change<model_component>(entity_);
 }
 
-void model_system::model_modifier::set_voxel(
+auto model_system::model_modifier::set_chunk(
+    std::shared_ptr<asset::chunk_volume> volume
+) -> void {
+    component_->model_ = volume->shared_voxels();
+    component_->chunk_ = std::move(volume);
+    system_->world_->registry().request_change<model_component>(entity_);
+}
+
+auto model_system::model_modifier::set_voxel(
     int x, int y, int z, const voxel& v
-) {
+) -> void {
     if (component_->model_) {
         component_->model_->set_voxel(x, y, z, v);
         system_->world_->registry().request_change<model_component>(entity_);
     }
 }
 
-void model_system::model_modifier::set_voxel(
+auto model_system::model_modifier::set_voxel(
     vec3i pos, const voxel& v
-) {
+) -> void {
     if (component_->model_) {
         component_->model_->set_voxel(pos.x, pos.y, pos.z, v);
         system_->world_->registry().request_change<model_component>(entity_);
     }
 }
 
-void model_system::model_modifier::fill(
+auto model_system::model_modifier::fill(
     const voxel& v
-) {
+) -> void {
     if (component_->model_) {
         component_->model_->fill(v);
         system_->world_->registry().request_change<model_component>(entity_);

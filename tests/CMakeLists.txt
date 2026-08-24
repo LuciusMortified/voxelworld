@@ -73,6 +73,7 @@ add_executable(world_tests
     world/headless.test.cpp
     world/column_staging.test.cpp
     world/model_fill.test.cpp
+    world/model_edit.test.cpp
     world/surface.test.cpp
     world/sky_light.test.cpp
     world/emission.test.cpp
@@ -81,6 +82,7 @@ add_executable(world_tests
     world/chunk_links.test.cpp
     world/chunk_walk.test.cpp
     world/cave_culling.test.cpp
+    world/serial.test.cpp
 )
 
 target_link_libraries(world_tests PRIVATE

@@ -6,16 +6,16 @@ import vw.core;
 namespace vw::ecs {
 
 chunk::chunk(
-    world& w, vec3i coord, std::shared_ptr<asset::model> mdl, int32 voxel_scale
+    world& w, vec3i coord, std::shared_ptr<asset::chunk_volume> volume, int32 voxel_scale
 )
     : world_(&w)
     , coord_(coord)
     , voxel_scale_(voxel_scale)
     , ent_(invalid_entity)
-    , model_(std::move(mdl))
-    , fill_(model_->scan_fill()) {
+    , volume_(std::move(volume))
+    , fill_(volume_->voxels().scan_fill()) {
     for (int32 fd = 0; fd < 6; ++fd) {
-        if (model_->has_boundary_slice(fd)) {
+        if (volume_->has_boundary_slice(fd)) {
             known_neighbors_ |= static_cast<uint8>(1U << fd);
         }
     }
@@ -24,7 +24,7 @@ chunk::chunk(
     // мешер прошёл бы весь чанк и не вернул ни одного квада. К моменту размещения
     // чанка границы окончательны, поэтому ответ под ним не изменится.
     const bool has_faces = fill_ == asset::model_fill::mixed ||
-        (fill_ == asset::model_fill::solid && !model_->boundaries_are_solid());
+        (fill_ == asset::model_fill::solid && !volume_->boundaries_are_solid());
 
     if (has_faces) {
         create_entity_();
@@ -34,10 +34,10 @@ chunk::chunk(
     // Этот чанк никто и никогда не смешит, поэтому только что выданные ему
     // плоскости уже сделали всю работу, какую могли. Для чанков, которые он
     // действительно строит, их освобождает мешер.
-    model_->release_boundary();
+    volume_->release_boundary();
 }
 
-void chunk::create_entity_() {
+auto chunk::create_entity_() -> void {
     auto& w = *world_;
 
     ent_ = w.create()
@@ -56,7 +56,7 @@ void chunk::create_entity_() {
     w.system<transform_system>().modify(ent_)
         .set_position(world_pos)
         .set_scale({vs, vs, vs});
-    w.system<model_system>().modify(ent_).set_model(model_);
+    w.system<model_system>().modify(ent_).set_chunk(volume_);
     w.system<spatial_system>().modify(ent_).set_layer(spatial_layer::terrain);
 }
 
@@ -82,7 +82,7 @@ chunk::chunk(
     , coord_(other.coord_)
     , voxel_scale_(other.voxel_scale_)
     , ent_(other.ent_)
-    , model_(std::move(other.model_))
+    , volume_(std::move(other.volume_))
     , fill_(other.fill_)
     , known_neighbors_(other.known_neighbors_) {
     other.world_ = nullptr;
@@ -100,7 +100,7 @@ auto chunk::operator=(
         coord_       = other.coord_;
         voxel_scale_ = other.voxel_scale_;
         ent_             = other.ent_;
-        model_           = std::move(other.model_);
+        volume_          = std::move(other.volume_);
         fill_            = other.fill_;
         known_neighbors_ = other.known_neighbors_;
         other.world_ = nullptr;
@@ -112,36 +112,40 @@ auto chunk::operator=(
 auto chunk::get_voxel(
     int32 x, int32 y, int32 z
 ) const -> voxel {
-    return model_->get_voxel(x, y, z);
+    return volume_->voxels().get_voxel(x, y, z);
 }
 
 auto chunk::get_voxel(
     vec3i local
 ) const -> voxel {
-    return model_->get_voxel(local);
+    return volume_->voxels().get_voxel(local);
 }
 
-void chunk::set_voxel(
+auto chunk::set_voxel(
     int32 x, int32 y, int32 z, const voxel& v
-) {
-    model_->set_voxel(x, y, z, v);
-    fill_ = model_->scan_fill();
+) -> void {
+    volume_->voxels().set_voxel(x, y, z, v);
+    fill_ = volume_->voxels().scan_fill();
 }
 
-void chunk::set_voxel(
+auto chunk::set_voxel(
     vec3i local, const voxel& v
-) {
+) -> void {
     set_voxel(local.x, local.y, local.z, v);
 }
 
 auto chunk::is_empty(
     int32 x, int32 y, int32 z
 ) const -> bool {
-    return model_->is_empty(x, y, z);
+    return volume_->voxels().is_empty(x, y, z);
 }
 
 auto chunk::get_model() const -> std::shared_ptr<asset::model> {
-    return model_;
+    return volume_->shared_voxels();
+}
+
+auto chunk::get_volume() const -> std::shared_ptr<asset::chunk_volume> {
+    return volume_;
 }
 
 auto chunk::get_entity() const -> entity {
@@ -160,7 +164,7 @@ auto chunk::known_neighbors() const -> uint8 {
     return known_neighbors_;
 }
 
-void chunk::set_known_neighbors(uint8 mask) {
+auto chunk::set_known_neighbors(uint8 mask) -> void {
     known_neighbors_ = mask;
 }
 

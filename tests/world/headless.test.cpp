@@ -79,12 +79,14 @@ TEST_CASE("chunk occupancy matches the voxel volume bit for bit", "[world][occup
     constexpr int32 side = asset::chunk_occupancy::side;
     asset::model model{identity_pool, pages, side, side, side};
 
+    asset::model_writer writer{model};
+
     // One uniform page, one sparse page and a lot of empty ones, so all three
     // page modes take part.
     for (int32 x = 0; x < 8; ++x) {
         for (int32 y = 0; y < 8; ++y) {
             for (int32 z = 0; z < 8; ++z) {
-                model.set_voxel_raw(x, y, z, voxel{blocks::gray_3});
+                writer.set(x, y, z, voxel{blocks::gray_3});
             }
         }
     }
@@ -95,7 +97,7 @@ TEST_CASE("chunk occupancy matches the voxel volume bit for bit", "[world][occup
         const int32 x = static_cast<int32>((state >> 8) % side);
         const int32 y = static_cast<int32>((state >> 14) % side);
         const int32 z = static_cast<int32>((state >> 20) % side);
-        model.set_voxel_raw(x, y, z, voxel{blocks::red_2});
+        writer.set(x, y, z, voxel{blocks::red_2});
     }
 
     asset::chunk_occupancy occupancy;

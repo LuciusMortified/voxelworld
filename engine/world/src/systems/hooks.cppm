@@ -7,7 +7,7 @@ import vw.ecs;
 import :anim;
 import :components;
 import :grid;
-import :index;
+import :spatial;
 import :model;
 import :light;
 import :terrain;
@@ -28,21 +28,21 @@ concept has_shutdown = requires(S& s) { s.shutdown(); };
 namespace detail {
 
 template <typename C, typename S>
-void invoke_on_add(S& system, entity ent) {
+auto invoke_on_add(S& system, entity ent) -> void {
     if constexpr (has_on_add<S, C>) {
         system.template on_add<C>(ent);
     }
 }
 
 template <typename C, typename S>
-void invoke_on_remove(S& system, entity ent) {
+auto invoke_on_remove(S& system, entity ent) -> void {
     if constexpr (has_on_remove<S, C>) {
         system.template on_remove<C>(ent);
     }
 }
 
 template <typename S>
-void invoke_shutdown(S& system) {
+auto invoke_shutdown(S& system) -> void {
     if constexpr (has_shutdown<S>) {
         system.shutdown();
     }

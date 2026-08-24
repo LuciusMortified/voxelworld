@@ -31,7 +31,7 @@ public:
         gen.generate(ctx);
 
         for (auto& [cy, data] : column.get_all_chunk_data()) {
-            models_[cy] = data.chunk_model;
+            models_[cy] = data.volume->shared_voxels();
             min_y_      = std::min(min_y_, cy * chunk);
             max_y_      = std::max(max_y_, (cy * chunk) + chunk - 1);
         }

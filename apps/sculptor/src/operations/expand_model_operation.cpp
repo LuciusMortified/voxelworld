@@ -14,7 +14,7 @@ expand_model_operation::expand_model_operation(
     engine_type& eng, app_state& st, const expand_model_params& params
 ) : engine_(&eng), state_(&st), params_(params) {}
 
-void expand_model_operation::execute() {
+auto expand_model_operation::execute() -> void {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
@@ -39,16 +39,22 @@ void expand_model_operation::execute() {
         params_.dir.z < 0 ? 1 : 0
     };
 
-    for (int x = 0; x < size.x; ++x) {
-        for (int y = 0; y < size.y; ++y) {
-            for (int z = 0; z < size.z; ++z) {
-                const auto v = model->get_voxel(x, y, z);
-                const auto new_p = vec3i{
-                    x + zeroed_dir.x,
-                    y + zeroed_dir.y,
-                    z + zeroed_dir.z
-                };
-                new_model->set_voxel(new_p, v);
+    // Один писатель на всё копирование: поэлементный set_voxel брал бы мьютекс
+    // пула идентичностей на каждый воксель, а их тут весь объём модели.
+    {
+        asset::model_writer writer{*new_model};
+
+        for (int x = 0; x < size.x; ++x) {
+            for (int y = 0; y < size.y; ++y) {
+                for (int z = 0; z < size.z; ++z) {
+                    const auto v = model->get_voxel(x, y, z);
+                    const auto new_p = vec3i{
+                        x + zeroed_dir.x,
+                        y + zeroed_dir.y,
+                        z + zeroed_dir.z
+                    };
+                    writer.set(new_p, v);
+                }
             }
         }
     }
@@ -65,7 +71,7 @@ void expand_model_operation::execute() {
     state_->file.has_unsaved_changes = true;
 }
 
-void expand_model_operation::undo() {
+auto expand_model_operation::undo() -> void {
     auto ent = state_->scene.name_to_entity[params_.name];
 
     auto& world        = engine_->get_world();
@@ -100,16 +106,20 @@ void expand_model_operation::undo() {
         params_.dir.z < 0 ? 1 : 0
     };
 
-    for (int x = beg.x; x < end.x; ++x) {
-        for (int y = beg.y; y < end.y; ++y) {
-            for (int z = beg.z; z < end.z; ++z) {
-                const auto v = model->get_voxel(x, y, z);
-                const auto new_p = vec3i{
-                    x - zeroed_dir.x,
-                    y - zeroed_dir.y,
-                    z - zeroed_dir.z
-                };
-                new_model->set_voxel(new_p, v);
+    {
+        asset::model_writer writer{*new_model};
+
+        for (int x = beg.x; x < end.x; ++x) {
+            for (int y = beg.y; y < end.y; ++y) {
+                for (int z = beg.z; z < end.z; ++z) {
+                    const auto v = model->get_voxel(x, y, z);
+                    const auto new_p = vec3i{
+                        x - zeroed_dir.x,
+                        y - zeroed_dir.y,
+                        z - zeroed_dir.z
+                    };
+                    writer.set(new_p, v);
+                }
             }
         }
     }

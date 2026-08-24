@@ -92,11 +92,43 @@ struct mesh_options {
     bool build_links = false;
 };
 
+// Модель и то, что знает о ней мир: плоскости соседей по швам и запечённый свет.
+// У модели, которая чанком не является — а это всё, что открыто в редакторе, —
+// чанковой половины нет вовсе, и мешер строит её как отдельно стоящую: за её
+// границами ничего не известно, и известным оно не станет.
+struct mesh_source {
+    const vw::asset::model& voxels;
+    const vw::asset::chunk_volume* chunk = nullptr;
+
+    [[nodiscard]] auto has_boundary_slice(int32 face_direction) const -> bool {
+        return chunk != nullptr && chunk->has_boundary_slice(face_direction);
+    }
+
+    // Спрашивать вправе только тот, кому has_boundary_slice это подтвердил.
+    [[nodiscard]] auto is_boundary_solid(int32 face_direction, int32 x, int32 y, int32 z) const
+        -> bool {
+        return chunk->is_boundary_solid(face_direction, x, y, z);
+    }
+
+    [[nodiscard]] auto boundary_face(int32 face_direction) const
+        -> const vw::asset::face_occupancy& {
+        return chunk->get_boundary_face(face_direction);
+    }
+
+    [[nodiscard]] auto sky_light() const -> const vw::asset::light_field* {
+        return chunk != nullptr ? chunk->get_sky_light() : nullptr;
+    }
+
+    [[nodiscard]] auto block_light() const -> const vw::asset::light_field* {
+        return chunk != nullptr ? chunk->get_block_light() : nullptr;
+    }
+};
+
 class simple_mesh_generator {
 public:
     [[nodiscard]]
     static auto generate_mesh_data(
-        const std::shared_ptr<vw::asset::model>& mdl,
+        const mesh_source& src,
         const block_registry& registry,
         mesh_options opts = {}
     ) -> mesh;
@@ -104,7 +136,7 @@ public:
 private:
     static auto add_cube_face(
         std::vector<quad>& quads,
-        const std::shared_ptr<vw::asset::model>& mdl,
+        const mesh_source& src,
         int32 x,
         int32 y,
         int32 z,
@@ -116,7 +148,7 @@ private:
 
     [[nodiscard]]
     static auto is_face_visible(
-        const std::shared_ptr<vw::asset::model>& mdl, int32 x, int32 y, int32 z,
+        const mesh_source& src, int32 x, int32 y, int32 z,
         int32 face_direction
     ) -> bool;
 };
@@ -179,7 +211,7 @@ struct face_axis_mapping {
     int32 face_direction;
     int32 voxel_scale;
 
-    face_axis_mapping(const vw::asset::model& mdl, int32 face_dir);
+    face_axis_mapping(const mesh_source& src, int32 face_dir);
 
     [[nodiscard]] auto to_model_coords(int32 u, int32 v, int32 layer) const
         -> std::tuple<int32, int32, int32>;
@@ -188,11 +220,11 @@ struct face_axis_mapping {
         -> std::pair<vec3i, vec3i>;
 };
 
-[[nodiscard]] auto compute_corner_darkness(const vw::asset::model& mdl, int32 x, int32 y, int32 z,
+[[nodiscard]] auto compute_corner_darkness(const mesh_source& src, int32 x, int32 y, int32 z,
                                            int32 face) -> uint8;
-[[nodiscard]] auto compute_corner_convexity(const vw::asset::model& mdl, int32 x, int32 y, int32 z,
+[[nodiscard]] auto compute_corner_convexity(const mesh_source& src, int32 x, int32 y, int32 z,
                                             int32 face) -> uint8;
-[[nodiscard]] auto compute_corner_light(const vw::asset::model& mdl, int32 x, int32 y, int32 z,
+[[nodiscard]] auto compute_corner_light(const mesh_source& src, int32 x, int32 y, int32 z,
                                         int32 face) -> corner_light;
 
 // Единственная грань, для которой считается выпуклость. Боковая грань и так
@@ -200,12 +232,12 @@ struct face_axis_mapping {
 // смотрят, — остальные пять платили бы ключом слияния и ничего не показывали.
 inline constexpr int32 convex_face = 2;
 
-[[nodiscard]] auto is_face_visible(const vw::asset::model& mdl, int32 x, int32 y, int32 z,
+[[nodiscard]] auto is_face_visible(const mesh_source& src, int32 x, int32 y, int32 z,
                                    int32 face_direction) -> bool;
 
 auto build_face_mask(
     mesh_generation_storage& storage,
-    const vw::asset::model& mdl,
+    const mesh_source& src,
     const face_axis_mapping& axes,
     int32 face_direction,
     int32 layer,
@@ -240,12 +272,12 @@ struct layer_rows {
     bool front_outside = false;
 };
 
-[[nodiscard]] auto light_from_rows(const vw::asset::model& mdl, const layer_rows& rows,
+[[nodiscard]] auto light_from_rows(const mesh_source& src, const layer_rows& rows,
                                    int32 u_at, int32 v_at, int32 x, int32 y, int32 z,
                                    int32 face) -> corner_light;
 
 [[nodiscard]] auto build_layer_rows(
-    const vw::asset::model& mdl,
+    const mesh_source& src,
     const vw::asset::chunk_occupancy& occupancy,
     const face_axis_mapping& axes,
     int32 face_direction,
@@ -271,7 +303,7 @@ public:
     [[nodiscard]]
     static auto generate_mesh_data(
         mesh_generation_storage& storage,
-        const vw::asset::model& mdl,
+        const mesh_source& src,
         const block_registry& registry,
         mesh_options opts = {}
     ) -> mesh;
@@ -279,7 +311,7 @@ public:
 private:
     static auto merge_and_emit_strips(
         mesh_generation_storage& storage,
-        const vw::asset::model& mdl,
+        const mesh_source& src,
         const detail::face_axis_mapping& axes,
         int32 face_direction,
         int32 layer,
@@ -289,7 +321,7 @@ private:
 
     static auto generate_face_quads(
         mesh_generation_storage& storage,
-        const vw::asset::model& mdl,
+        const mesh_source& src,
         int32 face_direction,
         const block_registry& registry,
         mesh_options opts
@@ -301,7 +333,7 @@ public:
     [[nodiscard]]
     static auto generate_mesh_data(
         mesh_generation_storage& storage,
-        const vw::asset::model& mdl,
+        const mesh_source& src,
         const block_registry& registry,
         mesh_options opts = {}
     ) -> mesh;
@@ -320,7 +352,7 @@ private:
 
     static auto merge_and_emit_rects(
         mesh_generation_storage& storage,
-        const vw::asset::model& mdl,
+        const mesh_source& src,
         const detail::face_axis_mapping& axes,
         int32 face_direction,
         int32 layer,
@@ -330,7 +362,7 @@ private:
 
     static auto generate_face_quads(
         mesh_generation_storage& storage,
-        const vw::asset::model& mdl,
+        const mesh_source& src,
         int32 face_direction,
         const block_registry& registry,
         mesh_options opts

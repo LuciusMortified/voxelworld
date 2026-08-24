@@ -15,15 +15,22 @@ class vulkan_context;
 struct mesh_generation_task {
     vw::asset::model_identity identity;
     std::weak_ptr<vw::asset::model> model_ref;
+    // Пусто у модели, которая не чанк мира. Слабая по той же причине, что и
+    // модель: пока задача ждёт очереди, колонку могло унести из виду.
+    std::weak_ptr<vw::asset::chunk_volume> chunk_ref;
     std::promise<mesh> promise;
     mesh_options opts;
 
     mesh_generation_task(
         vw::asset::model_identity identity,
         std::weak_ptr<vw::asset::model> model_ref,
+        std::weak_ptr<vw::asset::chunk_volume> chunk_ref,
         mesh_options opts
     )
-        : identity(identity), model_ref(std::move(model_ref)), opts(opts) {}
+        : identity(identity)
+        , model_ref(std::move(model_ref))
+        , chunk_ref(std::move(chunk_ref))
+        , opts(opts) {}
 };
 
 // Мешинг идёт вне кадрового потока, поэтому кадровые перцентили о нём ничего не
@@ -67,26 +74,32 @@ public:
     mesh_pool(mesh_pool&&)                         = delete;
     auto operator=(mesh_pool&&) -> mesh_pool&      = delete;
 
-    void stop_gen_threads();
+    auto stop_gen_threads() -> void;
     [[nodiscard]] auto has(const vw::asset::model_identity& identity) const -> bool;
     [[nodiscard]] auto is_pending(const vw::asset::model_identity& identity) const -> bool;
-    void request_mesh(const std::shared_ptr<vw::asset::model>& model_ptr, mesh_options opts = {});
+    auto request_mesh(
+        const std::shared_ptr<vw::asset::model>& model_ptr,
+        const std::shared_ptr<vw::asset::chunk_volume>& chunk_ptr,
+        mesh_options opts = {}
+    ) -> void;
     [[nodiscard]] auto get(const vw::asset::model_identity& identity) const -> std::shared_ptr<mesh>;
-    void remove(const vw::asset::model_identity& identity);
-    void evict(const vw::asset::model_identity& identity);
-    void process_completed();
+    auto remove(const vw::asset::model_identity& identity) -> void;
+    auto evict(const vw::asset::model_identity& identity) -> void;
+    auto process_completed() -> void;
     [[nodiscard]] auto get_pending_count() const -> uint32;
     [[nodiscard]] auto get_gen_stats() const -> mesh_gen_stats;
 
 private:
-    void gen_thread_function();
-    void sweep_orphaned_();
-    void merge_worker_stats_(mesh_gen_worker_stats& worker);
+    auto gen_thread_function() -> void;
+    auto sweep_orphaned_() -> void;
+    auto merge_worker_stats_(mesh_gen_worker_stats& worker) -> void;
 
     vulkan_context* context_;
     const block_registry* registry_;
     std::unordered_map<vw::asset::model_identity, std::shared_ptr<mesh>> meshes_;
     std::unordered_map<vw::asset::model_identity, std::weak_ptr<vw::asset::model>> model_refs_;
+    std::unordered_map<vw::asset::model_identity, std::weak_ptr<vw::asset::chunk_volume>>
+        chunk_refs_;
     std::unordered_map<vw::asset::model_identity, std::future<mesh>> pending_meshes_;
     std::unordered_set<uint32> pending_indices_;
 

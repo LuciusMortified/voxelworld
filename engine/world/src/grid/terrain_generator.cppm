@@ -9,7 +9,7 @@ export namespace vw::ecs {
 
 struct chunk_data {
     vec3i coord;
-    std::shared_ptr<asset::model> chunk_model;
+    std::shared_ptr<asset::chunk_volume> volume;
 };
 
 struct chunk_y_range {

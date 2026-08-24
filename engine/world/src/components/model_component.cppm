@@ -5,7 +5,7 @@ import std;
 import vw.core;
 import vw.ecs;
 import :anim;
-import :index;
+import :spatial;
 import :model;
 
 export namespace vw::ecs {
@@ -29,6 +29,13 @@ struct model_component final {
 
     [[nodiscard]] auto get_model() const -> std::shared_ptr<asset::model> {
         return model_;
+    }
+
+    // Чанк, которым эта модель стоит в мире, — со швами и запечённым светом; у
+    // модели, которая чанком не является (всё в редакторе), его нет вовсе, и
+    // мешер строит её как отдельно стоящую.
+    [[nodiscard]] auto get_chunk() const -> const std::shared_ptr<asset::chunk_volume>& {
+        return chunk_;
     }
 
     [[nodiscard]] auto get_voxel(int32 x, int32 y, int32 z) const -> voxel {
@@ -71,6 +78,7 @@ private:
     friend class model_system;
 
     std::shared_ptr<asset::model> model_;
+    std::shared_ptr<asset::chunk_volume> chunk_;
 };
 
 }  // namespace vw::ecs

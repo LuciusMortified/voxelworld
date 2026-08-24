@@ -32,7 +32,7 @@ auto dynamic_aabb_tree::allocate_node() -> uint32 {
     return static_cast<uint32>(nodes_.size() - 1);
 }
 
-void dynamic_aabb_tree::free_node(uint32 index) {
+auto dynamic_aabb_tree::free_node(uint32 index) -> void {
     if (index >= nodes_.size()) {
         return;
     }
@@ -52,7 +52,7 @@ auto dynamic_aabb_tree::empty() const -> bool {
     return entity_to_node_.empty();
 }
 
-void dynamic_aabb_tree::clear() {
+auto dynamic_aabb_tree::clear() -> void {
     nodes_.clear();
     free_nodes_.clear();
     entity_to_node_.clear();
@@ -108,7 +108,7 @@ auto dynamic_aabb_tree::find_best_sibling(uint32 new_node_index) const -> uint32
     return best_sibling;
 }
 
-void dynamic_aabb_tree::insert_leaf(uint32 leaf_index) {
+auto dynamic_aabb_tree::insert_leaf(uint32 leaf_index) -> void {
     if (root_index_ == invalid_node_index) {
         root_index_ = leaf_index;
         return;
@@ -156,7 +156,7 @@ void dynamic_aabb_tree::insert_leaf(uint32 leaf_index) {
     refit(new_parent);
 }
 
-void dynamic_aabb_tree::remove_leaf(uint32 leaf_index) {
+auto dynamic_aabb_tree::remove_leaf(uint32 leaf_index) -> void {
     if (leaf_index == root_index_) {
         root_index_ = invalid_node_index;
         return;
@@ -192,7 +192,7 @@ void dynamic_aabb_tree::remove_leaf(uint32 leaf_index) {
     free_node(parent);
 }
 
-void dynamic_aabb_tree::refit(uint32 index) {
+auto dynamic_aabb_tree::refit(uint32 index) -> void {
     while (index != invalid_node_index) {
         node& current = nodes_[index];
         if (!current.is_leaf) {
@@ -212,7 +212,7 @@ void dynamic_aabb_tree::refit(uint32 index) {
     }
 }
 
-void dynamic_aabb_tree::rotate(uint32 a_idx) {
+auto dynamic_aabb_tree::rotate(uint32 a_idx) -> void {
     node& a = nodes_[a_idx];
     int32 balance = nodes_[a.right].height - nodes_[a.left].height;
 
@@ -266,7 +266,7 @@ void dynamic_aabb_tree::rotate(uint32 a_idx) {
     b.height = std::max(bl.height, br.height) + 1;
 }
 
-void dynamic_aabb_tree::insert(entity e, const vw::spatial::aabb& bounds, spatial_layer_mask layer) {
+auto dynamic_aabb_tree::insert(entity e, const vw::spatial::aabb& bounds, spatial_layer_mask layer) -> void {
     if (entity_to_node_.find(e) != entity_to_node_.end()) {
         update(e, bounds, layer);
         return;
@@ -286,7 +286,7 @@ void dynamic_aabb_tree::insert(entity e, const vw::spatial::aabb& bounds, spatia
     entity_to_node_[e] = new_node;
 }
 
-void dynamic_aabb_tree::remove(entity e) {
+auto dynamic_aabb_tree::remove(entity e) -> void {
     auto it = entity_to_node_.find(e);
     if (it == entity_to_node_.end()) {
         return;
@@ -298,7 +298,7 @@ void dynamic_aabb_tree::remove(entity e) {
     free_node(node_index);
 }
 
-void dynamic_aabb_tree::update(entity e, const vw::spatial::aabb& new_bounds, spatial_layer_mask layer) {
+auto dynamic_aabb_tree::update(entity e, const vw::spatial::aabb& new_bounds, spatial_layer_mask layer) -> void {
     auto it = entity_to_node_.find(e);
     if (it == entity_to_node_.end()) {
         insert(e, new_bounds, layer);
@@ -324,11 +324,11 @@ void dynamic_aabb_tree::update(entity e, const vw::spatial::aabb& new_bounds, sp
     insert_leaf(node_index);
 }
 
-void dynamic_aabb_tree::query_all(
+auto dynamic_aabb_tree::query_all(
     const vw::spatial::frustum& f,
     std::vector<entity>& result_out,
     spatial_layer_mask layer_mask
-) const {
+) const -> void {
     result_out.clear();
     if (root_index_ == invalid_node_index) {
         return;
@@ -357,10 +357,10 @@ void dynamic_aabb_tree::query_all(
     }
 }
 
-void dynamic_aabb_tree::query_all_any(
+auto dynamic_aabb_tree::query_all_any(
     std::span<const vw::spatial::frustum> frustums,
     std::vector<entity>& result_out
-) const {
+) const -> void {
     result_out.clear();
     if (root_index_ == invalid_node_index) {
         return;
@@ -396,11 +396,11 @@ void dynamic_aabb_tree::query_all_any(
     }
 }
 
-void dynamic_aabb_tree::query_all(
+auto dynamic_aabb_tree::query_all(
     const vw::spatial::ray& r,
     std::vector<entity>& result_out,
     spatial_layer_mask layer_mask
-) const {
+) const -> void {
     result_out.clear();
     if (root_index_ == invalid_node_index) {
         return;
@@ -429,11 +429,11 @@ void dynamic_aabb_tree::query_all(
     }
 }
 
-void dynamic_aabb_tree::query_all(
+auto dynamic_aabb_tree::query_all(
     const vw::spatial::aabb& bounds,
     std::vector<entity>& result_out,
     spatial_layer_mask layer_mask
-) const {
+) const -> void {
     result_out.clear();
     if (root_index_ == invalid_node_index) {
         return;

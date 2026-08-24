@@ -7,7 +7,7 @@ import vw.ecs;
 import :anim;
 import :components;
 import :grid;
-import :index;
+import :spatial;
 import :model;
 import :light;
 import :terrain;
@@ -26,10 +26,13 @@ public:
 
         [[nodiscard]] auto get_model() const -> std::shared_ptr<asset::model>;
 
-        void set_model(std::shared_ptr<asset::model> model_ptr);
-        void set_voxel(int32 x, int32 y, int32 z, const voxel& v);
-        void set_voxel(vec3i pos, const voxel& v);
-        void fill(const voxel& v);
+        auto set_model(std::shared_ptr<asset::model> model_ptr) -> void;
+
+        // Ставит и чанк, и его модель разом: у сущности чанка они всегда пара.
+        auto set_chunk(std::shared_ptr<asset::chunk_volume> volume) -> void;
+        auto set_voxel(int32 x, int32 y, int32 z, const voxel& v) -> void;
+        auto set_voxel(vec3i pos, const voxel& v) -> void;
+        auto fill(const voxel& v) -> void;
 
     private:
         model_system* system_;
@@ -38,11 +41,11 @@ public:
     };
 
     auto modify(entity e) -> model_modifier;
-    void update(float32 dt);
+    auto update(float32 dt) -> void;
 
     template <typename C>
         requires std::same_as<C, model_component>
-    void on_add(entity e);
+    auto on_add(entity e) -> void;
 
 private:
     world* world_;

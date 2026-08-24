@@ -75,9 +75,9 @@ auto chunk_loader::pending_count() const -> uint32 {
     return static_cast<uint32>(pending_columns_.size());
 }
 
-void chunk_loader::merge_worker_stats_(
+auto chunk_loader::merge_worker_stats_(
     column_gen_worker_stats& worker
-) {
+) -> void {
     if (worker.columns == 0) {
         return;
     }
@@ -129,7 +129,7 @@ auto chunk_loader::get_gen_stats() const -> column_gen_stats {
     return out;
 }
 
-void chunk_loader::gen_thread_function_() {
+auto chunk_loader::gen_thread_function_() -> void {
     column_gen_worker_stats local;
 
     while (true) {
@@ -172,7 +172,7 @@ void chunk_loader::gen_thread_function_() {
         // килобайтах промахов кэша. Здесь она ещё в кэше потока, который её только
         // что записал.
         for (auto& [y, cd] : col->get_all_chunk_data()) {
-            static_cast<void>(cd.chunk_model->scan_fill());
+            static_cast<void>(cd.volume->voxels().scan_fill());
         }
 
         const auto elapsed = std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -399,9 +399,10 @@ auto perlin_terrain_generator::cave_openness_at(
     return open;
 }
 
-void perlin_terrain_generator::carve_caves_(
-    vw::asset::model& mdl, terrain_context& ctx, int32 chunk_y, const column_profile& profile
-) const {
+auto perlin_terrain_generator::carve_caves_(
+    vw::asset::model_writer& writer, terrain_context& ctx, int32 chunk_y,
+    const column_profile& profile
+) const -> void {
     constexpr int32 s = 64;
 
     if (!params_.caves) {
@@ -540,7 +541,7 @@ void perlin_terrain_generator::carve_caves_(
                         for (int32 x = cx * stride; x < x_end; ++x) {
                             const float32 tx = static_cast<float32>(x - (cx * stride)) * inv;
                             if (std::lerp(z0v, z1v, tx) > 0.0F) {
-                                mdl.set_voxel_raw(x, y, z, voxel{blocks::air});
+                                writer.set(x, y, z, voxel{blocks::air});
                             }
                         }
                     }
@@ -716,9 +717,9 @@ auto perlin_terrain_generator::surface_height_at(
     return stone + soil_depth_at(wx, wz, stone, slope);
 }
 
-void perlin_terrain_generator::generate(
+auto perlin_terrain_generator::generate(
     terrain_context& ctx
-) {
+) -> void {
     constexpr int32 s = 64;
 
     const auto profile = sample_column_(ctx.cx, ctx.cz);
@@ -783,9 +784,9 @@ auto perlin_terrain_generator::sample_column_(
     return profile;
 }
 
-void perlin_terrain_generator::generate_chunk(
+auto perlin_terrain_generator::generate_chunk(
     terrain_context& ctx, int32 chunk_y, const column_profile& profile
-) {
+) -> void {
     constexpr int32 s = 64;
 
     auto mdl = std::make_shared<vw::asset::model>(*identity_pool_, *page_pool_, s, s, s, params_.voxel_scale);
@@ -794,6 +795,10 @@ void perlin_terrain_generator::generate_chunk(
     constexpr int32 pn = column_profile::pages;
 
     const int32 base_y = chunk_y * s;
+
+    // Один писатель на весь чанк: поколение поднимается на выходе из скоупа, а не
+    // на каждой из десятков тысяч записей.
+    vw::asset::model_writer writer{*mdl};
 
     // По страницам, а не по вокселям: тысяча вокселей породы под каждой колонкой —
     // это одна запись на страницу и вовсе никакого цикла. Полностью выписывается
@@ -818,7 +823,7 @@ void perlin_terrain_generator::generate_chunk(
                 }
 
                 if (one_rock && y1 < (profile.page_min_stone[page] - params_.rock_skin)) {
-                    mdl->fill_page_raw(px, py, pz, voxel{rock_block_at(y0)});
+                    writer.fill_page(px, py, pz, voxel{rock_block_at(y0)});
                     continue;
                 }
 
@@ -835,9 +840,7 @@ void perlin_terrain_generator::generate_chunk(
                         const int32 bottom = std::max(y0, params_.world_bottom_y);
 
                         for (int32 wy = bottom; wy <= top; ++wy) {
-                            mdl->set_voxel_raw(
-                                x, wy - base_y, z, voxel{block_at(wy, stone, surface)}
-                            );
+                            writer.set(x, wy - base_y, z, voxel{block_at(wy, stone, surface)});
                         }
                     }
                 }
@@ -845,13 +848,16 @@ void perlin_terrain_generator::generate_chunk(
         }
     }
 
-    carve_caves_(*mdl, ctx, chunk_y, profile);
+    carve_caves_(writer, ctx, chunk_y, profile);
 
     // И сплошная порода, и выеденные залы сворачиваются здесь обратно в одну
     // страничную запись; без этого глубокий мир осушает пул страниц.
-    mdl->compact_pages();
+    writer.compact_pages();
 
-    ctx.create_chunk(chunk_y) = {vec3i{ctx.cx, chunk_y, ctx.cz}, std::move(mdl)};
+    ctx.create_chunk(chunk_y) = {
+        vec3i{ctx.cx, chunk_y, ctx.cz},
+        std::make_shared<vw::asset::chunk_volume>(std::move(mdl))
+    };
 }
 
 }  // namespace vw::ecs

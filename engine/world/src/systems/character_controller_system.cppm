@@ -7,7 +7,7 @@ import vw.ecs;
 import :anim;
 import :components;
 import :grid;
-import :index;
+import :spatial;
 import :model;
 import :light;
 import :terrain;
@@ -20,7 +20,7 @@ class character_controller_system final {
 public:
     explicit character_controller_system(world& w);
 
-    void update(float32 delta_time);
+    auto update(float32 delta_time) -> void;
 
     class controller_modifier {
     public:

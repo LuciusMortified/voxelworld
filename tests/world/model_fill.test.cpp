@@ -44,8 +44,9 @@ TEST_CASE("six solid neighbours leave nothing to draw", "[model]") {
     asset::model_identity_pool ids;
     asset::page_pool pages;
 
-    asset::model center{ids, pages, side, side, side};
-    center.fill(voxel{blocks::gray_4});
+    auto voxels = std::make_shared<asset::model>(ids, pages, side, side, side);
+    voxels->fill(voxel{blocks::gray_4});
+    asset::chunk_volume center{voxels};
 
     std::array<std::unique_ptr<asset::model>, 6> neighbors;
     for (auto& n : neighbors) {

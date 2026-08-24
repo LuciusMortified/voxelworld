@@ -7,7 +7,7 @@ import vw.ecs;
 import :anim;
 import :components;
 import :grid;
-import :index;
+import :spatial;
 import :model;
 import :light;
 import :terrain;
@@ -34,10 +34,10 @@ public:
 
     explicit physics_system(world& w);
 
-    void set_gravity(float32 g);
+    auto set_gravity(float32 g) -> void;
     [[nodiscard]] auto get_gravity() const -> float32;
 
-    void update(float32 delta_time);
+    auto update(float32 delta_time) -> void;
     [[nodiscard]] auto get_stats() const -> const physics_stats&;
 
     class rigid_body_modifier {
@@ -73,7 +73,7 @@ public:
     auto modify_collider(entity ent) -> collider_modifier;
 
 private:
-    void step(float32 dt);
+    auto step(float32 dt) -> void;
     [[nodiscard]] auto are_chunks_loaded(const vec3f& position, const vec3f& extents) const -> bool;
 
     struct collision_result {
@@ -84,8 +84,8 @@ private:
     [[nodiscard]] auto resolve_box_voxel(vec3f center, const vec3f& half_extents,
                                          vec3f& velocity) const -> collision_result;
 
-    void resolve_entity_collisions(entity ent, vec3f& position, vec3f& velocity,
-                                   const vec3f& half_extents, const vec3f& offset);
+    auto resolve_entity_collisions(entity ent, vec3f& position, vec3f& velocity,
+                                   const vec3f& half_extents, const vec3f& offset) -> void;
 
     world* world_;
     float32 gravity_          = -300.0F;

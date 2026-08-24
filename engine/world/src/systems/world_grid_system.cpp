@@ -16,16 +16,16 @@ world_grid_system::world_grid_system(world_grid_system&&) noexcept = default;
 
 auto world_grid_system::operator=(world_grid_system&&) noexcept -> world_grid_system& = default;
 
-void world_grid_system::set_grid(
+auto world_grid_system::set_grid(
     std::unique_ptr<world_grid> grid
-) {
+) -> void {
     clear_grid_transient_state_();
     grid_ = std::move(grid);
 }
 
-void world_grid_system::set_loader(
+auto world_grid_system::set_loader(
     std::unique_ptr<chunk_loader> loader
-) {
+) -> void {
     clear_loader_transient_state_();
     loader_ = std::move(loader);
     baker_  = loader_ != nullptr ? std::make_unique<light_baker>() : nullptr;
@@ -67,13 +67,13 @@ auto world_grid_system::get_stats() const -> const world_grid_system_stats& {
     return stats_;
 }
 
-void world_grid_system::shutdown() {
+auto world_grid_system::shutdown() -> void {
     grid_.reset();
     baker_.reset();
     loader_.reset();
 }
 
-void world_grid_system::update(float32 /*dt*/) {
+auto world_grid_system::update(float32 /*dt*/) -> void {
     if (!grid_ || !loader_) {
         return;
     }
@@ -141,9 +141,9 @@ auto world_grid_system::column_ready_(
     });
 }
 
-void world_grid_system::queue_if_ready_(
+auto world_grid_system::queue_if_ready_(
     vec2i coord
-) {
+) -> void {
     const auto it = staged_columns_.find(coord);
     if (it == staged_columns_.end()) {
         return;
@@ -176,7 +176,7 @@ auto world_grid_system::already_lit_(
 ) -> bool {
     const auto& chunks = col.get_all_chunk_data();
     return !chunks.empty() && std::ranges::all_of(chunks, [](const auto& entry) -> bool {
-        return entry.second.chunk_model->has_sky_light();
+        return entry.second.volume->has_sky_light();
     });
 }
 
@@ -217,7 +217,7 @@ auto world_grid_system::column_stack_(
 
     if (const auto it = staged_columns_.find(coord); it != staged_columns_.end()) {
         for (auto& [y, cd] : it->second->get_all_chunk_data()) {
-            put(y, cd.chunk_model);
+            put(y, cd.volume->shared_voxels());
         }
         return stack;
     }
@@ -268,7 +268,7 @@ auto world_grid_system::dispatch_light_(
     return baker_->request(std::move(job));
 }
 
-void world_grid_system::collect_lit_columns_() {
+auto world_grid_system::collect_lit_columns_() -> void {
     if (baker_ == nullptr) {
         return;
     }
@@ -286,8 +286,8 @@ void world_grid_system::collect_lit_columns_() {
         for (auto& [y, cd] : it->second->get_all_chunk_data()) {
             const auto slot = static_cast<std::size_t>(y - result->bottom_y);
             if (slot < result->sky.size()) {
-                cd.chunk_model->set_sky_light(std::move(result->sky[slot]));
-                cd.chunk_model->set_block_light(std::move(result->block[slot]));
+                cd.volume->set_sky_light(std::move(result->sky[slot]));
+                cd.volume->set_block_light(std::move(result->block[slot]));
             }
         }
 
@@ -307,9 +307,9 @@ void world_grid_system::collect_lit_columns_() {
 // Сравниваются оба канала, и чанк мешится один раз, если сдвинулся хоть один.
 // Зажжённый в запертой комнате факел двигает канал блоков и не двигает небесный;
 // дыра в крыше — наоборот.
-void world_grid_system::apply_relit_column_(
+auto world_grid_system::apply_relit_column_(
     light_result& result
-) {
+) -> void {
     for (int32 y : grid_->column_levels(result.coord)) {
         const auto slot = static_cast<std::size_t>(y - result.bottom_y);
         if (slot >= result.sky.size()) {
@@ -322,9 +322,9 @@ void world_grid_system::apply_relit_column_(
             continue;
         }
 
-        auto& mdl              = *placed->get_model();
-        const auto* stood_sky   = mdl.get_sky_light();
-        const auto* stood_block = mdl.get_block_light();
+        auto& vol               = *placed->get_volume();
+        const auto* stood_sky   = vol.get_sky_light();
+        const auto* stood_block = vol.get_block_light();
 
         const bool sky_moved   = stood_sky == nullptr || *stood_sky != result.sky[slot];
         const bool block_moved = stood_block == nullptr || *stood_block != result.block[slot];
@@ -333,8 +333,8 @@ void world_grid_system::apply_relit_column_(
             continue;
         }
 
-        mdl.set_sky_light(std::move(result.sky[slot]));
-        mdl.set_block_light(std::move(result.block[slot]));
+        vol.set_sky_light(std::move(result.sky[slot]));
+        vol.set_block_light(std::move(result.block[slot]));
         grid_->remesh_drawn_chunk(at);
         ++stats_.relit_chunks;
     }
@@ -348,7 +348,7 @@ void world_grid_system::apply_relit_column_(
 // Колонка, освещаемая прямо сейчас, остаётся грязной, а не спрашивается повторно:
 // задача в полёте стартовала от вокселей, которые с тех пор сдвинулись, поэтому её
 // результат уже неверен, и следующий кадр всё равно закажет новую.
-void world_grid_system::relight_dirty_columns_() {
+auto world_grid_system::relight_dirty_columns_() -> void {
     if (baker_ == nullptr) {
         return;
     }
@@ -389,7 +389,7 @@ void world_grid_system::relight_dirty_columns_() {
     stats_.relight_backlog = static_cast<uint32>(light_dirty_.size());
 }
 
-void world_grid_system::stage_completed_columns_() {
+auto world_grid_system::stage_completed_columns_() -> void {
     while (true) {
         auto col = loader_->try_pop_completed();
         if (!col) {
@@ -425,10 +425,10 @@ auto world_grid_system::model_at_(
     }
 
     const auto* data = it->second->get_chunk_data(chunk_coord.y);
-    return data != nullptr ? data->chunk_model.get() : nullptr;
+    return data != nullptr ? data->volume->shared_voxels().get() : nullptr;
 }
 
-void world_grid_system::integrate_completed_columns_() {
+auto world_grid_system::integrate_completed_columns_() -> void {
     static constexpr int32 max_columns_per_frame = 1;
 
     float32 boundary_from_total = 0.0f;
@@ -462,7 +462,7 @@ void world_grid_system::integrate_completed_columns_() {
                 // открытое небо над колонкой пониже) и читается воздухом.
                 for (int32 fd = 0; fd < 6; ++fd) {
                     if (auto* neighbor = model_at_(cd.coord + boundary_face_offsets[fd])) {
-                        cd.chunk_model->set_boundary_slice(fd, *neighbor);
+                        cd.volume->set_boundary_slice(fd, *neighbor);
                     }
                 }
             }
@@ -475,7 +475,7 @@ void world_grid_system::integrate_completed_columns_() {
 
         for (auto& [y, cd] : col->get_all_chunk_data()) {
             chunk_create_total += measure_ms([&] -> auto {
-                grid_->place_chunk(cd.coord, std::move(cd.chunk_model));
+                grid_->place_chunk(cd.coord, std::move(cd.volume));
             });
 
             y_levels.push_back(y);
@@ -490,7 +490,7 @@ void world_grid_system::integrate_completed_columns_() {
     stats_.chunk_create_ms  = chunk_create_total;
 }
 
-void world_grid_system::dispatch_column_requests_() {
+auto world_grid_system::dispatch_column_requests_() -> void {
     static constexpr int32 max_requests_per_frame = 8;
 
     // Потолок на работу в полёте, а не только на начатую за кадр. У загрузчика не
@@ -520,7 +520,7 @@ void world_grid_system::dispatch_column_requests_() {
     }
 }
 
-void world_grid_system::update_grid_stats_() {
+auto world_grid_system::update_grid_stats_() -> void {
     stats_.active_count      = static_cast<uint32>(active_columns_.size());
     stats_.pending_count     = loader_->pending_count();
     stats_.loaded_count      = grid_->chunk_count();
@@ -577,9 +577,9 @@ auto world_grid_system::rebuild_active_set_() -> vec2i {
     return camera_column;
 }
 
-void world_grid_system::demote_column_(
+auto world_grid_system::demote_column_(
     vec2i coord
-) {
+) -> void {
     // Вне дальности отрисовки, но всё ещё нужна как сосед. Её меши, сущности и
     // инстансы уходят, модели остаются, поэтому возвращение не стоит ничего, а
     // колонка не генерируется дважды.
@@ -588,7 +588,7 @@ void world_grid_system::demote_column_(
     for (int32 y : grid_->column_levels(coord)) {
         const vec3i chunk_coord{coord.x, y, coord.y};
         if (auto* placed = grid_->get_chunk(chunk_coord)) {
-            col->create_chunk(y, chunk_data{chunk_coord, placed->get_model()});
+            col->create_chunk(y, chunk_data{chunk_coord, placed->get_volume()});
         }
     }
 
@@ -598,7 +598,7 @@ void world_grid_system::demote_column_(
     staged_columns_[coord] = std::move(col);
 }
 
-void world_grid_system::unload_inactive_columns_() {
+auto world_grid_system::unload_inactive_columns_() -> void {
     for (const auto& coord : active_columns_) {
         if (!pending_active_columns_.contains(coord)) {
             grid_->unload_column(coord);
@@ -676,9 +676,9 @@ auto world_grid_system::view_modifier::set_view_distance(
     return *this;
 }
 
-void world_grid_system::rebuild_pending_requests_(
+auto world_grid_system::rebuild_pending_requests_(
     vec2i camera_column
-) {
+) -> void {
     pending_requests_.clear();
 
     for (const auto& coord : active_columns_) {
@@ -699,7 +699,7 @@ void world_grid_system::rebuild_pending_requests_(
     );
 }
 
-void world_grid_system::clear_grid_transient_state_() {
+auto world_grid_system::clear_grid_transient_state_() -> void {
     pending_requests_.clear();
     staged_columns_.clear();
     ready_columns_.clear();
@@ -708,7 +708,7 @@ void world_grid_system::clear_grid_transient_state_() {
     pending_active_columns_.clear();
 }
 
-void world_grid_system::clear_loader_transient_state_() {
+auto world_grid_system::clear_loader_transient_state_() -> void {
     pending_requests_.clear();
 }
 

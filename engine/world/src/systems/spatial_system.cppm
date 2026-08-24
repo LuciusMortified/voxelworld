@@ -7,7 +7,7 @@ import vw.ecs;
 import :anim;
 import :components;
 import :grid;
-import :index;
+import :spatial;
 import :model;
 import :light;
 import :terrain;
@@ -26,29 +26,29 @@ class spatial_system {
 public:
     explicit spatial_system(world& w);
 
-    void update(float32 dt);
+    auto update(float32 dt) -> void;
 
-    void query_all(const spatial::frustum& f, std::vector<entity>& result_out,
-                   spatial_layer_mask layer_mask = spatial_layer::all) const;
+    auto query_all(const spatial::frustum& f, std::vector<entity>& result_out,
+                   spatial_layer_mask layer_mask = spatial_layer::all) const -> void;
 
-    void query_all(const spatial::ray& r, std::vector<entity>& result_out,
-                   spatial_layer_mask layer_mask = spatial_layer::all) const;
+    auto query_all(const spatial::ray& r, std::vector<entity>& result_out,
+                   spatial_layer_mask layer_mask = spatial_layer::all) const -> void;
 
-    void query_all(const spatial::aabb& bounds, std::vector<entity>& result_out,
-                   spatial_layer_mask layer_mask = spatial_layer::all) const;
+    auto query_all(const spatial::aabb& bounds, std::vector<entity>& result_out,
+                   spatial_layer_mask layer_mask = spatial_layer::all) const -> void;
 
-    void query_all_any(std::span<const spatial::frustum> frustums,
-                       std::vector<entity>& result_out) const;
+    auto query_all_any(std::span<const spatial::frustum> frustums,
+                       std::vector<entity>& result_out) const -> void;
 
     [[nodiscard]] auto voxel_ray_cast(const spatial::ray& r, std::vector<entity>& candidates,
                                       spatial_layer_mask layer_mask = spatial_layer::all) const
         -> std::optional<voxel_ray_hit>;
 
-    void cleanup(entity ent);
+    auto cleanup(entity ent) -> void;
 
     template <typename C>
         requires std::same_as<C, spatial_component>
-    void on_remove(entity e) {
+    auto on_remove(entity e) -> void {
         cleanup(e);
     }
 
@@ -67,7 +67,7 @@ public:
     auto modify(entity ent) -> spatial_modifier;
 
 private:
-    void update_entity(entity ent);
+    auto update_entity(entity ent) -> void;
     auto calculate_aabb_from_model(entity ent, const model_component& model_comp,
                                    const transform_component& transform_comp) const
         -> spatial::aabb;

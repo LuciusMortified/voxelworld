@@ -25,11 +25,11 @@ public:
         }
     }
 
-    void set(int32 x, int32 y, int32 z, block_id id) {
+    auto set(int32 x, int32 y, int32 z, block_id id) -> void {
         models_[static_cast<std::size_t>(y / side)]->set_voxel(x, y % side, z, voxel{id});
     }
 
-    void fill(vec3i from, vec3i to, block_id id) {
+    auto fill(vec3i from, vec3i to, block_id id) -> void {
         for (int32 y = from.y; y <= to.y; ++y) {
             for (int32 z = from.z; z <= to.z; ++z) {
                 for (int32 x = from.x; x <= to.x; ++x) {
@@ -210,14 +210,15 @@ TEST_CASE("setting either light invalidates the mesh built from it", "[block_lig
     asset::model_identity_pool ids;
     asset::page_pool pages;
 
-    asset::model m{ids, pages, side, side, side};
+    auto voxels = std::make_shared<asset::model>(ids, pages, side, side, side);
+    asset::chunk_volume chunk{voxels};
 
-    const asset::model_identity fresh = m.get_identity();
+    const asset::model_identity fresh = voxels->get_identity();
 
-    m.set_sky_light(asset::light_field{});
-    const asset::model_identity after_sky = m.get_identity();
+    chunk.set_sky_light(asset::light_field{});
+    const asset::model_identity after_sky = voxels->get_identity();
     REQUIRE(after_sky != fresh);
 
-    m.set_block_light(asset::light_field{});
-    REQUIRE(m.get_identity() != after_sky);
+    chunk.set_block_light(asset::light_field{});
+    REQUIRE(voxels->get_identity() != after_sky);
 }

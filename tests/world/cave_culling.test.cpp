@@ -32,7 +32,7 @@ public:
 
                 for (auto& [cy, data] : column.get_all_chunk_data()) {
                     asset::chunk_occupancy occupancy;
-                    if (!data.chunk_model->build_occupancy(occupancy)) {
+                    if (!data.volume->voxels().build_occupancy(occupancy)) {
                         continue;
                     }
                     chunks_.emplace(vec3i{cx, cy, cz}, occupancy);

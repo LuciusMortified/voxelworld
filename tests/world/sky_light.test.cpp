@@ -20,11 +20,11 @@ class column_fixture {
 public:
     explicit column_fixture(int32 chunks) : occupancy_(static_cast<std::size_t>(chunks)) {}
 
-    void set_solid(int32 x, int32 y, int32 z) {
+    auto set_solid(int32 x, int32 y, int32 z) -> void {
         occupancy_[static_cast<std::size_t>(y / side)].set_row(y % side, z, uint64{1} << x);
     }
 
-    void fill_solid(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1) {
+    auto fill_solid(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1) -> void {
         for (int32 y = y0; y <= y1; ++y) {
             for (int32 z = z0; z <= z1; ++z) {
                 for (int32 x = x0; x <= x1; ++x) {
@@ -35,7 +35,7 @@ public:
     }
 
     // Rock from the bottom of the column up to and including y.
-    void floor_at(int32 y) {
+    auto floor_at(int32 y) -> void {
         fill_solid(0, 0, 0, side - 1, y, side - 1);
     }
 
@@ -230,13 +230,13 @@ public:
         heights_.fill(chunks);
     }
 
-    void set_solid(int32 x, int32 y, int32 z) {
+    auto set_solid(int32 x, int32 y, int32 z) -> void {
         occupancy_[slot(x / side, z / side, y / side)].set_row(
             y % side, z % side, uint64{1} << (x % side)
         );
     }
 
-    void fill_solid(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1) {
+    auto fill_solid(int32 x0, int32 y0, int32 z0, int32 x1, int32 y1, int32 z1) -> void {
         for (int32 y = y0; y <= y1; ++y) {
             for (int32 z = z0; z <= z1; ++z) {
                 for (int32 x = x0; x <= x1; ++x) {
@@ -246,13 +246,13 @@ public:
         }
     }
 
-    void floor_at(int32 y) {
+    auto floor_at(int32 y) -> void {
         fill_solid(0, 0, 0, wide - 1, y, wide - 1);
     }
 
     // A lid over the whole neighbourhood with one square hole left in it. Built
     // as four rectangles because occupancy bits only ever go on.
-    void lid_with_hole(int32 y, int32 hx0, int32 hz0, int32 hx1, int32 hz1) {
+    auto lid_with_hole(int32 y, int32 hx0, int32 hz0, int32 hx1, int32 hz1) -> void {
         fill_solid(0, y, 0, hx0 - 1, y, wide - 1);
         fill_solid(hx1 + 1, y, 0, wide - 1, y, wide - 1);
         fill_solid(hx0, y, 0, hx1, y, hz0 - 1);
@@ -261,7 +261,7 @@ public:
 
     // How many chunks of a column the flood is allowed to see. Anything above
     // that is open air, which is what a plain beside a mountain looks like.
-    void set_column_height(int32 cx, int32 cz, int32 chunks) {
+    auto set_column_height(int32 cx, int32 cz, int32 chunks) -> void {
         heights_[static_cast<std::size_t>((cz * 3) + cx)] = chunks;
     }
 
@@ -543,7 +543,7 @@ TEST_CASE("sky light cost on real terrain", "[.sky_light_measure]") {
             if (stack.size() <= slot) {
                 stack.resize(slot + 1, nullptr);
             }
-            stack[slot] = data.chunk_model.get();
+            stack[slot] = &data.volume->voxels();
             ++chunk_count;
         }
     }

@@ -7,7 +7,7 @@ import vw.ecs;
 import :anim;
 import :components;
 import :grid;
-import :index;
+import :spatial;
 import :model;
 import :light;
 import :terrain;
@@ -20,7 +20,7 @@ class hierarchy_system final {
 public:
     explicit hierarchy_system(world& w);
 
-    void update(float32 dt);
+    auto update(float32 dt) -> void;
 
     class hierarchy_modifier {
     public:
@@ -35,11 +35,11 @@ public:
         entity entity_;
     };
 
-    void cleanup(entity ent);
+    auto cleanup(entity ent) -> void;
 
     template <typename C>
         requires std::same_as<C, hierarchy_component>
-    void on_remove(entity e) {
+    auto on_remove(entity e) -> void {
         cleanup(e);
     }
 

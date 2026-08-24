@@ -5,7 +5,7 @@ import std;
 export import :model;
 export import :anim;
 export import :serial;
-export import :index;
+export import :spatial;
 export import :components;
 export import :terrain;
 export import :light;
@@ -17,24 +17,30 @@ import vw.ecs;
 
 export namespace vw::ecs {
 
-
 // Владеет реестром, системами и общими реестрами ассетов и держит их в согласии:
 // добавление или удаление компонента извещает каждую систему, которой этот тип
 // небезразличен.
 class world final {
 public:
-    using systems = std::tuple<hierarchy_system, character_controller_system, animation_fsm_system,
-                               physics_system, transform_system, model_system, spatial_system,
-                               light_system, socket_system, world_grid_system, animation_system>;
+    using systems = std::tuple< //
+        hierarchy_system, character_controller_system, animation_fsm_system,
+        physics_system, transform_system, model_system, spatial_system,
+        light_system, socket_system, world_grid_system, animation_system
+    >;
 
     using resources = std::tuple<asset::model_registry, asset::animation_clip_registry>;
 
     class modifier {
     public:
-        modifier(world& w, entity ent) : world_{&w}, ent_{ent} {}
+        modifier(
+            world& w, entity ent
+        )
+            : world_{&w}, ent_{ent} {}
 
         template <typename C>
-        auto with(C&& value = {}) -> modifier& {
+        auto with(
+            C&& value = {}
+        ) -> modifier& {
             world_->add_component_<C>(ent_, std::forward<C>(value));
             return *this;
         }
@@ -56,11 +62,15 @@ public:
 
     class batch_modifier {
     public:
-        batch_modifier(world& w, std::vector<entity> entities)
+        batch_modifier(
+            world& w, std::vector<entity> entities
+        )
             : world_{&w}, entities_{std::move(entities)} {}
 
         template <typename C>
-        auto with(const C& value = {}) -> batch_modifier& {
+        auto with(
+            const C& value = {}
+        ) -> batch_modifier& {
             world_->batch_add_component_<C>(entities_, value);
             return *this;
         }
@@ -92,29 +102,35 @@ public:
     world(world&&)                         = delete;
     auto operator=(world&&) -> world&      = delete;
 
-    void update(float32 delta_time);
-    void clear_changed();
+    auto update(float32 delta_time) -> void;
+    auto clear_changed() -> void;
 
     [[nodiscard]] auto create() -> modifier;
     [[nodiscard]] auto modify(entity ent) -> modifier;
-    void destroy(entity ent) noexcept;
+    auto destroy(entity ent) noexcept -> void;
 
     [[nodiscard]] auto batch_create(uint32 count) -> batch_modifier;
     [[nodiscard]] auto batch_modify(std::vector<entity> entities) -> batch_modifier;
-    void batch_destroy(const std::vector<entity>& entities) noexcept;
+    auto batch_destroy(const std::vector<entity>& entities) noexcept -> void;
 
     template <typename T>
-    [[nodiscard]] auto has(entity ent) const -> bool {
+    [[nodiscard]] auto has(
+        entity ent
+    ) const -> bool {
         return registry_.has<T>(ent);
     }
 
     template <typename T>
-    [[nodiscard]] auto get(entity ent) -> T& {
+    [[nodiscard]] auto get(
+        entity ent
+    ) -> T& {
         return registry_.get<T>(ent);
     }
 
     template <typename T>
-    [[nodiscard]] auto get(entity ent) const -> const T& {
+    [[nodiscard]] auto get(
+        entity ent
+    ) const -> const T& {
         return registry_.get<T>(ent);
     }
 
@@ -124,7 +140,9 @@ public:
     }
 
     template <typename... Cs, typename Fn>
-    void for_each(Fn&& fn) {
+    auto for_each(
+        Fn&& fn
+    ) -> void {
         registry_.for_each<Cs...>(std::forward<Fn>(fn));
     }
 
@@ -159,24 +177,34 @@ public:
 
 private:
     template <typename T>
-    void add_component_(entity ent, T&& value = {}) {
+    auto add_component_(
+        entity ent, T&& value = {}
+    ) -> void {
         using C = std::remove_cvref_t<T>;
         remember_remove_hook_<C>();
         registry_.add<C>(ent, std::forward<T>(value));
 
-        std::apply([&](auto&... systems) { (detail::invoke_on_add<C>(systems, ent), ...); },
-                   systems_);
+        std::apply(
+            [&](auto&... systems) { (detail::invoke_on_add<C>(systems, ent), ...); },
+            systems_
+        );
     }
 
     template <typename T>
-    void remove_component_(entity ent) noexcept {
-        std::apply([&](auto&... systems) { (detail::invoke_on_remove<T>(systems, ent), ...); },
-                   systems_);
+    auto remove_component_(
+        entity ent
+    ) noexcept -> void {
+        std::apply(
+            [&](auto&... systems) { (detail::invoke_on_remove<T>(systems, ent), ...); },
+            systems_
+        );
         registry_.remove<T>(ent);
     }
 
     template <typename T>
-    void batch_add_component_(const std::vector<entity>& entities, const T& value = {}) {
+    auto batch_add_component_(
+        const std::vector<entity>& entities, const T& value = {}
+    ) -> void {
         remember_remove_hook_<T>();
         registry_.batch_add<T>(entities, value);
 
@@ -186,18 +214,22 @@ private:
                     (detail::invoke_on_add<T>(systems, ent), ...);
                 }
             },
-            systems_);
+            systems_
+        );
     }
 
     template <typename T>
-    void batch_remove_component_(const std::vector<entity>& entities) noexcept {
+    auto batch_remove_component_(
+        const std::vector<entity>& entities
+    ) noexcept -> void {
         std::apply(
             [&](auto&... systems) {
                 for (auto ent : entities) {
                     (detail::invoke_on_remove<T>(systems, ent), ...);
                 }
             },
-            systems_);
+            systems_
+        );
         registry_.batch_remove<T>(entities);
     }
 
@@ -206,7 +238,7 @@ private:
     // поэтому каждый тип компонента при первом добавлении оставляет за собой
     // типизированный удалитель.
     template <typename T>
-    void remember_remove_hook_() {
+    auto remember_remove_hook_() -> void {
         const uint32 id = component_id_of<T>();
         if (id >= remove_hooks_.size()) {
             remove_hooks_.resize(id + 1, nullptr);
@@ -216,7 +248,7 @@ private:
         }
     }
 
-    void detach_components_(entity ent) noexcept;
+    auto detach_components_(entity ent) noexcept -> void;
 
     ecs::registry registry_;
     // Ресурсы стоят перед системами намеренно: система может держать модели, чьи

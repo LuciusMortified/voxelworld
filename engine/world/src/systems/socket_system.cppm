@@ -7,7 +7,7 @@ import vw.ecs;
 import :anim;
 import :components;
 import :grid;
-import :index;
+import :spatial;
 import :model;
 import :light;
 import :terrain;
@@ -38,12 +38,12 @@ public:
     };
 
     auto modify(entity ent) -> socket_modifier;
-    void cleanup(entity ent);
-    void update(float32 dt);
+    auto cleanup(entity ent) -> void;
+    auto update(float32 dt) -> void;
 
     template <typename C>
         requires std::same_as<C, socket_component>
-    void on_remove(entity e) {
+    auto on_remove(entity e) -> void {
         cleanup(e);
     }
 

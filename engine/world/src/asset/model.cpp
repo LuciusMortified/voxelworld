@@ -38,7 +38,7 @@ auto model_identity_pool::has(model_identity id) const -> bool {
     return has_unlocked_(id);
 }
 
-void model_identity_pool::destroy(model_identity id) {
+auto model_identity_pool::destroy(model_identity id) -> void {
     std::scoped_lock lock(mutex_);
     if (has_unlocked_(id)) [[likely]] {
         ++generations_[id.index];
@@ -62,7 +62,7 @@ auto page_pool::alloc() -> uint32 {
     return idx;
 }
 
-void page_pool::free(uint32 index) {
+auto page_pool::free(uint32 index) -> void {
     std::scoped_lock lock(mutex_);
     free_indices_.push_back(index);
 }
@@ -94,7 +94,7 @@ auto page_pool::alloc_batch(uint32 count) -> std::vector<uint32> {
     return result;
 }
 
-void page_pool::free_batch(std::span<const uint32> indices) {
+auto page_pool::free_batch(std::span<const uint32> indices) -> void {
     std::scoped_lock lock(mutex_);
     free_indices_.reserve(free_indices_.size() + indices.size());
     for (uint32 idx : indices) {
@@ -112,7 +112,7 @@ auto page_pool::free_count() const -> uint32 {
     return static_cast<uint32>(free_indices_.size());
 }
 
-void page_pool::ensure_capacity_(uint32 index) {
+auto page_pool::ensure_capacity_(uint32 index) -> void {
     // page_entry хранит индекс в 20 битах, поэтому выход за пул сам по себе ничем
     // не падает — он молча накладывается на страницы другой модели. Лучше сказать
     // об этом, чем испортить мир и упасть где-то в другом месте.
@@ -170,9 +170,6 @@ model::model(model&& other) noexcept
     , pages_(std::move(other.pages_))
     , owned_pages_(std::move(other.owned_pages_))
     , identity_(other.identity_)
-    , boundary_(std::move(other.boundary_))
-    , light_(std::move(other.light_))
-    , block_light_(std::move(other.block_light_))
     , fill_(other.fill_)
     , fill_known_(other.fill_known_) {
     other.identity_pool_ = nullptr;
@@ -199,9 +196,6 @@ auto model::operator=(model&& other) noexcept -> model& {
         pages_               = std::move(other.pages_);
         owned_pages_         = std::move(other.owned_pages_);
         identity_            = other.identity_;
-        boundary_            = std::move(other.boundary_);
-        light_               = std::move(other.light_);
-        block_light_         = std::move(other.block_light_);
         fill_                = other.fill_;
         fill_known_          = other.fill_known_;
         other.identity_pool_ = nullptr;
@@ -210,12 +204,12 @@ auto model::operator=(model&& other) noexcept -> model& {
     return *this;
 }
 
-void model::set_voxel(int32 x, int32 y, int32 z, const voxel& v) {
-    set_voxel_raw(x, y, z, v);
+auto model::set_voxel(int32 x, int32 y, int32 z, const voxel& v) -> void {
+    set_voxel_raw_(x, y, z, v);
     increment_generation_();
 }
 
-void model::set_voxel_raw(int32 x, int32 y, int32 z, const voxel& v) {
+auto model::set_voxel_raw_(int32 x, int32 y, int32 z, const voxel& v) -> void {
     fill_known_    = false;
     const int32 px = x / page_size;
     const int32 py = y / page_size;
@@ -653,25 +647,6 @@ auto model::scan_fill() const -> model_fill {
     return fill_;
 }
 
-auto model::boundaries_are_solid() const -> bool {
-    if (boundary_ == nullptr || boundary_->valid != 0x3F) {
-        return false;
-    }
-
-    // Плоскости фиксированы, 64x64. У всего остального нет соседей, к которым его
-    // прижимают, а лишние биты читались бы воздухом.
-    if (width_ != face_occupancy::side || height_ != face_occupancy::side ||
-        depth_ != face_occupancy::side) {
-        return false;
-    }
-
-    return std::ranges::all_of(boundary_->faces, [](const face_occupancy& face) -> bool {
-        return std::ranges::all_of(face.rows, [](uint64 row) -> bool {
-            return row == ~uint64{0};
-        });
-    });
-}
-
 auto model::extract_face(int32 face_direction, face_occupancy& out) const -> bool {
     constexpr int32 side  = face_occupancy::side;
     constexpr int32 ps    = page_size;
@@ -746,82 +721,11 @@ auto model::extract_face(int32 face_direction, face_occupancy& out) const -> boo
     return true;
 }
 
-void model::set_boundary_slice(int32 face_direction, const model& neighbor) {
-    constexpr int32 side = face_occupancy::side;
-
-    if (neighbor.width_ != side || neighbor.height_ != side || neighbor.depth_ != side) {
-        return;
-    }
-
-    if (boundary_ == nullptr) {
-        boundary_ = std::make_unique<model_boundary>();
-    }
-
-    auto& face = boundary_->faces[face_direction];
-
-    // Большинство швов глубокого мира — порода против породы, а у объёма,
-    // однородного насквозь, все шесть сторон дают одну и ту же плоскость. Дважды
-    // читать ради этого таблицу страниц дороже, чем просто это сказать.
-    switch (neighbor.scan_fill()) {
-        case model_fill::solid:
-            face.rows.fill(~uint64{0});
-            break;
-        case model_fill::air:
-            face.clear();
-            break;
-        case model_fill::mixed:
-            // Сосед лежит отсюда по `face_direction`, поэтому обращённая к этой
-            // модели его сторона — противоположная. Отказать extract_face может
-            // только на несовпадении размеров, а его проверили на входе.
-            static_cast<void>(neighbor.extract_face(face_direction ^ 1, face));
-            break;
-    }
-
-    boundary_->valid |= static_cast<uint8>(1U << face_direction);
-}
-
-void model::release_boundary() {
-    boundary_.reset();
-}
-
-// Оба увеличивают поколение, и это не бухгалтерия: меш есть функция света ровно в
-// той же мере, что и вокселей, потому что уровни запечены в углы квадов. mesh_pool
-// ключуется по model_identity и отбрасывает запрос на уже имеющуюся, поэтому свет,
-// пришедший без новой идентичности, — это свет, который никогда не доходит до
-// экрана: чанк остаётся с мешем, выданным мгновением раньше и построенным под тот
-// свет, который этот вызов как раз заменяет.
-//
-// Симптом — отставание на одну правку. Ставишь лампу — не загорается ничего;
-// ставишь рядом что угодно — и первая лампа зажигается, потому что та правка
-// увеличила поколение по своим причинам, и меш перестроился со светом, всё это
-// время лежавшим на модели.
-void model::set_sky_light(light_field light) {
-    light_ = std::make_unique<light_field>(std::move(light));
+auto model::invalidate() -> void {
     increment_generation_();
 }
 
-void model::set_block_light(light_field light) {
-    block_light_ = std::make_unique<light_field>(std::move(light));
-    increment_generation_();
-}
-
-auto model::is_boundary_solid(int32 face_direction, int32 x, int32 y, int32 z) const -> bool {
-    const auto& face = boundary_->faces[face_direction];
-    switch (face_direction / 2) {
-        case 0:
-            return face.test(y, z);
-        case 1:
-            return face.test(x, z);
-        default:
-            return face.test(x, y);
-    }
-}
-
-void model::invalidate() {
-    increment_generation_();
-}
-
-void model::fill(const voxel& v) {
+auto model::fill(const voxel& v) -> void {
     if (!owned_pages_.empty()) {
         pool_ptr_->free_batch(owned_pages_);
         owned_pages_.clear();
@@ -838,7 +742,7 @@ void model::fill(const voxel& v) {
     increment_generation_();
 }
 
-void model::fill_page_raw(int32 px, int32 py, int32 pz, const voxel& v) {
+auto model::fill_page_raw_(int32 px, int32 py, int32 pz, const voxel& v) -> void {
     fill_known_ = false;
     auto& entry = pages_[page_index(px, py, pz)];
 
@@ -849,7 +753,7 @@ void model::fill_page_raw(int32 px, int32 py, int32 pz, const voxel& v) {
     entry = v.is_empty() ? page_entry::make_empty() : page_entry::make_uniform(v.id);
 }
 
-void model::clone_pages_from(const model& source) {
+auto model::clone_pages_from(const model& source) -> void {
     fill_known_ = false;
     if (!owned_pages_.empty()) {
         pool_ptr_->free_batch(owned_pages_);
@@ -886,7 +790,7 @@ auto model::alloc_sparse_page() -> uint32 {
     return idx;
 }
 
-void model::free_sparse_page(uint32 index) {
+auto model::free_sparse_page(uint32 index) -> void {
     pool_ptr_->free(index);
     const auto it = std::ranges::find(owned_pages_, index);
     if (it != owned_pages_.end()) {
@@ -904,7 +808,7 @@ auto model::promote_to_sparse(int32 px, int32 py, int32 pz) -> page_type& {
     return page;
 }
 
-void model::increment_generation_() {
+auto model::increment_generation_() -> void {
     identity_ = identity_pool_->next_generation(identity_);
 }
 
@@ -950,7 +854,7 @@ auto model_registry::create_clone(std::string_view name) -> std::shared_ptr<mode
     return cloned_model;
 }
 
-void model_registry::erase(std::string_view name) {
+auto model_registry::erase(std::string_view name) -> void {
     models_.erase(std::string(name));
 }
 

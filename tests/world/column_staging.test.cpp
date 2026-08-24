@@ -45,7 +45,7 @@ public:
     // Runs frames until nothing is in flight. Called once to build the world,
     // and again by the tests that edit it: an edit relights the columns it
     // touched, and that lands frames later on a worker of its own.
-    void settle() {
+    auto settle() -> void {
         auto& gs = world_->system<world_grid_system>();
 
         // Quiet frames rather than one quiet frame: requests go out eight per
@@ -104,7 +104,7 @@ private:
     static constexpr int32 max_frames  = 4000;
     static constexpr int32 quiet_frames = 120;
 
-    void observe_() {
+    auto observe_() -> void {
         placed_this_frame_ = 0;
 
         world_->system<world_grid_system>().grid()->for_each_chunk(
@@ -131,7 +131,7 @@ auto light_at(world_grid& grid, vec3i world_pos) -> std::optional<int32> {
         return std::nullopt;
     }
 
-    const auto* light = c->get_model()->get_sky_light();
+    const auto* light = c->get_volume()->get_sky_light();
     if (light == nullptr) {
         return std::nullopt;
     }
@@ -384,11 +384,11 @@ TEST_CASE("digging a seam tells both sides", "[world][grid]") {
     REQUIRE(digger->is_drawn());
     REQUIRE(digger->known_neighbors() != 0);
     REQUIRE(east->is_drawn());
-    REQUIRE(east->get_model()->has_boundary_slice(1));
-    REQUIRE_FALSE(east->get_model()->is_boundary_solid(1, 0, local.y, local.z));
+    REQUIRE(east->get_volume()->has_boundary_slice(1));
+    REQUIRE_FALSE(east->get_volume()->is_boundary_solid(1, 0, local.y, local.z));
 
     // ...and the rock beside the hole is still rock.
-    REQUIRE(east->get_model()->is_boundary_solid(1, 0, local.y + 1, local.z));
+    REQUIRE(east->get_volume()->is_boundary_solid(1, 0, local.y + 1, local.z));
 }
 
 // The light stage, from the outside. A column is generated, then lit on a
@@ -408,7 +408,7 @@ TEST_CASE("a placed chunk arrives with its sky light", "[world][grid]") {
     settled.grid().for_each_chunk([&](vec3i, const chunk& c) -> void {
         ++chunks;
 
-        const auto* light = c.get_model()->get_sky_light();
+        const auto* light = c.get_volume()->get_sky_light();
         if (light == nullptr) {
             return;
         }
@@ -525,7 +525,7 @@ TEST_CASE("digging in the dark relights nothing", "[world][grid]") {
             return;
         }
 
-        const auto* light = c.get_model()->get_sky_light();
+        const auto* light = c.get_volume()->get_sky_light();
         if (light != nullptr && light->is_uniform() && light->uniform_level() == 0) {
             target = coord;
         }

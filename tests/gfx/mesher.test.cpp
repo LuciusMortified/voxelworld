@@ -364,10 +364,19 @@ class model_fixture {
 public:
     explicit model_fixture(int32 size) : size_{size} {
         model_ = std::make_shared<asset::model>(identity_pool_, pages_, size, size, size);
+        chunk_ = std::make_shared<asset::chunk_volume>(model_);
     }
 
     [[nodiscard]] auto get() const -> const std::shared_ptr<asset::model>& {
         return model_;
+    }
+
+    [[nodiscard]] auto chunk() const -> asset::chunk_volume& {
+        return *chunk_;
+    }
+
+    [[nodiscard]] auto source() const -> gfx::mesh_source {
+        return gfx::mesh_source{.voxels = *model_, .chunk = chunk_.get()};
     }
 
     [[nodiscard]] auto size() const -> int32 {
@@ -376,11 +385,11 @@ public:
 
     [[nodiscard]] auto greedy() -> gfx::mesh {
         gfx::mesh_generation_storage storage;
-        return gfx::greedy_mesh_generator::generate_mesh_data(storage, *model_, registry_);
+        return gfx::greedy_mesh_generator::generate_mesh_data(storage, source(), registry_);
     }
 
     [[nodiscard]] auto simple() const -> gfx::mesh {
-        return gfx::simple_mesh_generator::generate_mesh_data(model_, registry_);
+        return gfx::simple_mesh_generator::generate_mesh_data(source(), registry_);
     }
 
 private:
@@ -389,6 +398,7 @@ private:
     asset::page_pool pages_;
     block_registry registry_;
     std::shared_ptr<asset::model> model_;
+    std::shared_ptr<asset::chunk_volume> chunk_;
 };
 
 }  // namespace
@@ -525,9 +535,12 @@ TEST_CASE("boundary faces close the seam between chunks", "[mesh]") {
     left->fill(voxel{blocks::gray_4});
     right->fill(voxel{blocks::gray_4});
 
-    const auto count_faces = [&registry](const asset::model& m, uint8 normal) {
+    asset::chunk_volume left_chunk{left};
+
+    const auto count_faces = [&registry](const asset::chunk_volume& c, uint8 normal) {
         gfx::mesh_generation_storage storage;
-        const auto mesh = gfx::greedy_mesh_generator::generate_mesh_data(storage, m, registry);
+        const auto mesh = gfx::greedy_mesh_generator::generate_mesh_data(
+            storage, gfx::mesh_source{.voxels = c.voxels(), .chunk = &c}, registry);
 
         std::size_t count = 0;
         for (const auto& cell : to_face_cells(mesh)) {
@@ -540,14 +553,14 @@ TEST_CASE("boundary faces close the seam between chunks", "[mesh]") {
 
     // Face 0 is +X: without a neighbour the whole side is drawn, with one it
     // disappears, and the other five sides are untouched either way.
-    REQUIRE(count_faces(*left, 0) == size * size);
-    const auto before_minus_x = count_faces(*left, 1);
+    REQUIRE(count_faces(left_chunk, 0) == size * size);
+    const auto before_minus_x = count_faces(left_chunk, 1);
 
-    left->set_boundary_slice(0, *right);
+    left_chunk.set_boundary_slice(0, *right);
 
-    REQUIRE(left->has_boundary_slice(0));
-    REQUIRE(count_faces(*left, 0) == 0);
-    REQUIRE(count_faces(*left, 1) == before_minus_x);
+    REQUIRE(left_chunk.has_boundary_slice(0));
+    REQUIRE(count_faces(left_chunk, 0) == 0);
+    REQUIRE(count_faces(left_chunk, 1) == before_minus_x);
 }
 
 // The sampler grades occlusion from nothing to shut in, and the packing has to
@@ -787,24 +800,26 @@ TEST_CASE("packed sky light matches the field at every corner", "[mesh]") {
     // Rock with a shaft down into it and a tunnel off the bottom of the shaft.
     // The tunnel is what makes the test say anything: along it the light falls
     // a level a voxel, so most corners have four different numbers around them.
+    asset::model_writer writer{mdl};
+
     for (int32 y = 0; y < 40; ++y) {
         for (int32 z = 0; z < 64; ++z) {
             for (int32 x = 0; x < 64; ++x) {
-                mdl.set_voxel_raw(x, y, z, voxel{blocks::gray_5});
+                writer.set(x, y, z, voxel{blocks::gray_5});
             }
         }
     }
     for (int32 y = 10; y < 40; ++y) {
         for (int32 z = 30; z < 34; ++z) {
             for (int32 x = 30; x < 34; ++x) {
-                mdl.set_voxel_raw(x, y, z, voxel{});
+                writer.set(x, y, z, voxel{});
             }
         }
     }
     for (int32 y = 10; y < 14; ++y) {
         for (int32 z = 30; z < 34; ++z) {
             for (int32 x = 8; x < 34; ++x) {
-                mdl.set_voxel_raw(x, y, z, voxel{});
+                writer.set(x, y, z, voxel{});
             }
         }
     }
@@ -816,12 +831,10 @@ TEST_CASE("packed sky light matches the field at every corner", "[mesh]") {
     for (int32 y = 40; y < 64; ++y) {
         for (int32 z = 50; z < 54; ++z) {
             for (int32 x = 50; x < 54; ++x) {
-                mdl.set_voxel_raw(x, y, z, voxel{blocks::gray_5});
+                writer.set(x, y, z, voxel{blocks::gray_5});
             }
         }
     }
-
-    mdl.invalidate();
 
     asset::chunk_occupancy occupancy;
     REQUIRE(mdl.build_occupancy(occupancy));
@@ -830,7 +843,7 @@ TEST_CASE("packed sky light matches the field at every corner", "[mesh]") {
     const asset::light_column column{
         std::span<const asset::chunk_occupancy* const>{stack, 1}
     };
-    mdl.set_sky_light(column.bake(0, asset::light_channel::sky));
+    fixture.chunk().set_sky_light(column.bake(0, asset::light_channel::sky));
 
     const auto check = [&mdl, &column](const gfx::mesh& m, std::string_view what) {
         std::size_t checked = 0;
@@ -900,10 +913,12 @@ TEST_CASE("packed block light matches the field at every corner", "[mesh]") {
     model_fixture fixture{64};
     auto& mdl = *fixture.get();
 
+    asset::model_writer writer{mdl};
+
     for (int32 y = 0; y < 64; ++y) {
         for (int32 z = 0; z < 64; ++z) {
             for (int32 x = 0; x < 64; ++x) {
-                mdl.set_voxel_raw(x, y, z, voxel{blocks::gray_5});
+                writer.set(x, y, z, voxel{blocks::gray_5});
             }
         }
     }
@@ -914,22 +929,20 @@ TEST_CASE("packed block light matches the field at every corner", "[mesh]") {
     for (int32 y = 20; y < 28; ++y) {
         for (int32 z = 20; z < 28; ++z) {
             for (int32 x = 20; x < 28; ++x) {
-                mdl.set_voxel_raw(x, y, z, voxel{});
+                writer.set(x, y, z, voxel{});
             }
         }
     }
     for (int32 y = 20; y < 24; ++y) {
         for (int32 z = 23; z < 25; ++z) {
             for (int32 x = 28; x < 50; ++x) {
-                mdl.set_voxel_raw(x, y, z, voxel{});
+                writer.set(x, y, z, voxel{});
             }
         }
     }
 
-    mdl.set_voxel_raw(24, 20, 24, voxel{blocks::lamp});
-    mdl.set_voxel_raw(21, 26, 21, voxel{blocks::lava});
-
-    mdl.invalidate();
+    writer.set(24, 20, 24, voxel{blocks::lamp});
+    writer.set(21, 26, 21, voxel{blocks::lava});
 
     asset::chunk_occupancy occupancy;
     REQUIRE(mdl.build_occupancy(occupancy));
@@ -947,8 +960,8 @@ TEST_CASE("packed block light matches the field at every corner", "[mesh]") {
         around, asset::build_emission_table(block_registry{}), {}
     };
 
-    mdl.set_sky_light(column.bake(0, asset::light_channel::sky));
-    mdl.set_block_light(column.bake(0, asset::light_channel::block));
+    fixture.chunk().set_sky_light(column.bake(0, asset::light_channel::sky));
+    fixture.chunk().set_block_light(column.bake(0, asset::light_channel::block));
 
     const auto check = [&mdl, &column](const gfx::mesh& m, std::string_view what) {
         std::size_t checked = 0;
@@ -1051,7 +1064,7 @@ TEST_CASE("ambient occlusion reads across the chunk seam", "[mesh]") {
     REQUIRE(before.has_value());
     REQUIRE(*before == open);
 
-    left.get()->set_boundary_slice(0, *right.get());
+    left.chunk().set_boundary_slice(0, *right.get());
 
     const auto after = seam_corners(left.simple());
     REQUIRE(after.has_value());

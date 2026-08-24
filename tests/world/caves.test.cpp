@@ -42,7 +42,8 @@ public:
                 for (auto& [cy, data] : column.get_all_chunk_data()) {
                     min_y_ = std::min(min_y_, cy);
                     max_y_ = std::max(max_y_, cy);
-                    chunks.emplace_back(vec3i{ix, cy, iz}, data.chunk_model);
+                    chunks.emplace_back(
+                        vec3i{ix, cy, iz}, data.volume->shared_voxels());
                 }
             }
         }
@@ -305,7 +306,7 @@ auto measure(const sampled_region& r) -> cave_stats {
     return stats;
 }
 
-void report(std::string_view label, const cave_stats& stats) {
+auto report(std::string_view label, const cave_stats& stats) -> void {
     const auto total = static_cast<float64>(stats.underground_total);
     const auto air   = static_cast<float64>(stats.underground_air);
 
