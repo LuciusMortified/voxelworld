@@ -38,53 +38,39 @@ struct tracked_component {
     }
 };
 
-template <typename T, typename... Args>
-auto put(component_pool& pool, entity e, Args&&... args) -> T& {
-    return *std::construct_at(static_cast<T*>(pool.emplace(e)), std::forward<Args>(args)...);
-}
-
-template <typename T>
-auto fetch(component_pool& pool, entity e) -> T& {
-    return *static_cast<T*>(pool.get(e));
-}
-
-auto make_pool_of_test_component() -> component_pool {
-    return component_pool{ops_of<test_component>()};
-}
-
 }  // namespace
 
 TEST_CASE("component_pool emplace and get", "[component_pool]") {
-    auto pool = make_pool_of_test_component();
+    component_pool<test_component> pool;
 
     entity e{0, 0};
-    put<test_component>(pool, e, 42);
+    pool.emplace(e, 42);
 
     REQUIRE(pool.has(e));
-    REQUIRE(fetch<test_component>(pool, e).value == 42);
+    REQUIRE(pool.get(e)->value == 42);
     REQUIRE(pool.size() == 1);
 }
 
 TEST_CASE("component_pool get returns nullptr for absent entity", "[component_pool]") {
-    auto pool = make_pool_of_test_component();
+    component_pool<test_component> pool;
 
     REQUIRE(pool.get(entity{7, 0}) == nullptr);
 }
 
 TEST_CASE("component_pool distinguishes generations", "[component_pool]") {
-    auto pool = make_pool_of_test_component();
+    component_pool<test_component> pool;
 
-    put<test_component>(pool, entity{3, 0}, 1);
+    pool.emplace(entity{3, 0}, 1);
 
     REQUIRE(pool.has(entity{3, 0}));
     REQUIRE_FALSE(pool.has(entity{3, 1}));
 }
 
 TEST_CASE("component_pool remove", "[component_pool]") {
-    auto pool = make_pool_of_test_component();
+    component_pool<test_component> pool;
 
     entity e{0, 0};
-    put<test_component>(pool, e, 42);
+    pool.emplace(e, 42);
     pool.remove(e);
 
     REQUIRE_FALSE(pool.has(e));
@@ -92,22 +78,22 @@ TEST_CASE("component_pool remove", "[component_pool]") {
 }
 
 TEST_CASE("component_pool emplace on existing entity overwrites in place", "[component_pool]") {
-    auto pool = make_pool_of_test_component();
+    component_pool<test_component> pool;
 
     entity e{0, 0};
-    put<test_component>(pool, e, 1);
-    put<test_component>(pool, e, 42);
+    pool.emplace(e, 1);
+    pool.emplace(e, 42);
 
     REQUIRE(pool.size() == 1);
-    REQUIRE(fetch<test_component>(pool, e).value == 42);
+    REQUIRE(pool.get(e)->value == 42);
 }
 
 TEST_CASE("component_pool keeps a dense array", "[component_pool]") {
-    auto pool = make_pool_of_test_component();
+    component_pool<test_component> pool;
 
     const std::vector<entity> entities = {{0, 0}, {1, 0}, {2, 0}, {3, 0}, {4, 0}};
     for (auto e : entities) {
-        put<test_component>(pool, e, static_cast<int>(e.index));
+        pool.emplace(e, static_cast<int>(e.index));
     }
 
     REQUIRE(pool.entities().size() == 5);
@@ -115,33 +101,33 @@ TEST_CASE("component_pool keeps a dense array", "[component_pool]") {
         REQUIRE(pool.entities()[i] == entities[i]);
     }
 
-    const auto* raw = static_cast<const test_component*>(pool.get(entities.front()));
+    const auto* raw = pool.data();
     for (uint32 i = 0; i < entities.size(); ++i) {
         REQUIRE(raw[i].value == static_cast<int>(i));
     }
 }
 
 TEST_CASE("component_pool remove swaps the last element into the hole", "[component_pool]") {
-    auto pool = make_pool_of_test_component();
+    component_pool<test_component> pool;
 
-    put<test_component>(pool, entity{0, 0}, 10);
-    put<test_component>(pool, entity{1, 0}, 20);
-    put<test_component>(pool, entity{2, 0}, 30);
+    pool.emplace(entity{0, 0}, 10);
+    pool.emplace(entity{1, 0}, 20);
+    pool.emplace(entity{2, 0}, 30);
 
     pool.remove(entity{0, 0});
 
     REQUIRE(pool.size() == 2);
     REQUIRE(pool.entities()[0] == entity{2, 0});
-    REQUIRE(fetch<test_component>(pool, entity{2, 0}).value == 30);
-    REQUIRE(fetch<test_component>(pool, entity{1, 0}).value == 20);
+    REQUIRE(pool.get(entity{2, 0})->value == 30);
+    REQUIRE(pool.get(entity{1, 0})->value == 20);
 }
 
 TEST_CASE("component_pool batch_remove", "[component_pool]") {
-    auto pool = make_pool_of_test_component();
+    component_pool<test_component> pool;
 
     const std::vector<entity> entities = {{0, 0}, {1, 0}, {2, 0}};
     for (auto e : entities) {
-        put<test_component>(pool, e, 10);
+        pool.emplace(e, 10);
     }
 
     pool.batch_remove(entities);
@@ -153,28 +139,28 @@ TEST_CASE("component_pool batch_remove", "[component_pool]") {
 }
 
 TEST_CASE("component_pool grows the sparse table on demand", "[component_pool]") {
-    auto pool = make_pool_of_test_component();
+    component_pool<test_component> pool;
 
-    put<test_component>(pool, entity{10, 0}, 5);
-    put<test_component>(pool, entity{2000, 0}, 6);
+    pool.emplace(entity{10, 0}, 5);
+    pool.emplace(entity{2000, 0}, 6);
 
-    REQUIRE(fetch<test_component>(pool, entity{10, 0}).value == 5);
-    REQUIRE(fetch<test_component>(pool, entity{2000, 0}).value == 6);
+    REQUIRE(pool.get(entity{10, 0})->value == 5);
+    REQUIRE(pool.get(entity{2000, 0})->value == 6);
 }
 
 TEST_CASE("component_pool destroys non-trivial components", "[component_pool]") {
     live_instances = 0;
 
     {
-        component_pool pool{ops_of<tracked_component>()};
+        component_pool<tracked_component> pool;
 
-        put<tracked_component>(pool, entity{0, 0}, "first");
-        put<tracked_component>(pool, entity{1, 0}, "second");
+        pool.emplace(entity{0, 0}, "first");
+        pool.emplace(entity{1, 0}, "second");
         REQUIRE(live_instances == 2);
 
         pool.remove(entity{0, 0});
         REQUIRE(live_instances == 1);
-        REQUIRE(fetch<tracked_component>(pool, entity{1, 0}).label == "second");
+        REQUIRE(pool.get(entity{1, 0})->label == "second");
     }
 
     REQUIRE(live_instances == 0);
@@ -184,17 +170,16 @@ TEST_CASE("component_pool relocates non-trivial components on growth", "[compone
     live_instances = 0;
 
     {
-        component_pool pool{ops_of<tracked_component>()};
+        component_pool<tracked_component> pool;
 
         constexpr uint32 count = 64;
         for (uint32 i = 0; i < count; ++i) {
-            put<tracked_component>(pool, entity{i, 0}, "item-" + std::to_string(i));
+            pool.emplace(entity{i, 0}, "item-" + std::to_string(i));
         }
 
         REQUIRE(live_instances == static_cast<int>(count));
         for (uint32 i = 0; i < count; ++i) {
-            REQUIRE(fetch<tracked_component>(pool, entity{i, 0}).label ==
-                    "item-" + std::to_string(i));
+            REQUIRE(pool.get(entity{i, 0})->label == "item-" + std::to_string(i));
         }
     }
 
@@ -204,13 +189,32 @@ TEST_CASE("component_pool relocates non-trivial components on growth", "[compone
 TEST_CASE("component_pool clear destroys everything", "[component_pool]") {
     live_instances = 0;
 
-    component_pool pool{ops_of<tracked_component>()};
-    put<tracked_component>(pool, entity{0, 0}, "a");
-    put<tracked_component>(pool, entity{1, 0}, "b");
+    component_pool<tracked_component> pool;
+    pool.emplace(entity{0, 0}, "a");
+    pool.emplace(entity{1, 0}, "b");
 
     pool.clear();
 
     REQUIRE(live_instances == 0);
     REQUIRE(pool.size() == 0);
     REQUIRE_FALSE(pool.has(entity{0, 0}));
+}
+
+TEST_CASE("dynamic_pool stores a component known only at runtime", "[component_pool]") {
+    dynamic_pool pool{component_layout{.size = sizeof(int), .align = alignof(int)}};
+
+    entity first{0, 0};
+    entity second{1, 0};
+
+    *static_cast<int*>(pool.emplace(first))  = 7;
+    *static_cast<int*>(pool.emplace(second)) = 9;
+
+    REQUIRE(pool.size() == 2);
+    REQUIRE(*static_cast<const int*>(pool.get(first)) == 7);
+
+    pool.remove(first);
+
+    REQUIRE(pool.size() == 1);
+    REQUIRE_FALSE(pool.has(first));
+    REQUIRE(*static_cast<const int*>(pool.get(second)) == 9);
 }

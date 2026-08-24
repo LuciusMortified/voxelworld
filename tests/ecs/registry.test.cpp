@@ -215,20 +215,16 @@ TEST_CASE("registry accepts a component registered without its type", "[registry
     registry reg;
 
     const uint32 script_component = component_id_of<struct script_tag>();
-    const component_ops ops{
-        .size     = sizeof(int),
-        .align    = alignof(int),
-        .destroy  = nullptr,
-        .relocate = +[](void* dst, void* src) { *static_cast<int*>(dst) = *static_cast<int*>(src); },
-    };
+    const component_layout layout{.size = sizeof(int), .align = alignof(int)};
 
-    auto& pool = reg.ensure_pool(script_component, ops);
+    auto& pool = reg.ensure_pool(script_component, layout);
 
     auto e = reg.create();
     *static_cast<int*>(pool.emplace(e)) = 7;
 
     REQUIRE(reg.try_pool(script_component) == &pool);
-    REQUIRE(*static_cast<const int*>(reg.try_pool(script_component)->get(e)) == 7);
+    REQUIRE(reg.try_pool(script_component)->has(e));
+    REQUIRE(*static_cast<const int*>(pool.get(e)) == 7);
 
     std::vector<uint32> ids;
     reg.collect_components(e, ids);
