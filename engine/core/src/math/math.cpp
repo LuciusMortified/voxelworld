@@ -786,9 +786,8 @@ auto apply_easing(
         case interpolation_type::ease_in_out:
             if (t < 0.5f) {
                 return 2.0f * t * t;
-            } else {
-                return -1.0f + ((4.0f - (2.0f * t)) * t);
             }
+            return -1.0f + ((4.0f - (2.0f * t)) * t);
 
         case interpolation_type::cubic_bezier:
             return t;
@@ -1088,65 +1087,3 @@ auto inverse_matrix(
 }
 
 }  // namespace vw::math
-
-namespace vw {
-
-auto transform::get_position() const -> const vec3f& {
-    return position_;
-}
-
-auto transform::get_rotation() const -> const quat& {
-    return rotation_;
-}
-
-auto transform::get_rotation_euler() const -> vec3f {
-    return math::quat_to_euler(rotation_);
-}
-
-auto transform::get_scale() const -> const vec3f& {
-    return scale_;
-}
-
-auto transform::get_origin() const -> const vec3f& {
-    return origin_;
-}
-
-auto transform::calc_matrix() const -> mat4f {
-    return math::transform_matrix(position_, rotation_, scale_, origin_);
-}
-
-void transform::set_position(const vec3f& position) {
-    position_ = position;
-}
-
-void transform::set_rotation(const quat& rotation) {
-    rotation_ = rotation;
-}
-
-void transform::set_rotation_euler(const vec3f& euler) {
-    rotation_ = math::euler_to_quat(euler);
-}
-
-void transform::set_scale(const vec3f& scale) {
-    scale_ = scale;
-}
-
-void transform::set_origin(const vec3f& origin) {
-    origin_ = origin;
-}
-
-void transform::translate(const vec3f& offset) {
-    position_ += offset;
-}
-
-void transform::rotate(const vec3f& angles) {
-    rotation_ = math::euler_to_quat(angles) * rotation_;
-}
-
-void transform::scale(const vec3f& factor) {
-    scale_.x *= factor.x;
-    scale_.y *= factor.y;
-    scale_.z *= factor.z;
-}
-
-}  // namespace vw

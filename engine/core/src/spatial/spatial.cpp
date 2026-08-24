@@ -22,8 +22,8 @@ auto frustum::from_view_projection_matrix(const mat4f& view_proj) -> frustum {
     frustum f{};
 
     for (int32 row = 0; row < 3; ++row) {
-        const int32 left  = row * 2;
-        const int32 right = left + 1;
+        const auto left  = static_cast<std::size_t>(row) * 2;
+        const auto right = left + 1;
 
         f.planes[left] = normalized_plane(
             view_proj[3, 0] + view_proj[row, 0], view_proj[3, 1] + view_proj[row, 1],
@@ -38,7 +38,7 @@ auto frustum::from_view_projection_matrix(const mat4f& view_proj) -> frustum {
 }
 
 auto frustum::operator==(const frustum& other) const -> bool {
-    for (std::size_t i = 0; i < 6; ++i) {
+    for (std::size_t i = 0; i < frustum::plane_count; ++i) {
         if (planes[i].normal != other.planes[i].normal ||
             std::abs(planes[i].distance - other.planes[i].distance) > 1e-5F) {
             return false;
@@ -53,7 +53,7 @@ auto frustum::operator!=(const frustum& other) const -> bool {
 
 auto frustum::approximately_equal(
     const frustum& other, float32 angle_threshold, float32 distance_threshold) const -> bool {
-    for (std::size_t i = 0; i < 6; ++i) {
+    for (std::size_t i = 0; i < frustum::plane_count; ++i) {
         const float32 angle_diff = std::acos(
             math::clamp(math::dot(planes[i].normal, other.planes[i].normal), -1.0F, 1.0F));
         const float32 distance_diff = std::abs(planes[i].distance - other.planes[i].distance);

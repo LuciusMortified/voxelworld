@@ -9,16 +9,18 @@ target_sources(vw_core
         FILE_SET CXX_MODULES BASE_DIRS src FILES
             src/core.cppm
             src/types/types.cppm
-            src/types/timing.cppm
             src/types/color.cppm
+            src/utils/timing.cppm
             src/math/vector.cppm
             src/math/matrix.cppm
+            src/math/transform.cppm
             src/math/math.cppm
             src/spatial/spatial.cppm
             src/blocks/blocks.cppm
             src/log/log.cppm
     PRIVATE
         src/math/math.cpp
+        src/math/transform.cpp
         src/spatial/spatial.cpp
         src/blocks/blocks.cpp
         src/log/log.cpp

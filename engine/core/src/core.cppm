@@ -5,6 +5,7 @@ export import :timing;
 export import :log;
 export import :vector;
 export import :matrix;
+export import :transform;
 export import :color;
 export import :math;
 export import :spatial;

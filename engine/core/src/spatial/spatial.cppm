@@ -16,7 +16,9 @@ struct plane {
     vec3f normal;
     float32 distance;
 
-    [[nodiscard]] auto distance_to_point(const vec3f& point) const -> float32 {
+    [[nodiscard]] auto distance_to_point(
+        const vec3f& point
+    ) const -> float32 {
         return math::dot(normal, point) + distance;
     }
 };
@@ -49,46 +51,66 @@ struct aabb {
 
     [[nodiscard]] auto area() const -> float32 {
         const vec3f s = size();
-        return s.x * s.y + s.y * s.z + s.z * s.x;
+        return (s.x * s.y) + (s.y * s.z) + (s.z * s.x);
     }
 
-    [[nodiscard]] auto intersects(const aabb& other) const -> bool {
-        return min.x <= other.max.x && max.x >= other.min.x && min.y <= other.max.y &&
-               max.y >= other.min.y && min.z <= other.max.z && max.z >= other.min.z;
+    [[nodiscard]] auto intersects(
+        const aabb& other
+    ) const -> bool {
+        return  //
+            min.x <= other.max.x && max.x >= other.min.x && min.y <= other.max.y &&
+            max.y >= other.min.y && min.z <= other.max.z && max.z >= other.min.z;
     }
 
-    [[nodiscard]] auto intersects(const vec3f& point) const -> bool {
-        return point.x >= min.x && point.x <= max.x && point.y >= min.y && point.y <= max.y &&
-               point.z >= min.z && point.z <= max.z;
+    [[nodiscard]] auto intersects(
+        const vec3f& point
+    ) const -> bool {
+        return  //
+            point.x >= min.x && point.x <= max.x && point.y >= min.y && point.y <= max.y &&
+            point.z >= min.z && point.z <= max.z;
     }
 
     [[nodiscard]] auto intersects(const ray& r) const -> bool;
 
-    [[nodiscard]] static auto merge(const aabb& a, const aabb& b) -> aabb {
+    [[nodiscard]] static auto merge(
+        const aabb& a, const aabb& b
+    ) -> aabb {
         return aabb{
-            vec3f{std::min(a.min.x, b.min.x), std::min(a.min.y, b.min.y),
-                  std::min(a.min.z, b.min.z)},
-            vec3f{std::max(a.max.x, b.max.x), std::max(a.max.y, b.max.y),
-                  std::max(a.max.z, b.max.z)}};
+            .min =
+                vec3f{
+                    std::min(a.min.x, b.min.x),
+                    std::min(a.min.y, b.min.y),
+                    std::min(a.min.z, b.min.z)
+                },
+            .max = vec3f{
+                std::max(a.max.x, b.max.x), std::max(a.max.y, b.max.y), std::max(a.max.z, b.max.z)
+            }
+        };
     }
 
-    [[nodiscard]] auto operator==(const aabb& other) const -> bool {
+    [[nodiscard]] auto operator==(
+        const aabb& other
+    ) const -> bool {
         constexpr float32 epsilon = 1e-5F;
         return math::is_safe_zero(min.x - other.min.x, epsilon) &&
-               math::is_safe_zero(min.y - other.min.y, epsilon) &&
-               math::is_safe_zero(min.z - other.min.z, epsilon) &&
-               math::is_safe_zero(max.x - other.max.x, epsilon) &&
-               math::is_safe_zero(max.y - other.max.y, epsilon) &&
-               math::is_safe_zero(max.z - other.max.z, epsilon);
+            math::is_safe_zero(min.y - other.min.y, epsilon) &&
+            math::is_safe_zero(min.z - other.min.z, epsilon) &&
+            math::is_safe_zero(max.x - other.max.x, epsilon) &&
+            math::is_safe_zero(max.y - other.max.y, epsilon) &&
+            math::is_safe_zero(max.z - other.max.z, epsilon);
     }
 
-    [[nodiscard]] auto operator!=(const aabb& other) const -> bool {
+    [[nodiscard]] auto operator!=(
+        const aabb& other
+    ) const -> bool {
         return !(*this == other);
     }
 };
 
 struct frustum {
-    plane planes[6];
+    static constexpr std::size_t plane_count = 6;
+
+    std::array<plane, plane_count> planes{};
 
     [[nodiscard]] static auto from_view_projection_matrix(const mat4f& view_proj) -> frustum;
 
@@ -100,7 +122,8 @@ struct frustum {
     [[nodiscard]] auto operator!=(const frustum& other) const -> bool;
 
     [[nodiscard]] auto approximately_equal(
-        const frustum& other, float32 angle_threshold, float32 distance_threshold) const -> bool;
+        const frustum& other, float32 angle_threshold, float32 distance_threshold
+    ) const -> bool;
 };
 
 // Границы одного среза по глубине. Обе положительны и обе меряются вдоль оси
@@ -162,15 +185,18 @@ struct cluster_grid {
         return -z_scale() * std::log(near_depth);
     }
 
-    [[nodiscard]] auto slice_of(float32 depth) const -> uint32 {
+    [[nodiscard]] auto slice_of(
+        float32 depth
+    ) const -> uint32 {
         const float32 held = std::clamp(depth, near_depth, far_depth);
-        const auto raw =
-            static_cast<int32>(std::floor(std::log(held) * z_scale() + z_bias()));
+        const auto raw     = static_cast<int32>(std::floor(std::log(held) * z_scale() + z_bias()));
 
         return static_cast<uint32>(std::clamp(raw, 0, static_cast<int32>(slices) - 1));
     }
 
-    [[nodiscard]] auto z_range_of(uint32 slice) const -> depth_range {
+    [[nodiscard]] auto z_range_of(
+        uint32 slice
+    ) const -> depth_range {
         const float32 ratio = far_depth / near_depth;
         const auto count    = static_cast<float32>(slices);
 
@@ -180,7 +206,9 @@ struct cluster_grid {
         };
     }
 
-    [[nodiscard]] auto cluster_index(uint32 tile_x, uint32 tile_y, uint32 slice) const -> uint32 {
+    [[nodiscard]] auto cluster_index(
+        uint32 tile_x, uint32 tile_y, uint32 slice
+    ) const -> uint32 {
         return ((slice * tiles_y()) + tile_y) * tiles_x() + tile_x;
     }
 };
@@ -209,7 +237,9 @@ struct view_capsule {
     float32 radius;
 };
 
-[[nodiscard]] constexpr auto as_capsule(const view_sphere& ball) -> view_capsule {
+[[nodiscard]] constexpr auto as_capsule(
+    const view_sphere& ball
+) -> view_capsule {
     return {.end_a = ball.center, .end_b = ball.center, .radius = ball.radius};
 }
 
@@ -228,9 +258,8 @@ struct tile_rect {
 
 // Один вызов компьютного прохода: тайлы, которых один источник касается в одном
 // срезе. Это эталон, переводом которого является GLSL, и при расхождении прав он.
-[[nodiscard]] auto scatter_slice(
-    const cluster_grid& grid, const view_capsule& shape, uint32 slice
-) -> tile_rect;
+[[nodiscard]] auto scatter_slice(const cluster_grid& grid, const view_capsule& shape, uint32 slice)
+    -> tile_rect;
 
 [[nodiscard]] inline auto scatter_slice(
     const cluster_grid& grid, const view_sphere& light, uint32 slice
@@ -251,7 +280,9 @@ public:
     auto clear() -> void;
     auto add(uint32 index, const view_capsule& shape) -> void;
 
-    auto add(uint32 index, const view_sphere& light) -> void {
+    auto add(
+        uint32 index, const view_sphere& light
+    ) -> void {
         add(index, as_capsule(light));
     }
 
@@ -263,7 +294,9 @@ public:
         return cap_;
     }
 
-    [[nodiscard]] auto count_of(uint32 cluster) const -> uint32 {
+    [[nodiscard]] auto count_of(
+        uint32 cluster
+    ) const -> uint32 {
         return counts_[cluster];
     }
 
@@ -316,30 +349,35 @@ struct cluster_check {
 // решает та же гонка, — и сравнивают только счётчик, то есть ровно то число,
 // которое остаётся определённым.
 [[nodiscard]] auto check_clusters(
-    const cluster_lights& reference,
-    std::span<const uint32> counts,
-    std::span<const uint32> indices
+    const cluster_lights& reference, std::span<const uint32> counts, std::span<const uint32> indices
 ) -> cluster_check;
 
 // Отсев и выбор мышью зовут это на каждый узел дерева, поэтому тела остаются в
 // интерфейсе, где импортирующий ещё может их встроить; в имплементационном юните
 // живут только холодное разложение матрицы и сравнение.
 
-inline ray::ray(const vec3f& start, const vec3f& end) : start(start), end(end) {
-    const vec3f dir       = end - start;
-    const float32 len     = math::length(dir);
-    direction             = len > 0.0F ? math::normalize(dir) : vec3f{1.0F, 0.0F, 0.0F};
+inline ray::ray(
+    const vec3f& start, const vec3f& end
+)
+    : start(start), end(end) {
+    const vec3f dir   = end - start;
+    const float32 len = math::length(dir);
+    direction         = len > 0.0F ? math::normalize(dir) : vec3f{1.0F, 0.0F, 0.0F};
 }
 
 inline auto ray::length() const -> float32 {
     return math::length(end - start);
 }
 
-inline auto ray::point_at(float32 t) const -> vec3f {
+inline auto ray::point_at(
+    float32 t
+) const -> vec3f {
     return start + direction * t;
 }
 
-inline auto ray::intersects_at(const aabb& bounds, float32& t_out) const -> bool {
+inline auto ray::intersects_at(
+    const aabb& bounds, float32& t_out
+) const -> bool {
     float32 t_min = 0.0F;
     float32 t_max = length();
 
@@ -383,12 +421,16 @@ inline auto ray::intersects_at(const aabb& bounds, float32& t_out) const -> bool
     return true;
 }
 
-inline auto aabb::intersects(const ray& r) const -> bool {
+inline auto aabb::intersects(
+    const ray& r
+) const -> bool {
     float32 unused = 0.0F;
     return r.intersects_at(*this, unused);
 }
 
-inline auto frustum::intersects(const vec3f& point) const -> bool {
+inline auto frustum::intersects(
+    const vec3f& point
+) const -> bool {
     for (const auto& p : planes) {
         if (math::dot(p.normal, point) + p.distance < 0.0F) {
             return false;
@@ -397,12 +439,15 @@ inline auto frustum::intersects(const vec3f& point) const -> bool {
     return true;
 }
 
-inline auto frustum::intersects(const aabb& bounds) const -> bool {
+inline auto frustum::intersects(
+    const aabb& bounds
+) const -> bool {
     for (const auto& p : planes) {
         const vec3f p_vertex{
             p.normal.x > 0.0F ? bounds.max.x : bounds.min.x,
             p.normal.y > 0.0F ? bounds.max.y : bounds.min.y,
-            p.normal.z > 0.0F ? bounds.max.z : bounds.min.z};
+            p.normal.z > 0.0F ? bounds.max.z : bounds.min.z
+        };
 
         if (math::dot(p.normal, p_vertex) + p.distance < 0.0F) {
             return false;
@@ -411,7 +456,9 @@ inline auto frustum::intersects(const aabb& bounds) const -> bool {
     return true;
 }
 
-inline auto frustum::intersects(const ray& r) const -> bool {
+inline auto frustum::intersects(
+    const ray& r
+) const -> bool {
     float32 t_min = 0.0F;
     float32 t_max = r.length();
 
