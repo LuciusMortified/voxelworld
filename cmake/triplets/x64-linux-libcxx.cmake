@@ -16,5 +16,9 @@ set(VCPKG_CRT_LINKAGE dynamic)
 set(VCPKG_LIBRARY_LINKAGE static)
 set(VCPKG_CMAKE_SYSTEM_NAME Linux)
 
-set(VCPKG_CXX_FLAGS "-stdlib=libc++")
+# Флаги vcpkg принимает только парой — «If VCPKG_CXX_FLAGS is set,
+# VCPKG_C_FLAGS must be set», — а C-коду от libc++ ничего не нужно. Поэтому в
+# C-половине повторяется -fPIC, который штатный тулчейн ставит и сам.
+set(VCPKG_C_FLAGS "-fPIC")
+set(VCPKG_CXX_FLAGS "-fPIC -stdlib=libc++")
 set(VCPKG_LINKER_FLAGS "-stdlib=libc++")
