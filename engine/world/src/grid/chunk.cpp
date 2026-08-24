@@ -6,13 +6,13 @@ import vw.core;
 namespace vw::ecs {
 
 chunk::chunk(
-    world& w, vec3i coord, std::shared_ptr<asset::chunk_volume> volume, int32 voxel_scale
+    world& w, vec3i coord, std::shared_ptr<asset::chunk_volume> content, int32 voxel_scale
 )
     : world_(&w)
     , coord_(coord)
     , voxel_scale_(voxel_scale)
     , ent_(invalid_entity)
-    , volume_(std::move(volume))
+    , volume_(std::move(content))
     , fill_(volume_->voxels().scan_fill()) {
     for (int32 fd = 0; fd < 6; ++fd) {
         if (volume_->has_boundary_slice(fd)) {

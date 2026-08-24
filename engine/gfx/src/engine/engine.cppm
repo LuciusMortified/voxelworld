@@ -2,6 +2,7 @@ export module vw.gfx:engine;
 
 export import :engine.app;
 export import :engine.stats;
+export import :engine.report;
 import :debug.window;
 
 import std;

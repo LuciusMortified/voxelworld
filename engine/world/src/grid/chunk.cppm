@@ -23,7 +23,7 @@ public:
     static constexpr int32 size   = 64;
     static constexpr int32 volume = size * size * size;
 
-    chunk(world& w, vec3i coord, std::shared_ptr<asset::chunk_volume> volume,
+    chunk(world& w, vec3i coord, std::shared_ptr<asset::chunk_volume> content,
           int32 voxel_scale = 1);
     ~chunk();
 

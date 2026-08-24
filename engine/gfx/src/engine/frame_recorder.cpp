@@ -154,4 +154,33 @@ auto frame_recorder::report() const -> std::string {
     return out;
 }
 
+
+auto frame_recorder::collect(gfx::report& out) const -> void {
+    if (samples_.empty()) {
+        return;
+    }
+
+    auto& section = out.section("stages");
+
+    const auto write_stage = [&](const stage_desc& stage) -> void {
+        auto& row = section.sub(std::string{stage.name});
+        row.value("p50", static_cast<float64>(percentile_of(stage.get, 0.50f)))
+            .value("p95", static_cast<float64>(percentile_of(stage.get, 0.95f)))
+            .value("p99", static_cast<float64>(percentile_of(stage.get, 0.99f)))
+            .value("max", static_cast<float64>(percentile_of(stage.get, 1.00f)));
+    };
+
+    for (const auto& stage : cpu_stages) {
+        write_stage(stage);
+    }
+
+    if (!samples_.front().render.gpu.supported) {
+        return;
+    }
+
+    for (const auto& stage : gpu_stages) {
+        write_stage(stage);
+    }
+}
+
 }  // namespace vw::gfx

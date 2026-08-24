@@ -3,6 +3,7 @@ export module vw.gfx:engine.frame_recorder;
 import std;
 
 import vw.core;
+import :engine.report;
 import vw.world;
 import :engine.stats;
 import :renderer;
@@ -26,6 +27,11 @@ public:
 
     [[nodiscard]] auto sample_count() const -> uint32;
     [[nodiscard]] auto report() const -> std::string;
+
+    // Те же стадии и те же перцентили, но деревом: текст читает человек, это —
+    // машина. Обе формы идут от одной таблицы стадий, поэтому разойтись им
+    // негде.
+    auto collect(gfx::report& out) const -> void;
 
 private:
     using stage_getter = auto (*)(const frame_sample&) -> float32;

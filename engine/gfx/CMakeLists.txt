@@ -43,6 +43,7 @@ target_sources(vw_gfx
             src/debug/debug_window.cppm
             src/debug/debug_primitive.cppm
             src/engine/stats.cppm
+            src/engine/report.cppm
             src/engine/app.cppm
             src/engine/frame_recorder.cppm
             src/engine/engine.cppm
@@ -71,6 +72,7 @@ target_sources(vw_gfx
         src/render/renderer.cpp
         src/debug/debug_primitive.cpp
         src/debug/debug_window.cpp
+        src/engine/report.cpp
         src/engine/frame_recorder.cpp
         src/engine/engine.cpp
 )

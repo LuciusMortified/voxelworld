@@ -178,7 +178,7 @@ auto engine::bench_tick_() -> void {
 auto engine::write_bench_report_() const -> void {
     const auto props = vulkan_context_->get_physical_device().getProperties();
 
-    std::string report = std::format(
+    std::string report_text = std::format(
         "gpu: {}\nbuild: {}\npresent mode: {}\nframes in flight: {}\nwarmup frames: {}\n{}",
         static_cast<const char*>(props.deviceName),
         build_config,
@@ -192,7 +192,7 @@ auto engine::write_bench_report_() const -> void {
     // перцентили скрыли бы его целиком.
     const auto meshing = renderer_->get_mesh_pool().get_gen_stats();
     std::format_to(
-        std::back_inserter(report),
+        std::back_inserter(report_text),
         "\nmeshing: {} chunks, {} quads, {:.1f} ms total\n"
         "  per chunk (us): mean {:.0f}  p50 {:.0f}  p99 {:.0f}  max {:.0f}\n"
         "  queue: {} left, {} peak\n",
@@ -209,7 +209,7 @@ auto engine::write_bench_report_() const -> void {
 
     const auto columns = world_->system<ecs::world_grid_system>().get_loader_stats();
     std::format_to(
-        std::back_inserter(report),
+        std::back_inserter(report_text),
         "\nterrain: {} columns, {} chunks, {:.1f} ms total\n"
         "  per column (us): mean {:.0f}  p50 {:.0f}  p99 {:.0f}  max {:.0f}\n"
         "  queue: {} left, {} peak\n",
@@ -231,7 +231,7 @@ auto engine::write_bench_report_() const -> void {
     const auto light      = world_->system<ecs::world_grid_system>().get_light_stats();
     const auto grid_stats = world_->system<ecs::world_grid_system>().get_stats();
     std::format_to(
-        std::back_inserter(report),
+        std::back_inserter(report_text),
         "\nsky light: {} columns, rows {:.1f} ms, flood {:.1f} ms, bake {:.1f} ms\n"
         "  per column (us): mean {:.0f}  p50 {:.0f}  p99 {:.0f}  max {:.0f}\n"
         "  queue: {} left, {} peak\n"
@@ -252,7 +252,7 @@ auto engine::write_bench_report_() const -> void {
     );
 
     std::format_to(
-        std::back_inserter(report),
+        std::back_inserter(report_text),
         "\nscene ready after {} frames, {:.0f} ms\n",
         ready_frames_,
         ready_ms_
@@ -260,7 +260,7 @@ auto engine::write_bench_report_() const -> void {
 
     const auto grid = world_->system<ecs::world_grid_system>().get_stats();
     std::format_to(
-        std::back_inserter(report),
+        std::back_inserter(report_text),
         "\ngrid: {} chunks loaded, {} drawn, {} buried in rock or open air\n",
         grid.loaded_count,
         grid.drawn_count,
@@ -277,7 +277,7 @@ auto engine::write_bench_report_() const -> void {
     constexpr auto to_mb = 1.0F / (1024.0F * 1024.0F);
 
     std::format_to(
-        std::back_inserter(report),
+        std::back_inserter(report_text),
         "\npages: {} of {} in use ({:.1f}% of the addressable limit), {} free, {:.0f} MB\n"
         "memory: ram {:.0f} MB now, {:.0f} MB peak; commit {:.0f} MB now, {:.0f} MB peak; "
         "vram {:.0f} MB now, {:.0f} MB peak\n",
@@ -304,7 +304,7 @@ auto engine::write_bench_report_() const -> void {
     float32 slot_mb = 0.0F;
     float32 used_mb = 0.0F;
 
-    report += "\nbuffers by size class (quads): slots, load, MB\n";
+    report_text += "\nbuffers by size class (quads): slots, load, MB\n";
 
     for (const auto& b : buffers.buffers) {
         const auto slot_bytes = static_cast<float32>(b.chunk_size.quad_count) * sizeof(quad);
@@ -316,7 +316,7 @@ auto engine::write_bench_report_() const -> void {
         used_mb += full * b.quad_load_avg;
 
         std::format_to(
-            std::back_inserter(report),
+            std::back_inserter(report_text),
             "  {:>8}  {:>5} of {:<6}  load {:.2f}  {:.1f} MB\n",
             b.chunk_size.quad_count,
             b.mesh_count,
@@ -327,7 +327,7 @@ auto engine::write_bench_report_() const -> void {
     }
 
     std::format_to(
-        std::back_inserter(report),
+        std::back_inserter(report_text),
         "  total {:.0f} MB of slots, about {:.0f} MB of it geometry\n",
         slot_mb,
         used_mb
@@ -337,7 +337,7 @@ auto engine::write_bench_report_() const -> void {
     // камера стоит сейчас.
     const auto& cull = renderer_->get_stats().combined_buffers.chunk_cull;
     std::format_to(
-        std::back_inserter(report),
+        std::back_inserter(report_text),
         "\nchunk cull: {} of {} chunks visible ({:.1f}% hidden), walk {:.3f} ms\n"
         "  walked {} cells, {} of them empty; {} chunks with links, {} sealed, "
         "{} merged, {} pockets at most\n",
@@ -356,18 +356,64 @@ auto engine::write_bench_report_() const -> void {
         cull.max_pockets
     );
 
-    log::info(lc_bench_, "benchmark report\n{}", report);
+    // Что скажет о себе само приложение: сцена, её счётчики, её приборы. Раньше
+    // это печаталось в stdout из деструктора, то есть уже после записи файла, и
+    // в отчёт не попадало вовсе.
+    report extra;
+    if (app_) {
+        app_->collect_report(extra);
+    }
+    report_text += extra.to_text();
 
-    if (bench_.report_path.empty()) {
+    log::info(lc_bench_, "benchmark report\n{}", report_text);
+
+    if (!bench_.report_path.empty()) {
+        std::ofstream out{bench_.report_path};
+        if (!out) {
+            log::error(lc_bench_, "cannot write bench report to {}", bench_.report_path);
+        } else {
+            out << report_text;
+        }
+    }
+
+    if (bench_.json_path.empty()) {
         return;
     }
 
-    std::ofstream out{bench_.report_path};
-    if (!out) {
-        log::error(lc_bench_, "cannot write bench report to {}", bench_.report_path);
+    // Тот же прогон деревом: шапка, стадии и всё, что доложило приложение.
+    report structured;
+    structured.section("run")
+        .value("gpu", std::string_view{static_cast<const char*>(props.deviceName)})
+        .value("build", std::string_view{build_config})
+        .value("present_mode", std::string_view{renderer_->get_present_mode_name()})
+        .value("frames_in_flight", static_cast<uint64>(renderer_type::get_frames_in_flight()))
+        .value("warmup_frames", static_cast<uint64>(bench_.warmup_frames))
+        .value("measured_frames", static_cast<uint64>(recorder_->sample_count()))
+        .value("ready_frames", static_cast<uint64>(ready_frames_))
+        .value("ready_ms", static_cast<float64>(ready_ms_), 1);
+
+    recorder_->collect(structured);
+
+    structured.section("meshing")
+        .value("chunks", meshing.chunks)
+        .value("quads", meshing.quads)
+        .value("total_ms", static_cast<float64>(meshing.total_ms), 1)
+        .value("mean_us", static_cast<float64>(meshing.mean_us), 0)
+        .value("p50_us", static_cast<float64>(meshing.p50_us), 0)
+        .value("p99_us", static_cast<float64>(meshing.p99_us), 0)
+        .value("max_us", static_cast<float64>(meshing.max_us), 0)
+        .value("queue_peak", static_cast<uint64>(meshing.queue_peak));
+
+    if (app_) {
+        app_->collect_report(structured);
+    }
+
+    std::ofstream json{bench_.json_path};
+    if (!json) {
+        log::error(lc_bench_, "cannot write bench json to {}", bench_.json_path);
         return;
     }
-    out << report;
+    json << structured.to_json();
 }
 
 auto engine::render(
