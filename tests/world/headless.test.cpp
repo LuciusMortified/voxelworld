@@ -1,3 +1,4 @@
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 import std;
@@ -175,4 +176,23 @@ TEST_CASE("a model outranks a collider when an entity has both", "[world]") {
     w.update(0.016F);
 
     REQUIRE(w.get<spatial_component>(ent).get_bounds().size().x == 4.0F);
+}
+
+TEST_CASE("every system reports its own timing", "[world]") {
+    world w;
+    w.update(0.016F);
+
+    const auto& stats = w.get_update_stats();
+
+    REQUIRE(world_system_names.size() == world_system_count);
+    for (const auto name : world_system_names) {
+        REQUIRE_FALSE(name.empty());
+    }
+
+    float32 sum = 0.0F;
+    for (const auto ms : stats.ms) {
+        REQUIRE(ms >= 0.0F);
+        sum += ms;
+    }
+    REQUIRE(stats.total_ms == Catch::Approx(sum));
 }

@@ -28,6 +28,8 @@ struct physics_stats {
 
 class physics_system final {
 public:
+    static constexpr std::string_view system_name = "physics";
+
     static constexpr int32 max_collision_iterations = 4;
     static constexpr float32 fixed_dt               = 1.0F / 60.0F;
     static constexpr int32 max_steps_per_frame      = 5;

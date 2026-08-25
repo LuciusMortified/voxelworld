@@ -24,6 +24,8 @@ struct voxel_ray_hit {
 
 class spatial_system {
 public:
+    static constexpr std::string_view system_name = "spatial";
+
     explicit spatial_system(world& w);
 
     auto update(float32 dt) -> void;

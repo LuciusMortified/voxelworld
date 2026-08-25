@@ -34,7 +34,16 @@ world::~world() {
 }
 
 auto world::update(float32 delta_time) -> void {
-    std::apply([delta_time](auto&... s) { (s.update(delta_time), ...); }, systems_);
+    std::size_t index = 0;
+    std::apply(
+        [&](auto&... s) {
+            ((update_stats_.ms[index++] = measure_ms([&] { s.update(delta_time); })), ...);
+        },
+        systems_
+    );
+
+    update_stats_.total_ms =
+        std::accumulate(update_stats_.ms.begin(), update_stats_.ms.end(), 0.0f);
 }
 
 auto world::clear_changed() -> void {
@@ -75,6 +84,10 @@ auto world::registry() -> ecs::registry& {
 
 auto world::destroyed() const -> const std::vector<entity>& {
     return registry_.destroyed();
+}
+
+auto world::get_update_stats() const -> const world_update_stats& {
+    return update_stats_;
 }
 
 auto world::detach_components_(entity ent) noexcept -> void {

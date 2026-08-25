@@ -18,6 +18,8 @@ class world;
 
 class animation_fsm_system final {
 public:
+    static constexpr std::string_view system_name = "anim_fsm";
+
     explicit animation_fsm_system(world& w);
 
     auto update(float32 dt) -> void;

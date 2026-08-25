@@ -18,6 +18,8 @@ class world;
 
 class character_controller_system final {
 public:
+    static constexpr std::string_view system_name = "char_ctrl";
+
     explicit character_controller_system(world& w);
 
     auto update(float32 delta_time) -> void;

@@ -2,6 +2,7 @@ module vw.gfx;
 
 import std;
 import vw.core;
+import vw.world;
 import :engine.frame_recorder;
 
 namespace vw::gfx {
@@ -52,6 +53,21 @@ constexpr std::array cpu_stages{
     stage_desc{"grid_pending", [](const frame_sample& s) -> float32 { return static_cast<float32>(s.grid.pending_count); }},
     stage_desc{"grid_staged", [](const frame_sample& s) -> float32 { return static_cast<float32>(s.grid.staged_count); }},
 };
+
+// Каждая система мира отдельной строкой: world_update меряет их сумму, а имя
+// той, что съела кадр, видно только здесь. Порядок и имена берутся из кортежа
+// систем, поэтому новая система попадает в отчёт сама.
+template <std::size_t I>
+constexpr auto system_stage_desc() -> stage_desc {
+    return {
+        ecs::world_system_names[I],
+        [](const frame_sample& s) -> float32 { return s.systems.ms[I]; },
+    };
+}
+
+constexpr auto system_stages = []<std::size_t... Is>(std::index_sequence<Is...> /*unused*/) {
+    return std::array<stage_desc, sizeof...(Is)>{system_stage_desc<Is>()...};
+}(std::make_index_sequence<ecs::world_system_count>{});
 
 constexpr std::array gpu_stages{
     gpu_stage_desc<gpu_stage::frame>(),
@@ -139,6 +155,13 @@ auto frame_recorder::report() const -> std::string {
         write_row(stage);
     }
 
+    std::format_to(
+        sink, "\n{:<21}{:>9}{:>9}{:>9}{:>9}\n", "system (ms)", "p50", "p95", "p99", "max"
+    );
+    for (const auto& stage : system_stages) {
+        write_row(stage);
+    }
+
     // Стадии CPU меряют запись команд, а эти — выполнение. Показываются порознь,
     // потому что складывать и сравнивать их нельзя.
     if (!samples_.front().render.gpu.supported) {
@@ -172,6 +195,17 @@ auto frame_recorder::collect(gfx::report& out) const -> void {
 
     for (const auto& stage : cpu_stages) {
         write_stage(stage);
+    }
+
+    {
+        auto& systems = out.section("systems");
+        for (const auto& stage : system_stages) {
+            auto& row = systems.sub(std::string{stage.name});
+            row.value("p50", static_cast<float64>(percentile_of(stage.get, 0.50f)))
+                .value("p95", static_cast<float64>(percentile_of(stage.get, 0.95f)))
+                .value("p99", static_cast<float64>(percentile_of(stage.get, 0.99f)))
+                .value("max", static_cast<float64>(percentile_of(stage.get, 1.00f)));
+        }
     }
 
     if (!samples_.front().render.gpu.supported) {

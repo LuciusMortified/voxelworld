@@ -17,16 +17,40 @@ import vw.ecs;
 
 export namespace vw::ecs {
 
+// Порядок здесь — это порядок кадра: каждая система видит мир таким, каким его
+// оставила предыдущая.
+using world_systems = std::tuple< //
+    hierarchy_system, character_controller_system, animation_fsm_system,
+    physics_system, transform_system, model_system, spatial_system,
+    light_system, socket_system, world_grid_system, animation_system
+>;
+
+inline constexpr std::size_t world_system_count = std::tuple_size_v<world_systems>;
+
+// Имя система носит сама: таблица имён рядом с кортежем разъезжается с ним при
+// первой же перестановке, и разъехавшуюся видно только по перепутанным числам.
+inline constexpr auto world_system_names = []<std::size_t... Is>(
+    std::index_sequence<Is...> /*unused*/
+) {
+    return std::array<std::string_view, sizeof...(Is)>{
+        std::tuple_element_t<Is, world_systems>::system_name...
+    };
+}(std::make_index_sequence<world_system_count>{});
+
+// Сколько заняла каждая система на последнем кадре, в порядке кортежа. Замер
+// идёт всегда: одиннадцать чтений часов на кадр не стоят ничего, а метрика,
+// которую надо включить, показывает не тот кадр, из-за которого её открыли.
+struct world_update_stats {
+    std::array<float32, world_system_count> ms{};
+    float32 total_ms = 0.0f;
+};
+
 // Владеет реестром, системами и общими реестрами ассетов и держит их в согласии:
 // добавление или удаление компонента извещает каждую систему, которой этот тип
 // небезразличен.
 class world final {
 public:
-    using systems = std::tuple< //
-        hierarchy_system, character_controller_system, animation_fsm_system,
-        physics_system, transform_system, model_system, spatial_system,
-        light_system, socket_system, world_grid_system, animation_system
-    >;
+    using systems = world_systems;
 
     using resources = std::tuple<asset::model_registry, asset::animation_clip_registry>;
 
@@ -175,6 +199,8 @@ public:
 
     [[nodiscard]] auto destroyed() const -> const std::vector<entity>&;
 
+    [[nodiscard]] auto get_update_stats() const -> const world_update_stats&;
+
 private:
     template <typename T>
     auto add_component_(
@@ -249,6 +275,8 @@ private:
     }
 
     auto detach_components_(entity ent) noexcept -> void;
+
+    world_update_stats update_stats_;
 
     ecs::registry registry_;
     // Ресурсы стоят перед системами намеренно: система может держать модели, чьи

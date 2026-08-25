@@ -14,6 +14,7 @@ struct frame_sample {
     engine_stats engine{};
     render_timing_stats render{};
     ecs::world_grid_system_stats grid{};
+    ecs::world_update_stats systems{};
 };
 
 // Копит целые кадровые сэмплы за прогон бенчмарка и сводит их к перцентилям.

@@ -18,6 +18,8 @@ class world;
 
 class light_system final {
 public:
+    static constexpr std::string_view system_name = "light";
+
     explicit light_system(world& w);
 
     auto update(float32 dt) -> void;

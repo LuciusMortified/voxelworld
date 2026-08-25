@@ -18,6 +18,8 @@ class world;
 
 class model_system {
 public:
+    static constexpr std::string_view system_name = "model";
+
     explicit model_system(world& w);
 
     class model_modifier {

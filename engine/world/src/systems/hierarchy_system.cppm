@@ -18,6 +18,8 @@ class world;
 
 class hierarchy_system final {
 public:
+    static constexpr std::string_view system_name = "hierarchy";
+
     explicit hierarchy_system(world& w);
 
     auto update(float32 dt) -> void;

@@ -55,6 +55,8 @@ struct world_grid_system_stats {
 
 class world_grid_system {
 public:
+    static constexpr std::string_view system_name = "world_grid";
+
     explicit world_grid_system(world& w);
     ~world_grid_system();
 

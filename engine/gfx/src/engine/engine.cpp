@@ -164,9 +164,10 @@ auto engine::bench_tick_() -> void {
     }
 
     recorder_->record({
-        .engine = stats_,
-        .render = renderer_->get_stats().timing,
-        .grid   = world_->system<ecs::world_grid_system>().get_stats(),
+        .engine  = stats_,
+        .render  = renderer_->get_stats().timing,
+        .grid    = world_->system<ecs::world_grid_system>().get_stats(),
+        .systems = world_->get_update_stats(),
     });
 
     if (recorder_->sample_count() >= bench_.measure_frames) {

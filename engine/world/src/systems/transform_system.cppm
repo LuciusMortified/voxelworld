@@ -18,6 +18,8 @@ class world;
 
 class transform_system final {
 public:
+    static constexpr std::string_view system_name = "transform";
+
     explicit transform_system(world& w);
 
     auto update(float32 dt) -> void;

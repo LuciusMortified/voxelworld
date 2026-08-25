@@ -18,6 +18,8 @@ class world;
 
 class socket_system final {
 public:
+    static constexpr std::string_view system_name = "socket";
+
     explicit socket_system(world& w);
 
     class socket_modifier {

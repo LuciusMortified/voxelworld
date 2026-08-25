@@ -18,6 +18,8 @@ class world;
 
 class animation_system final {
 public:
+    static constexpr std::string_view system_name = "animation";
+
     explicit animation_system(world& w);
 
     auto update(float32 delta_time) -> void;
