@@ -40,10 +40,15 @@ auto spatial_system::update(float32 /*dt*/) -> void {
     }
 
     for (entity ent : requested) {
+        // Границы есть у того, чью форму движок знает: у несущего модель — по
+        // её вокселям, у несущего коллайдер — по коробке физики. Второе — про
+        // корень иерархии, который сам ничего не рисует: тело, собранное из
+        // детей, в дерево не попадало вовсе, и запрос столкновений его не
+        // находил, сколько бы слоёв ему ни назначили.
         const bool can_be_updated =  //
-            reg.has<model_component>(ent) &&
             reg.has<transform_component>(ent) &&
-            reg.has<spatial_component>(ent);
+            reg.has<spatial_component>(ent) &&
+            (reg.has<model_component>(ent) || reg.has<box_collider_component>(ent));
         if (!can_be_updated) {
             continue;
         }
@@ -60,9 +65,14 @@ auto spatial_system::update_entity(
     auto& reg     = world_->registry();
     auto& spatial = reg.get<spatial_component>(ent);
 
-    const auto& model_comp     = reg.get<model_component>(ent);
     const auto& transform_comp = reg.get<transform_component>(ent);
-    spatial::aabb new_bounds = calculate_aabb_from_model(ent, model_comp, transform_comp);
+
+    // Модель важнее коллайдера у того, у кого есть и то, и другое: по её
+    // границам такую сущность видели до сих пор, и менять их значило бы менять
+    // отсев и попадания луча заодно.
+    const spatial::aabb new_bounds = reg.has<model_component>(ent)
+        ? calculate_aabb_from_model(ent, reg.get<model_component>(ent), transform_comp)
+        : calculate_aabb_from_collider(reg.get<box_collider_component>(ent), transform_comp);
 
     const bool bounds_changed =  //
         spatial.bounds_.min != new_bounds.min || spatial.bounds_.max != new_bounds.max;
@@ -113,6 +123,18 @@ auto spatial_system::expand_aabb_for_fat(
         vec3f{bounds.min.x - expansion.x, bounds.min.y - expansion.y, bounds.min.z - expansion.z},
         vec3f{bounds.max.x + expansion.x, bounds.max.y + expansion.y, bounds.max.z + expansion.z}
     };
+}
+
+auto spatial_system::calculate_aabb_from_collider(
+    const box_collider_component& collider, const transform_component& transform_comp
+) -> spatial::aabb {
+    // Коробка физики осями мира и живёт: resolve_box_voxel вращения не знает и
+    // берёт середину как позицию плюс смещение. Границы, посчитанные через
+    // мировую матрицу, описывали бы не то тело, с которым столкнётся движок.
+    const vec3f centre = transform_comp.get_position() + collider.get_offset();
+    const vec3f half   = collider.get_extents() * 0.5f;
+
+    return spatial::aabb{centre - half, centre + half};
 }
 
 auto spatial_system::calculate_aabb_from_model(

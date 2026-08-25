@@ -1,5 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
+import std;
+
 import vw.core;
 import vw.ecs;
 import vw.world;
@@ -123,4 +125,54 @@ TEST_CASE("chunk occupancy declines models that are not 64 cubes", "[world][occu
 
     asset::chunk_occupancy occupancy;
     REQUIRE_FALSE(model.build_occupancy(occupancy));
+}
+
+// Корень иерархии сам ничего не рисует, и о своей форме знает только по коробке
+// физики: пока границы считались лишь по модели, тело, собранное из детей, в
+// дерево не попадало вовсе, сколько бы слоёв ему ни назначили.
+TEST_CASE("a collider without a model still gets spatial bounds", "[world]") {
+    world w;
+
+    const auto ent = w.create()
+                         .with<transform_component>()
+                         .with<spatial_component>()
+                         .with<box_collider_component>()
+                         .get_entity();
+
+    w.system<spatial_system>().modify(ent).set_layer(spatial_layer::character);
+    w.system<physics_system>()
+        .modify_collider(ent)
+        .set_extents(vec3f{12.0F, 24.0F, 12.0F})
+        .set_offset(vec3f{0.0F, 12.0F, 0.0F});
+    w.system<transform_system>().modify(ent).set_position(vec3f{100.0F, 40.0F, -20.0F});
+    w.update(0.016F);
+
+    const auto bounds = w.get<spatial_component>(ent).get_bounds();
+
+    // Смещение поднимает коробку на половину роста, поэтому начало координат
+    // тела — точка между ступнями, а не середина.
+    REQUIRE(bounds.min.y == 40.0F);
+    REQUIRE(bounds.max.y == 64.0F);
+    REQUIRE(bounds.size().x == 12.0F);
+
+    std::vector<entity> found;
+    w.system<spatial_system>().query_all(
+        spatial::aabb{vec3f{96.0F, 36.0F, -24.0F}, vec3f{104.0F, 44.0F, -16.0F}}, found,
+        spatial_layer::character
+    );
+    REQUIRE(std::ranges::find(found, ent) != found.end());
+}
+
+// А у несущего и то, и другое границы остаются модельными: по ним такую
+// сущность видели до сих пор, и подмена сдвинула бы и отсев, и попадания луча.
+TEST_CASE("a model outranks a collider when an entity has both", "[world]") {
+    world w;
+    auto& models = w.resource<asset::model_registry>();
+
+    const auto ent = make_cube(w, models, "cube");
+    w.modify(ent).with<box_collider_component>();
+    w.system<physics_system>().modify_collider(ent).set_extents(vec3f{100.0F, 100.0F, 100.0F});
+    w.update(0.016F);
+
+    REQUIRE(w.get<spatial_component>(ent).get_bounds().size().x == 4.0F);
 }

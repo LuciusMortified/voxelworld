@@ -71,6 +71,9 @@ private:
     auto calculate_aabb_from_model(entity ent, const model_component& model_comp,
                                    const transform_component& transform_comp) const
         -> spatial::aabb;
+    static auto calculate_aabb_from_collider(const box_collider_component& collider,
+                                             const transform_component& transform_comp)
+        -> spatial::aabb;
     static auto expand_aabb_for_fat(const spatial::aabb& bounds) -> spatial::aabb;
 
     world* world_;
