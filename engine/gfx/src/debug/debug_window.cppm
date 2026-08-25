@@ -8,7 +8,9 @@ export namespace vw::gfx {
 
 class engine;
 
-// Отладочная панель поверх ImGui: FPS, статистика систем, рендера и буферов.
+// Отладочная панель поверх ImGui: кадровые числа в главном окне, всё остальное —
+// в окнах, которые открывает его меню. Главное окно намеренно держится
+// маленьким: оно висит поверх сцены всегда, а панели открывают по одной.
 class debug_window final {
 public:
     using engine_type = engine;
@@ -30,18 +32,70 @@ public:
     [[nodiscard]] auto is_visible() const -> bool;
 
 private:
-    auto render_fps_window() -> void;
-    auto render_render_mode_controls() const -> void;
-    auto render_combined_buffers_detail() -> void;
-    auto render_systems_detail() -> void;
-    auto render_render_detail() -> void;
+    // Порядок здесь — порядок пунктов в меню; первые четыре живут под Stats,
+    // остальные под Settings.
+    enum class panel : uint8 {
+        systems,
+        render,
+        buffers,
+        world,
+        view,
+        lighting,
+        shadows,
+        lights,
+        fog,
+    };
+
+    static constexpr std::size_t panel_count = static_cast<std::size_t>(panel::fog) + 1;
+    static constexpr std::size_t first_settings_panel =
+        static_cast<std::size_t>(panel::view);
+
+    static constexpr std::array<const char*, panel_count> panel_names{
+        "Systems", "Render",   "Buffers", "World", "View",
+        "Lighting", "Shadows", "Lights",  "Fog",
+    };
+
+    static constexpr std::array<const char*, panel_count> panel_titles{
+        "Debug Tool - Systems",  "Debug Tool - Render",
+        "Debug Tool - Buffers",  "Debug Tool - World",
+        "Debug Tool - View",     "Debug Tool - Lighting",
+        "Debug Tool - Shadows",  "Debug Tool - Lights",
+        "Debug Tool - Fog",
+    };
+
+    auto render_main_window() -> void;
+    auto render_menu_bar() -> void;
+    auto render_frame_plot() -> void;
+    auto render_panels() -> void;
+    auto render_panel_body(panel id) -> void;
+
+    // Отрисовать примитивы, которые заказаны выключателями панели View. Зовётся
+    // из кадра отладчика, потому что примитив живёт ровно один кадр.
+    auto submit_debug_draws() -> void;
+
+    // Строка «имя — время — максимум за прогон» с цветом по порогам. Ею меряют и
+    // системы, и стадии рендера, поэтому максимумы у них общие и сбрасываются
+    // вместе.
+    auto metric_row(const char* name, float32 ms) -> void;
+    auto count_row(const char* name, uint32 value) const -> void;
+
+    auto render_systems_panel() -> void;
+    auto render_render_panel() -> void;
+    auto render_buffers_panel() -> void;
+    auto render_world_panel() -> void;
+
+    auto render_view_panel() -> void;
+    auto render_lighting_panel() -> void;
+    auto render_shadows_panel() -> void;
+    auto render_lights_panel() -> void;
+    auto render_fog_panel() -> void;
 
     engine_type* engine_;
 
-    bool visible_                      = false;
-    bool show_combined_buffers_detail_ = false;
-    bool show_systems_detail_          = false;
-    bool show_render_detail_           = false;
+    bool visible_ = false;
+    std::array<bool, panel_count> panel_open_{};
+
+    bool show_colliders_ = false;
 
     std::unordered_map<std::string, float32> metric_max_;
 

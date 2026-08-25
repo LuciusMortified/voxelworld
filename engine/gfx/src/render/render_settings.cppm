@@ -8,6 +8,8 @@ export namespace vw::gfx {
 
 enum class render_mode : uint8 { lit, wireframe };
 
+inline constexpr std::array<std::string_view, 2> render_mode_names{"lit", "wireframe"};
+
 struct directional_light_settings {
     vec3f direction{0.0f, -1.0f, 0.0f};
     vec3f color{1.f, 1.f, 1.f};
@@ -103,6 +105,18 @@ enum class debug_view : uint32 {
     // предела на число тел в кадре нет, это единственный способ потерять пятно.
     blob_complexity,
 };
+
+// Имена живут рядом с перечислением, а не в интерфейсе, который их показывает:
+// показывающих несколько, и разъехаться им негде только так.
+inline constexpr std::array<std::string_view, 9> debug_view_names{
+    "off",         "ambient occlusion", "normals",
+    "sky light",   "convexity",         "block light",
+    "blob shadow", "light complexity",  "blob complexity",
+};
+
+static_assert(
+    debug_view_names.size() == static_cast<std::size_t>(debug_view::blob_complexity) + 1
+);
 
 // Что излучает запечённый светящийся блок. Один цвет на все такие блоки мира —
 // так делает Minecraft, и столько позволяет один полубайт на угол: уровень

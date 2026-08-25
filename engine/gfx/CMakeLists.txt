@@ -72,6 +72,8 @@ target_sources(vw_gfx
         src/render/renderer.cpp
         src/debug/debug_primitive.cpp
         src/debug/debug_window.cpp
+        src/debug/debug_panels_stats.cpp
+        src/debug/debug_panels_settings.cpp
         src/engine/report.cpp
         src/engine/frame_recorder.cpp
         src/engine/engine.cpp

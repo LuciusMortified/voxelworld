@@ -137,6 +137,10 @@ public:
         combined_buffer_pool_->set_chunk_cull_enabled(enabled);
     }
 
+    [[nodiscard]] auto is_chunk_cull_enabled() const -> bool {
+        return combined_buffer_pool_->is_chunk_cull_enabled();
+    }
+
     auto draw_colliders(world_type& w, color col = colors::green) -> void;
 
     // Получить ImTextureID для shadow map (для отображения в ImGui::Image)
