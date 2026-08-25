@@ -40,6 +40,7 @@ auto testbed_app::render_ui() -> void {
     ImGui::Text("F1 - toggle cursor");
     ImGui::Text("LMB - use the tool, cursor captured");
     ImGui::Text("N - pause the sun, [ ] - move it");
+    ImGui::Text("CTRL+F12 - engine debug tool");
     ImGui::Text("ESC - exit");
     ImGui::Separator();
 
@@ -101,85 +102,22 @@ auto testbed_app::render_ui() -> void {
 
     ImGui::Separator();
 
-    // No shadow panel: the cascades are parked, and sliders that move
-    // nothing are worse than none. Turning them back on is two edits --
-    // shadow_settings::enabled and SHADOW_ENABLED in voxel.frag.
-    if (ImGui::CollapsingHeader("Lighting")) {
-        auto& renderer = get_engine().get_renderer();
-        auto& ambient  = renderer.get_ambient_settings();
-
-        ImGui::SliderFloat("Ambient", &ambient.strength, 0.0f, 2.0f, "%.2f");
-        ImGui::SliderFloat("AO strength", &ambient.ao_strength, 0.0f, 1.0f, "%.2f");
-        ImGui::SliderFloat("AO curve", &ambient.ao_curve, 0.25f, 4.0f, "%.2f");
-
-        // Drag this to zero and look at a hillside from the downhill side:
-        // the steps flatten into one plane, because occlusion has nothing
-        // to say about a corner with nothing above it.
-        ImGui::SliderFloat("Convex strength", &ambient.convex_strength, 0.0f, 1.0f, "%.2f");
-        ImGui::SliderFloat("Convex curve", &ambient.convex_curve, 0.25f, 4.0f, "%.2f");
-
-        ImGui::ColorEdit3("Cave ambient", &ambient.cave.x);
-
-        // Exposure moves the whole picture; the white point decides where
-        // the roll-off lands. Drop the white point under what the brightest
-        // face reaches and that face clips again, which is the state this
-        // replaced.
-        auto& tonemap = renderer.get_tonemap_settings();
-        ImGui::SliderFloat("Exposure", &tonemap.exposure, 0.1f, 4.0f, "%.2f");
-        ImGui::SliderFloat("White point", &tonemap.white_point, 0.25f, 4.0f, "%.2f");
-
-        // Zero is plain Lambert. Set the time to noon and drag it there:
-        // three of the four walls of every voxel collapse onto one colour,
-        // because the sun gives all three exactly nothing.
-        auto& sun = renderer.get_directional_light_settings();
-        ImGui::SliderFloat("Sun wrap", &sun.wrap, 0.0f, 1.0f, "%.2f");
-
-        ImGui::SliderFloat("Sky curve", &ambient.sky_curve, 0.25f, 4.0f, "%.2f");
-
-        // Drag this to one and stand in a cave mouth: daylight walks
-        // fifteen voxels in, because that is how far the flood carries it.
-        // Sky light is the sun's only occluder now, so this is the whole
-        // say over how sharply the sun stops at an opening.
-        ImGui::SliderFloat("Sun curve", &ambient.sun_curve, 0.25f, 8.0f, "%.2f");
-
-        // One colour for every light block there is. Set the time to
-        // midnight and it is the only thing still lighting anything --
-        // which is the point of keeping this channel out of the day.
-        auto& lamp = renderer.get_block_light_settings();
-        ImGui::ColorEdit3("Lamp colour", &lamp.color.x);
-        ImGui::SliderFloat("Lamp strength", &lamp.intensity, 0.0f, 4.0f, "%.2f");
-
-        // At one the fifteen baked steps come out even and read as a ramp
-        // painted on the wall. Two is near the curve Minecraft's lightmap
-        // uses and reads as falloff.
-        ImGui::SliderFloat("Lamp curve", &lamp.curve, 0.25f, 4.0f, "%.2f");
-
-        // At one a lava face comes out as exactly the colour lava was
-        // drawn where nothing else reaches it. That is the anchor; above
-        // it the tone curve starts taking the difference back.
-        ImGui::SliderFloat("Glow", &lamp.glow, 0.0f, 3.0f, "%.2f");
-
-        // The dynamic half of the same light. Light it, place a lamp, and
-        // walk one onto the other: if the falloffs have drifted apart this
-        // is where it shows.
+    // Не настройки света, а то, чем стенд его создаёт: настройки самого рендера
+    // переехали в Debug Tool движка, а поставить в мир источник умеет только
+    // стенд.
+    if (ImGui::CollapsingHeader("Emitters")) {
+        // Динамическая половина того же света. Зажги, поставь лампу и наведи
+        // одно на другое: разошедшиеся затухания видно только так.
         bool torch = torch_.is_valid();
         if (ImGui::Checkbox("Carry a torch", &torch)) {
             set_torch_(torch);
         }
 
-        // Zero is the honest comparison: the crowd with nothing under it,
-        // which is what the patch is meant to fix.
-        ImGui::SliderFloat(
-            "Blob shadow", &get_engine().get_renderer().get_blob_strength(), 0.0f, 1.0f,
-            "%.2f"
-        );
-
-        // Nothing in the terrain emits, so without these there is nothing
-        // to look at. Both write through world_grid::set_voxel, which is
-        // the same path an edit takes -- the column goes dirty, the baker
-        // floods it again and the chunks whose light moved are meshed
-        // again. Watching the relight counters below tick is half the
-        // point of the buttons.
+        // В рельефе не светит ничто, поэтому без этих кнопок смотреть не на что.
+        // Обе пишут через world_grid::set_voxel — тем же путём, каким идёт
+        // правка: колонка грязнеет, пекарь заливает её снова, и чанки, чей свет
+        // сдвинулся, мешатся заново. Счётчики этой перезаливки — в Debug Tool,
+        // окно World.
         if (world_grid_ != nullptr) {
             if (ImGui::Button("Drop lamp")) {
                 drop_emitter(blocks::lamp, 1);
@@ -189,68 +127,13 @@ auto testbed_app::render_ui() -> void {
                 drop_emitter(blocks::lava, 3);
             }
 
-            // A button that does nothing and says nothing is the worst of
-            // both: the first version of this missed the ground by a factor
-            // of the voxel scale and looked exactly like a broken shader.
+            // Кнопка, которая ничего не делает и ничего не говорит, — худшее из
+            // двух: первая версия этой промахивалась мимо земли на масштаб
+            // вокселя и выглядела ровно как сломанный шейдер.
             if (!drop_status_.empty()) {
                 ImGui::TextUnformatted(drop_status_.c_str());
             }
         }
-
-        // Judging occlusion off the finished frame means judging a product
-        // of the block's colour and everything falling on it. These show
-        // one factor with the others taken away.
-        static constexpr std::array<const char*, 9> view_names{
-            "off",         "ambient occlusion", "normals",
-            "sky light",   "convexity",         "block light",
-            "blob shadow", "light complexity",  "blob complexity"
-        };
-        auto view = static_cast<int32>(renderer.get_debug_view());
-        if (ImGui::Combo(
-                "Debug view", &view, view_names.data(), static_cast<int32>(view_names.size())
-            )) {
-            renderer.set_debug_view(static_cast<gfx::debug_view>(view));
-        }
-
-        // The switch the acceptance of the froxel pass rests on: the same
-        // frame lit both ways, with nothing else moving between the two.
-        auto& clusters = renderer.get_cluster_settings();
-        ImGui::Checkbox("Clustered lights", &clusters.enabled);
-        ImGui::SameLine();
-        ImGui::Text("%u x %u x %u, cap %u",
-            renderer.get_cluster_grid(get_engine().get_camera()).tiles_x(),
-            renderer.get_cluster_grid(get_engine().get_camera()).tiles_y(),
-            clusters.slices, clusters.cap);
-
-        ImGui::Text(
-            "sky   %.3f %.3f %.3f", ambient.sky.x, ambient.sky.y, ambient.sky.z
-        );
-        ImGui::Text(
-            "grnd  %.3f %.3f %.3f", ambient.ground.x, ambient.ground.y, ambient.ground.z
-        );
-    }
-
-    ImGui::Separator();
-
-    const auto& camera = get_engine().get_camera();
-    const auto pos     = camera.get_position();
-    ImGui::Text("Camera: (%.1f, %.1f, %.1f)", pos.x, pos.y, pos.z);
-
-    if (world_grid_) {
-        auto chunk_coord = world_grid_->world_to_chunk_coord(
-            {static_cast<int32>(pos.x), static_cast<int32>(pos.y), static_cast<int32>(pos.z)}
-        );
-        ImGui::Text("Chunk: (%d, %d, %d)", chunk_coord.x, chunk_coord.y, chunk_coord.z);
-        const auto& wgs = get_engine().get_world().system<ecs::world_grid_system>();
-        ImGui::Text("Loaded columns: %u", world_grid_->column_count());
-        ImGui::Text(
-            "Loaded chunks: %u (%u drawn)", world_grid_->chunk_count(),
-            world_grid_->drawn_chunk_count()
-        );
-        ImGui::Text("Pending columns: %u", wgs.get_stats().pending_count);
-        ImGui::Text(
-            "Pending meshes: %u", get_engine().get_renderer().get_mesh_pool().get_pending_count()
-        );
     }
 
     ImGui::Separator();

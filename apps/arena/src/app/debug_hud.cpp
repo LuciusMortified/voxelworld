@@ -77,13 +77,6 @@ auto render_debug_hud(
         ImGui::Text("Colliders: %s", show_colliders ? "visible" : "hidden");
     }
 
-    const auto& wgs = engine.get_world().system<ecs::world_grid_system>();
-    if (const auto* grid = wgs.grid()) {
-        ImGui::Separator();
-        ImGui::Text("Loaded chunks: %u", grid->chunk_count());
-        ImGui::Text("Pending columns: %u", wgs.get_stats().pending_count);
-    }
-
     ImGui::End();
 }
 
