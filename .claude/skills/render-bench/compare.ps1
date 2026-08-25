@@ -3,7 +3,7 @@
     Сравнивает два отчёта testbed и печатает вердикт по порогам.
 
 .EXAMPLE
-    pwsh .claude/skills/render-bench/compare.ps1 -Before before/parked.txt -After after/parked.txt
+    pwsh .claude/skills/render-bench/compare.ps1 -Before before/terrain-parked.txt -After after/terrain-parked.txt
 #>
 param(
     [Parameter(Mandatory)][string]$Before,
@@ -50,6 +50,10 @@ function Read-Summary([string]$path) {
         Samples = & $first '^samples: (\d+)$' 1
         Ready   = & $first '^scene ready after .+$' $null
         Memory  = & $first '^memory: .+$' $null
+        # Блок stand: сцена и путь камеры выбираются порознь, и по имени файла
+        # уже не сказать, что именно мерили.
+        Scene   = & $first '^\s+scene: (.+)$' 1
+        Camera  = & $first '^\s+camera: (.+)$' 1
     }
 }
 
@@ -58,6 +62,9 @@ $a = Read-Stages $After
 $bs = Read-Summary $Before
 $as = Read-Summary $After
 
+if ($bs.Scene -ne $as.Scene -or $bs.Camera -ne $as.Camera) {
+    Write-Host "мерили разное: $($bs.Scene)/$($bs.Camera) против $($as.Scene)/$($as.Camera) -- числа несравнимы" -ForegroundColor Red
+}
 if ($bs.Present -ne $as.Present) {
     Write-Host "present mode отличается: $($bs.Present) против $($as.Present) -- числа несравнимы" -ForegroundColor Red
 }

@@ -23,8 +23,8 @@
 
 - **Apps** — `apps/sculptor/` (модуль `vw.sculptor`, партиции `:state`,
   `:operations`, `:services`, `:tools`, `:ui`, `:app`), `apps/testbed/`
-  (`vw.testbed`: стенд `:app`, сцена на партицию в `:scenes.*`, приборы
-  `:probes.*`), `apps/arena/` (`vw.arena`)
+  (`vw.testbed`: стенд `:app`, сцена на партицию в `:scenes.*`, пути камеры
+  `:cameras`, приборы `:probes.*`), `apps/arena/` (`vw.arena`)
 - **Shaders** — GLSL → SPIR-V (`shaders/`)
 
 Исходники разложены по смысловым каталогам внутри `src/`; в корне лежит только

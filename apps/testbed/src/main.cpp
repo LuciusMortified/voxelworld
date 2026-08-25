@@ -14,7 +14,7 @@ namespace {
 auto bench_from(const testbed::arg_reader& args) -> gfx::bench_config {
     gfx::bench_config bench;
 
-    if (!args.text("--bench")) {
+    if (!args.flag("--bench")) {
         return bench;
     }
 
@@ -34,20 +34,15 @@ auto bench_from(const testbed::arg_reader& args) -> gfx::bench_config {
     return bench;
 }
 
-// Какую сцену открыть. --bench=<имя> называет её прямо; --lights и --blobs — те
-// же сцены, только чтобы смотреть глазами: без камеры на рельсах и без выхода по
-// счётчику кадров.
-auto scene_name(const testbed::arg_reader& args) -> std::string_view {
-    if (const auto named = args.text("--bench")) {
-        return *named;
+auto joined(const std::vector<std::string_view>& names) -> std::string {
+    std::string all;
+    for (const auto name : names) {
+        if (!all.empty()) {
+            all += ", ";
+        }
+        all += name;
     }
-    if (args.flag("--lights")) {
-        return "torches";
-    }
-    if (args.flag("--blobs")) {
-        return "blobs";
-    }
-    return "flythrough";
+    return all;
 }
 
 }  // namespace
@@ -55,28 +50,51 @@ auto scene_name(const testbed::arg_reader& args) -> std::string_view {
 auto main(int argc, char** argv) -> int {
     const testbed::arg_reader args{argc, argv};
 
-    const auto name = scene_name(args);
+    const auto wanted_scene = args.text("--scene").value_or("terrain");
 
     // Имя, не совпавшее ни с одним известным, — ошибка со списком. Раньше оно
-    // молча давало flythrough, и опечатка была не ошибкой, а другой сценой:
-    // прогон проходил целиком и мерил не то, что просили.
-    auto factory = testbed::find_scene(name, args);
-    if (!factory) {
-        std::string known;
-        for (const auto scene : testbed::scene_names()) {
-            if (!known.empty()) {
-                known += ", ";
-            }
-            known += scene;
-        }
-        log::error("unknown scene '{}'; known scenes are: {}", name, known);
+    // молча давало облёт пустого рельефа, и опечатка была не ошибкой, а другой
+    // сценой: прогон проходил целиком и мерил не то, что просили.
+    const auto scene = testbed::find_scene(wanted_scene, args);
+    if (!scene) {
+        log::error(
+            "unknown scene '{}'; known scenes are: {}", wanted_scene,
+            joined(testbed::scene_names())
+        );
         return 1;
+    }
+
+    const bool benching        = args.flag("--bench");
+    const auto wanted_camera   = args.text("--camera");
+
+    if (benching && wanted_camera == "free") {
+        log::error("--bench needs a camera on rails: a hand-flown path differs every run");
+        return 1;
+    }
+
+    // Без замера камера принадлежит человеку: любую сцену можно облазить руками.
+    // В замерном прогоне без ключа путь берёт сама сцена — тот, на котором в ней
+    // есть что смотреть.
+    testbed::camera_factory camera;
+    if (wanted_camera || !benching) {
+        const auto name = wanted_camera.value_or("free");
+
+        const auto found = testbed::find_camera(name);
+        if (!found) {
+            log::error(
+                "unknown camera '{}'; known cameras are: {}", name,
+                joined(testbed::camera_names())
+            );
+            return 1;
+        }
+
+        camera = *found;
     }
 
     try {
         log::add_file_sink("testbed.log");
         std::make_unique<gfx::engine>(1280, 720, "Voxel World - Testbed", bench_from(args))
-            ->run<testbed::testbed_app>(args, *factory);
+            ->run<testbed::testbed_app>(args, *scene, camera);
     } catch (const std::exception& e) {
         log::error("Error: {}", e.what());
         return 1;

@@ -6,7 +6,7 @@ import vw.core;
 namespace vw::testbed {
 namespace {
 
-// Таблица сцен: имя, которое принимает --bench, и то, как построить сцену на
+// Таблица сцен: имя, которое принимает --scene, и то, как построить сцену на
 // уже стоящем стенде.
 struct scene_entry {
     std::string_view name;
@@ -22,17 +22,14 @@ constexpr auto entry_for(std::string_view name) -> scene_entry {
             }};
 }
 
-const std::array<scene_entry, 10> scene_table{{
-    entry_for<parked_scene>("parked"),
-    entry_for<spin_scene>("spin"),
-    entry_for<advance_scene>("advance"),
-    entry_for<flythrough_scene>("flythrough"),
-    entry_for<dig_scene>("dig"),
-    entry_for<light_scene>("light"),
-    entry_for<torches_scene>("torches"),
-    entry_for<village_scene>("village"),
-    entry_for<blobs_scene>("blobs"),
-    entry_for<crowd_scene>("crowd"),
+const std::array<scene_entry, 7> scene_table{{
+    entry_for<terrain_scene>("terrain"),
+    entry_for<voxel_edits_scene>("voxel-edits"),
+    entry_for<lamp_edits_scene>("lamp-edits"),
+    entry_for<standing_lights_scene>("standing-lights"),
+    entry_for<clustered_lights_scene>("clustered-lights"),
+    entry_for<blob_shadows_scene>("blob-shadows"),
+    entry_for<animated_crowd_scene>("animated-crowd"),
 }};
 
 }  // namespace

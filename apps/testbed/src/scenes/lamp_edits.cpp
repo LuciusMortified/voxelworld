@@ -12,20 +12,14 @@ import vw.gfx;
 
 namespace vw::testbed {
 
-light_scene::light_scene(
+lamp_edits_scene::lamp_edits_scene(
     testbed_app& stand, const arg_reader& args
 )
     : scene{stand}
-    , per_frame_{args.integer("--bench-lamps", 1)}
-    , inert_{args.flag("--bench-inert")} {}
+    , per_frame_{args.integer("--lamps-per-frame", 1)}
+    , inert_{args.flag("--inert")} {}
 
-auto light_scene::drive_camera() -> void {
-    auto& camera = stand().camera();
-    camera.set_position({0.0f, stand().altitude(), 0.0f});
-    camera.set_rotation(-10.0f, 0.0f);
-}
-
-auto light_scene::start_() -> void {
+auto lamp_edits_scene::start_() -> void {
     const auto& wgs      = stand().world().system<ecs::world_grid_system>();
     const auto& mesh_gen = stand().renderer().get_mesh_pool().get_gen_stats();
 
@@ -46,7 +40,7 @@ auto light_scene::start_() -> void {
     bake_base_ms_          = light_stats.bake_ms;
 }
 
-auto light_scene::tick(float32 /*delta_time*/) -> void {
+auto lamp_edits_scene::tick(float32 /*delta_time*/) -> void {
     if (!stand().is_bench_ready()) {
         return;
     }
@@ -87,7 +81,7 @@ auto light_scene::tick(float32 /*delta_time*/) -> void {
     }
 }
 
-auto light_scene::collect_report(gfx::report& out) const -> void {
+auto lamp_edits_scene::collect_report(gfx::report& out) const -> void {
     if (!started_ || placed_ == 0) {
         return;
     }
@@ -119,7 +113,7 @@ auto light_scene::collect_report(gfx::report& out) const -> void {
     const float64 quads_a_chunk =
         meshed == 0 ? 0.0 : static_cast<float64>(quads) / static_cast<float64>(meshed);
 
-    out.section("light")
+    out.section(name())
         .value("placed", placed_)
         .value("block", inert_ ? "inert" : "lamp")
         .value("chunk_meshes", meshed)
@@ -141,8 +135,8 @@ auto light_scene::collect_report(gfx::report& out) const -> void {
         .value("relight_backlog", static_cast<uint64>(stats.relight_backlog));
 }
 
-auto light_scene::ui() -> void {
-    ImGui::Text("light: %llu %s placed, cursor %d of %d",
+auto lamp_edits_scene::ui() -> void {
+    ImGui::Text("lamp-edits: %llu %s placed, cursor %d of %d",
                 static_cast<unsigned long long>(placed_), inert_ ? "inert blocks" : "lamps",
                 cursor_, cells);
 }

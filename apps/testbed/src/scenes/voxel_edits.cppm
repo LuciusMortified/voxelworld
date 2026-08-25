@@ -1,4 +1,4 @@
-export module vw.testbed:scenes.dig;
+export module vw.testbed:scenes.voxel_edits;
 
 import std;
 
@@ -24,15 +24,14 @@ export namespace vw::testbed {
 // не копается: model::set_voxel поднимает поколение, что бы ни записал, поэтому
 // запись воздуха по воздуху заказала бы перестроение меша впустую и приукрасила
 // бы среднее на правку.
-class dig_scene final : public scene {
+class voxel_edits_scene final : public scene {
 public:
-    dig_scene(testbed_app& stand, const arg_reader& args);
+    voxel_edits_scene(testbed_app& stand, const arg_reader& args);
 
     [[nodiscard]] auto name() const -> std::string_view override {
-        return "dig";
+        return "voxel-edits";
     }
 
-    auto drive_camera() -> void override;
     auto tick(float32 delta_time) -> void override;
     auto collect_report(gfx::report& out) const -> void override;
     auto ui() -> void override;
@@ -46,7 +45,7 @@ private:
 
     auto start_() -> void;
 
-    // Вокселей за кадр: --bench-dig.
+    // Вокселей за кадр: --voxels-per-frame.
     int32 per_frame_ = 1;
 
     int32 cursor_    = 0;

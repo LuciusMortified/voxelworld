@@ -12,17 +12,17 @@ import vw.gfx;
 
 namespace vw::testbed {
 
-torches_scene::torches_scene(
+standing_lights_scene::standing_lights_scene(
     testbed_app& stand, const arg_reader& args
 )
     : scene{stand}
-    , static_lights_{args.integer("--bench-static", 400)}
-    , dynamic_lights_{args.integer("--bench-dynamic", 64)}
-    , village_groups_{std::max(args.integer("--bench-groups", 24), 1)}
-    , per_frame_{args.integer("--bench-lamps", 1)}
+    , static_lights_{args.integer("--emitters", 400)}
+    , dynamic_lights_{args.integer("--moving-lights", 64)}
+    , hamlets_{std::max(args.integer("--hamlets", 24), 1)}
+    , per_frame_{args.integer("--emitters-per-frame", 1)}
     , light_speed_{std::max(args.real("--light-speed", 1.0F), 0.0F)} {}
 
-auto torches_scene::spiral_point(int32 i, int32 count, float32 span) -> vec2f {
+auto standing_lights_scene::spiral_point(int32 i, int32 count, float32 span) -> vec2f {
     constexpr float32 golden = 2.39996323f;
 
     const auto n    = static_cast<float32>(std::max(count, 1));
@@ -33,7 +33,7 @@ auto torches_scene::spiral_point(int32 i, int32 count, float32 span) -> vec2f {
     return vec2f{r * std::cos(a), r * std::sin(a)};
 }
 
-auto torches_scene::site(int32 i) const -> vec2i {
+auto standing_lights_scene::site(int32 i) const -> vec2i {
     const vec2f at =
         spiral_point(i, std::max(static_lights_, 1), static_cast<float32>(radius));
 
@@ -43,28 +43,20 @@ auto torches_scene::site(int32 i) const -> vec2i {
     };
 }
 
-auto torches_scene::orbit_home(std::size_t /*i*/) const -> vec2f {
+auto standing_lights_scene::orbit_home(std::size_t /*i*/) const -> vec2f {
     return vec2f{0.0f, 0.0f};
 }
 
-auto torches_scene::orbit_radius(std::size_t /*i*/, float32 spread) const -> float32 {
+auto standing_lights_scene::orbit_radius(std::size_t /*i*/, float32 spread) const -> float32 {
     return static_cast<float32>(radius) * (0.2f + (0.8f * spread));
 }
 
-// Поворачивается, а не стоит: отсев, которого ни разу не попросили ничего
-// отбросить, — это отсев, который не измеряют.
-auto torches_scene::drive_camera() -> void {
-    auto& camera = stand().camera();
-    camera.set_position({0.0f, stand().altitude(), 0.0f});
-    camera.set_rotation(-20.0f, static_cast<float32>(camera_frame_++) * 0.25f);
-}
-
-auto torches_scene::is_ready() const -> bool {
+auto standing_lights_scene::is_ready() const -> bool {
     const auto& wgs = stand().world().system<ecs::world_grid_system>();
     return standing_ && wgs.get_stats().relight_backlog == 0;
 }
 
-auto torches_scene::spawn_lights_() -> void {
+auto standing_lights_scene::spawn_lights_() -> void {
     auto& world = stand().world();
 
     while (static_cast<int32>(lights_.size()) < dynamic_lights_) {
@@ -74,7 +66,7 @@ auto torches_scene::spawn_lights_() -> void {
     }
 }
 
-auto torches_scene::place_emitters_() -> void {
+auto standing_lights_scene::place_emitters_() -> void {
     if (standing_) {
         return;
     }
@@ -136,7 +128,7 @@ auto torches_scene::place_emitters_() -> void {
 
 // Орбиты — функция номера кадра и никогда не времени, по той же причине, что и
 // путь камеры: сцена, которую ведут по стенным часам, на каждой машине другая.
-auto torches_scene::drive_lights_(float32 delta_time) -> void {
+auto standing_lights_scene::drive_lights_(float32 delta_time) -> void {
     if (lights_.empty()) {
         return;
     }
@@ -165,7 +157,7 @@ auto torches_scene::drive_lights_(float32 delta_time) -> void {
     const auto scale = static_cast<float32>(stand().voxel_scale());
     const auto phase = static_cast<float32>(phase_);
 
-    phase_ += stand().drives_camera()
+    phase_ += stand().benching()
         ? static_cast<float64>(light_speed_)
         : static_cast<float64>(delta_time * steps_per_second * light_speed_);
 
@@ -210,19 +202,19 @@ auto torches_scene::drive_lights_(float32 delta_time) -> void {
     }
 }
 
-auto torches_scene::tick(float32 delta_time) -> void {
+auto standing_lights_scene::tick(float32 delta_time) -> void {
     place_emitters_();
     drive_lights_(delta_time);
 }
 
-auto torches_scene::collect_report(gfx::report& out) const -> void {
+auto standing_lights_scene::collect_report(gfx::report& out) const -> void {
     if (visible_frames_ == 0) {
         return;
     }
 
     const uint32 cap = stand().renderer().get_max_visible_lights();
 
-    auto& section = out.section(std::string{name()});
+    auto& section = out.section(name());
 
     section.value("emitters_placed", placed_)
         .value("emitters_asked", static_cast<int64>(static_lights_))
@@ -242,7 +234,7 @@ auto torches_scene::collect_report(gfx::report& out) const -> void {
     }
 }
 
-auto torches_scene::ui() -> void {
+auto standing_lights_scene::ui() -> void {
     ImGui::Text(
         "%s: %llu of %d emitters, %zu moving, %u visible", std::string{name()}.c_str(),
         static_cast<unsigned long long>(placed_), static_lights_, lights_.size(),
@@ -250,12 +242,12 @@ auto torches_scene::ui() -> void {
     );
 }
 
-auto village_scene::centre_(int32 group) const -> vec2f {
-    return spiral_point(group, village_groups(), static_cast<float32>(radius));
+auto clustered_lights_scene::centre_(int32 group) const -> vec2f {
+    return spiral_point(group, hamlets(), static_cast<float32>(radius));
 }
 
-auto village_scene::site(int32 i) const -> vec2i {
-    const int32 groups = std::max(village_groups(), 1);
+auto clustered_lights_scene::site(int32 i) const -> vec2i {
+    const int32 groups = std::max(hamlets(), 1);
 
     // Сначала группа, потом её житель: прогон, поставивший только половину
     // эмиттеров, получает начатыми все хутора, а не законченными первые.
@@ -264,7 +256,7 @@ auto village_scene::site(int32 i) const -> vec2i {
     const int32 per    = (std::max(static_lights(), 1) + groups - 1) / groups;
 
     const vec2f centre = centre_(group);
-    const vec2f offset = spiral_point(member, per, static_cast<float32>(village_spread));
+    const vec2f offset = spiral_point(member, per, static_cast<float32>(hamlet_spread));
 
     return vec2i{
         static_cast<int32>(std::lround(centre.x + offset.x)),
@@ -275,18 +267,18 @@ auto village_scene::site(int32 i) const -> vec2i {
 // В деревне движущиеся источники принадлежат хутору и ходят внутри него.
 // Отправленные по всему диску, они провели бы большую часть прогона над пустой
 // землёй, и сцена перестала бы быть той плотной, ради которой она есть.
-auto village_scene::orbit_home(std::size_t i) const -> vec2f {
-    return centre_(static_cast<int32>(i) % std::max(village_groups(), 1));
+auto clustered_lights_scene::orbit_home(std::size_t i) const -> vec2f {
+    return centre_(static_cast<int32>(i) % std::max(hamlets(), 1));
 }
 
-auto village_scene::orbit_radius(std::size_t /*i*/, float32 spread) const -> float32 {
-    return static_cast<float32>(village_spread) * (0.3f + (0.7f * spread));
+auto clustered_lights_scene::orbit_radius(std::size_t /*i*/, float32 spread) const -> float32 {
+    return static_cast<float32>(hamlet_spread) * (0.3f + (0.7f * spread));
 }
 
-auto village_scene::layout_text() const -> std::string {
+auto clustered_lights_scene::layout_text() const -> std::string {
     return std::format(
-        "{} hamlets {} voxels across, spread over a spiral", village_groups(),
-        village_spread * 2
+        "{} hamlets {} voxels across, spread over a spiral", hamlets(),
+        hamlet_spread * 2
     );
 }
 

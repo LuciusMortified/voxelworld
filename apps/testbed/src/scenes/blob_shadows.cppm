@@ -1,4 +1,4 @@
-export module vw.testbed:scenes.blobs;
+export module vw.testbed:scenes.blob_shadows;
 
 import std;
 
@@ -7,6 +7,7 @@ import vw.ecs;
 import vw.world;
 import :app;
 import :args;
+import :camera;
 import :scene;
 
 export namespace vw::testbed {
@@ -15,16 +16,21 @@ export namespace vw::testbed {
 // пятно под ними. Одно из них намеренно не отрывается от земли: судить, бледнеет
 // ли тень, когда её хозяин поднимается, по памяти невозможно, если в том же
 // кадре нет стоящего на земле.
-class blobs_scene final : public scene {
+class blob_shadows_scene final : public scene {
 public:
-    blobs_scene(testbed_app& stand, const arg_reader& args);
+    blob_shadows_scene(testbed_app& stand, const arg_reader& args);
 
     [[nodiscard]] auto name() const -> std::string_view override {
-        return "blobs";
+        return "blob-shadows";
     }
 
-    auto drive_camera() -> void override;
     auto tick(float32 delta_time) -> void override;
+
+    // Медленно по кругу, чтобы всё кольцо прошло через вид, и круче вниз, чем
+    // где-либо ещё: смотрят здесь на пятно под телом, а не на тело.
+    [[nodiscard]] auto default_camera() const -> camera_hint override {
+        return {.rig = "spin", .pitch = -25.0f, .degrees_per_frame = 0.0625f};
+    }
 
     // Кольцо встаёт колонка за колонкой, поэтому последнее тело может встать
     // позже последней колонки. Мерить кольцо, которое ещё достраивается, значит
@@ -55,12 +61,11 @@ private:
 
     auto spawn_() -> void;
 
-    // Тел в кольце: --bench-bodies.
+    // Тел в кольце: --bodies.
     int32 bodies_asked_ = 8;
 
-    bool seeded_         = false;
-    uint32 bob_frame_    = 0;
-    uint64 camera_frame_ = 0;
+    bool seeded_      = false;
+    uint32 bob_frame_ = 0;
     std::vector<bob> bodies_;
 
     // Индексы кольца, которые ещё ждут земли под собой, и одна модель на всех.

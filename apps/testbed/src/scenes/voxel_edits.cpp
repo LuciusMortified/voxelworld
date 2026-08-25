@@ -12,18 +12,12 @@ import vw.gfx;
 
 namespace vw::testbed {
 
-dig_scene::dig_scene(
+voxel_edits_scene::voxel_edits_scene(
     testbed_app& stand, const arg_reader& args
 )
-    : scene{stand}, per_frame_{args.integer("--bench-dig", 1)} {}
+    : scene{stand}, per_frame_{args.integer("--voxels-per-frame", 1)} {}
 
-auto dig_scene::drive_camera() -> void {
-    auto& camera = stand().camera();
-    camera.set_position({0.0f, stand().altitude(), 0.0f});
-    camera.set_rotation(-10.0f, 0.0f);
-}
-
-auto dig_scene::start_() -> void {
+auto voxel_edits_scene::start_() -> void {
     const auto surface = stand().grid().get_surface_y(0, 0);
     if (!surface) {
         return;
@@ -44,7 +38,7 @@ auto dig_scene::start_() -> void {
     light_base_       = wgs.get_light_stats().columns;
 }
 
-auto dig_scene::tick(float32 /*delta_time*/) -> void {
+auto voxel_edits_scene::tick(float32 /*delta_time*/) -> void {
     if (!stand().is_bench_ready()) {
         return;
     }
@@ -75,7 +69,7 @@ auto dig_scene::tick(float32 /*delta_time*/) -> void {
     }
 }
 
-auto dig_scene::collect_report(gfx::report& out) const -> void {
+auto voxel_edits_scene::collect_report(gfx::report& out) const -> void {
     if (!started_ || edits_ == 0) {
         return;
     }
@@ -92,7 +86,7 @@ auto dig_scene::collect_report(gfx::report& out) const -> void {
         return static_cast<float64>(n) / static_cast<float64>(edits_);
     };
 
-    out.section("dig")
+    out.section(name())
         .value("voxels_removed", edits_)
         .value("chunk_meshes", meshed)
         .value("meshes_per_edit", per(meshed), 2)
@@ -107,8 +101,8 @@ auto dig_scene::collect_report(gfx::report& out) const -> void {
         .value("relight_backlog", static_cast<uint64>(stats.relight_backlog));
 }
 
-auto dig_scene::ui() -> void {
-    ImGui::Text("dig: %llu voxels removed, cursor %d of %d",
+auto voxel_edits_scene::ui() -> void {
+    ImGui::Text("voxel-edits: %llu voxels removed, cursor %d of %d",
                 static_cast<unsigned long long>(edits_), cursor_, cells);
 }
 

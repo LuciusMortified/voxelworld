@@ -10,7 +10,8 @@ import vw.gfx;
 namespace vw::testbed {
 
 testbed_app::testbed_app(
-    gfx::engine& eng, const arg_reader& args, const scene_factory& make_scene
+    gfx::engine& eng, const arg_reader& args, const scene_factory& make_scene,
+    const camera_factory& make_camera
 )
     // Порядок повторяет объявление полей: иначе список врёт о том, что
     // произойдёт на самом деле, и -Wreorder-ctor это ловит.
@@ -19,8 +20,7 @@ testbed_app::testbed_app(
     // который поворачивается, обнуляет каждый каскад, и прогон мерил бы солнце,
     // а не то, что проверяют.
     , sun_in_bench_{args.flag("--sun")}
-    // Замерный прогон камеру ведёт сам; свободные режимы оставляют её мыши.
-    , drives_camera_{args.text("--bench").has_value()}
+    , benching_{args.flag("--bench")}
     , clusters_{args.flag("--cluster-stats"), args.count("--verify-lights", 0)} {
     auto& renderer = get_engine().get_renderer();
 
@@ -28,7 +28,7 @@ testbed_app::testbed_app(
     renderer.get_cluster_settings().enabled = !args.flag("--no-clusters");
 
     // Ноль оставляет движку его умолчание, для всех четырёх.
-    if (const auto visible = args.count("--bench-visible", 0); visible > 0) {
+    if (const auto visible = args.count("--max-visible-lights", 0); visible > 0) {
         renderer.get_max_visible_lights() = visible;
     }
     if (const auto tile = args.count("--cluster-tile", 0); tile > 0) {
@@ -95,6 +95,23 @@ testbed_app::testbed_app(
     // Сцена строится последней: её конструктор вправе спрашивать стенд про мир,
     // камеру и рельеф, а к этому моменту всё это уже стоит.
     scene_ = make_scene(*this);
+    rig_   = make_camera ? make_camera(*this) : scene_camera_();
+}
+
+// Путь, который сцена назначила себе сама. Имени, которого нет в таблице, здесь
+// взяться неоткуда — оно приходит из кода сцены, а не из командной строки,
+// поэтому это нарушение инварианта, а не ошибка пользователя.
+auto testbed_app::scene_camera_() -> std::unique_ptr<camera_rig> {
+    const auto wanted = scene_->default_camera().rig;
+
+    const auto factory = find_camera(wanted);
+    if (!factory) {
+        throw std::runtime_error(
+            std::format("scene '{}' asks for unknown camera '{}'", scene_->name(), wanted)
+        );
+    }
+
+    return (*factory)(*this);
 }
 
 testbed_app::~testbed_app() {
@@ -135,12 +152,8 @@ auto testbed_app::is_bench_ready() const -> bool {
 auto testbed_app::render(
     float32 delta_time
 ) -> void {
-    if (drives_camera_) {
-        if (camera_placed_) {
-            scene_->drive_camera();
-        }
-    } else {
-        camera_controller_->update(delta_time);
+    if (camera_placed_ || !rig_->needs_ground()) {
+        rig_->drive(scene_->default_camera(), delta_time);
     }
 
     try_place_camera();
@@ -153,7 +166,7 @@ auto testbed_app::render(
     }
 
     scene_->tick(delta_time);
-    clusters_.collect(get_engine().get_renderer(), !drives_camera_ || bench_ready_);
+    clusters_.collect(get_engine().get_renderer(), !benching_ || bench_ready_);
     tick_day_night_(delta_time);
 
     const auto cam_pos = get_engine().get_camera().get_position();
@@ -176,9 +189,11 @@ auto testbed_app::render(
 }
 
 auto testbed_app::collect_report(gfx::report& out) const -> void {
-    if (scene_ != nullptr) {
-        scene_->collect_report(out);
-    }
+    // Что именно мерили, прямо в отчёте: сцена и путь теперь выбираются
+    // порознь, и по одному имени файла уже не сказать, чей это прогон.
+    out.section("stand").value("scene", scene_->name()).value("camera", rig_->name());
+
+    scene_->collect_report(out);
     clusters_.collect_report(out);
 }
 

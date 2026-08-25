@@ -1,4 +1,4 @@
-export module vw.testbed:scenes.light;
+export module vw.testbed:scenes.lamp_edits;
 
 import std;
 
@@ -17,17 +17,16 @@ export namespace vw::testbed {
 // канал и оставляет канал блоков на том же нуле, где он и был. Что эта сцена
 // на самом деле оценивает — это число квадов: лампа кладёт градиент на каждую
 // поверхность в четырнадцати вокселях, а градиент стоит квадов, потому что
-// уровень входит в ключ слияния. Прогнать дважды, второй раз с --bench-inert, и
+// уровень входит в ключ слияния. Прогнать дважды, второй раз с --inert, и
 // разница будет ценой света, а не блока.
-class light_scene final : public scene {
+class lamp_edits_scene final : public scene {
 public:
-    light_scene(testbed_app& stand, const arg_reader& args);
+    lamp_edits_scene(testbed_app& stand, const arg_reader& args);
 
     [[nodiscard]] auto name() const -> std::string_view override {
-        return "light";
+        return "lamp-edits";
     }
 
-    auto drive_camera() -> void override;
     auto tick(float32 delta_time) -> void override;
     auto collect_report(gfx::report& out) const -> void override;
     auto ui() -> void override;
@@ -43,11 +42,10 @@ private:
 
     auto start_() -> void;
 
-    // Ламп за кадр: --bench-lamps. Тот же ключ читает и torches — обе ставят
-    // светящие блоки, просто с разными целями.
+    // Ламп за кадр: --lamps-per-frame.
     int32 per_frame_ = 1;
 
-    // --bench-inert: контрольный прогон теми же правками и той же геометрией,
+    // --inert: контрольный прогон теми же правками и той же геометрией,
     // но блоком, который не светит.
     bool inert_ = false;
 
@@ -65,7 +63,7 @@ private:
 
     // Что построил стриминг, пока эмиттеров не было нигде. Прогон ниже
     // сравнивают с этим, и сравнение честно лишь до известного предела: это не
-    // те же чанки. Честное сравнение — два прогона, один из них --bench-inert.
+    // те же чанки. Честное сравнение — два прогона, один из них --inert.
     float64 quads_per_chunk_base_ = 0.0;
 };
 

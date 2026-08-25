@@ -12,18 +12,12 @@ import vw.gfx;
 
 namespace vw::testbed {
 
-crowd_scene::crowd_scene(
+animated_crowd_scene::animated_crowd_scene(
     testbed_app& stand, const arg_reader& args
 )
-    : scene{stand}, size_{args.count("--bench-crowd", 50)} {}
+    : scene{stand}, size_{args.count("--bodies", 50)} {}
 
-auto crowd_scene::drive_camera() -> void {
-    auto& camera = stand().camera();
-    camera.set_position({0.0f, stand().altitude() + 60.0f, 260.0f});
-    camera.set_rotation(-15.0f, 180.0f);
-}
-
-auto crowd_scene::on_world_ready() -> void {
+auto animated_crowd_scene::on_world_ready() -> void {
     if (spawned_ || size_ == 0) {
         return;
     }
@@ -32,7 +26,7 @@ auto crowd_scene::on_world_ready() -> void {
     spawned_ = true;
 }
 
-auto crowd_scene::tick(float32 /*delta_time*/) -> void {
+auto animated_crowd_scene::tick(float32 /*delta_time*/) -> void {
     if (bodies_.empty()) {
         return;
     }
@@ -41,7 +35,7 @@ auto crowd_scene::tick(float32 /*delta_time*/) -> void {
     }
 }
 
-auto crowd_scene::make_clip_(
+auto animated_crowd_scene::make_clip_(
     ecs::world& world
 ) -> std::shared_ptr<asset::animation_clip> {
     auto& clips = world.resource<asset::animation_clip_registry>();
@@ -63,7 +57,7 @@ auto crowd_scene::make_clip_(
     return clip;
 }
 
-auto crowd_scene::spawn_(float32 ground_y) -> void {
+auto animated_crowd_scene::spawn_(float32 ground_y) -> void {
     auto& world    = stand().world();
     auto& registry = world.resource<asset::model_registry>();
 
@@ -157,11 +151,11 @@ auto crowd_scene::spawn_(float32 ground_y) -> void {
         bodies_.push_back(root);
     }
 
-    log::info("crowd: {} bodies, {} entities", size_, bodies_.size());
+    log::info("animated-crowd: {} bodies, {} entities", size_, bodies_.size());
 }
 
-auto crowd_scene::ui() -> void {
-    ImGui::Text("crowd: %u bodies, %zu entities, settled %u/%u", size_, bodies_.size(),
+auto animated_crowd_scene::ui() -> void {
+    ImGui::Text("animated-crowd: %u bodies, %zu entities, settled %u/%u", size_, bodies_.size(),
                 settle_frames_, settle_target);
 }
 

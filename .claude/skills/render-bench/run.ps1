@@ -1,23 +1,26 @@
 <#
 .SYNOPSIS
-    Прогоняет testbed по списку сцен и складывает отчёты в каталог.
+    Прогоняет testbed по списку прогонов и складывает отчёты в каталог.
 
 .DESCRIPTION
-    Берёт на себя три вещи, без которых замер молча не состоится: опции с
-    "=", рабочий каталог рядом с экзешником (шейдеры ищутся от него) и окно
-    на переднем плане (свёрнутое не презентует, и кадры не идут вовсе).
+    Берёт на себя три вещи, без которых замер молча не состоится: ключ
+    "--bench", рабочий каталог рядом с экзешником (шейдеры ищутся от него) и
+    окно на переднем плане (свёрнутое не презентует, и кадры не идут вовсе).
 
 .EXAMPLE
     pwsh .claude/skills/render-bench/run.ps1 -OutDir bench/before
-    pwsh .claude/skills/render-bench/run.ps1 -OutDir bench/after -Scenes parked,torches -Frames 600
+    pwsh .claude/skills/render-bench/run.ps1 -OutDir bench/after -Runs terrain:parked,standing-lights -Frames 600
 #>
 param(
-    [string[]]$Scenes = @('parked', 'spin', 'advance', 'flythrough'),
+    # Прогон -- это сцена и путь камеры через двоеточие. Имя без двоеточия
+    # означает путь, который сцена назначила себе сама.
+    [string[]]$Runs = @('terrain:parked', 'terrain:spin', 'terrain:walk', 'terrain:orbit'),
+
     [Parameter(Mandatory)][string]$OutDir,
     [int]$Frames = 2000,
     [int]$Warmup = 200,
 
-    # Прочие опции приложения как есть, например '--bench-dynamic=256'.
+    # Прочие опции приложения как есть, например '--moving-lights=256'.
     [string[]]$Extra = @(),
 
     [string]$ExeDir = 'build/release/apps/testbed',
@@ -40,16 +43,17 @@ $outFull = (Resolve-Path $OutDir).Path
 
 $shell = New-Object -ComObject WScript.Shell
 
-function Invoke-Scene([string]$scene, [string]$report) {
-    $args = @("--bench=$scene", "--bench-frames=$Frames", "--bench-warmup=$Warmup")
+function Invoke-Run([string]$scene, [string]$camera, [string]$report) {
+    $argv = @("--scene=$scene", '--bench', "--bench-frames=$Frames", "--bench-warmup=$Warmup")
+    if ($camera) { $argv += "--camera=$camera" }
     if ($report) {
-        $args += "--bench-out=$report"
+        $argv += "--bench-out=$report"
         # Тот же прогон деревом, рядом с таблицами: человеку txt, разбору json.
-        $args += "--bench-json=$([System.IO.Path]::ChangeExtension($report, 'json'))"
+        $argv += "--bench-json=$([System.IO.Path]::ChangeExtension($report, 'json'))"
     }
-    $args += $Extra
+    $argv += $Extra
 
-    $proc = Start-Process -FilePath $exe -WorkingDirectory $exeDirFull -ArgumentList $args -PassThru
+    $proc = Start-Process -FilePath $exe -WorkingDirectory $exeDirFull -ArgumentList $argv -PassThru
     $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 
     while (-not $proc.HasExited -and (Get-Date) -lt $deadline) {
@@ -59,22 +63,27 @@ function Invoke-Scene([string]$scene, [string]$report) {
 
     if (-not $proc.HasExited) {
         $proc | Stop-Process -Force
-        throw "$scene не завершилась за $TimeoutSeconds с. Первый подозреваемый -- опция без '=': тогда бенч не включается и приложение работает как обычное окно."
+        throw "$scene не завершилась за $TimeoutSeconds с. Первые подозреваемые -- потерянный '--bench' и опция без '=': в обоих случаях замер не включается и приложение работает как обычное окно."
     }
 
     return $proc.ExitCode
 }
 
-foreach ($scene in $Scenes) {
+foreach ($run in $Runs) {
+    $parts  = $run.Split(':')
+    $scene  = $parts[0]
+    $camera = if ($parts.Count -gt 1) { $parts[1] } else { '' }
+    $label  = if ($camera) { "$scene-$camera" } else { $scene }
+
     for ($i = 0; $i -lt $Warmups; $i++) {
-        Write-Host "$scene -- прогрев $($i + 1)/$Warmups (отчёт выбрасывается)"
-        $null = Invoke-Scene $scene ''
+        Write-Host "$label -- прогрев $($i + 1)/$Warmups (отчёт выбрасывается)"
+        $null = Invoke-Run $scene $camera ''
     }
 
-    $report = Join-Path $outFull "$scene.txt"
-    Write-Host "$scene -- замер в $report"
+    $report = Join-Path $outFull "$label.txt"
+    Write-Host "$label -- замер в $report"
 
-    $code = Invoke-Scene $scene $report
+    $code = Invoke-Run $scene $camera $report
     if ($code -ne 0) { Write-Host "  код возврата $code" -ForegroundColor Yellow }
 
     $line = Get-Content -LiteralPath $report | Select-String -Pattern '^fps at median frame:'
@@ -82,4 +91,4 @@ foreach ($scene in $Scenes) {
 }
 
 Write-Host "`nотчёты в $outFull"
-Write-Host "сравнить: pwsh .claude/skills/render-bench/compare.ps1 -Before <до>/<сцена>.txt -After $OutDir/<сцена>.txt"
+Write-Host "сравнить: pwsh .claude/skills/render-bench/compare.ps1 -Before <до>/<прогон>.txt -After $OutDir/<прогон>.txt"

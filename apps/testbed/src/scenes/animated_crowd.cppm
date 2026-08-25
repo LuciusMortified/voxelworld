@@ -1,4 +1,4 @@
-export module vw.testbed:scenes.crowd;
+export module vw.testbed:scenes.animated_crowd;
 
 import std;
 
@@ -7,6 +7,7 @@ import vw.ecs;
 import vw.world;
 import :app;
 import :args;
+import :camera;
 import :scene;
 
 export namespace vw::testbed {
@@ -17,16 +18,21 @@ export namespace vw::testbed {
 // Тела сбрасываются в воздухе и должны приземлиться до того, как их начнут
 // мерить: пойманные в падении, они кладут в каждый прогон разное количество
 // работы, и разброс топит то, ради чего сцена существует.
-class crowd_scene final : public scene {
+class animated_crowd_scene final : public scene {
 public:
-    crowd_scene(testbed_app& stand, const arg_reader& args);
+    animated_crowd_scene(testbed_app& stand, const arg_reader& args);
 
     [[nodiscard]] auto name() const -> std::string_view override {
-        return "crowd";
+        return "animated-crowd";
     }
 
-    auto drive_camera() -> void override;
     auto tick(float32 delta_time) -> void override;
+
+    // Единственная сцена, которую смотрят со стороны: толпу видно только тогда,
+    // когда камера отошла от неё и развернулась.
+    [[nodiscard]] auto default_camera() const -> camera_hint override {
+        return {.offset = {0.0f, 60.0f, 260.0f}, .pitch = -15.0f, .yaw = 180.0f};
+    }
     auto on_world_ready() -> void override;
 
     [[nodiscard]] auto is_ready() const -> bool override {
@@ -47,7 +53,7 @@ private:
 
     auto spawn_(float32 ground_y) -> void;
 
-    // Тел: --bench-crowd. Полсотни по умолчанию — столько эта сцена и мерила,
+    // Тел: --bodies. Полсотни по умолчанию — столько эта сцена и мерила,
     // когда размер задавался снаружи.
     uint32 size_ = 50;
 

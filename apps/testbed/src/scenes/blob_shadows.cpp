@@ -12,19 +12,12 @@ import vw.gfx;
 
 namespace vw::testbed {
 
-blobs_scene::blobs_scene(
+blob_shadows_scene::blob_shadows_scene(
     testbed_app& stand, const arg_reader& args
 )
-    : scene{stand}, bodies_asked_{args.integer("--bench-bodies", 8)} {}
+    : scene{stand}, bodies_asked_{args.integer("--bodies", 8)} {}
 
-// Медленно по кругу, чтобы всё кольцо прошло через вид.
-auto blobs_scene::drive_camera() -> void {
-    auto& camera = stand().camera();
-    camera.set_position({0.0f, stand().altitude(), 0.0f});
-    camera.set_rotation(-25.0f, static_cast<float32>(camera_frame_++) * 0.25f * 0.25f);
-}
-
-auto blobs_scene::spawn_() -> void {
+auto blob_shadows_scene::spawn_() -> void {
     if (seeded_ && pending_.empty()) {
         return;
     }
@@ -132,13 +125,13 @@ auto blobs_scene::spawn_() -> void {
 
     if (pending_.empty()) {
         log::info(
-            "blobs: {} bodies of {} asked on a ring of {} voxels", bodies_.size(), bodies_asked_,
+            "blob-shadows: {} bodies of {} asked on a ring of {} voxels", bodies_.size(), bodies_asked_,
             ring
         );
     }
 }
 
-auto blobs_scene::tick(float32 /*delta_time*/) -> void {
+auto blob_shadows_scene::tick(float32 /*delta_time*/) -> void {
     spawn_();
 
     if (bodies_.empty()) {
@@ -156,8 +149,8 @@ auto blobs_scene::tick(float32 /*delta_time*/) -> void {
     }
 }
 
-auto blobs_scene::ui() -> void {
-    ImGui::Text("blobs: %zu bodies of %d asked", bodies_.size(), bodies_asked_);
+auto blob_shadows_scene::ui() -> void {
+    ImGui::Text("blob-shadows: %zu bodies of %d asked", bodies_.size(), bodies_asked_);
 }
 
 }  // namespace vw::testbed

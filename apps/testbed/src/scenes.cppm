@@ -1,12 +1,12 @@
 export module vw.testbed:scenes;
 
 // Собирает сцены стенда и таблицу, по которой их выбирает командная строка.
-export import :scenes.traverse;
-export import :scenes.dig;
-export import :scenes.light;
-export import :scenes.torches;
-export import :scenes.blobs;
-export import :scenes.crowd;
+export import :scenes.terrain;
+export import :scenes.voxel_edits;
+export import :scenes.lamp_edits;
+export import :scenes.standing_lights;
+export import :scenes.blob_shadows;
+export import :scenes.animated_crowd;
 
 import std;
 
@@ -23,7 +23,7 @@ export namespace vw::testbed {
     -> std::optional<scene_factory>;
 
 // Для сообщения об ошибке: раньше имя, не совпавшее ни с одним, молча давало
-// flythrough, и опечатка была не ошибкой, а другой сценой.
+// облёт пустого рельефа, и опечатка была не ошибкой, а другой сценой.
 [[nodiscard]] auto scene_names() -> std::vector<std::string_view>;
 
 }  // namespace vw::testbed

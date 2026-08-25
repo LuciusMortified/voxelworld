@@ -10,17 +10,20 @@ target_sources(${PROJECT_NAME}
             src/testbed.cppm
             src/args.cppm
             src/scene.cppm
+            src/camera.cppm
+            src/cameras.cppm
             src/probes/clusters.cppm
             src/app.cppm
             src/scenes.cppm
-            src/scenes/traverse.cppm
-            src/scenes/dig.cppm
-            src/scenes/light.cppm
-            src/scenes/torches.cppm
-            src/scenes/blobs.cppm
-            src/scenes/crowd.cppm
+            src/scenes/terrain.cppm
+            src/scenes/voxel_edits.cppm
+            src/scenes/lamp_edits.cppm
+            src/scenes/standing_lights.cppm
+            src/scenes/blob_shadows.cppm
+            src/scenes/animated_crowd.cppm
     PRIVATE
         src/main.cpp
+        src/cameras.cpp
         src/scenes.cpp
         src/probes/clusters.cpp
         src/app/app.cpp
@@ -28,12 +31,11 @@ target_sources(${PROJECT_NAME}
         src/app/daynight.cpp
         src/app/editing.cpp
         src/app/ui.cpp
-        src/scenes/traverse.cpp
-        src/scenes/dig.cpp
-        src/scenes/light.cpp
-        src/scenes/torches.cpp
-        src/scenes/blobs.cpp
-        src/scenes/crowd.cpp
+        src/scenes/voxel_edits.cpp
+        src/scenes/lamp_edits.cpp
+        src/scenes/standing_lights.cpp
+        src/scenes/blob_shadows.cpp
+        src/scenes/animated_crowd.cpp
 )
 
 target_link_libraries(${PROJECT_NAME} PRIVATE vwengine imgui::imgui)

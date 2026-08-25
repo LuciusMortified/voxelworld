@@ -9,6 +9,7 @@ import vw.platform;
 import vw.gfx;
 
 import :args;
+import :camera;
 import :probes.clusters;
 import :scene;
 
@@ -62,7 +63,12 @@ struct voxel_pick {
 // конструкторе.
 class testbed_app final : public gfx::app {
 public:
-    testbed_app(gfx::engine& eng, const arg_reader& args, const scene_factory& make_scene);
+    // Риг строится после сцены и потому приходит фабрикой: пустая означает
+    // «взять тот путь, который сцена сама себе назначила».
+    testbed_app(
+        gfx::engine& eng, const arg_reader& args, const scene_factory& make_scene,
+        const camera_factory& make_camera
+    );
     ~testbed_app() override;
 
     testbed_app(const testbed_app&)                    = delete;
@@ -88,6 +94,12 @@ public:
     [[nodiscard]] auto renderer() const -> gfx::renderer&;
     [[nodiscard]] auto camera() const -> gfx::camera&;
 
+    // Камера человека: ею ходит свободный риг, ею же интерфейс спрашивает, не
+    // захвачен ли курсор.
+    [[nodiscard]] auto camera_controller() const -> gfx::free_camera_controller& {
+        return *camera_controller_;
+    }
+
     [[nodiscard]] auto grid() const -> ecs::world_grid& {
         return *world_grid_;
     }
@@ -103,8 +115,8 @@ public:
         return generator_params_.voxel_scale;
     }
 
-    // Высота, на которой стоит камера бенча: земля над началом координат плюс
-    // просвет. Известна только после того, как колонка под камерой загрузилась.
+    // Земля над началом координат: от неё риг отмеряет свой путь. Известна
+    // только после того, как колонка под камерой загрузилась.
     [[nodiscard]] auto altitude() const -> float32 {
         return bench_altitude_;
     }
@@ -117,10 +129,11 @@ public:
     // догрузился.
     [[nodiscard]] auto streaming_settled() const -> bool;
 
-    // Сцена ведёт камеру сама, если стенд в режиме замера. Свободные режимы
-    // (--lights, --blobs) оставляют камеру человеку.
-    [[nodiscard]] auto drives_camera() const -> bool {
-        return drives_camera_;
+    // Идёт замер: шаг мира фиксирован, кадры сочтены, отчёт будет записан. Всё,
+    // что в сцене движется, шагает тогда по номеру кадра, а не по часам — иначе
+    // сцена на каждой машине разная и мерить её нельзя.
+    [[nodiscard]] auto benching() const -> bool {
+        return benching_;
     }
 
     // Куб светящих блоков, вкопанный в землю под камерой: сцены ставят им своё
@@ -130,6 +143,7 @@ public:
 private:
     auto setup_world_grid() -> void;
     auto try_place_camera() -> void;
+    [[nodiscard]] auto scene_camera_() -> std::unique_ptr<camera_rig>;
 
     auto tick_day_night_(float32 delta_time) -> void;
     auto apply_time_of_day_() -> void;
@@ -175,13 +189,17 @@ private:
     float32 bench_altitude_   = 0.0f;
     mutable bool bench_ready_ = false;
     bool world_ready_         = false;
-    bool drives_camera_       = false;
+    bool benching_            = false;
 
     cluster_probe clusters_;
 
     // Строится последней: конструктор сцены вправе спрашивать стенд про мир и
     // камеру, а к этому моменту всё остальное уже стоит.
     std::unique_ptr<scene> scene_;
+
+    // И риг — после неё: без ключа путь берётся тот, который назначила себе
+    // сцена.
+    std::unique_ptr<camera_rig> rig_;
 };
 
 }  // namespace vw::testbed
