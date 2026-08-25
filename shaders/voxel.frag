@@ -415,17 +415,19 @@ vec3 calculatePointLight(uint lightIndex, vec3 fragPos) {
     return light.color.xyz * pow(raw, ubo.lamp_params.w);
 }
 
-// How much of the light from above a body standing here is keeping off the
-// ground. Returns a multiplier, one where nothing is over the ground.
+// How much of the light around a body standing here it is keeping off this
+// surface. Returns a multiplier, one where nothing is near.
 //
-// Straight down and nothing else: no ray to the floor, so nothing to break on a
-// staircase or a slope, and at the edge of a cliff it stops by itself because
-// the ground it would have darkened is not there to darken.
+// No ray anywhere: nothing to break on a staircase or a slope, and at the edge
+// of a cliff it stops by itself because the ground it would have darkened is
+// not there to darken.
 float blobShadow(vec3 fragPos, vec3 normal) {
-    // Only the floor. max(n.y, 0) keeps the patch off the walls, which is what
-    // separates this from a decal projected down a wall it never touched.
-    float facing = max(normal.y, 0.0);
-    if (facing <= 0.0) {
+    // A face looking down is behind every body that could be over it, and voxel
+    // normals are axis-aligned, so this one test spares every ceiling in the
+    // frame the whole loop. Which way the others face is settled per body
+    // below: a wall next to a body is turned towards it, and it used to be that
+    // the patch stopped dead where the floor met it.
+    if (normal.y < -0.5) {
         return 1.0;
     }
 
@@ -453,7 +455,8 @@ float blobShadow(vec3 fragPos, vec3 normal) {
         vec4 body = blobs.items[i].position_radius;
         vec4 p    = blobs.items[i].params;
 
-        float fall = max(p.x, 0.001);
+        float fall   = max(p.x, 0.001);
+        float height = max(p.z, 0.001);
 
         // What a sphere the size of the body looks like from this piece of
         // ground. It narrows as one over one plus the height, and darkens as
@@ -471,23 +474,36 @@ float blobShadow(vec3 fragPos, vec3 normal) {
 
         float d = length(fragPos.xz - body.xz) / max(body.w * shrink, 0.001);
 
-        // Everything under the body, and the body itself spared. The ramp
-        // hangs off the head rather than the feet, because the ground a body
-        // stands on is often not level with its feet -- it straddles two
-        // columns of terrain, one of them a voxel or two higher, and against a
-        // rule measured from the feet that higher one lost its patch. On a
-        // bobbing body it lost and regained it every jump, which is what the
-        // flicker was.
+        // How high the body stands over this piece of ground: the sine of the
+        // angle its middle is seen at. One straight underneath, nothing at all
+        // for ground level with the middle, and every value between them along
+        // the way -- an angle, so there is no threshold anywhere in it and
+        // nothing that a jump can step over.
         //
-        // Ground up to two thirds of the way up the body keeps the whole patch.
-        // Above that it tapers out, so the body's own top face -- which points
-        // up like the ground does and is inside the disc -- gets none of it.
-        // Anything horizontal in between, a shoulder or an outstretched arm,
-        // takes part of the taper; that is the price of the rule, and it is
-        // cheaper than the flicker.
-        float height = max(p.z, 0.001);
-        float band   = 0.35 * height;
-        float over   = clamp((fragPos.y - (body.y + height - band)) / band, 0.0, 1.0);
+        // The rule this replaces was a taper hung off the head of the body,
+        // and it had the sign wrong. Ground abreast of the body sat inside the
+        // full patch, so a stride of stairs beside a standing figure went dark
+        // to chest height; and since the taper moved with the head, a jump
+        // dragged it upwards and made the patch on that stair stronger while
+        // the one under the feet faded. Two neighbouring faces answered one
+        // jump in opposite directions, and the flicker was that disagreement.
+        //
+        // The body's own top face, which points up like the ground does and
+        // lies inside the disc, is above the middle and so gets nothing. That
+        // is what the taper was for; the angle spares it without being told,
+        // and spares a shoulder and an outstretched arm with it.
+        //
+        // And how much of this surface the body stands in front of, which for
+        // the floor is the same number over again and for a wall is what used
+        // to be zero. Both are kept: the cosine alone would leave a wall a
+        // hundred units over a body still three percent dark, and a patch whose
+        // reach up has no end cannot be put in a list of the clusters it
+        // touches. See blob_buffer, where the column now stops at the middle.
+        vec3  toBody = vec3(body.x, body.y + (0.5 * height), body.z) - fragPos;
+        vec3  dir    = toBody * inversesqrt(max(dot(toBody, toBody), 0.0001));
+
+        float above = max(dir.y, 0.0);
+        float lean  = max(dot(normal, dir), 0.0);
 
         // And the end of the reach. The falloff above never reaches zero, and
         // nothing unbounded can be put in a list of the clusters it touches --
@@ -497,7 +513,7 @@ float blobShadow(vec3 fragPos, vec3 normal) {
         float reach = max(p.w, 0.001);
         float tail  = 1.0 - smoothstep(0.75, 1.0, rise / reach);
 
-        float a = (1.0 - smoothstep(0.6, 1.0, d)) * shrink * shrink * (1.0 - over) * tail * p.y;
+        float a = (1.0 - smoothstep(0.6, 1.0, d)) * shrink * shrink * above * lean * tail * p.y;
 
         // The darkest wins rather than the sum. Two bodies shoulder to shoulder
         // should stand on one patch of shade, not bore a hole through the floor
@@ -505,7 +521,7 @@ float blobShadow(vec3 fragPos, vec3 normal) {
         darkest = max(darkest, a);
     }
 
-    return 1.0 - clamp(darkest * facing * ubo.blob_strength, 0.0, 1.0);
+    return 1.0 - clamp(darkest * ubo.blob_strength, 0.0, 1.0);
 }
 
 // Everything that is not a light: sky from above, ground bounce from below.
@@ -666,12 +682,23 @@ void main() {
     // cascades out was for. Turning SHADOW_ENABLED back on would put two
     // occluders on one light and darken every overhang twice; whichever of the
     // two is kept, it has to be one.
-    // On the sky and on the sun, and on nothing else. The patch is a stand-in
-    // for the shadow a body casts in daylight, so it belongs to the light that
-    // comes from above. Laying it over the point lights as well would have a
-    // character dimming the torch in its own hand; over the block channel it
-    // would put a dark ring round every lamp somebody walked past; over
-    // emissive it would shade a light source by standing near it.
+    // On every light in the sum, applied once where they meet. A surface does
+    // not care which light it was that failed to reach it, and while the patch
+    // rode on the sky and the sun alone, a body standing in lamplight cast no
+    // shade at all: the ground by an emitter is lit through the channel the
+    // patch did not touch, and the figure over it read as pasted on.
+    //
+    // The bill is real and worth naming. The patch is round and sits under the
+    // body, while the shadow of a point source is thrown away from it -- so a
+    // lamp walked past gets a dark ring rather than a shadow leaning off, and a
+    // torch carried in a hand is dimmed by the hand carrying it. A shadow that
+    // leans away from each source is different work: a segment tested against
+    // the body's capsule, bodies times sources per pixel, and that is what this
+    // one round patch is instead of.
+    //
+    // Emissive stays outside it, below and on its own: a glowing voxel is a
+    // source and not a lit surface, and shading it would be saying that lava
+    // shines less with somebody standing next to it.
     //
     // cave_ambient rides along inside sky, which is right enough: a body in a
     // cave should not float either, and there is so little of that term that
@@ -679,13 +706,13 @@ void main() {
     float blob = blobShadow(fragPos, normal);
 
     vec3 sky = mix(ubo.cave_ambient.rgb, calculateHemisphereAmbient(normal), skyReach);
-    vec3 ambient = sky * aoFactor * blob;
+    vec3 ambient = sky * aoFactor;
 
     // AO is deliberately not here. It measures how much of the surroundings a
     // point can see, so it belongs to the light that arrives from the
     // surroundings; over the sun it counts the same occlusion twice and grimes
     // up every corner the sun shines straight into.
-    vec3 directional = calculateDirectionalLight(normal, shadow) * sunReach * blob;
+    vec3 directional = calculateDirectionalLight(normal, shadow) * sunReach;
 
     // AO is here, and belongs here: a baked lamp is light arriving from the
     // surroundings exactly as the sky is, and the corner it cannot reach into
@@ -716,7 +743,7 @@ void main() {
     // No rim term and no edge term. Both sat at 0.01, which is invisible, and
     // the edge one never reached the sum at all. Nothing here is a stand-in for
     // something else any more: every term is a light with an occluder.
-    vec3 lighting = (ambient + directional + lamp + pointLighting) * convexFactor;
+    vec3 lighting = (ambient + directional + lamp + pointLighting) * convexFactor * blob;
     vec3 result = lighting * fragColor.rgb;
 
     // Emissive, and outside everything on purpose. No AO, no convexity, no sky
